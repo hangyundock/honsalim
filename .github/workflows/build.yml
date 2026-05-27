@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python 3.10
-        uses: actions/setup-python@v5  # [관찰] 작성 시점 stable
+        uses: actions/setup-python@v6  # [관찰] 작성 시점 stable
         with:
           python-version: "3.10"
           cache: "pip"
