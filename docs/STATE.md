@@ -7,8 +7,10 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 0: 설계 완료 → Phase 1 인프라 대기** | #2 (2026-05-27) |
+| 진행 단계 | **Phase 1 인프라 70% 진행 중** (외부 계정·도메인·인프라·Git 완료, 일부 보류) | #2 (2026-05-28) |
 | 운영 모델 갱신 (세션 #2 후반) | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건 + GitHub 보안 다중 방어 | #2 |
+| Phase 1 외부 작업 완료 | GitHub(2FA·보안 5종) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic 키 · secrets .env 2종 · Git init·push (commit b413803) · 알리 가입 신청 | #2 |
+| Phase 1 보류·대기 | BitLocker (사용자 결정) · 쿠팡 (Phase 4 후 콘텐츠 누적) · 알리 심사 대기 (1~2일) · detect-secrets baseline 디버깅 · Branch Protection | #2 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (PLAN·ARCH·DB·SCENARIOS·DESIGN·FRONTEND·BACKEND·POLICY·OPS·BACKUP·MAINTENANCE·SCHEDULE + SUMMARY 비개발자 요약) | #2 |
 | 일관성 점검 | ✅ 모순 0건 (167+73+44+34+211+43회 일관 인용) | #2 |
 | 사전 작성 SQL | `sql/migrations/001_initial_schema.sql` + `sql/seeds/001_personas_scenarios.sql` | #2 |
@@ -32,19 +34,26 @@
 | archive 폴더 | `D:\affiliate_hub\docs\archive\` |
 | 슬래시 명령 | `D:\affiliate_hub\.claude\commands\` |
 | 사이트명 | 혼살림 (Honsalim) |
-| 도메인 | honsalim.com (구매 전, Phase 1) |
-| 호스팅 | Cloudflare Pages (계정 미생성, Phase 1) |
-| GitHub 저장소 | 미생성 (Phase 1) |
+| 도메인 | **honsalim.com 등록 완료** (만료 2027-05-28·Auto Renew·SSL Active) |
+| 호스팅 | **Cloudflare Pages `honsalim` 프로젝트 생성** + Custom domain honsalim.com 연결 (Dugi2020@naver.com 계정) |
+| GitHub 저장소 | **`hangyundock/honsalim` Public 생성·첫 push 완료 (b413803)** |
+| R2 버킷 | **`honsalim-images` (APAC)** |
+| D1 DB | **`honsalim-clicks` ID: 9bae858e-456f-40e7-8084-c3b90e4ec3ca** |
 | Python 환경 | 3.10 32-bit (시스템 공유, TIMA·AutoBlog 동일) |
 | DB | `data/honsalim.db` (미생성, Phase 2) |
 | 로그 | `logs/honsalim.log` (미생성, Phase 2) |
-| secrets | `D:\secrets\affiliate_hub\` (미생성, Phase 1) |
+| secrets | **`D:\secrets\affiliate_hub\` 생성·자격증명 보관 중** (cloudflare.env·claude.env·github 복구 코드·cloudflare 복구 코드) |
 
 ## 자격증명 만료 (시급 사안)
 
 | 자격증명 | 발급 | 만료 | 갱신 |
 |---------|------|------|------|
-| (아직 없음 — Phase 1에서 발급) | — | — | — |
+| 도메인 honsalim.com | 2026-05-28 | 2027-05-28 | Auto Renew (D-60) |
+| Cloudflare API Token | 2026-05-28 | 미정 | 6개월 회전 권장 (I7) |
+| Anthropic API Key | 기존 보유 | 영구 | 6개월 회전 권장 (I7) |
+| GitHub PAT | 미발급 | — | Actions 사용 시 발급 |
+| AliExpress Portals | 2026-05-28 신청 | 심사 대기 | — |
+| 쿠팡 파트너스 | 보류 | — | Phase 4 (콘텐츠 누적 후) 재가입 |
 
 ## 보안 / 권한
 

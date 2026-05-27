@@ -8,6 +8,7 @@
 
 - **A1. 사이트명**: 혼살림 (Honsalim) — 세션 #1
 - **A2. 도메인**: honsalim.com (Cloudflare Registrar, 마진 0) — 세션 #1
+  - **세션 #2 (2026-05-28) 등록 완료**: 만료 2027-05-28·Auto Renew ON·SSL Active·Custom domain 연결
 - **A3. 분야**: 1인 가구·자취·홈오피스·일상살림 (비YMYL) — 세션 #1
 - **A4. 타겟 언어**: 한국어 단일 (영어 확장은 6개월 후 검토) — 세션 #1
 - **A5. 컨셉**: 시나리오 추천 + 특화 결합 (페르소나×예산×시나리오) — 세션 #1
@@ -25,6 +26,10 @@
 - **B8. 이미지 호스팅**: Cloudflare R2 (10GB 무료) + Pages 정적 자산 — G3 조사
 - **B9. 한글 폰트**: Pretendard 권장 (G1 조사 + DESIGN 추후 확정)
 - **B10. 한국 응답 속도**: Cloudflare 서울 PoP (ICN) 보유 — G1 조사 [확정]
+- **B11. Cloudflare 계정**: `Dugi2020@naver.com` 기존 사용 (kfood-buddy·kdrama-api와 동일 계정) — 세션 #2
+- **B12. D1 DB**: `honsalim-clicks` ID `9bae858e-456f-40e7-8084-c3b90e4ec3ca` — 세션 #2
+- **B13. R2 버킷**: `honsalim-images` (APAC) — 세션 #2
+- **B14. Pages 프로젝트**: `honsalim` (placeholder 배포·honsalim.com 연결) — 세션 #2
 
 ## C. 운영 모델 [확정]
 
@@ -41,7 +46,9 @@
 ## D. 어필리에이트·수익 [확정]
 
 - **D1. 메인 어필리에이트**: 쿠팡 파트너스 — 세션 #1
+  - **세션 #2 정정**: 사용자 회원 탈퇴 + 쿠팡 정책 [확정 — 쿠팡 공식]: 콘텐츠 있는 승인 URL만 광고 가능 → **Phase 4 출시 후 재가입** (콘텐츠 누적 의존)
 - **D2. 보조 어필리에이트**: AliExpress Portals — 세션 #1
+  - **세션 #2 임시 우선순위 변경**: 쿠팡 가입 보류로 D2 알리 먼저 진행. 가입 신청 완료 (2026-05-28 심사 대기). honsalim.com이 "ali" 문자열 충돌로 거부 → primary site 임시 우회 (kcontenthubblog 사용·승인 후 honsalim.com secondary 추가 예정)
 - **D3. AdSense**: 6개월 후 트래픽·수익 보고 재결정 — 세션 #1
 - **D4. 사업자 등록**: 월 10만원 누적 후 (간이과세자, 광고대행업 743002) — 세션 #1
 - **D5. 이미지 전략**: 글당 추천 상품 5~10개 + 사용자 직접 사진 1~3장 + 쿠팡 공식 위젯 — 세션 #1
@@ -86,7 +93,8 @@
 
 ## I. 보안 강화 [확정] — 세션 #2 신규
 
-- **I1. GitHub 보안 파일 차단 다중 방어**: (1) `.gitignore` 엄격 (2) **pre-commit hook (gitleaks 또는 detect-secrets)** (3) **GitHub Secret Scanning 활성** (4) Repository Settings 보호 — 세션 #2
+- **I1. GitHub 보안 파일 차단 다중 방어**: (1) `.gitignore` 엄격 (2) **pre-commit hook = detect-secrets** (gitleaks는 V3 백신 차단으로 폐기, 세션 #2 확정) (3) **GitHub Secret Scanning + Push Protection 활성** (4) Repository Settings 보호 — 세션 #2
+  - **세션 #2 보강**: GitHub Advanced Security 활성 — Private vulnerability reporting·Dependency graph·Dependabot alerts/security updates/grouped/malware/version updates(dependabot.yml 작성)·CodeQL(lint.yml)·Copilot Autofix·Push protection 모두 ON
 - **I2. 보안 헤더 의무**: CSP + HSTS + X-Content-Type-Options + X-Frame-Options + Referrer-Policy + Permissions-Policy 모두 적용 (Cloudflare Pages `_headers`) — 세션 #2
 - **I3. 외부 계정 2FA 의무**: GitHub·Cloudflare·쿠팡·Anthropic·도메인 Registrar 모두 2FA (TOTP 또는 보안 키) 활성 — 세션 #2
 - **I4. 의존성 보안 자동화**: GitHub Dependabot Alerts + pip-audit 월 1회 + npm audit (wrangler) 분기 1회 — 세션 #2

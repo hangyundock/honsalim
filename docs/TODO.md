@@ -14,13 +14,30 @@
   - POLICY §6-1 외부 단축 URL 차단 목록 추가/제외 검토
 - [ ] Phase 1 진입 사용자 명시 OK
 
-## Phase 1: 인프라 (2026-06)
+## Phase 1: 인프라 (2026-06) — 진행 상황 갱신 (세션 #2)
 
-- [ ] GitHub 공개 저장소 생성 (이름 후보: honsalim 또는 affiliate_hub) + **Secret Scanning 활성·main 브랜치 보호·CodeQL 활성** (DECISIONS I1·I6)
-- [ ] pre-commit hook 설정 (gitleaks 또는 detect-secrets) — `.pre-commit-config.yaml` **사전 작성 완료** (옵션 A·B 중 선택, Phase 1 사용자 결정) (DECISIONS I1)
-- [ ] 외부 계정 5종 2FA 활성 (GitHub·Cloudflare·Anthropic·쿠팡·Registrar) (DECISIONS I3)
-- [ ] 로컬 D 드라이브 BitLocker 활성 (DECISIONS I5)
-- [ ] **윈도우 작업 스케줄러 등록**: 매일 11:00 KST `python -m honsalim scheduler-publish` (DECISIONS C7)
+### 완료 ✅
+- [x] GitHub `hangyundock/honsalim` Public 생성·Secret Scanning·CodeQL·Dependabot·Push protection 활성
+- [x] GitHub 2FA 활성 + 복구 코드 저장
+- [x] Cloudflare 계정 (Dugi2020@naver.com 기존 사용)·2FA·복구 코드 저장
+- [x] honsalim.com 도메인 결제 (2026-05-28, 만료 2027-05-28, Auto Renew)
+- [x] Cloudflare Pages 프로젝트 `honsalim`·placeholder 배포·Custom domain (SSL Active)
+- [x] R2 버킷 `honsalim-images`
+- [x] D1 DB `honsalim-clicks` (ID: 9bae858e-456f-40e7-8084-c3b90e4ec3ca)
+- [x] API Token 발급 + `cloudflare.env`
+- [x] Anthropic API 키 확인 + `claude.env`
+- [x] AliExpress Portals 가입 신청 (심사 대기)
+- [x] Git init·remote·branch·pre-commit 설치 (detect-secrets)·첫 commit·push (b413803)
+
+### 남음 ⏳
+- [ ] AliExpress 심사 결과 확인 (이메일 1~2영업일)
+- [ ] AliExpress 승인 후 API 키 발급 + `ali.env` 작성
+- [ ] 쿠팡 파트너스 재가입 — **Phase 4 출시 후** (콘텐츠 누적·승인 의존)
+- [ ] BitLocker 활성 (사용자 결정 시점 — 보류)
+- [ ] detect-secrets baseline 디버깅 (PowerShell 인코딩 추정)
+- [ ] Branch Protection (main) 설정 — `git push` 안정 후
+- [ ] INDEXNOW_KEY 발급 + GitHub Repository Secrets 등록 (CF_API_TOKEN·CF_ACCOUNT_ID·INDEXNOW_KEY)
+- [ ] **윈도우 작업 스케줄러 등록**: Phase 2 코드 작성 후 (DECISIONS C7)
 - [ ] 도메인 honsalim.com 가용성 재확인 + 결제 (Cloudflare Registrar)
 - [ ] Cloudflare 계정 + Pages 프로젝트 + R2 버킷 + D1 DB + Workers 라우트
 - [ ] `D:\secrets\affiliate_hub\` 폴더 생성 + 자격증명 .env 5개
