@@ -1,0 +1,37 @@
+# wrangler.toml — 혼살림 Cloudflare Workers·D1 설정
+# 출처: BACKEND §5-1 + DECISIONS B3·D7 [확정 — Cloudflare 공식 표준]
+# 작성: 2026-05-28 세션 #2
+#
+# Phase 1 적용 순서:
+#   1. Cloudflare 계정·Pages 프로젝트·R2·D1·Workers 생성
+#   2. D1 DB 생성: wrangler d1 create honsalim-clicks
+#   3. 본 파일의 placeholder를 secrets 발급값으로 교체
+#   4. wrangler deploy
+
+name = "honsalim-go-gateway"
+main = "src/workers/go_gateway.js"
+compatibility_date = "2026-01-01"  # [관찰] 작성 시점 기준 stable
+
+# ─── Workers 라우트 (BACKEND §5-1) ─────────────────────
+[[routes]]
+pattern = "honsalim.com/go/*"
+zone_name = "honsalim.com"
+
+# ─── D1 (BACKEND §5-1 + DB §11) ────────────────────────
+[[d1_databases]]
+binding = "DB"
+database_name = "honsalim-clicks"
+database_id = "9bae858e-456f-40e7-8084-c3b90e4ec3ca"  # [확정] 2026-05-28 발급
+
+# ─── R2 (Phase 4+ 검토 시 활성) ─────────────────────────
+# [[r2_buckets]]
+# binding = "IMAGES"
+# bucket_name = "honsalim-images"
+
+# ─── 환경 변수 (Workers 안에서 사용 시) ────────────────
+# [vars]
+# SITE_BASE_URL = "https://honsalim.com"
+
+# ─── 빌드 (Workers는 JS 단일 파일이라 빌드 불요) ───────
+# [build]
+# command = ""

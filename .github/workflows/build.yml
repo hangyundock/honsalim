@@ -1,0 +1,68 @@
+# .github/workflows/build.yml — 빌드·배포 워크플로
+# 출처: ARCH §8-2 [확정] + BACKEND §10·§11 + DECISIONS B2·B3·H1 [확정]
+# 작성: 2026-05-28 세션 #2
+#
+# 트리거: main 브랜치 push (수동 + 자동 게시 후)
+# 동작: lint → test → build → diff vs 로컬 → wrangler deploy → IndexNow
+#
+# Repository Secrets (Phase 1 사용자 설정):
+#   CF_API_TOKEN, CF_ACCOUNT_ID, INDEXNOW_KEY
+
+name: build-and-deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # 수동 트리거
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # ARCH §12 + DECISIONS B2 [확정]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v5  # [관찰] 작성 시점 stable
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest --maxfail=1
+        # 회귀 게이트 — validator 100% 통과 의무 (BACKEND §8-1)
+
+      - name: Build site
+        run: python -m honsalim build --full
+        # ARCH §8-2 단계 6
+
+      - name: Verify build artifacts
+        run: |
+          test -f build/index.html
+          test -f build/sitemap.xml
+          test -f build/robots.txt
+          test -f build/_headers
+        # ARCH §8-2 단계 8
+
+      - name: Setup wrangler
+        uses: cloudflare/wrangler-action@v3  # [관찰] 공식 액션
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy build --project-name=honsalim --branch=main
+        # ARCH §8-2 단계 9
+
+      - name: Notify IndexNow
+        run: python -m honsalim sitemap-notify --indexnow
+        env:
+          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
+        continue-on-error: true  # ARCH §8-2 단계 10 — warn (block X)

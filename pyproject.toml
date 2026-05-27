@@ -1,0 +1,123 @@
+# pyproject.toml — 혼살림
+# 출처: BACKEND §10·§12 + ARCH §12 + CLAUDE §12 [확정]
+# 작성: 2026-05-28 세션 #2
+# Phase 1·2에서 사용자 검토 후 적용
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "honsalim"
+version = "0.1.0"
+description = "혼살림 — 1인 가구 어필리에이트 추천 사이트 빌더"
+requires-python = ">=3.10,<3.11"  # CLAUDE §12 [확정] Python 3.10
+authors = [{ name = "혼살림 운영자" }]
+license = { text = "Proprietary" }  # 공개 저장소이지만 콘텐츠 라이선스 별도
+
+# 1차 의존성 (BACKEND §10-1 [확정])
+dependencies = [
+  "anthropic>=0.50",
+  "jinja2>=3.1",
+  "requests>=2.31",
+  "python-dotenv>=1.0",
+  "pyyaml>=6.0",
+  "markdown>=3.5",
+  "pillow>=10.0",
+]
+
+[project.optional-dependencies]
+# 개발 의존성 (BACKEND §10-2 [확정])
+dev = [
+  "pytest>=8.0",
+  "responses>=0.24",
+  "black>=24.1",
+  "ruff>=0.1",
+  "mypy>=1.8",
+  "pip-audit>=2.6",      # 보안 (DECISIONS I4)
+  "pre-commit>=3.6",     # hook (DECISIONS I1)
+  "types-requests",
+  "types-PyYAML",
+]
+
+[project.scripts]
+# BACKEND §9 CLI 명령 11개
+honsalim = "honsalim.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# ─── Black [관찰 — 공식 기본값] ────────────────────────
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.git
+  | \.venv
+  | build
+  | data
+  | logs
+)/
+'''
+
+# ─── Ruff [관찰 — 공식 권장] ───────────────────────────
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["build", "data", "logs", "migrations"]
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W",    # pycodestyle·pyflakes
+  "I",              # isort
+  "B",              # bugbear
+  "UP",             # pyupgrade
+  "S",              # bandit (보안)
+  "RUF",            # ruff
+]
+ignore = [
+  "E501",  # line too long (black 처리)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]  # tests 안 assert 허용
+
+# ─── Mypy [관찰 — 공식 권장] ───────────────────────────
+[tool.mypy]
+python_version = "3.10"
+strict = false                      # Phase 2 안정화 후 true 검토
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false       # 점진 도입
+exclude = ["build/", "data/", "logs/"]
+
+[[tool.mypy.overrides]]
+module = ["anthropic.*", "jinja2.*"]
+ignore_missing_imports = true
+
+# ─── Pytest [관찰] ─────────────────────────────────────
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+  "integration: 외부 API 호출 (CI 미실행)",
+  "slow: 느린 테스트",
+]
+
+# ─── Coverage (선택) [추정] ────────────────────────────
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*", "*/migrations/*"]
+
+[tool.coverage.report]
+fail_under = 70  # BACKEND §8-6 [추정] 전체 70% 목표
+exclude_lines = [
+  "pragma: no cover",
+  "raise NotImplementedError",
+  "if __name__ == .__main__.:",
+]

@@ -1,0 +1,39 @@
+# 혼살림 Cloudflare Pages _headers 초안
+# 출처: POLICY §14-bis-2 (I2 보안 헤더) + FRONTEND §9-4 + DECISIONS I2 [확정]
+# 작성: 2026-05-27 세션 #2
+#
+# 적용:
+#   - Phase 2 빌드 단계에서 build/_headers로 출력
+#   - Cloudflare Pages가 자동 인식 [확정 — Cloudflare 공식]
+#
+# 주의:
+#   - CSP의 외부 도메인 화이트리스트는 [추정] — Phase 4에서 위젯 도메인 확정 후 정밀화 필요
+#   - 쿠팡 위젯·이미지 도메인은 실제 사용 시 확인 후 추가
+
+# ─── 모든 경로 (전역) ──────────────────────────────────
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=()
+
+  # CSP — [추정] Phase 4에서 위젯 도메인 확정 후 갱신
+  # 현재: 자체 도메인 + Cloudflare Analytics + 쿠팡 일반 도메인 (정확 도메인 검증 필요)
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https://*.coupangcdn.com https://ae01.alicdn.com; frame-src https://link.coupang.com https://ads-partners.coupang.com; connect-src 'self' https://cloudflareinsights.com; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+
+# ─── 정적 자산 (캐시) ──────────────────────────────────
+/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# ─── 글 페이지 (단기 캐시) ─────────────────────────────
+/articles/*
+  Cache-Control: public, max-age=300, s-maxage=3600
+
+# ─── 홈·허브 (매우 단기 캐시) ──────────────────────────
+/
+  Cache-Control: public, max-age=60, s-maxage=600
+
+# ─── /go/ 게이트웨이 (캐시 금지) ───────────────────────
+# /go/* 는 Cloudflare Workers가 처리하므로 Pages _headers는 미적용
+# Workers 응답에 별도 Cache-Control: no-store 의무 (BACKEND §5-2)

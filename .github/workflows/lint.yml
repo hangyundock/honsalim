@@ -1,0 +1,66 @@
+# .github/workflows/lint.yml — 린트·타입 체크
+# 출처: ARCH §8-2 + BACKEND §10·§7-2 [확정]
+# 작성: 2026-05-28 세션 #2
+#
+# 트리거: PR + push (별도 workflow로 빌드보다 빠름)
+
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Black format check
+        run: black --check src tests
+
+      - name: Ruff lint
+        run: ruff check src tests
+
+      - name: Mypy type check
+        run: mypy src
+
+      - name: pip-audit (보안 — DECISIONS I4)
+        run: pip-audit --strict
+        continue-on-error: true  # 알림만, block X
+
+  codeql:
+    # DECISIONS I6 [확정] — CodeQL 보안 분석
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python, javascript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3

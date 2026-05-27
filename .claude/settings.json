@@ -1,0 +1,70 @@
+{
+  "_comment": "혼살림 Claude Code 권한 설정 — POLICY §10-2 + I1 + DECISIONS H4·E5. AutoBlog 패턴 확장. 세션 #2 작성. Phase 1에서 사용자 검토.",
+  "model": "claude-opus-4-7",
+  "permissions": {
+    "deny": [
+      "Read(D:\\secrets\\**)",
+      "Write(D:\\secrets\\**)",
+      "Edit(D:\\secrets\\**)",
+
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Write(**/.env)",
+      "Write(**/.env.*)",
+      "Edit(**/.env)",
+      "Edit(**/.env.*)",
+
+      "Edit(D:\\affiliate_hub\\data\\honsalim.db)",
+      "Write(D:\\affiliate_hub\\data\\honsalim.db)",
+      "Edit(D:\\affiliate_hub\\data\\honsalim.db.*)",
+      "Write(D:\\affiliate_hub\\data\\honsalim.db.*)",
+
+      "Bash(*sqlite3*DROP*)",
+      "Bash(*sqlite3*TRUNCATE*)",
+      "Bash(*sqlite3*DELETE FROM*)",
+      "PowerShell(*sqlite3*DROP*)",
+      "PowerShell(*sqlite3*TRUNCATE*)",
+      "PowerShell(*sqlite3*DELETE FROM*)",
+
+      "Bash(pip install*)",
+      "Bash(pip uninstall*)",
+      "Bash(python -m pip install*)",
+      "Bash(python -m pip uninstall*)",
+      "PowerShell(pip install*)",
+      "PowerShell(pip uninstall*)",
+
+      "Bash(git push*)",
+      "Bash(git push --force*)",
+      "PowerShell(git push*)",
+      "PowerShell(git push --force*)",
+
+      "Bash(wrangler pages deploy*)",
+      "Bash(wrangler deploy*)",
+      "PowerShell(wrangler pages deploy*)",
+      "PowerShell(wrangler deploy*)",
+
+      "Bash(*--mode publish-now*)",
+      "PowerShell(*--mode publish-now*)",
+      "Bash(python -m honsalim deploy*)",
+      "PowerShell(python -m honsalim deploy*)",
+      "Bash(python -m honsalim scheduler-publish*)",
+      "PowerShell(python -m honsalim scheduler-publish*)"
+    ],
+    "allow": [
+      "Bash(git status)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(python -m py_compile:*)",
+      "PowerShell(python -m py_compile*)",
+      "Bash(python -m honsalim doctor)",
+      "Bash(python -m honsalim build*)",
+      "Bash(python -m honsalim dashboard)",
+      "Bash(python -m honsalim scheduler-status)",
+      "PowerShell(python -m honsalim doctor)",
+      "PowerShell(python -m honsalim build*)",
+      "PowerShell(python -m honsalim dashboard)",
+      "PowerShell(python -m honsalim scheduler-status)"
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+# .github/dependabot.yml — 혼살림 의존성 자동 업데이트
+# 출처: DECISIONS I4 [확정] + BACKEND §10 + MAINTENANCE §2 + POLICY §14-bis-4
+# 작성: 2026-05-28 세션 #2
+# 적용: 첫 push 후 GitHub이 자동 인식·활성
+
+version: 2
+
+updates:
+  # ─── Python 패키지 (pyproject.toml) ─────────────────────
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Seoul"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+    # 핵심 패키지는 메이저 업데이트 시 수동 검토 (MAINTENANCE §2-1)
+    ignore:
+      - dependency-name: "anthropic"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "jinja2"
+        update-types: ["version-update:semver-major"]
+
+  # ─── GitHub Actions 워크플로 ──────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Seoul"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  # ─── pre-commit hook 도구 ─────────────────────────────
+  # (.pre-commit-config.yaml의 hook 버전 자동 업데이트)
+  # Phase 1에서 pre-commit 활성 후 자동 작동
