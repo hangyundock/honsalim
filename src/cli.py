@@ -231,6 +231,8 @@ def _check_phase2_modules() -> bool:
         ("deployer", "git_push"),
         ("deployer", "wrangler_deploy"),
         ("deployer", "verify_deploy"),
+        ("tracker", "aggregate"),
+        ("tracker", "export_to_sqlite"),
     ]
     all_ok = True
     for mod_name, attr in checks:

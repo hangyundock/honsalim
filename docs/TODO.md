@@ -28,7 +28,7 @@
 
 ## Phase 2: 핵심 시스템 — 남음 ⏳
 
-> 완료 항목은 STATE.md "Phase 2 핵심 모듈 15개" + "회귀 283/283" + "CLI 8/11" 행 참조.
+> 완료 항목은 STATE.md "Phase 2 핵심 모듈 16개" + "회귀 295/295" + "CLI 8/11" 행 참조.
 
 ### 안전 진척 (검토 의존 작음)
 - [ ] CLI 남은 3 명령 (dashboard·build·deploy) — builder/dashboard/deployer 모듈 의존
@@ -38,7 +38,8 @@
 - [ ] `builder.manifest` 형태 결정 → 스키마 확정 적용 (인터페이스 stub 완료)
 - [ ] `builder.renderer/pages/sitemap/assets` (Jinja2 + DESIGN 시안)
 - [ ] `dashboard.render/approve` (디자인 시안 Phase 3 의존)
-- [ ] `tracker.d1_aggregator` + Workers `go_gateway.js`
+- [ ] `tracker.report` (주간·월간 HTML 리포트, dashboard 의존)
+- [ ] Workers `go_gateway.js` (Cloudflare Workers JS)
 - [ ] `python -m honsalim build --full` 성공 (Phase 2 종착)
 
 ## Phase 3: 디자인·콘텐츠 (2026-07)
