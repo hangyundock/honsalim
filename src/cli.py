@@ -40,7 +40,7 @@ _THIS_DIR = Path(__file__).resolve().parent
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
 
-from common import config  # noqa: E402
+from common import config, db  # noqa: E402
 
 PROJECT_ROOT = _THIS_DIR.parent
 
@@ -196,6 +196,26 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 2  # BACKEND §9-2 데이터 에러
 
 
+def cmd_db_migrate(args: argparse.Namespace) -> int:
+    """DB 마이그레이션 적용 (DB.md §14 [확정])."""
+    pending = db.migrate(dry_run=args.dry_run)
+    if args.dry_run:
+        if pending:
+            print(f"[DRY] 적용 예정 {len(pending)}건:")
+            for m in pending:
+                print(f"  - v{m.version}  {m.name}")
+        else:
+            print(f"{OK} 적용할 마이그레이션 없음 (이미 최신)")
+        return 0
+    if pending:
+        print(f"{OK} {len(pending)}건 적용:")
+        for m in pending:
+            print(f"  - v{m.version}  {m.name}")
+    else:
+        print(f"{OK} 이미 최신 — 적용할 마이그레이션 없음")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="honsalim",
@@ -208,6 +228,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_doctor = sub.add_parser("doctor", help="secrets·DB·외부 API 헬스 체크")
     p_doctor.set_defaults(func=cmd_doctor)
+
+    p_db = sub.add_parser("db", help="DB 관리 (마이그레이션 등)")
+    p_db_sub = p_db.add_subparsers(dest="db_command", required=True)
+    p_db_migrate = p_db_sub.add_parser("migrate", help="마이그레이션 적용 (DB §14)")
+    p_db_migrate.add_argument("--dry-run", action="store_true", help="실행 없이 목록만")
+    p_db_migrate.set_defaults(func=cmd_db_migrate)
 
     return parser
 
