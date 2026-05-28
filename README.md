@@ -34,8 +34,8 @@
 ## 보안 정책
 
 - secrets는 본 저장소 외부 (`D:\secrets\affiliate_hub\`) — 저장소에 절대 포함 X
-- `.gitignore` 엄격 + pre-commit hook (gitleaks) — 우발 누설 차단
-- GitHub Secret Scanning + Dependabot + CodeQL 활성
+- `.gitignore` 엄격 + pre-commit hook 9종 (detect-secrets·trim·black·ruff·mypy 등) — 우발 누설·품질 차단
+- GitHub Secret Scanning + Dependabot + CodeQL 활성 + Branch Protection (main-protect)
 - 외부 계정 5종 2FA 의무 (GitHub·Cloudflare·Anthropic·쿠팡·도메인)
 - 보안 헤더 6종 (CSP·HSTS·X-Content-Type-Options·X-Frame-Options·Referrer-Policy·Permissions-Policy)
 - 로컬 D 드라이브 BitLocker 암호화
@@ -45,9 +45,9 @@
 ## 진행 단계 (Phase)
 
 ```
-Phase 0  설계        2026-05  ← 완료 (12개 설계 문서 + 사전 작성물)
-Phase 1  인프라      2026-06  ← 다음
-Phase 2  핵심 시스템  2026-06~07
+Phase 0  설계        2026-05    ✅ 완료 (12개 설계 문서 + SUMMARY)
+Phase 1  인프라      2026-05~06 ✅ ~95% (GitHub·Cloudflare·도메인·R2·D1·secrets·pre-commit)
+Phase 2  핵심 시스템  2026-06~07 🔄 진행 중 (모듈 13개·회귀 247/247·CLI 8/11)
 Phase 3  디자인·콘텐츠 2026-07
 Phase 4  첫 출시      2026-07 말~08
 Phase 5  운영·확장    2026-08~11
@@ -55,9 +55,19 @@ Phase 6  6개월 결산   2026-12
 Phase 7  1년 결산     2027-06
 ```
 
+### Phase 2 진척 (세션 #4 기준)
+
+- **핵심 모듈 13개**: cli · common · validator · writer · collector · enricher · builder
+- **회귀 테스트 247/247 PASS** [확정]
+- **CLI 명령 8/11**: doctor · db migrate/seed · collect · enrich(dry_run) · validate · approve · unapprove
+- **state_machine**: 6 상태 머신 (collected→enriched→validated→approved→published + rejected/unapprove)
+- **validator 4 게이트**: truth(가격·1인칭·AI 흔적·단정형) · schema(Article·ItemList·Product·Review) · disclosure(공정위) · links(단축 URL 차단·rel)
+- **Schema.org JSON-LD 빌더**: Article·ItemList·Product
+- **Claude API 재시도 정책** (BACKEND §3-5): RateLimit·Overloaded·Timeout·BadRequest·APIError
+
 ## 설계 문서
 
-`docs/` 안에 13편 (1편 요약 + 12편 본문):
+`docs/` 안에 15편 (1편 요약 + 12편 본문 + 검토 자료 2편):
 
 | 문서 | 내용 |
 |------|------|
@@ -74,6 +84,8 @@ Phase 7  1년 결산     2027-06
 | [BACKUP.md](docs/BACKUP.md) | 백업·복구·재난 |
 | [MAINTENANCE.md](docs/MAINTENANCE.md) | 유지보수·확장 |
 | [SCHEDULE.md](docs/SCHEDULE.md) | Phase·시즌 캘린더·KPI |
+| [ARCH_MODULE_DIAGNOSIS.md](docs/ARCH_MODULE_DIAGNOSIS.md) | `src/` flat vs `honsalim` 패키지 모순 진단 + 옵션 A/B/C |
+| [KEY_DECISIONS_REVIEW.md](docs/KEY_DECISIONS_REVIEW.md) | manifest 형태·시나리오 우선순위·단축 URL 차단 목록 검토 자료 |
 
 ## 개발·기여
 
@@ -91,3 +103,5 @@ Phase 7  1년 결산     2027-06
 - 운영 가이드: [docs/SCHEDULER_GUIDE.md](docs/SCHEDULER_GUIDE.md)
 - 검증 규칙: [docs/POLICY.md](docs/POLICY.md)
 - 검증 패턴: [docs/VALIDATOR_PATTERNS.md](docs/VALIDATOR_PATTERNS.md)
+- 결정 이력: [docs/DECISIONS.md](docs/DECISIONS.md) (카테고리 A~J)
+- 변경 이력: [docs/CHANGELOG.md](docs/CHANGELOG.md) (v1.0~v1.4)
