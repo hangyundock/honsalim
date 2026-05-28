@@ -6,6 +6,7 @@
       "Read(D:\\secrets\\**)",
       "Write(D:\\secrets\\**)",
       "Edit(D:\\secrets\\**)",
+      "Glob(D:\\secrets\\**)",
 
       "Read(**/.env)",
       "Read(**/.env.*)",
