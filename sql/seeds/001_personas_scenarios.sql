@@ -7,7 +7,7 @@
 -- =====================================================
 -- personas (3건) — SCENARIOS.md §8-1
 -- =====================================================
-INSERT INTO personas (slug, title_ko, description, age_range, display_order) VALUES
+INSERT OR IGNORE INTO personas (slug, title_ko, description, age_range, display_order) VALUES
   ('cheot-jachi',  '새내기 자취생',     '첫 자취·이사 직전 20대',          '20대',    1),
   ('homeoffice',   '재택근무자',         '30~40대 홈오피스 셋업',           '30~40대', 2),
   ('minimal-life', '1인 가구 정착자',    '자취 2년차 이상 미니멀 라이프',    '30~40대', 3);
@@ -16,7 +16,7 @@ INSERT INTO personas (slug, title_ko, description, age_range, display_order) VAL
 -- scenarios (10건) — SCENARIOS.md §8-2
 -- persona_id는 (SELECT id FROM personas WHERE slug=?) 로 안전 매핑
 -- =====================================================
-INSERT INTO scenarios (slug, title_ko, description, persona_id, budget_min_krw, budget_max_krw, season_peak, priority, active) VALUES
+INSERT OR IGNORE INTO scenarios (slug, title_ko, description, persona_id, budget_min_krw, budget_max_krw, season_peak, priority, active) VALUES
   ('wonroom-cheot-jachi-30',
    '원룸 첫 자취 30만원 필수템 패키지 — 신학기 완성',
    '신학기 1차 자취생을 위한 30만원 필수템 6~8개 추천',

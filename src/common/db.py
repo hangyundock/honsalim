@@ -120,3 +120,52 @@ def migrate(
         return pending
     finally:
         conn.close()
+
+
+def seed(
+    db_path: Path = DB_PATH,
+    seeds_dir: Path = SEEDS_DIR,
+    dry_run: bool = False,
+) -> list[Path]:
+    """sql/seeds/*.sql 적용. INSERT OR IGNORE 가정 — idempotent.
+
+    seed는 schema_version 추적 안 함 — 단순 반복 실행 가능 (INSERT OR IGNORE).
+    """
+    if not seeds_dir.exists():
+        return []
+    seed_files = sorted(seeds_dir.glob("*.sql"))
+    if dry_run:
+        return seed_files
+    conn = connect(db_path)
+    try:
+        for f in seed_files:
+            sql = f.read_text(encoding="utf-8")
+            try:
+                conn.executescript(sql)
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        return seed_files
+    finally:
+        conn.close()
+
+
+def db_stats(db_path: Path = DB_PATH) -> dict[str, int]:
+    """주요 테이블 row count. 데이터 진척 가시화용."""
+    if not db_path.exists():
+        return {}
+    conn = connect(db_path)
+    try:
+        stats: dict[str, int] = {}
+        for table in ("personas", "scenarios", "products", "drafts", "articles"):
+            try:
+                # table 이름은 코드 내 화이트리스트 — SQL injection 아님
+                row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()  # noqa: S608
+                stats[table] = int(row[0]) if row else 0
+            except sqlite3.OperationalError:
+                # 테이블 미존재 — 마이그레이션 전
+                stats[table] = -1
+        return stats
+    finally:
+        conn.close()

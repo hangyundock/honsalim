@@ -136,6 +136,27 @@ def _check_sqlite_module() -> bool:
         return False
 
 
+def _check_db_state() -> bool:
+    if not db.DB_PATH.exists():
+        print(f"{WARN} DB 파일 없음: {db.DB_PATH} (db migrate 실행 필요)")
+        return False
+    conn = db.connect(db.DB_PATH)
+    try:
+        ver = db.current_version(conn)
+        if ver == 0:
+            print(f"{WARN} schema_version 미적용 (db migrate 필요)")
+        else:
+            print(f"{OK} schema_version v{ver}")
+        stats = db.db_stats(db.DB_PATH)
+        for table, count in stats.items():
+            marker = OK if count >= 0 else WARN
+            shown = "테이블 없음" if count < 0 else f"{count}행"
+            print(f"{marker} {table}: {shown}")
+        return bool(ver > 0)
+    finally:
+        conn.close()
+
+
 def _check_git_repo() -> bool:
     # git을 PATH에서 찾아 인자는 list로 전달 — shell injection 위험 없음
     try:
@@ -183,6 +204,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _print_section("7. git 저장소 상태")
     _check_git_repo()
 
+    _print_section("8. DB 상태 (data/honsalim.db)")
+    _check_db_state()
+
     _print_section("종합")
     if py_ok and sec_ok and sql_ok and tools_ok and dep_found == dep_total:
         print(f"{OK} 모든 필수 체크 통과 — Phase 2 진입 가능")
@@ -216,6 +240,30 @@ def cmd_db_migrate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_db_seed(args: argparse.Namespace) -> int:
+    """seed 적용 (INSERT OR IGNORE — idempotent)."""
+    files = db.seed(dry_run=args.dry_run)
+    if args.dry_run:
+        if files:
+            print(f"[DRY] seed 파일 {len(files)}건:")
+            for f in files:
+                print(f"  - {f.name}")
+        else:
+            print(f"{WARN} seed 파일 없음")
+        return 0
+    if files:
+        print(f"{OK} seed {len(files)}건 적용:")
+        for f in files:
+            print(f"  - {f.name}")
+        stats = db.db_stats()
+        for table, count in stats.items():
+            if count > 0:
+                print(f"  → {table}: {count}행")
+    else:
+        print(f"{WARN} seed 파일 없음")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="honsalim",
@@ -234,6 +282,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_db_migrate = p_db_sub.add_parser("migrate", help="마이그레이션 적용 (DB §14)")
     p_db_migrate.add_argument("--dry-run", action="store_true", help="실행 없이 목록만")
     p_db_migrate.set_defaults(func=cmd_db_migrate)
+
+    p_db_seed = p_db_sub.add_parser("seed", help="seed 적용 (INSERT OR IGNORE)")
+    p_db_seed.add_argument("--dry-run", action="store_true", help="실행 없이 파일 목록만")
+    p_db_seed.set_defaults(func=cmd_db_seed)
 
     return parser
 
