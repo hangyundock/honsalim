@@ -396,6 +396,140 @@ def cmd_db_seed(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_enrich(args: argparse.Namespace) -> int:
+    """Claude API로 본문 생성 (BACKEND §3).
+
+    Phase 2 stub: 기본 dry_run=True — prompt 빌드만 검증 + 상태 전이 (enriched).
+    실제 API 호출 (--no-dry-run)은 비용 발생 — 사용자 명시 승인 후.
+    """
+    from enricher.claude_client import ClaudeClient, GenerateRequest
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        row = conn.execute(
+            """
+            SELECT s.slug, s.title_ko, s.season_peak, s.keywords,
+                   p.slug, p.title_ko, p.description, p.age_range
+            FROM drafts d
+            JOIN scenarios s ON d.scenario_id = s.id
+            JOIN personas p ON s.persona_id = p.id
+            WHERE d.id = ?
+            """,
+            (args.draft,),
+        ).fetchone()
+        if row is None:
+            print(f"{FAIL} draft {args.draft} 또는 연결된 scenario·persona 없음")
+            return 2
+
+        scenario_dict = {
+            "slug": row[0],
+            "title_ko": row[1],
+            "season_peak": row[2],
+            "keywords": row[3],
+        }
+        persona_dict = {
+            "slug": row[4],
+            "title_ko": row[5],
+            "description": row[6],
+            "age_range": row[7],
+        }
+        req = GenerateRequest(scenario=scenario_dict, persona=persona_dict)
+
+        import os
+
+        api_key = None
+        if not args.dry_run:
+            config.load_secrets()
+            api_key = os.environ.get("ANTHROPIC_API_KEY")
+        client = ClaudeClient(api_key=api_key)
+        result = client.generate_article(req, dry_run=args.dry_run)
+
+        from writer import article_writer, state_machine
+
+        state_machine.transition(
+            conn,
+            args.draft,
+            "enriched",
+            reason=f"cli enrich ({'dry_run' if args.dry_run else 'live'})",
+        )
+        article_writer.save_enriched(
+            conn,
+            args.draft,
+            {
+                "dry_run": result.dry_run,
+                "user_prompt_preview": result.user_prompt[:500],
+                "system_blocks_count": len(result.system_blocks),
+                "usage": result.usage,
+            },
+        )
+        mode = "dry_run" if args.dry_run else "live"
+        print(f"{OK} draft {args.draft} → enriched ({mode})")
+        print(f"     user_prompt 길이: {len(result.user_prompt)}자")
+        print(f"     system_blocks: {len(result.system_blocks)}개 (cache_control)")
+        if not args.dry_run and result.usage:
+            print(
+                f"     usage: input={result.usage.get('input_tokens')} output={result.usage.get('output_tokens')}"
+            )
+        return 0
+    finally:
+        conn.close()
+
+
+def cmd_validate(args: argparse.Namespace) -> int:
+    """validator 4 게이트 검사 (POLICY §3·§4·§2·§6) + 상태 전이.
+
+    drafts.enriched_payload를 payload로 사용. 모든 게이트 PASS → validated,
+    하나라도 fail → rejected (BACKEND §2-3 흐름).
+    """
+    from writer import article_writer
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        row = conn.execute(
+            "SELECT enriched_payload FROM drafts WHERE id = ?", (args.draft,)
+        ).fetchone()
+        if row is None:
+            print(f"{FAIL} draft {args.draft} 없음")
+            return 2
+        if not row[0]:
+            print(f"{FAIL} draft {args.draft} enriched_payload 비어있음 (enrich 먼저 실행)")
+            return 2
+
+        import json as _json
+
+        payload = _json.loads(row[0])
+        ok, report = article_writer.validate_and_save(conn, args.draft, payload)
+        if ok:
+            print(f"{OK} draft {args.draft} → validated (4 게이트 모두 PASS)")
+            for gate in ("truth", "schema", "disclosure", "links"):
+                print(f"     {gate}: pass")
+            return 0
+        print(f"{WARN} draft {args.draft} → rejected")
+        for gate, info in report["gates"].items():
+            mark = OK if info["pass"] else FAIL
+            print(f"     {mark} {gate}: {info['issues'] if info['issues'] else 'pass'}")
+        return 1
+    finally:
+        conn.close()
+
+
+def cmd_approve(args: argparse.Namespace) -> int:
+    """validated draft → approved (사용자 1클릭 승인). BACKEND §9 [확정]."""
+    from writer import state_machine
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        reason = "cli approve" + (f" — {args.note}" if args.note else "")
+        state_machine.transition(conn, args.draft, "approved", reason=reason)
+        # drafts.user_approved_at·user_approved_note 갱신은 promote 시점에 자동
+        print(f"{OK} draft {args.draft} → approved")
+        if args.note:
+            print(f"     note: {args.note}")
+        return 0
+    finally:
+        conn.close()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="honsalim",
@@ -418,6 +552,26 @@ def build_parser() -> argparse.ArgumentParser:
     p_db_seed = p_db_sub.add_parser("seed", help="seed 적용 (INSERT OR IGNORE)")
     p_db_seed.add_argument("--dry-run", action="store_true", help="실행 없이 파일 목록만")
     p_db_seed.set_defaults(func=cmd_db_seed)
+
+    # BACKEND §9 [확정] — Phase 2 진입점 명령 3개
+    p_enrich = sub.add_parser("enrich", help="Claude API 본문 생성 (BACKEND §3) — 기본 dry_run")
+    p_enrich.add_argument("--draft", type=int, required=True, help="draft id")
+    p_enrich.add_argument(
+        "--no-dry-run",
+        dest="dry_run",
+        action="store_false",
+        help="실제 Claude API 호출 (비용 발생 — 명시 승인 후)",
+    )
+    p_enrich.set_defaults(func=cmd_enrich, dry_run=True)
+
+    p_validate = sub.add_parser("validate", help="validator 4 게이트 검사 (POLICY §3·§4·§2·§6)")
+    p_validate.add_argument("--draft", type=int, required=True, help="draft id")
+    p_validate.set_defaults(func=cmd_validate)
+
+    p_approve = sub.add_parser("approve", help="validated draft 사용자 1클릭 승인")
+    p_approve.add_argument("--draft", type=int, required=True, help="draft id")
+    p_approve.add_argument("--note", type=str, default=None, help="승인 메모")
+    p_approve.set_defaults(func=cmd_approve)
 
     return parser
 

@@ -7,11 +7,12 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 12개·회귀 216 PASS** [확정] | #4 (2026-05-28) |
+| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 12개·회귀 225 PASS + CLI 6 명령** [확정] | #4 (2026-05-28) |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
 | Phase 2 핵심 모듈 12개 (#3~#4) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor} · builder/jsonld | #4 |
-| Phase 2 회귀 테스트 | **216/216 PASS** [확정] — validator 39 + state_machine 13 + scenario_loader 11 + enricher 13 + meta_extractor 31 + jsonld 45 + db 12 + cli 16 + article_writer 25 + integration_phase2 11 (10 test 파일) | #4 |
+| Phase 2 회귀 테스트 | **225/225 PASS** [확정] — validator 39 + state_machine 13 + scenario_loader 11 + enricher 13 + meta_extractor 31 + jsonld 45 + db 12 + cli 25 + article_writer 25 + integration_phase2 11 (10 test 파일) | #4 |
+| CLI 명령 (BACKEND §9) | 6/11 — doctor · db migrate · db seed · enrich (dry_run 기본) · validate · approve. 나머지 5개 (collect·unapprove·dashboard·build·deploy) Phase 2 후속 | #4 |
 | Phase 2 통합 회귀 (세션 #4) | `tests/test_integration_phase2.py` 11 케이스 — 정상 전체 흐름(collected→published) + truth/disclosure fail rejected + rejected 재수집 + state_machine 위반 차단 + builder↔validator 정합 + content_hash/disclosure_first 자동 생성 + validation_report 영속화 | #4 |
 | Phase 2 흐름 골격 [관찰] | collected→enriched→validated/rejected→approved→published 6 상태 + 4 게이트 통합 (validate_and_save) + META-JSON 추출 + Article JSON-LD 빌더 + 1인칭/사진 게이트. 남은 영역: collector(쿠팡)·builder.manifest·dashboard·deployer·tracker | #4 |
 | doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 17개 · §11 state_machine 매트릭스 · §12 tests 로드 가능 — Phase 2 진입 게이트 자동 점검 | #4 |

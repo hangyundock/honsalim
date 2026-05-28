@@ -126,6 +126,66 @@ class TestPhase2HealthChecks:
         assert cli._check_tests_loadable() is True
 
 
+class TestPhase2Commands:
+    """세션 #4 추가 — BACKEND §9 명시 enrich·validate·approve 명령 (3개)."""
+
+    # enrich
+    def test_enrich_subcommand_recognized(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["enrich", "--draft", "1"])
+        assert args.command == "enrich"
+        assert args.draft == 1
+        assert args.dry_run is True  # 기본 dry_run
+        assert args.func == cli.cmd_enrich
+
+    def test_enrich_no_dry_run_flag(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["enrich", "--draft", "5", "--no-dry-run"])
+        assert args.dry_run is False
+
+    def test_enrich_requires_draft_id(self) -> None:
+        parser = cli.build_parser()
+        with raises(SystemExit):
+            parser.parse_args(["enrich"])
+
+    def test_enrich_draft_must_be_int(self) -> None:
+        parser = cli.build_parser()
+        with raises(SystemExit):
+            parser.parse_args(["enrich", "--draft", "not-a-number"])
+
+    # validate
+    def test_validate_subcommand_recognized(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["validate", "--draft", "1"])
+        assert args.command == "validate"
+        assert args.draft == 1
+        assert args.func == cli.cmd_validate
+
+    def test_validate_requires_draft_id(self) -> None:
+        parser = cli.build_parser()
+        with raises(SystemExit):
+            parser.parse_args(["validate"])
+
+    # approve
+    def test_approve_subcommand_recognized(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["approve", "--draft", "1"])
+        assert args.command == "approve"
+        assert args.draft == 1
+        assert args.note is None
+        assert args.func == cli.cmd_approve
+
+    def test_approve_note_flag(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["approve", "--draft", "1", "--note", "검토 완료"])
+        assert args.note == "검토 완료"
+
+    def test_approve_requires_draft_id(self) -> None:
+        parser = cli.build_parser()
+        with raises(SystemExit):
+            parser.parse_args(["approve"])
+
+
 if __name__ == "__main__":
     if pytest is not None:
         pytest.main([__file__, "-v"])
