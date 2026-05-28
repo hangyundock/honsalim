@@ -1,6 +1,6 @@
-"""tests/test_check_size_caps.py — scripts/check_size_caps 회귀.
+"""tests/test_check_size_caps.py — size cap 점검 회귀.
 
-출처: 세션 #6 추가 — size cap 자동 점검 도구 회귀.
+출처: 세션 #6 추가 — common.size_caps 모듈 + scripts/ CLI wrapper + doctor §14.
 """
 
 from __future__ import annotations
@@ -13,43 +13,33 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = PROJECT_ROOT / "scripts" / "check_size_caps.py"
 
+# src/를 path에 추가 (conftest와 동일 패턴)
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-def _import_module():
-    """check_size_caps 모듈 동적 import (scripts/ 비패키지)."""
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location("check_size_caps", SCRIPT)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+from common import size_caps  # noqa: E402
 
 
-class TestCheckFunction:
+class TestCommonModule:
     def test_caps_dict_keys(self) -> None:
-        mod = _import_module()
-        assert set(mod.CAPS.keys()) == {
+        assert set(size_caps.CAPS.keys()) == {
             "docs/STATE.md",
             "docs/EVENTS.md",
             "docs/TODO.md",
         }
 
     def test_caps_values_bytes(self) -> None:
-        mod = _import_module()
-        assert mod.CAPS["docs/STATE.md"] == 10 * 1024
-        assert mod.CAPS["docs/EVENTS.md"] == 20 * 1024
-        assert mod.CAPS["docs/TODO.md"] == 5 * 1024
+        assert size_caps.CAPS["docs/STATE.md"] == 10 * 1024
+        assert size_caps.CAPS["docs/EVENTS.md"] == 20 * 1024
+        assert size_caps.CAPS["docs/TODO.md"] == 5 * 1024
 
     def test_check_returns_tuple(self) -> None:
-        mod = _import_module()
-        code, results = mod.check()
+        code, results = size_caps.check()
         assert isinstance(code, int)
         assert isinstance(results, list)
         assert len(results) == 3
 
     def test_check_results_schema(self) -> None:
-        mod = _import_module()
-        _, results = mod.check()
+        _, results = size_caps.check()
         for r in results:
             assert "path" in r
             assert "exists" in r
@@ -58,16 +48,34 @@ class TestCheckFunction:
             assert "ratio" in r
 
     def test_format_human_output(self) -> None:
-        mod = _import_module()
-        _, results = mod.check()
-        text = mod.format_human(results)
+        _, results = size_caps.check()
+        text = size_caps.format_human(results)
         assert "docs/" in text
         assert "STATE.md" in text
         assert "EVENTS.md" in text
         assert "TODO.md" in text
 
+    def test_check_missing_file(self, tmp_path: Path) -> None:
+        """대상 파일 없는 임시 디렉토리에서 exit_code=2."""
+        code, results = size_caps.check(project_root=tmp_path)
+        assert code == 2
+        for r in results:
+            assert r["exists"] is False
 
-class TestCliExecution:
+    def test_check_over_cap(self, tmp_path: Path) -> None:
+        """STATE.md를 cap 초과로 만들면 exit_code=1."""
+        docs_dir = tmp_path / "docs"
+        docs_dir.mkdir()
+        (docs_dir / "STATE.md").write_text("x" * (11 * 1024), encoding="utf-8")
+        (docs_dir / "EVENTS.md").write_text("ok", encoding="utf-8")
+        (docs_dir / "TODO.md").write_text("ok", encoding="utf-8")
+        code, results = size_caps.check(project_root=tmp_path)
+        assert code == 1
+        state_result = next(r for r in results if r["path"] == "docs/STATE.md")
+        assert state_result["over"] is True
+
+
+class TestCliWrapper:
     def test_cli_runs(self) -> None:
         """본 프로젝트 docs/ 파일 모두 존재해야 PASS (코드 0)."""
         result = subprocess.run(  # noqa: S603

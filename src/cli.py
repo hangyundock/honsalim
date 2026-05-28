@@ -41,7 +41,7 @@ _THIS_DIR = Path(__file__).resolve().parent
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
 
-from common import config, db  # noqa: E402
+from common import config, db, size_caps  # noqa: E402
 
 PROJECT_ROOT = _THIS_DIR.parent
 
@@ -344,6 +344,30 @@ def _check_tests_loadable() -> bool:
     return all_ok
 
 
+def _check_size_caps() -> bool:
+    """docs/ 동적 파일 size cap 점검 (CLAUDE.md §3).
+
+    cap 초과는 회전·정돈 신호 — 운영 알림용 (WARN). 게이트 X.
+    파일 누락은 5파일 시스템 손상 — FAIL.
+    """
+    code, results = size_caps.check(PROJECT_ROOT)
+    for r in results:
+        path = r["path"]
+        if not r["exists"]:
+            print(f"{FAIL} {path} 없음 (5파일 시스템 손상)")
+            continue
+        size_kb = r["size"] / 1024
+        cap_kb = r["cap"] / 1024
+        pct = r["ratio"] * 100
+        if r.get("over"):
+            print(
+                f"{WARN} {path:<18} {size_kb:6.2f} / {cap_kb:5.1f} KB ({pct:5.1f}%) — 회전·정돈 필요"
+            )
+        else:
+            print(f"{OK} {path:<18} {size_kb:6.2f} / {cap_kb:5.1f} KB ({pct:5.1f}%)")
+    return code != 2  # 파일 누락만 게이트, cap 초과는 WARN
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     """secrets·DB·외부 API 헬스 체크 (BACKEND §9 [확정])."""
     print("혼살림 doctor — Phase 1 인프라 헬스 체크")
@@ -388,8 +412,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _print_section("13. Workers JS 파일 (BACKEND §5)")
     workers_ok = _check_workers_files()
 
+    _print_section("14. docs/ size cap (CLAUDE.md §3)")
+    caps_ok = _check_size_caps()
+
     _print_section("종합")
-    phase2_ok = tmpl_ok and mod_ok and sm_ok and tests_ok and workers_ok
+    phase2_ok = tmpl_ok and mod_ok and sm_ok and tests_ok and workers_ok and caps_ok
     if py_ok and sec_ok and sql_ok and tools_ok and dep_found == dep_total and phase2_ok:
         print(f"{OK} 모든 필수 체크 통과 — Phase 2 진입 가능")
         return 0
