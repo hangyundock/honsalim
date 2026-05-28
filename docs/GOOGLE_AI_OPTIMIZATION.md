@@ -147,6 +147,20 @@
 - `D:\autoblog\tistory_revival\TISTORY_DECISIONS.md` §Q (마스터 참조·tistory 적용)
 - AutoBlog 발견 추가: AI Overview 별도 기준 없음 [확정 P1B S7] — 본 프로젝트 M7 정합 강화
 
+### 7-bis-2. AutoBlog/tistory_revival prompt 코드 적용 [확정 세션 #6 2026-05-29]
+
+기존 AutoBlog/tistory_revival prompt에 이미 강한 정합 [확정]:
+- AutoBlog `src/content/templates/system_prompt.txt` Rule 1 (1인칭 차단)·Rule 12 (INFORMATION GAIN = non-commodity 명시)·Rule 13 (people-first)
+- tistory_revival `content_profiles.py` HEALTH·GENERAL system (가짜 1인칭 금지·의료 안전·과장 금지)
+
+본 세션 추가 강화 (사용자 명시 진행):
+- AutoBlog system_prompt.txt **Rule 14 신규** (Scaled Content Abuse 회피 — 키워드 클러스터 중복 글 70%+ 차별화 의무·`_quality_warning: duplicate_risk` 시그널)
+- AutoBlog system_prompt.txt **Rule 15 신규** (AUTHOR INTEGRITY — 가짜 author 주장 금지, QRG §4.5.3 정합)
+- tistory_revival `content_profiles.py` HEALTH·GENERAL 둘 다 **[차별화·non-commodity]·[저자 정직성]** 절 신규 추가
+- 검증: `python -c "..." → non-commodity in health/general: True` [확정]
+
+**결과**: AutoBlog/tistory_revival 매일 자동 발행 글에 본 정합 즉시 적용 (다음 호출부터).
+
 ## 9. AutoBlog 2주 SEO 조사 (P1A+P1B) 통합 — 본 프로젝트 적용
 
 > 출처: `D:\autoblog\tasks\TASK_019_FINAL_SYNTHESIS.md` §2 + `D:\autoblog\AUTOBLOG_SEO_MASTER.md` (혼살림 세션 #6 cross-project 검증)
