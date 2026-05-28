@@ -46,8 +46,8 @@
 
 ```
 Phase 0  설계        2026-05    ✅ 완료 (12개 설계 문서 + SUMMARY)
-Phase 1  인프라      2026-05~06 ✅ ~95% (GitHub·Cloudflare·도메인·R2·D1·secrets·pre-commit)
-Phase 2  핵심 시스템  2026-06~07 🔄 진행 중 (모듈 13개·회귀 247/247·CLI 8/11)
+Phase 1  인프라      2026-05~06 ✅ ~95% (GitHub·Cloudflare·도메인·R2·D1·secrets·pre-commit·AliExpress 승인)
+Phase 2  핵심 시스템  2026-06~07 ✅ ~95% (모듈 18개·회귀 342/342·CLI 10/11·Workers·tracker.report)
 Phase 3  디자인·콘텐츠 2026-07
 Phase 4  첫 출시      2026-07 말~08
 Phase 5  운영·확장    2026-08~11
@@ -55,15 +55,17 @@ Phase 6  6개월 결산   2026-12
 Phase 7  1년 결산     2027-06
 ```
 
-### Phase 2 진척 (세션 #4 기준)
+### Phase 2 진척 (세션 #6 기준)
 
-- **핵심 모듈 13개**: cli · common · validator · writer · collector · enricher · builder
-- **회귀 테스트 247/247 PASS** [확정]
-- **CLI 명령 8/11**: doctor · db migrate/seed · collect · enrich(dry_run) · validate · approve · unapprove
+- **핵심 모듈 18개**: cli · common(config·logging·grading·db·size_caps) · validator · writer · collector · enricher(meta_extractor·retry) · builder(jsonld·manifest) · deployer · tracker(d1_aggregator·report) · workers(go_gateway.js)
+- **회귀 테스트 342/342 PASS** [확정 pytest 9.0.3, 2.74초]
+- **CLI 명령 10/11**: doctor · db migrate/seed · collect · enrich(dry_run) · validate · approve · unapprove · deploy(dry_run, H4) · build(manifest stub). 남은 1개 dashboard는 Phase 3 디자인 의존
+- **doctor 14 게이트**: Python·의존성·secrets·DB·도구·git·DB 상태·prompt_templates·진입점 37·state_machine 매트릭스·tests 로드·Workers JS·size cap
 - **state_machine**: 6 상태 머신 (collected→enriched→validated→approved→published + rejected/unapprove)
-- **validator 4 게이트**: truth(가격·1인칭·AI 흔적·단정형) · schema(Article·ItemList·Product·Review) · disclosure(공정위) · links(단축 URL 차단·rel)
+- **validator 4 게이트**: truth(가격·1인칭·AI 흔적·단정형) · schema(Article·ItemList·Product·Review) · disclosure(공정위) · links(단축 URL 차단 13종·rel)
 - **Schema.org JSON-LD 빌더**: Article·ItemList·Product
 - **Claude API 재시도 정책** (BACKEND §3-5): RateLimit·Overloaded·Timeout·BadRequest·APIError
+- **CI 워크플로 3종**: build-and-deploy ✅ · lint ✅ · security(pip-audit 월간) ✅ · CodeQL ✅
 
 ## 설계 문서
 
@@ -72,6 +74,7 @@ Phase 7  1년 결산     2027-06
 | 문서 | 내용 |
 |------|------|
 | [SUMMARY.md](docs/SUMMARY.md) | 12편 1페이지 요약 + 결정 32개 매트릭스 |
+| [SUMMARY_PATCH_v1.1.md](docs/SUMMARY_PATCH_v1.1.md) | SUMMARY 진척 패치 — 결정 45 + REVIEW_QUESTIONS 23/25 자동 [확정] |
 | [PLAN.md](docs/PLAN.md) | 비전·KPI·로드맵·예산 |
 | [ARCH.md](docs/ARCH.md) | 시스템 아키텍처·모듈·외부 의존 |
 | [DB.md](docs/DB.md) | SQLite + D1 스키마 |

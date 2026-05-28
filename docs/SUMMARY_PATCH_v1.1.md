@@ -23,7 +23,7 @@
 | J7 | disclosure_first 추출/검증 분리 |
 | J8 | payload 책임 호출자 분리 |
 
-### K. 핵심 결정 4건 응답 — 5건 [확정 세션 #5]
+### K. 핵심 결정 5건 [확정 세션 #5]
 
 | # | 결정 |
 |---|------|
@@ -33,7 +33,7 @@
 | K4 | 모듈 분리 옵션 B (pyproject.toml flat 정합) |
 | K5 | prompt_loader Jinja2 `ChainableUndefined` 채택 |
 
-세션 #6 신규 결정 없음.
+세션 #6 신규 결정 없음 — 보안·운영 인프라 강화만 (DECISIONS 영구화 대상 X).
 
 ---
 
