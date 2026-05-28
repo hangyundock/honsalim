@@ -1,0 +1,39 @@
+# .gitattributes — line ending 통일 (LF)
+# 출처: 세션 #5 — Windows 로컬(autocrlf=true) vs Linux Actions black --check 차이 해소
+#
+# 효과:
+# - 텍스트 파일은 저장소에 LF로 저장 + checkout 시 OS native로 변환
+# - black/ruff/mypy 등 lint 도구의 line ending 의존 결과 일관성 확보
+# - Windows 로컬 working copy는 CRLF로 유지 (autocrlf=true 호환)
+
+# 모든 텍스트 파일 자동 감지 — CRLF/LF normalize
+* text=auto
+
+# Python / 설정 / 문서 — 항상 LF (lint 도구 정합)
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.sql text eol=lf
+*.js text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+
+# Windows 배치만 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# 바이너리 — 변환 금지
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.db binary
+*.sqlite binary

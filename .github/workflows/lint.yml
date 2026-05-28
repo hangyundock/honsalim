@@ -35,7 +35,13 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Black format check
-        run: black --check src tests
+        run: |
+          echo "--- versions ---"
+          black --version
+          ruff --version
+          mypy --version
+          echo "--- black --check (with diff) ---"
+          black --check --diff src tests
 
       - name: Ruff lint
         run: ruff check src tests
