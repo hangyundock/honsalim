@@ -103,6 +103,12 @@ doctor §10 진입점 **37개** (+5 tracker.report) + **§13 신설** Workers JS
   - doctor 검증: `[OK] secrets/ali.env (loaded)` + 환경 변수 길이/값 매칭 확인 (값 노출 없음, POLICY §14-bis-1 정합)
   - App Key/Secret은 Phase 5 시점 발급 (현재 본 프로젝트 Phase 1·2·3은 알리 미사용)
 
+- **push origin main 명시 승인·푸시 완료** [확정 세션 #5]:
+  - 사용자 "푸시해" 명시 승인 후 `git push origin main` 실행
+  - 결과: `c3e206f..6f14c42  main -> main` (fast-forward, force push 아님) — 본 세션 7 commits 모두 외부 백업
+  - origin/main..main = 0 (동기 검증)
+  - GitHub Actions 워크플로 자동 트리거 [관찰] (CodeQL·테스트 등)
+
 - **`pip install -e .[dev]` 명시 승인·설치·검증 완료** [확정]:
   - 사용자 "pip install 진행해" 명시 승인 (세션 #5)
   - Python 3.10.11 32-bit 시스템 Python에 editable 설치 — honsalim-0.1.0 wheel build 성공

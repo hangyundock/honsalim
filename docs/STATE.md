@@ -35,7 +35,7 @@
 | 프로젝트 폴더 | `D:\affiliate_hub\` (docs·archive·.claude/commands 하위) |
 | 사이트 / 도메인 | 혼살림 / **honsalim.com** (만료 2027-05-28·Auto Renew·SSL Active) |
 | 호스팅 | **Cloudflare Pages `honsalim`** + Custom domain (Dugi2020@naver.com) |
-| GitHub | **`hangyundock/honsalim` Public** — origin/main 동기 (세션 #5 검증 `git rev-list --count origin/main..main = 0`) [확정] |
+| GitHub | **`hangyundock/honsalim` Public** — origin/main 동기 [확정 세션 #5 push 후 `c3e206f..6f14c42`, 7 commits fast-forward]. GitHub Actions 자동 트리거 [관찰] |
 | GitHub Secrets / Branch Protection | CF_API_TOKEN · CF_ACCOUNT_ID · INDEXNOW_KEY 등록 / ruleset `main-protect` Active |
 | R2 / D1 | `honsalim-images` (APAC) / `honsalim-clicks` ID `9bae858e-456f-40e7-8084-c3b90e4ec3ca` |
 | Python | 3.10 32-bit (TIMA·AutoBlog 시스템 공유) |
@@ -70,7 +70,7 @@
 2. **SUMMARY.md / REVIEW_QUESTIONS.md 사용자 검토** — Phase 2 본격 진입 게이트
 3. (완료) ~~핵심 결정 4건~~ — DECISIONS K1·K2·K3·K4 [확정] 등재 (세션 #5)
 4. (완료) ~~`pip install -e .[dev]`~~ — 세션 #5 사용자 승인 후 설치. pytest 9.0.3·black 26.5.1·ruff 0.15.14·mypy 2.1.0·jinja2 3.1.6·markdown 3.10.2 등 모두 설치. 회귀 333/333 PASS + `honsalim` entry point 작동 + doctor 의존성 7/7 OK [확정]
-5. push origin main — 본 세션 추가 commit 누적 (사용자 승인 후)
+5. (완료) ~~push origin main~~ — 세션 #5 사용자 명시 승인 "푸시해" 후 7 commits 푸시 완료 [확정]
 
 ### Phase 2 진척 가능 (검토 영향 작음)
 - (현재 안전 진척 후보 모두 소진 — 다음은 사용자 검토 4건 의존)

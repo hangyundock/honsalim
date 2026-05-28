@@ -13,7 +13,7 @@
   - [x] K2 시나리오 우선순위: 현재 명세 그대로 [확정]
   - [x] K3 단축 URL: `n.kakao.com` + `naver.me` 추가 (11→13)
 - [x] ~~`pip install -e .[dev]` 사용자 명시 승인~~ — 세션 #5 설치·검증 완료 (회귀 333 PASS·`honsalim` entry point)
-- [ ] push origin main 사용자 승인 — 본 세션 commit 누적
+- [x] ~~push origin main 사용자 승인~~ — 세션 #5 "푸시해" 명시 승인 후 7 commits 푸시 완료 [확정 `c3e206f..6f14c42`]
 
 ## Phase 1: 인프라 — 남음 ⏳
 
