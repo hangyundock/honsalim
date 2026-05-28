@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import importlib.util
 import shutil
 import sqlite3
 import subprocess
@@ -178,6 +179,121 @@ def _check_git_repo() -> bool:
     return False
 
 
+def _check_prompt_templates() -> bool:
+    """BACKEND §3-3 명시 6종 prompt_templates 존재 확인."""
+    try:
+        from enricher.prompt_loader import KNOWN_TEMPLATES, verify_known_templates_present
+    except ImportError as e:
+        print(f"{FAIL} enricher.prompt_loader 로드 실패: {e}")
+        return False
+    present = verify_known_templates_present()
+    all_ok = True
+    for name in KNOWN_TEMPLATES:
+        if present.get(name):
+            print(f"{OK} prompt_templates/{name}.md")
+        else:
+            print(f"{FAIL} prompt_templates/{name}.md 누락")
+            all_ok = False
+    return all_ok
+
+
+def _check_phase2_modules() -> bool:
+    """Phase 2 핵심 모듈 import + 진입점 callable 확인.
+
+    BACKEND §2 모듈 인터페이스 명세 [확정] 기반.
+    """
+    checks: list[tuple[str, str]] = [
+        ("validator", "validate_all"),
+        ("validator", "serialize_report"),
+        ("validator", "check_truth"),
+        ("validator", "check_schema"),
+        ("validator", "check_disclosure"),
+        ("validator", "check_links"),
+        ("writer.article_writer", "create_draft"),
+        ("writer.article_writer", "save_enriched"),
+        ("writer.article_writer", "validate_and_save"),
+        ("writer.article_writer", "promote_to_article"),
+        ("writer.state_machine", "transition"),
+        ("writer.state_machine", "VALID_TRANSITIONS"),
+        ("enricher.claude_client", "ClaudeClient"),
+        ("enricher.meta_extractor", "MetaExtractor"),
+        ("collector.scenario_loader", "list_active_scenarios"),
+        ("collector.scenario_loader", "next_scenarios_for_collection"),
+    ]
+    all_ok = True
+    for mod_name, attr in checks:
+        try:
+            mod = importlib.import_module(mod_name)
+            target = getattr(mod, attr)
+            if target is None:
+                print(f"{FAIL} {mod_name}.{attr} (None)")
+                all_ok = False
+            else:
+                print(f"{OK} {mod_name}.{attr}")
+        except ImportError as e:
+            print(f"{FAIL} {mod_name} import 실패: {e}")
+            all_ok = False
+        except AttributeError:
+            print(f"{FAIL} {mod_name}.{attr} 누락")
+            all_ok = False
+    return all_ok
+
+
+def _check_state_machine_matrix() -> bool:
+    """DB §12-2 전이 매트릭스 정합성 (6 상태 + 정의된 전이만)."""
+    try:
+        from writer.state_machine import ALL_STATES, VALID_TRANSITIONS
+    except ImportError as e:
+        print(f"{FAIL} writer.state_machine 로드 실패: {e}")
+        return False
+    expected_states = {"collected", "enriched", "validated", "approved", "published", "rejected"}
+    if set(ALL_STATES) != expected_states:
+        print(f"{FAIL} ALL_STATES 불일치: {sorted(ALL_STATES)} vs {sorted(expected_states)}")
+        return False
+    # 매트릭스에서 도달 가능한 상태가 ALL_STATES에 모두 포함되는지
+    for src, targets in VALID_TRANSITIONS.items():
+        unknown = targets - ALL_STATES
+        if unknown:
+            print(f"{FAIL} 매트릭스 {src} → 알 수 없는 상태: {sorted(unknown)}")
+            return False
+    print(f"{OK} state_machine 6 상태 + 전이 매트릭스 정합 (DB §12-2)")
+    return True
+
+
+def _check_tests_loadable() -> bool:
+    """tests/ 모듈 로드 가능 확인 (회귀 인프라 헬스)."""
+    tests_dir = PROJECT_ROOT / "tests"
+    if not tests_dir.exists():
+        print(f"{WARN} tests/ 폴더 없음")
+        return False
+    test_files = sorted(tests_dir.glob("test_*.py"))
+    if not test_files:
+        print(f"{WARN} test_*.py 파일 없음")
+        return False
+    # tests/conftest.py가 src/를 sys.path에 추가하므로 사전 로드
+    conftest = tests_dir / "conftest.py"
+    if conftest.exists():
+        spec = importlib.util.spec_from_file_location("conftest", conftest)
+        if spec and spec.loader:
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+    all_ok = True
+    for tf in test_files:
+        spec = importlib.util.spec_from_file_location(tf.stem, tf)
+        if spec is None or spec.loader is None:
+            print(f"{FAIL} {tf.name} spec 생성 실패")
+            all_ok = False
+            continue
+        mod = importlib.util.module_from_spec(spec)
+        try:
+            spec.loader.exec_module(mod)
+            print(f"{OK} {tf.name}")
+        except Exception as e:
+            print(f"{FAIL} {tf.name} 로드 실패: {e}")
+            all_ok = False
+    return all_ok
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     """secrets·DB·외부 API 헬스 체크 (BACKEND §9 [확정])."""
     print("혼살림 doctor — Phase 1 인프라 헬스 체크")
@@ -207,11 +323,24 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _print_section("8. DB 상태 (data/honsalim.db)")
     _check_db_state()
 
+    _print_section("9. prompt_templates (BACKEND §3-3)")
+    tmpl_ok = _check_prompt_templates()
+
+    _print_section("10. Phase 2 모듈 진입점 (BACKEND §2)")
+    mod_ok = _check_phase2_modules()
+
+    _print_section("11. state_machine 매트릭스 (DB §12-2)")
+    sm_ok = _check_state_machine_matrix()
+
+    _print_section("12. tests 로드 가능 (회귀 인프라)")
+    tests_ok = _check_tests_loadable()
+
     _print_section("종합")
-    if py_ok and sec_ok and sql_ok and tools_ok and dep_found == dep_total:
+    phase2_ok = tmpl_ok and mod_ok and sm_ok and tests_ok
+    if py_ok and sec_ok and sql_ok and tools_ok and dep_found == dep_total and phase2_ok:
         print(f"{OK} 모든 필수 체크 통과 — Phase 2 진입 가능")
         return 0
-    if py_ok and sec_ok and sql_ok and tools_ok:
+    if py_ok and sec_ok and sql_ok and tools_ok and phase2_ok:
         print(
             f"{WARN} 의존성 일부 누락 ({dep_found}/{dep_total}) — `pip install -e .` 후 재실행 권장"
         )

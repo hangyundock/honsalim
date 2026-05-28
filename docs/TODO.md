@@ -25,7 +25,6 @@
 - [ ] 알리 승인 후 API 키 발급 + `ali.env` 작성
 - [ ] `.claude/settings.json` deny 룰 사용자 검토 (사전 작성 완료, AutoBlog 패턴 확장 deny 24·allow 14)
 - [ ] **윈도우 작업 스케줄러 등록**: Phase 2 코드 작성 후 (DECISIONS C7)
-- [ ] python -m honsalim doctor 전체 OK (Phase 2 진입 게이트)
 - [ ] Branch Protection에 Actions status check 추가 — Phase 2 코드 안정화 후
 
 ### 보류
@@ -47,8 +46,8 @@
 - [x] collector.scenario_loader (DB scenarios → 큐) + 11 회귀 테스트
 - [x] tests/test_db.py (12) + tests/test_cli.py (12) — 안정성 강화
 - [x] GitHub Actions workflows (build.yml·lint.yml) — Phase 1 사전 작성·세션 #3 버전 bump
-- [x] cli doctor + db migrate + db seed (CLI 3 명령)
-- [x] **회귀 테스트 145/145 PASS** [확정]
+- [x] cli doctor + db migrate + db seed (CLI 3 명령) + doctor §9~§12 보강 (Phase 2 게이트, 세션 #4)
+- [x] **회귀 테스트 149/149 PASS** [확정]
 
 ### 남음 ⏳ (검토 의존 큼)
 - [ ] collector.coupang (쿠팡 가입 후·Phase 4)

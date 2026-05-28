@@ -106,6 +106,26 @@ class TestConstants:
         assert (cli.PROJECT_ROOT / "src").exists()
 
 
+class TestPhase2HealthChecks:
+    """세션 #4 추가 — doctor §9~§12 헬스 체크 (BACKEND §3-3·§2 + DB §12-2 정합)."""
+
+    def test_prompt_templates_check_passes(self) -> None:
+        """BACKEND §3-3 명시 6종 prompt_templates 실제 존재."""
+        assert cli._check_prompt_templates() is True
+
+    def test_phase2_modules_check_passes(self) -> None:
+        """Phase 2 핵심 모듈 진입점 모두 import + callable."""
+        assert cli._check_phase2_modules() is True
+
+    def test_state_machine_matrix_check_passes(self) -> None:
+        """DB §12-2 전이 매트릭스 정합 (6 상태)."""
+        assert cli._check_state_machine_matrix() is True
+
+    def test_tests_loadable_check_passes(self) -> None:
+        """tests/ 모듈 모두 import 가능."""
+        assert cli._check_tests_loadable() is True
+
+
 if __name__ == "__main__":
     if pytest is not None:
         pytest.main([__file__, "-v"])
