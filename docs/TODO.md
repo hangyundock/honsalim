@@ -37,11 +37,11 @@
 
 ### 검토 의존 큼 (사용자 결정 후)
 - [ ] `collector.coupang` (쿠팡 가입 후·Phase 4)
-- [ ] `builder.manifest` 형태 결정 → 스키마 확정 적용 (인터페이스 stub 완료)
+- [x] ~~`builder.manifest` 형태 결정~~ (K1 [확정] JSON 파일)
 - [ ] `builder.renderer/pages/sitemap/assets` (Jinja2 + DESIGN 시안)
 - [ ] `dashboard.render/approve` (디자인 시안 Phase 3 의존)
-- [ ] `tracker.report` (주간·월간 HTML 리포트, dashboard 의존)
-- [ ] Workers `go_gateway.js` (Cloudflare Workers JS)
+- [x] ~~`tracker.report`~~ (세션 #5 데이터 집계 함수 완료, HTML 렌더는 dashboard 통합 시 jinja2 — `render_html_stub`만)
+- [x] ~~Workers `go_gateway.js`~~ (세션 #5 BACKEND §5 명세 충실 구현 — wrangler deploy는 사용자 명시 승인 후)
 - [ ] `python -m honsalim build --full` 성공 (Phase 2 종착)
 
 ## Phase 3: 디자인·콘텐츠 (2026-07)

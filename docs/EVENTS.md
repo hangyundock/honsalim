@@ -65,12 +65,42 @@ $ python -m src.cli doctor | grep 진입점
 - AliExpress 심사 결과 (D+1~D+4)
 - CLI dashboard 명령 — Phase 3 디자인 후
 
+**세션 #5 후반 진척 (사용자 "추천대로 진행 + 가능한 부분 다") [확정]**:
+
+핵심 결정 4건 모두 [확정] 응답 (DECISIONS K 카테고리 신설, commit `087035c`):
+- K1. manifest = `data/manifest.json` 단일 JSON 파일 [확정]
+- K2. 시나리오 우선순위 SCENARIOS §4-11 현재 명세 그대로 [확정]
+- K3. 외부 단축 URL 차단 11→13 (`n.kakao.com`+`naver.me`) — `src/validator/links.py` + POLICY §6-1 + 회귀 3 추가
+- K4. 모듈 분리 **옵션 B** (pyproject.toml flat 정합) — 옵션 A 변경 부담 큼(15+ 모듈)에 비해 효익 약함 판단. 코드 변경 0, pyproject만 수정
+
+Phase 2 잔존 모듈 본 세션 완료:
+- **`src/workers/go_gateway.js`** (BACKEND §5 [확정]) — Cloudflare Workers JS. /go/<slug> → D1 slug_map lookup → 302 redirect + 클릭 로그 비차단 INSERT. 보안 — IP 미저장 · UA SHA-256 16자 · referrer hostname만 · bot UA 별도 flag. wrangler deploy는 사용자 명시 승인 후
+- **`src/tracker/report.py`** (BACKEND §2-8 진입점) — `aggregate_weekly` · `aggregate_monthly` · `top_articles_by_clicks` · `weekly`/`monthly` 진입점 · `render_html_stub`. dashboard 디자인 의존 부분은 stub
+- **`scripts/run_tests.py`** — pytest 미설치 환경 일괄 회귀 헬퍼. Test* 클래스 자동 수집, tmp_path 의존은 자동 SKIP
+
+doctor §10 진입점 **37개** (+5 tracker.report) + **§13 신설** Workers JS 파일 점검 (export default 패턴 확인)
+
+회귀 일괄 검증 [확정 `scripts/run_tests.py`]:
+- **total=333 / pass=331 / fail=0 / skip=2** (tmp_path 픽스처 의존만 SKIP)
+- 신규: validator +3 (K3) + tracker +13 (report) + cli +15 (deploy/build) + integration +7 (deployer/tracker chain) = +38
+
+**합계 commit 진척 본 세션**:
+- `c77730d` CLI deploy/build + 통합 회귀 + doctor §10 보강
+- `1b09e8e` STATE 회귀 카운트 정정
+- `087035c` 핵심 결정 4건 [확정] (K1·K2·K3·K4)
+- (다음) Workers + tracker.report + 회귀 헬퍼 + doctor §13 등 본 보강 commit
+
+**잔존 (남은 Phase 2 코드 작업)**:
+- builder.renderer/pages/sitemap/assets — Phase 3 디자인 시안 의존
+- dashboard.render/approve — Phase 3 디자인 의존
+- collector.coupang — Phase 4 (쿠팡 재가입 후)
+
 **다음 세션 할 일**:
-1. SUMMARY.md/REVIEW_QUESTIONS.md/ARCH_MODULE_DIAGNOSIS.md/KEY_DECISIONS_REVIEW.md 정독 후 핵심 결정 4건 응답
-2. AliExpress 심사 결과 확인
-3. `pip install -e .[dev]` 명시 승인 → pytest로 회귀 317 일괄 재검증
-4. 결정 4건 응답 후 코드 반영
-5. dashboard 시안 진입 (Phase 3 — Claude Design)
+1. SUMMARY.md / REVIEW_QUESTIONS.md 정독 — Phase 2 본격 진입 게이트 (사용자 직접)
+2. AliExpress 심사 결과 확인 (D+1~D+4)
+3. `pip install -e .[dev]` 명시 승인 → pytest로 회귀 333 일괄 재검증 + entry point `honsalim` 명령 작동 확인 (K4 검증)
+4. push origin main 승인 (본 세션 commit 4건 누적 예정)
+5. dashboard 시안 진입 (Phase 3 — Claude Design, 사용자 직접)
 
 ### 세션 #4 — 2026-05-28 (Opus 4.7, Phase 2 풀 골격 + 검토 자료 + 메모리 강화, 회귀 95→295, 21 commits)
 

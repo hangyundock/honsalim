@@ -13,5 +13,22 @@ dry_run=True 기본 — D1 API 호출은 명시 승인 후.
 from __future__ import annotations
 
 from .d1_aggregator import aggregate, export_to_sqlite
+from .report import (
+    aggregate_monthly,
+    aggregate_weekly,
+    monthly,
+    render_html_stub,
+    top_articles_by_clicks,
+    weekly,
+)
 
-__all__ = ("aggregate", "export_to_sqlite")
+__all__ = (
+    "aggregate",
+    "export_to_sqlite",
+    "aggregate_weekly",
+    "aggregate_monthly",
+    "top_articles_by_clicks",
+    "render_html_stub",
+    "weekly",
+    "monthly",
+)

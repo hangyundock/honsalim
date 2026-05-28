@@ -235,6 +235,11 @@ def _check_phase2_modules() -> bool:
         ("deployer", "verify_deploy"),
         ("tracker", "aggregate"),
         ("tracker", "export_to_sqlite"),
+        ("tracker", "aggregate_weekly"),
+        ("tracker", "aggregate_monthly"),
+        ("tracker", "top_articles_by_clicks"),
+        ("tracker", "weekly"),
+        ("tracker", "monthly"),
     ]
     all_ok = True
     found = 0
@@ -277,6 +282,32 @@ def _check_state_machine_matrix() -> bool:
             return False
     print(f"{OK} state_machine 6 상태 + 전이 매트릭스 정합 (DB §12-2)")
     return True
+
+
+def _check_workers_files() -> bool:
+    """Workers JS 파일 존재 확인 (BACKEND §5 [확정]).
+
+    JS라 Python import 불가 — 파일 존재·기본 export 패턴만 점검.
+    """
+    workers_dir = PROJECT_ROOT / "src" / "workers"
+    if not workers_dir.exists():
+        print(f"{WARN} src/workers/ 폴더 없음 (BACKEND §5 미구현)")
+        return False
+    expected = ("go_gateway.js",)
+    all_ok = True
+    for name in expected:
+        p = workers_dir / name
+        if not p.exists():
+            print(f"{FAIL} src/workers/{name} 없음")
+            all_ok = False
+            continue
+        content = p.read_text(encoding="utf-8", errors="replace")
+        if "export default" not in content:
+            print(f"{WARN} src/workers/{name} — `export default` 패턴 누락 [관찰]")
+            all_ok = False
+        else:
+            print(f"{OK} src/workers/{name} (export default 확인)")
+    return all_ok
 
 
 def _check_tests_loadable() -> bool:
@@ -354,8 +385,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _print_section("12. tests 로드 가능 (회귀 인프라)")
     tests_ok = _check_tests_loadable()
 
+    _print_section("13. Workers JS 파일 (BACKEND §5)")
+    workers_ok = _check_workers_files()
+
     _print_section("종합")
-    phase2_ok = tmpl_ok and mod_ok and sm_ok and tests_ok
+    phase2_ok = tmpl_ok and mod_ok and sm_ok and tests_ok and workers_ok
     if py_ok and sec_ok and sql_ok and tools_ok and dep_found == dep_total and phase2_ok:
         print(f"{OK} 모든 필수 체크 통과 — Phase 2 진입 가능")
         return 0

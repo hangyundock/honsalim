@@ -7,11 +7,11 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 16개·회귀 295 PASS + 신규 25 [추정] + CLI 10/11 명령 + 결정 K1·K2·K3·K4 [확정]** | #5 (2026-05-28) |
+| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 18개·회귀 333 (331 PASS/0 FAIL/2 SKIP) [확정 직접 호출] + CLI 10/11 + 결정 K1~K4 + Workers + tracker.report** | #5 (2026-05-28) |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
-| Phase 2 핵심 모듈 16개 (#3~#4) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} · deployer/{git_push,wrangler,verify} · tracker/d1_aggregator | #4 |
-| Phase 2 회귀 테스트 | **320** (295 PASS [확정 #4 pytest] + 신규 25 [#5, 직접 호출 20 PASS, tmp_path 5건 pytest 환경 대기]) — validator **42** (+3 K3 단축 URL) + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + manifest 22 + db 12 + cli **46** + article_writer 25 + integration_phase2 **18** + deployer 14 + tracker 12 | #5 |
+| Phase 2 핵심 모듈 18개 (#3~#5) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} · deployer/{git_push,wrangler,verify} · tracker/{d1_aggregator,**report**} · **workers/go_gateway.js** | #5 |
+| Phase 2 회귀 테스트 | **333** (직접 호출 331 PASS / 0 FAIL / 2 SKIP — pytest tmp_path 의존) [확정 `scripts/run_tests.py`] — validator 42 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + manifest 22 + db 12 + cli 46 + article_writer 25 + integration_phase2 18 + deployer 14 + tracker **25** (+13 report) | #5 |
 | tracker.d1_aggregator (세션 #4) | BACKEND §2-8 [확정] — aggregate(date, dry_run=True) wrangler d1 execute · export_to_sqlite(aggregates) articles.view_count_cached UPDATE. D1 SQL UPSERT 패턴 (ON CONFLICT) — 재실행 안전 | #4 |
 | deployer (세션 #4) | BACKEND §2-7 [확정] — git_push · wrangler_deploy · verify_deploy. 모두 dry_run=True 기본 (외부 영향 차단, DECISIONS H4). 실제 push·deploy·HEAD는 사용자 명시 승인 후 dry_run=False | #4 |
 | builder.manifest (세션 #4) | DB §10 [추정] JSON 인터페이스 — new/load/save/upsert_article/upsert_asset/upsert_template/needs_rebuild (ARCH §7-3 5조건). 형태 결정은 사용자 검토 후 [확정] | #4 |
@@ -20,7 +20,7 @@
 | state_machine 매트릭스 보강 (세션 #4) | `approved → validated` 추가 — BACKEND §9 unapprove 정합. DB §12-2 매트릭스 갱신 | #4 |
 | Phase 2 통합 회귀 (세션 #4) | `tests/test_integration_phase2.py` 11 케이스 — 정상 전체 흐름(collected→published) + truth/disclosure fail rejected + rejected 재수집 + state_machine 위반 차단 + builder↔validator 정합 + content_hash/disclosure_first 자동 생성 + validation_report 영속화 | #4 |
 | Phase 2 흐름 골격 [관찰] | collected→enriched→validated/rejected→approved→published 6 상태 + 4 게이트 통합 (validate_and_save) + META-JSON 추출 + Article JSON-LD 빌더 + 1인칭/사진 게이트. 남은 영역: collector(쿠팡)·builder.manifest·dashboard·deployer·tracker | #4 |
-| doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 **32개** (deployer/tracker/manifest/compute_content_hash/extract_disclosure_first 등 망라) · §11 state_machine 매트릭스 · §12 tests 로드 가능 — Phase 2 진입 게이트 자동 점검 | #5 |
+| doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 **37개** (+tracker.report 5) · §11 state_machine 매트릭스 · §12 tests 로드 · **§13 Workers JS 파일 (go_gateway.js)** — Phase 2 진입 게이트 자동 점검 | #5 |
 | DB 초기화 | `data/honsalim.db` v1 + 13 테이블 + personas 3 + scenarios 10 (seed idempotent) | #3 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (PLAN·ARCH·DB·SCENARIOS·DESIGN·FRONTEND·BACKEND·POLICY·OPS·BACKUP·MAINTENANCE·SCHEDULE). 일관성 모순 0건 | #2 |
 | 사전 작성 산출물 (#2) | SQL 2편 + 설정 5건 + prompt_templates 6종 + 인프라 7건 (pyproject·wrangler·workflows·README·CHANGELOG 등). 세부는 EVENTS_202605.md | #2 |

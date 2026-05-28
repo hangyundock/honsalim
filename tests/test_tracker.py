@@ -185,6 +185,201 @@ class TestExportToSqlite:
             assert result.articles_updated == 0
 
 
+# ─── 세션 #5 — tracker.report (BACKEND §2-8 진입점) ─────────────────────
+
+
+def _seeded_clicks_db() -> sqlite3.Connection:
+    """in-memory DB + clicks_daily 시드."""
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(MIGRATION_001.read_text(encoding="utf-8"))
+    rows = [
+        ("2026-05-25", "wonroom-30", 10, 8, "KR"),
+        ("2026-05-26", "wonroom-30", 20, 15, "KR"),
+        ("2026-05-27", "wonroom-30", 5, 5, "KR"),
+        ("2026-05-26", "homeoffice-50", 15, 12, "KR"),
+        ("2026-05-28", "homeoffice-50", 30, 25, "KR"),
+        ("2026-04-15", "gaeul-30", 8, 7, "JP"),
+    ]
+    for date_, slug, c, uu, country in rows:
+        conn.execute(
+            "INSERT INTO clicks_daily (date, slug, click_count, unique_ua_count, top_country) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (date_, slug, c, uu, country),
+        )
+    conn.commit()
+    return conn
+
+
+class TestAggregateWeekly:
+    def test_weekly_range_includes_end(self) -> None:
+        from tracker.report import aggregate_weekly
+
+        conn = _seeded_clicks_db()
+        try:
+            data = aggregate_weekly(conn, end_date="2026-05-28")
+            assert data.period == "weekly"
+            assert data.start_date == "2026-05-22"
+            assert data.end_date == "2026-05-28"
+            # 7일 범위 합산: wonroom-30 = 10+20+5 = 35, homeoffice-50 = 15+30 = 45
+            assert data.total_clicks == 35 + 45
+            assert data.by_slug[0].slug == "homeoffice-50"  # clicks DESC
+            assert data.by_slug[0].click_count == 45
+            assert data.top_country == "KR"
+        finally:
+            conn.close()
+
+    def test_weekly_excludes_out_of_range(self) -> None:
+        from tracker.report import aggregate_weekly
+
+        conn = _seeded_clicks_db()
+        try:
+            data = aggregate_weekly(conn, end_date="2026-05-28")
+            slugs = {a.slug for a in data.by_slug}
+            assert "gaeul-30" not in slugs
+        finally:
+            conn.close()
+
+    def test_weekly_bad_date_rejected(self) -> None:
+        from tracker.report import aggregate_weekly
+
+        conn = _seeded_clicks_db()
+        try:
+            with raises(ValueError):
+                aggregate_weekly(conn, end_date="2026/05/28")
+        finally:
+            conn.close()
+
+
+class TestAggregateMonthly:
+    def test_monthly_includes_full_month(self) -> None:
+        from tracker.report import aggregate_monthly
+
+        conn = _seeded_clicks_db()
+        try:
+            data = aggregate_monthly(conn, year_month="2026-05")
+            assert data.period == "monthly"
+            assert data.start_date == "2026-05-01"
+            assert data.end_date == "2026-05-31"
+            # 5월: wonroom 35 + homeoffice 45 = 80
+            assert data.total_clicks == 80
+        finally:
+            conn.close()
+
+    def test_monthly_excludes_other_month(self) -> None:
+        from tracker.report import aggregate_monthly
+
+        conn = _seeded_clicks_db()
+        try:
+            data = aggregate_monthly(conn, year_month="2026-04")
+            assert data.total_clicks == 8  # gaeul-30만
+            assert len(data.by_slug) == 1
+            assert data.by_slug[0].slug == "gaeul-30"
+        finally:
+            conn.close()
+
+    def test_monthly_december_handles_year_end(self) -> None:
+        from tracker.report import aggregate_monthly
+
+        conn = _seeded_clicks_db()
+        try:
+            data = aggregate_monthly(conn, year_month="2026-12")
+            assert data.start_date == "2026-12-01"
+            assert data.end_date == "2026-12-31"
+        finally:
+            conn.close()
+
+    def test_monthly_bad_format_rejected(self) -> None:
+        from tracker.report import aggregate_monthly
+
+        conn = _seeded_clicks_db()
+        try:
+            with raises(ValueError):
+                aggregate_monthly(conn, year_month="2026/05")
+            with raises(ValueError):
+                aggregate_monthly(conn, year_month="2026-13")
+        finally:
+            conn.close()
+
+
+class TestTopArticles:
+    def test_top_articles_by_clicks_desc(self) -> None:
+        from tracker.report import top_articles_by_clicks
+
+        conn = _seeded_clicks_db()
+        try:
+            top = top_articles_by_clicks(conn, since_date="2026-05-01", limit=10)
+            assert top[0].slug == "homeoffice-50"
+            assert top[0].click_count == 45
+            assert top[1].slug == "wonroom-30"
+            assert top[1].click_count == 35
+        finally:
+            conn.close()
+
+    def test_top_articles_limit_respected(self) -> None:
+        from tracker.report import top_articles_by_clicks
+
+        conn = _seeded_clicks_db()
+        try:
+            top = top_articles_by_clicks(conn, since_date="2026-05-01", limit=1)
+            assert len(top) == 1
+            assert top[0].slug == "homeoffice-50"
+        finally:
+            conn.close()
+
+    def test_top_articles_invalid_limit(self) -> None:
+        from tracker.report import top_articles_by_clicks
+
+        conn = _seeded_clicks_db()
+        try:
+            with raises(ValueError):
+                top_articles_by_clicks(conn, since_date="2026-05-01", limit=0)
+        finally:
+            conn.close()
+
+
+class TestWeeklyMonthlyEntrypoints:
+    def test_weekly_entrypoint_with_render(self) -> None:
+        from tracker.report import weekly
+
+        conn = _seeded_clicks_db()
+        try:
+            result = weekly(conn, end_date="2026-05-28", render=True)
+            assert result["data"].period == "weekly"
+            assert result["html"] is not None
+            assert "[STUB]" in result["html"]
+            assert "weekly" in result["html"]
+        finally:
+            conn.close()
+
+    def test_monthly_entrypoint_without_render(self) -> None:
+        from tracker.report import monthly
+
+        conn = _seeded_clicks_db()
+        try:
+            result = monthly(conn, year_month="2026-05", render=False)
+            assert result["data"].period == "monthly"
+            assert result["html"] is None
+        finally:
+            conn.close()
+
+
+class TestRenderHtmlStub:
+    def test_stub_includes_summary_fields(self) -> None:
+        from tracker.report import aggregate_weekly, render_html_stub
+
+        conn = _seeded_clicks_db()
+        try:
+            data = aggregate_weekly(conn, end_date="2026-05-28")
+            html = render_html_stub(data)
+            assert "[STUB]" in html
+            assert "weekly" in html
+            assert "2026-05-22~2026-05-28" in html
+            assert "total_clicks=" in html
+            assert "homeoffice-50" in html
+        finally:
+            conn.close()
+
+
 if __name__ == "__main__":
     if pytest is not None:
         pytest.main([__file__, "-v"])
