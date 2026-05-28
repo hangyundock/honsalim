@@ -136,6 +136,21 @@
 - **L7. AI 이미지 명시 표기 [확정 세션 #6]**: 글 footer에 "이미지는 AI 생성 일러스트레이션" 한 줄 명시 의무. 한국 표시광고법상 명시 의무는 없으나 [확인 불가, 2026-05], 신뢰도·Google Helpful Content 안전 + 1인칭 차단 정합. 인물 이미지는 자제 (인테리어 분위기만) — 세션 #6
 - **L8. 상품 이미지 = 쿠팡 공식 위젯 [확정 세션 #6]**: 추천 상품 이미지는 **쿠팡 공식 위젯 embed**만 사용. Imagen으로 상품 이미지 생성 금지 (실제 제품 정확성·법규 — 가짜 제품 이미지 = 소비자 기만). 쿠팡 CDN 직접 다운로드 금지 유지 — 세션 #6
 
+## M. Google AI 검색 최적화 정합 [확정] — 세션 #6 신규
+
+> 출처: Google Search Central 공식 가이드 "AI Optimization Guide" (2026-05-15 발표) — 사용자 명시 의무 적용.
+> 원본: https://developers.google.com/search/docs/fundamentals/ai-optimization-guide?hl=ko
+> 본 프로젝트 정합 매트릭스: `docs/GOOGLE_AI_OPTIMIZATION.md`
+> 핵심: Google 공식 "AEO/GEO = SEO". 기존 SEO 정책 그대로 유효 + 6건 강화.
+
+- **M1. non-commodity content 의무 [확정]**: Claude API enricher prompt에 "일반 지식 reword 회피, 시나리오 페르소나×예산×시즌 결합 고유 인사이트 의무" 명시. Google 예시: ❌ "7 Tips for First-Time Homebuyers" / ✅ "Why We Waived the Inspection & Saved Money". `src/enricher/prompt_templates/article_main.md` 갱신 의무 (Phase 2 진척) — 세션 #6
+- **M2. E-E-A-T author 강화 [확정]**: `Person` Schema (운영자) + author 메타 + about 페이지 운영자 정보 명시 (Phase 4 진입 시). publisher Schema(이미 [확정 POLICY §4-1])와 정합 — 세션 #6
+- **M3. 시나리오 매트릭스 "확장 콘텐츠 악용" 회피 [확정]**: SCENARIOS §2-1 60 슬롯 매트릭스 — 페르소나×예산×시즌 결합 진짜 다른 가치 의무. 단순 변형 (예: "30만 자취"·"35만 자취" 만 다른 글) 회피. Google 공식 "확장된 콘텐츠 악용 = 모든 검색 변형에 별도 콘텐츠 = 스팸 정책 위반" 정합. SCENARIOS §2-1 차별화 기준 명시 의무 — 세션 #6
+- **M4. AI 이미지 시각 검수 [확정]**: AutoBlog `D:\autoblog\tistory_revival\image_qa.py` 패턴 이식 → `src/validator/image_qa.py` 신설 (Phase 3 시점). 가짜 보임·일관성 자동 점검. Google "고화질 멀티미디어" 권장 정합 — 세션 #6
+- **M5. Google Business Profile 등록 [확정]**: Phase 4 사업자 등록 후 등록 (운영자 신뢰성·로컬 노출). Google 공식 권장 — 세션 #6
+- **M6. UCP 프로토콜 (AI Agent) [확정 검토 보류]**: Universal Commerce Protocol (ucp.dev) Phase 6+ 검토. Google AI Agent (Search 내 챗) 대응 — 세션 #6
+- **M7. llms.txt·콘텐츠 청킹·AI 재작성·특수 Schema 안 함 [확정]**: Google 공식 명시 부정 — 본 프로젝트 추가 작업 의무 없음. 본 결정 영구화로 다음 세션 재검토 회피 — 세션 #6
+
 ## 폐기된 결정 (역사 참조용)
 
 | 폐기일 | 결정 | 폐기 사유 |

@@ -302,7 +302,24 @@
 - **POLICY §3-1-3·§3-1-7·§3-3** 재갱신 — 1인칭 무조건 fail. 페르소나 사진 → AI 생성 이미지 (`source_type='ai_generated'` + `ai_model` + `prompt_used` 메타)
 - **DESIGN §11-2** 재갱신 — 사진 사전 촬영 폐기. Google AI Studio API 키 발급·결제 활성화로 대체
 - **`src/validator/truth.py`** — `_check_first_person` 단순화 (인자 없음, 무조건 차단). 이슈 코드 `first_person_forbidden`. 회귀 갱신 (validator 43→43, owned_products 우회 케이스 폐기)
-- **예산 영향** [관찰] — Imagen $0.02/장 × 100편 × 6장 = $24/월 ≈ 32,000원 → PLAN §8 갱신 의무 (다음 세션)
+- **예산 영향** [관찰] — Imagen $0.02/장 × 100편 × 6장 = $24/월 ≈ 32,000원 → PLAN §8 갱신 완료 (commit 42a2921)
+
+### Added (Google AI Optimization Guide 정합 — DECISIONS M 신설 7건)
+
+- **출처**: Google Search Central 공식 가이드 (2026-05-15 발표). 사용자 명시 의무 적용 → 본 프로젝트 docs 영구 반영.
+- **`docs/GOOGLE_AI_OPTIMIZATION.md` 신설** — 공식 가이드 핵심 + 본 프로젝트 정합 매트릭스 + 강화 작업 6건
+- **DECISIONS M1~M7 신설**:
+  - M1 non-commodity content 의무 (Claude prompt 갱신)
+  - M2 E-E-A-T author 강화 (Phase 4)
+  - M3 시나리오 매트릭스 차별화 의무 (확장 콘텐츠 악용 회피)
+  - M4 AI 이미지 시각 검수 모듈 (Phase 3, AutoBlog image_qa.py 패턴)
+  - M5 Google Business Profile 등록 (Phase 4)
+  - M6 UCP 프로토콜 (Phase 6+, AI Agent)
+  - M7 llms.txt·청킹·AI 재작성·특수 Schema 안 함 (Google 부정)
+- **SCENARIOS §2-1** — 60 슬롯 매트릭스 차별화 의무 명시 (M3)
+- **`src/enricher/prompt_templates/article_main.md`** — 1인칭 금지 + non-commodity 의무 명시 (L3·M1)
+- **핵심 메시지**: Google "AEO/GEO = SEO". 기존 SEO 그대로 유효 + 6건 강화. llms.txt 등 "AI 해킹" 회피
+- **PLAN/SUMMARY_PATCH** 갱신 — Imagen 예산 (42a2921) + M 카테고리
 
 ### Known (다음 세션 처리)
 

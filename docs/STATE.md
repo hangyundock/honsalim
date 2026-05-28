@@ -7,7 +7,7 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 18개 + common.size_caps·회귀 343 PASS + CLI 10/11 + 결정 K1~K5 + L1~L8 (위키바이형 + AI 이미지 Google Imagen 4 Fast) + Workers + tracker.report + doctor §14 + IMAGE_GENERATION.md** | #6 (2026-05-28) |
+| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 18개 + common.size_caps·회귀 342 PASS + CLI 10/11 + 결정 K1~K5 + L1~L8 (위키바이형 + AI Imagen) + M1~M7 (Google AI Optimization 정합) + Workers + tracker.report + doctor §14 + IMAGE_GENERATION + GOOGLE_AI_OPTIMIZATION** | #6 (2026-05-28) |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
 | Phase 2 핵심 모듈 18개 (#3~#5) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} · deployer/{git_push,wrangler,verify} · tracker/{d1_aggregator,**report**} · **workers/go_gateway.js** | #5 |

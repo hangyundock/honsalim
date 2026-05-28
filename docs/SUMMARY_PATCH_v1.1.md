@@ -49,6 +49,21 @@
 **폐기**: E8 (한국어 1인칭 허용) · D5 (시나리오당 사진 의무) · L2/L3 1차 초안.
 **참조**: `docs/IMAGE_GENERATION.md` (도구·API·프롬프트·예산 명세).
 
+### M. Google AI 검색 최적화 정합 — 7건 [확정 세션 #6, Google 공식 2026-05-15]
+
+| # | 결정 |
+|---|------|
+| M1 | non-commodity content 의무 (Claude prompt 갱신) |
+| M2 | E-E-A-T author 강화 (Person Schema·about 운영자 정보) |
+| M3 | 시나리오 매트릭스 차별화 의무 (확장 콘텐츠 악용 회피) |
+| M4 | AI 이미지 시각 검수 모듈 (AutoBlog image_qa.py 패턴) |
+| M5 | Google Business Profile 등록 (Phase 4) |
+| M6 | UCP 프로토콜 검토 (Phase 6+, AI Agent) |
+| M7 | llms.txt·청킹·AI 재작성·특수 Schema 안 함 (Google 공식 부정) |
+
+**핵심**: Google "AEO/GEO = SEO". 기존 SEO 그대로 유지 + 6건 강화.
+**참조**: `docs/GOOGLE_AI_OPTIMIZATION.md` (공식 가이드 + 본 프로젝트 정합 매트릭스).
+
 ---
 
 ## 2. SUMMARY §5 Phase 일정 — 진척 갱신

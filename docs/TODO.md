@@ -9,18 +9,12 @@
 - [ ] **docs/SUMMARY.md / REVIEW_QUESTIONS.md + SUMMARY_PATCH_v1.1.md 정독** — Phase 3 진입 게이트 (2026-07 이전까지, 약 30분 예상)
 - [ ] **pip-audit 16건 환경 갱신** — `docs/PIP_AUDIT_ANALYSIS.md` 참조 (A/B/C 안). pip install -U 사용자 명시 승인 후
 
-## 세션 #6 완료 항목 (참고)
-- [x] **DECISIONS L 카테고리 신설 + 2차 재변경 (AI 이미지 Google Imagen 4 Fast)** — L1~L8 + E8·D5·L2/L3 1차 폐기. `docs/IMAGE_GENERATION.md` 신설 (AutoBlog 패턴 이식). POLICY §3 + DESIGN §11-2 + validator/truth.py 1인칭 무조건 차단 + 회귀 갱신
-- [ ] **Phase 3 시작 전 사용자 사전 작업**: Google AI Studio API 키 발급 + 결제 활성화 (https://aistudio.google.com) + `D:\secrets\affiliate_hub\google.env` 신설 (`GOOGLE_API_KEY=<key>`)
-- [ ] **알리 이미지·상세페이지 사용 정책 조사** — AliExpress Affiliate 약관 + Portal API `image_url`/`product_detail_url` 정확 사용 범위. 결과 DECISIONS 등재 + POLICY §3-3 갱신 (현재 본 프로젝트 docs에 명시 없음, Phase 5 진입 전 의무)
-- [x] CI lint #15 Black format check fail fix (commit 90d60f6, test 3건 black 26.5.1 inline 정합)
-- [x] pyproject.toml 직접 의존 3건 lower-bound (pillow/requests/python-dotenv, commit 5f6dfde)
-- [x] scripts/check_size_caps.py + 회귀 9 (commit bf82c73 → 55243bc 통합)
-- [x] .github/workflows/security.yml — pip-audit 월간 + JSON artifact 90일 (commit 987afed, DECISIONS I4 정합)
-- [x] docs/SUMMARY_PATCH_v1.1.md — 사용자 정독 보조 (commit f9299ab)
-- [x] doctor §14 docs/ size cap 통합 + common.size_caps 모듈 (commit 55243bc)
-- [x] 영구 메모리 신설 — [[no-end-of-step-prompting]] 세션 #6 사용자 비판 반영
+## 세션 #6 잔존 사용자 결정 의존
+- [ ] **Phase 3 사전 작업**: Google AI Studio API 키 발급 + 결제 + `D:\secrets\affiliate_hub\google.env` (`GOOGLE_API_KEY=<key>`)
+- [ ] **알리 이미지·상세페이지 정책 조사** — Phase 5 진입 전 (현재 docs 명시 없음)
+- [ ] **M2/M4/M5/M6 Phase 3~6 진척 시점 작업** — `docs/GOOGLE_AI_OPTIMIZATION.md` §6
 
+> 세션 #6 완료 commits·항목은 docs/CHANGELOG.md v1.6 / EVENTS.md / STATE.md 참조.
 > 세션 #5 이전 완료 항목은 EVENTS.md / STATE.md "진행 단계" 행 참조.
 
 ## Phase 1: 인프라 — 남음 ⏳
