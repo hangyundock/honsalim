@@ -65,10 +65,11 @@
 ### ★ 시급 (다음 세션)
 1. **알리 심사 결과 확인** (이메일, 2026-05-29~06-01 예상)
 2. **SUMMARY.md / REVIEW_QUESTIONS.md 사용자 검토** — Phase 2 본격 진입 게이트
-3. **ARCH §4 모듈 분리 결정 — 옵션 A/B/C 선택** (자료: docs/ARCH_MODULE_DIAGNOSIS.md, 세션 #4 작성)
-4. 핵심 결정 잔여 3건 검토 (manifest 형태·시나리오 우선순위·단축 URL 목록)
-5. `pip install -e .[dev]` 사용자 명시 승인 (옵션 A·B·C 어느 쪽이든 적용 가능)
-6. push origin main 사용자 승인 (15 commit ahead)
+3. **핵심 결정 4건 사용자 답변** — 자료 완비:
+   - 모듈 분리 → [ARCH_MODULE_DIAGNOSIS.md](ARCH_MODULE_DIAGNOSIS.md) 옵션 A/B/C
+   - manifest 형태 · 시나리오 우선순위 · 단축 URL 목록 → [KEY_DECISIONS_REVIEW.md](KEY_DECISIONS_REVIEW.md)
+4. `pip install -e .[dev]` 사용자 명시 승인
+5. push origin main 사용자 승인 (16 commit ahead)
 
 ### Phase 2 진척 가능 (검토 영향 작음)
 - (현재 안전 진척 후보 모두 소진 — 다음은 사용자 검토 4건 의존)
