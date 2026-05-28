@@ -7,13 +7,14 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 11개·회귀 137 PASS** [확정] | #4 (2026-05-28) |
+| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 11개·회귀 145 PASS** [확정] | #4 (2026-05-28) |
 | 운영 모델 (세션 #2 후반) | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건 + GitHub 보안 다중 방어 | #2 |
 | Phase 1 외부 작업 완료 | GitHub(2FA·보안 5종) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic 키 · secrets .env · Git init·push · 알리 가입 신청 | #2 |
 | Phase 1 세션 #3 정합성 | detect-secrets baseline UTF-8 + hook v1.5.0 · Dependabot PR 3건 일괄 처리 · gitignore SQLite WAL · settings.json Glob 차단 · INDEXNOW_KEY 발급·GitHub Secrets 3개 등록 · Branch Protection ruleset `main-protect` Active | #3 |
 | Phase 2 핵심 모듈 11개 (세션 #3~#4) | `src/cli.py` (doctor + db migrate + db seed) · `src/common/{config,logging,grading,db}.py` · `src/validator/{truth,schema,disclosure,links}.py` · `src/writer/{state_machine,article_writer}.py` · `src/collector/scenario_loader.py` · `src/enricher/{prompt_loader,claude_client,meta_extractor}.py` | #4 |
-| Phase 2 회귀 테스트 | **137/137 PASS** [확정] — validator 36 + state_machine 13 + scenario_loader 11 + enricher 13 + meta_extractor 31 + db 12 + cli 12 + article_writer 9. `tests/conftest.py` + 8 test 파일. pytest 미설치 환경에서도 standard library 직접 호출 가능 구조 | #4 |
-| validator 보강 (세션 #4) | truth: 1인칭/사진 게이트 (POLICY §3-1-3 [확정]) + AI soft 임계 (VALIDATOR §4 [관찰]) · schema: ItemList·Product 필수 필드 (VALIDATOR §8 [확정]) | #4 |
+| Phase 2 회귀 테스트 | **145/145 PASS** [확정] — validator 39 + state_machine 13 + scenario_loader 11 + enricher 13 + meta_extractor 31 + db 12 + cli 12 + article_writer 14. `tests/conftest.py` + 8 test 파일. pytest 미설치 환경에서도 standard library 직접 호출 가능 구조 | #4 |
+| validator 보강 (세션 #4) | truth: 1인칭/사진 게이트 (POLICY §3-1-3 [확정]) + AI soft 임계 (VALIDATOR §4 [관찰]) · schema: ItemList·Product 필수 필드 (VALIDATOR §8 [확정]) · serialize_report 직렬화 헬퍼 | #4 |
+| writer ↔ validator 통합 (세션 #4) | `article_writer.validate_and_save(conn, draft_id, payload)` — BACKEND §2-3 흐름 (validate_all → serialize → save_validation_report → transition validated/rejected). writer → validator 단방향 의존 | #4 |
 | DB 초기화 | `data/honsalim.db` 생성 + schema_version v1 + 13 테이블 + personas 3 + scenarios 10 (seed idempotent INSERT OR IGNORE) | #3 |
 | Phase 1 보류·대기 | BitLocker (사용자 결정) · 쿠팡 (Phase 4 후) · 알리 심사 대기 (1~2영업일) · Actions status check 등록 (Phase 2 코드 후) · pip install -e .[dev] (jinja2·markdown·pytest 등 사용자 승인) | #3 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (PLAN·ARCH·DB·SCENARIOS·DESIGN·FRONTEND·BACKEND·POLICY·OPS·BACKUP·MAINTENANCE·SCHEDULE + SUMMARY 비개발자 요약) | #2 |

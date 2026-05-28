@@ -170,6 +170,113 @@ class TestPromoteToArticle:
             article_writer.promote_to_article(conn, did, incomplete)
 
 
+# ─── validate_and_save — validator 4 게이트 통합 흐름 ─────────────────
+
+GOOD_PAYLOAD_BODY = (
+    "이 글은 쿠팡 파트너스 활동의 일환으로 일정 수수료를 받을 수 있습니다.\n"
+    "\n# 본문 시작\n"
+    "원룸 첫 자취 가이드입니다. 가격 290,000원 모델 추천.\n"
+    "\n## 푸터\n"
+    "본인은 쿠팡 파트너스 및 AliExpress 활동으로 수수료를 받을 수 있습니다."
+)
+
+
+def _good_article_jsonld() -> str:
+    return json.dumps(
+        {
+            "@context": "https://schema.org",
+            "@type": "Article",
+            "headline": "원룸",
+            "description": "가이드",
+            "image": "https://honsalim.com/i.jpg",
+            "datePublished": "2026-05-28",
+            "dateModified": "2026-05-28",
+            "author": {"@type": "Person", "name": "운영자"},
+            "publisher": {"@type": "Organization", "name": "혼살림"},
+            "mainEntityOfPage": "https://honsalim.com/articles/x",
+        }
+    )
+
+
+def _draft_at_enriched(conn: sqlite3.Connection) -> int:
+    """create → transition(enriched) 까지 진행한 draft."""
+    did = article_writer.create_draft(conn, scenario_id=1)
+    transition(conn, did, "enriched")
+    return int(did)
+
+
+class TestValidateAndSave:
+    def test_all_pass_transitions_to_validated(self) -> None:
+        conn = _seeded_db()
+        did = _draft_at_enriched(conn)
+        payload = {
+            "body_md": GOOD_PAYLOAD_BODY,
+            "schema_jsonld": _good_article_jsonld(),
+            "products": [],
+        }
+        overall, report = article_writer.validate_and_save(conn, did, payload)
+        assert overall is True
+        assert report["overall_pass"] is True
+        status = conn.execute("SELECT status FROM drafts WHERE id = ?", (did,)).fetchone()[0]
+        assert status == "validated"
+
+    def test_truth_fail_transitions_to_rejected(self) -> None:
+        conn = _seeded_db()
+        did = _draft_at_enriched(conn)
+        payload = {
+            "body_md": "본 글은 AI로 작성되었습니다.",
+            "schema_jsonld": _good_article_jsonld(),
+            "products": [],
+        }
+        overall, report = article_writer.validate_and_save(conn, did, payload)
+        assert overall is False
+        assert report["gates"]["truth"]["pass"] is False
+        status = conn.execute("SELECT status FROM drafts WHERE id = ?", (did,)).fetchone()[0]
+        assert status == "rejected"
+
+    def test_disclosure_fail_transitions_to_rejected(self) -> None:
+        conn = _seeded_db()
+        did = _draft_at_enriched(conn)
+        payload = {
+            "body_md": "일반 본문입니다. 가격 290,000원.",  # disclosure 키워드 없음
+            "schema_jsonld": _good_article_jsonld(),
+            "products": [],
+        }
+        overall, report = article_writer.validate_and_save(conn, did, payload)
+        assert overall is False
+        assert report["gates"]["disclosure"]["pass"] is False
+        status = conn.execute("SELECT status FROM drafts WHERE id = ?", (did,)).fetchone()[0]
+        assert status == "rejected"
+
+    def test_persists_validation_report(self) -> None:
+        conn = _seeded_db()
+        did = _draft_at_enriched(conn)
+        payload = {
+            "body_md": GOOD_PAYLOAD_BODY,
+            "schema_jsonld": _good_article_jsonld(),
+            "products": [],
+        }
+        article_writer.validate_and_save(conn, did, payload)
+        raw = conn.execute("SELECT validation_report FROM drafts WHERE id = ?", (did,)).fetchone()[
+            0
+        ]
+        rpt = json.loads(raw)
+        assert rpt["overall_pass"] is True
+        assert set(rpt["gates"]) == {"truth", "schema", "disclosure", "links"}
+
+    def test_requires_enriched_status(self) -> None:
+        """status='collected' 인 draft에 호출 시 IllegalStateError (state_machine 매트릭스)."""
+        conn = _seeded_db()
+        did = article_writer.create_draft(conn, scenario_id=1)  # collected
+        payload = {
+            "body_md": GOOD_PAYLOAD_BODY,
+            "schema_jsonld": _good_article_jsonld(),
+            "products": [],
+        }
+        with raises(IllegalStateError):
+            article_writer.validate_and_save(conn, did, payload)
+
+
 if __name__ == "__main__":
     if pytest is not None:
         pytest.main([__file__, "-v"])

@@ -12,7 +12,14 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from validator import check_disclosure, check_links, check_schema, check_truth, validate_all
+from validator import (
+    check_disclosure,
+    check_links,
+    check_schema,
+    check_truth,
+    serialize_report,
+    validate_all,
+)
 
 # ─── 공통 픽스처 ──────────────────────────────────────────────────────
 
@@ -350,6 +357,42 @@ class TestValidateAll:
             assert isinstance(ok, bool)
             assert "issues" in rpt
             assert rpt["gate"] == gate
+
+
+# ─── serialize_report — JSON 직렬화 ──────────────────────────────────
+
+
+class TestSerializeReport:
+    def test_all_pass_overall_true(self) -> None:
+        payload: dict[str, Any] = {
+            "body_md": GOOD_DISCLOSURE_BODY,
+            "schema_jsonld": _good_article_schema(),
+            "products": [],
+        }
+        report = serialize_report(validate_all(payload))
+        assert report["overall_pass"] is True
+        for gate in ("truth", "schema", "disclosure", "links"):
+            assert gate in report["gates"]
+            assert report["gates"][gate]["pass"] is True
+            assert report["gates"][gate]["issues"] == []
+
+    def test_any_fail_overall_false(self) -> None:
+        payload: dict[str, Any] = {
+            "body_md": "본 글은 AI로 작성되었습니다.",  # truth fail (AI hard)
+            "schema_jsonld": None,  # schema fail
+            "products": [],
+        }
+        report = serialize_report(validate_all(payload))
+        assert report["overall_pass"] is False
+        assert report["gates"]["truth"]["pass"] is False
+        assert report["gates"]["schema"]["pass"] is False
+        assert len(report["gates"]["truth"]["issues"]) > 0
+
+    def test_serialized_is_json_safe(self) -> None:
+        """결과 dict가 json.dumps로 직렬화 가능해야 함."""
+        payload: dict[str, Any] = {"body_md": "x", "schema_jsonld": None, "products": []}
+        report = serialize_report(validate_all(payload))
+        json.dumps(report)  # 예외 없으면 OK
 
 
 if __name__ == "__main__":

@@ -40,14 +40,15 @@
 - [x] DB 마이그레이션 적용 — `data/honsalim.db` v1 + 13 테이블 + personas 3·scenarios 10
 - [x] enricher.claude_client stub + prompt_loader (6 templates 로드)
 - [x] enricher.meta_extractor (META-JSON 분리 추출) + 31 회귀 테스트 — 세션 #4
-- [x] validator 4모듈 (truth·schema·disclosure·links) + 36 회귀 테스트 (세션 #4 보강: 1인칭/사진 게이트·AI soft 임계·Schema ItemList/Product)
+- [x] validator 4모듈 (truth·schema·disclosure·links) + 39 회귀 테스트 (세션 #4 보강: 1인칭/사진 게이트·AI soft 임계·Schema ItemList/Product·serialize_report 헬퍼)
+- [x] writer ↔ validator 통합: `validate_and_save` (BACKEND §2-3 흐름, 세션 #4)
 - [x] writer.state_machine (DB §12 6 상태 머신) + 13 회귀 테스트
 - [x] writer.article_writer (drafts INSERT + promote_to_article) + 9 회귀 테스트
 - [x] collector.scenario_loader (DB scenarios → 큐) + 11 회귀 테스트
 - [x] tests/test_db.py (12) + tests/test_cli.py (12) — 안정성 강화
 - [x] GitHub Actions workflows (build.yml·lint.yml) — Phase 1 사전 작성·세션 #3 버전 bump
 - [x] cli doctor + db migrate + db seed (CLI 3 명령)
-- [x] **회귀 테스트 137/137 PASS** [확정]
+- [x] **회귀 테스트 145/145 PASS** [확정]
 
 ### 남음 ⏳ (검토 의존 큼)
 - [ ] collector.coupang (쿠팡 가입 후·Phase 4)

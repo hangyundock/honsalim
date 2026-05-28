@@ -26,6 +26,7 @@ __all__ = (
     "check_disclosure",
     "check_links",
     "validate_all",
+    "serialize_report",
 )
 
 
@@ -36,6 +37,7 @@ def validate_all(payload: dict[str, Any]) -> dict[str, tuple[bool, dict[str, Any
     - body_md       : 본문 Markdown
     - schema_jsonld : Schema.org JSON-LD 문자열
     - products      : [{id, price_krw, ...}, ...] 가격 검증용
+    - photos        : list — 1인칭 게이트용 (POLICY §3-1-3)
 
     반환: { gate_name: (pass, report) }
     """
@@ -45,3 +47,30 @@ def validate_all(payload: dict[str, Any]) -> dict[str, tuple[bool, dict[str, Any
         "disclosure": check_disclosure(payload.get("body_md")),
         "links": check_links(payload.get("body_md")),
     }
+
+
+def serialize_report(
+    results: dict[str, tuple[bool, dict[str, Any]]],
+) -> dict[str, Any]:
+    """validate_all 결과를 JSON 직렬화 가능한 dict로 정돈.
+
+    구조:
+    {
+      "overall_pass": bool,
+      "gates": {
+        "truth":      {"pass": bool, "issues": [...]},
+        "schema":     {"pass": bool, "issues": [...]},
+        "disclosure": {"pass": bool, "issues": [...]},
+        "links":      {"pass": bool, "issues": [...]},
+      }
+    }
+
+    drafts.validation_report 컬럼 저장용 (DB §5).
+    """
+    gates: dict[str, dict[str, Any]] = {}
+    overall = True
+    for name, (ok, rpt) in results.items():
+        gates[name] = {"pass": ok, "issues": list(rpt.get("issues", []))}
+        if not ok:
+            overall = False
+    return {"overall_pass": overall, "gates": gates}

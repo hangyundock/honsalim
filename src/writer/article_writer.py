@@ -6,9 +6,11 @@
 - create_draft        : collector 결과를 drafts INSERT (status='collected')
 - save_enriched       : Claude 결과를 drafts.enriched_payload에 저장
 - save_validation_report : validator 결과를 drafts.validation_report에 저장
+- validate_and_save   : validator 4 게이트 호출 → report 저장 + 상태 전이 (BACKEND §2-3 흐름)
 - promote_to_article  : approved draft → articles INSERT + 상태 published 전이
 
 payload는 dict로 받아 JSON 문자열로 저장 (DB §5).
+모듈 의존: writer → validator (단방향).
 """
 
 from __future__ import annotations
@@ -17,6 +19,8 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 from typing import Any
+
+import validator
 
 from . import state_machine
 
@@ -74,6 +78,44 @@ def save_validation_report(
         (json.dumps(report, ensure_ascii=False), draft_id),
     )
     conn.commit()
+
+
+def validate_and_save(
+    conn: sqlite3.Connection,
+    draft_id: int,
+    payload: dict[str, Any],
+) -> tuple[bool, dict[str, Any]]:
+    """validator 4 게이트 호출 → validation_report 저장 + 상태 전이 (BACKEND §2-3 흐름).
+
+    호출 전제: draft가 'enriched' 상태여야 함 (state_machine 매트릭스).
+
+    payload 기대 키 (validator.validate_all 호환):
+    - body_md       : 본문 Markdown
+    - schema_jsonld : Schema.org JSON-LD 문자열
+    - products      : [{id, price_krw, ...}, ...] (선택)
+    - photos        : 1인칭 게이트용 (선택)
+
+    동작:
+    1. validator.validate_all(payload) 호출
+    2. serialize_report로 JSON 직렬화 가능 형태 변환
+    3. drafts.validation_report 저장
+    4. 전체 pass → state_machine.transition('validated')
+       하나라도 fail → state_machine.transition('rejected')
+
+    반환: (overall_pass, serialized_report)
+    """
+    results = validator.validate_all(payload)
+    report = validator.serialize_report(results)
+    save_validation_report(conn, draft_id, report)
+
+    next_status = "validated" if report["overall_pass"] else "rejected"
+    state_machine.transition(
+        conn,
+        draft_id,
+        next_status,
+        reason=f"validate_and_save → {next_status}",
+    )
+    return report["overall_pass"], report
 
 
 def promote_to_article(
