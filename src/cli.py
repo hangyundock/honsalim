@@ -228,6 +228,9 @@ def _check_phase2_modules() -> bool:
         ("builder.manifest", "load"),
         ("builder.manifest", "save"),
         ("builder.manifest", "needs_rebuild"),
+        ("deployer", "git_push"),
+        ("deployer", "wrangler_deploy"),
+        ("deployer", "verify_deploy"),
     ]
     all_ok = True
     for mod_name, attr in checks:

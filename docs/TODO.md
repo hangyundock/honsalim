@@ -28,17 +28,16 @@
 
 ## Phase 2: 핵심 시스템 — 남음 ⏳
 
-> 완료 항목은 STATE.md "Phase 2 핵심 모듈 14개" + "회귀 269/269" + "CLI 8/11" 행 참조.
+> 완료 항목은 STATE.md "Phase 2 핵심 모듈 15개" + "회귀 283/283" + "CLI 8/11" 행 참조.
 
 ### 안전 진척 (검토 의존 작음)
 - [ ] CLI 남은 3 명령 (dashboard·build·deploy) — builder/dashboard/deployer 모듈 의존
 
 ### 검토 의존 큼 (사용자 결정 후)
 - [ ] `collector.coupang` (쿠팡 가입 후·Phase 4)
-- [ ] `builder.manifest` 형태 결정 → 인터페이스에 스키마 확정 적용 (현재 stub 인터페이스만 완료)
+- [ ] `builder.manifest` 형태 결정 → 스키마 확정 적용 (인터페이스 stub 완료)
 - [ ] `builder.renderer/pages/sitemap/assets` (Jinja2 + DESIGN 시안)
 - [ ] `dashboard.render/approve` (디자인 시안 Phase 3 의존)
-- [ ] `deployer.git_push/wrangler/verify`
 - [ ] `tracker.d1_aggregator` + Workers `go_gateway.js`
 - [ ] `python -m honsalim build --full` 성공 (Phase 2 종착)
 
