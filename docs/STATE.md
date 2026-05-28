@@ -83,8 +83,9 @@
 4. `pip install -e .[dev]` 사용자 명시 승인 (jinja2·markdown·pytest 정상 설치 → 의존성 7/7·표준 pytest 실행)
 
 ### Phase 2 진척 가능 (사용자 검토 영향 작음)
-- `tests/test_db.py` · `tests/test_cli.py` 보강 (안정성 강화)
-- `src/writer/article_writer.py` (drafts INSERT + enriched_payload 저장 — DB §5 활용)
+- `python -m honsalim doctor` 보강 (Phase 2 진입 게이트 — validator·templates·DB 일치 점검)
+- `enricher` 응답 ↔ `schema_jsonld` 빌더 (meta_extractor 결과를 Schema.org Article JSON-LD로 변환)
+- push origin main 사용자 승인 (현재 3 commit ahead — 2cbddb9, 1e7b333, 6d5cff1)
 
 ### Phase 2 진척 가능 (검토 의존 큼 — 사용자 결정 후)
 - `src/builder/manifest.py` 증분 빌드 JSON 인프라 (ARCH §7·DB §10)

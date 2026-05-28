@@ -6,9 +6,58 @@
 
 ## ARCHIVE 인덱스 (옛 세션 한 줄 요약)
 
-- [EVENTS_202605.md](archive/EVENTS_202605.md) — 세션 #1 (2026-05-27 프로젝트 신규 셋업·정밀 조사·5파일 시스템·슬래시 명령 등록)
+- [EVENTS_202605.md](archive/EVENTS_202605.md):
+  - 세션 #1 (2026-05-27 프로젝트 신규 셋업·정밀 조사·5파일 시스템·슬래시 명령 등록)
+  - 세션 #2 (2026-05-27~28 Phase 0 설계 12/12 + Phase 1 외부 작업 큰 산: GitHub·Cloudflare·도메인·R2·D1·Git push, 사전 설정·코드 다수)
 
 ## 최근 5세션
+
+### 세션 #4 — 2026-05-28 (Opus 4.7, Phase 2 후반 진척 — enricher.meta_extractor + validator 보강 + writer ↔ validator 통합, 회귀 95→145, 3 commits)
+
+**시작 상황**: `/honsalim-start` → 세션 #3 정합성 양호. Phase 2 핵심 모듈 10개 + 회귀 95/95 PASS. STATE.md 첫 행 모순 발견 (모듈 수 9 vs 10 vs 11, 회귀 62 vs 95). 다음 작업 안전 후보 검토.
+
+**3 commits 진척 [확정]**:
+
+1. `2cbddb9`: **enricher.meta_extractor + 31 회귀** + STATE/TODO 정돈
+   - BACKEND §49 시그니처 `extract(body_md)` 호환 헬퍼 + `MetaExtractor` 클래스 (claude_client 패턴, dry_run=True 기본)
+   - `parse_meta_json` / `validate_meta` / `normalize_meta` 분리 — 코드 펜스 견고, 길이/개수 검증 (TITLE≤60·SUMMARY 80~180·DESC 80~160·KEYWORDS 3~10)
+   - `MetaExtractionError(ValueError)` — 입력/응답 결함과 환경 결함 분리
+   - STATE.md 모순 정정 (9→11 모듈, 62→126 회귀, 분배 db 11→12·cli 13→12)
+   - TODO.md Phase 1 완료 3건 제거 (cap 97%→91%)
+
+2. `1e7b333`: **validator 보강** (1인칭/사진 게이트 + AI soft + Schema 확장)
+   - truth.py: `FIRST_PERSON_PATTERNS` (VALIDATOR §5) + `photos`/`has_user_photo` 게이트 — POLICY §3-1-3 [확정] "1인칭 검출 시 직접 사진 없으면 fail"
+   - truth.py: `AI_TRACE_PATTERNS_SOFT` 임계 카운트 (VALIDATOR §4 [관찰]) — "~로 알려져 있습니다" 3+ / "(훌륭한|완벽한|최고의)" 5+ → fail
+   - schema.py: `ItemList` (itemListElement 필수 + 빈 배열 차단), `Product` (name + offers.{price,priceCurrency} 필수) — VALIDATOR §8 [확정]
+   - test_validator.py +11 회귀
+
+3. `6d5cff1`: **writer ↔ validator 통합** (validate_and_save, BACKEND §2-3 흐름)
+   - validator/__init__.py: `serialize_report(results)` — JSON 직렬화 가능 dict `{overall_pass, gates: {gate: {pass, issues}}}`
+   - writer/article_writer.py: `validate_and_save(conn, draft_id, payload)` — `validate_all → serialize → save_validation_report → transition(validated|rejected)` 통합
+   - 모듈 의존 [확정]: writer → validator 단방향. payload는 호출자 책임 (enriched_payload 구조 결정 의존 회피)
+   - test_validator +3 (TestSerializeReport) · test_article_writer +5 (TestValidateAndSave)
+
+**회귀 테스트 95 → 145 PASS [확정]** (+50):
+- validator 25 → 39 (+14)
+- article_writer 9 → 14 (+5)
+- meta_extractor 0 → 31 (신규)
+- 분배: validator 39 + state_machine 13 + scenario_loader 11 + enricher 13 + meta_extractor 31 + db 12 + cli 12 + article_writer 14
+
+**Phase 2 흐름 완성도 [관찰]**: collector·dashboard·deployer·builder 외 사용자 영향 작은 핵심 흐름 골격 완성. collected → enriched → validated/rejected → approved → published 6 상태 머신 + DB INSERT/UPDATE + validator 4 게이트 통합 + JSON-LD/Schema 4 타입 + META-JSON 추출 분리 + 1인칭/사진 게이트.
+
+**발견 사항 [관찰]**:
+- 직전 추천 시 "validator stub 활성화"라고 표현했으나 실제 코드 살펴보니 핵심 패턴은 이미 활성화 상태였음. 누락분 보강이 정확한 표현. [[no-speculation]] 위반 재발 사례 — 추천 시 코드 확인 우선이 정답.
+- 메인 워크트리(main 브랜치)에 직접 commit하는 워크플로 확인 [확정] — claude/busy-hermann-62c7c7 worktree는 격리용이지만 변경은 메인에 직접 작성됨.
+- pre-commit hook 동작 안정 [확정]: detect-secrets · trim/eof · check-yaml/json · large-files · merge-conflict · private-key · black · ruff · mypy 9종 모두 Passed.
+
+**남은 일 (다음 세션)**:
+1. **SUMMARY.md / REVIEW_QUESTIONS.md 사용자 검토** — Phase 2 본격 진입 게이트 (핵심 결정 4건)
+2. **AliExpress 심사 결과 확인** (이메일, D+1~D+4)
+3. `pip install -e .[dev]` 사용자 명시 승인 (jinja2·markdown·pytest 등)
+4. Phase 2 남은 모듈: `builder.manifest` (ARCH §7) · `dashboard.render/approve` (디자인 시안 Phase 3 의존) · `deployer.{git_push,wrangler}` · `tracker.d1_aggregator` · `collector.coupang` (Phase 4)
+5. `python -m honsalim doctor` 보강 (Phase 2 진입 게이트 — validator·templates·DB 일치 점검)
+6. Branch Protection에 Actions status check 추가 (코드 안정화 후)
+7. push 사용자 승인 — 현재 origin/main과 3 commit ahead
 
 ### 세션 #3 — 2026-05-28 (Opus 4.7, Phase 1 마무리·Phase 2 핵심 모듈 9개·회귀 62 테스트)
 
@@ -67,140 +116,4 @@ Phase 2 핵심 모듈 9개 (8 commits):
 6. ARCH §4 모듈 분리 결정 검토 (src/ flat layout vs honsalim 패키지 — pyproject.toml 모순)
 7. Branch Protection에 Actions status check 추가 (Phase 2 코드 안정화 후)
 
-### 세션 #2 — 2026-05-27 (Opus 4.7, Phase 0 설계 11개 문서 일괄 작성·12/12 완료)
-
-**시작 상황**: 사용자가 `/honsalim-start` 입력 → 세션 #1 보고 후 ARCH.md 작성 진입 결정. 컨텍스트 8% 사용 시점에 "최대한 효율적으로 이번 세션에서 다 진행"·"여유분 많다" 명시 → 위임 모드 진입.
-
-**실행 결과** [확정]:
-
-1. **ARCH.md** 작성 (~600줄): 시스템 다이어그램·디렉토리·모듈 8개·외부 의존 5개·secrets 격리·빌드 manifest·듀얼 빌드·진실성 게이트 위치·Workers `/go/<slug>`·CWV·개발 환경·부록 A 시퀀스·부록 B 장애 5종.
-2. **DB.md** 작성 (~650줄): SQLite 9테이블 + D1 3테이블 + manifest JSON·articles·drafts·products·scenarios·personas·images + 조인 4·6 상태 머신·인덱스·자체 SQL 마이그레이션·VACUUM 정책.
-3. **SCENARIOS.md** 작성 (~500줄): 페르소나 3 + 시나리오 10편 카드·확장 룰·시드 데이터·키워드 전략.
-4. **DESIGN.md** 작성 (~650줄): 미니멀+따뜻함 토큰·Pretendard·컴포넌트 18종·페이지 5종 와이어프레임·접근성·CWV 디자인 측면·직접 사진 가이드·Claude Design 시안 워크플로·벤치마크 매칭.
-5. **FRONTEND.md** 작성 (~600줄): Jinja2 구조·base/partials/macros·meta/OG/Twitter·Schema.org 5종·sitemap/RSS/IndexNow·이미지 srcset·CSS/JS 자산·CWV 측정·한글 SEO·hreflang 골격.
-6. **BACKEND.md** 작성 (~600줄): 모듈 8개 인터페이스·Claude API 캐시·Cloudflare API·Workers `go_gateway.js` 구현·manifest 코드 흐름·에러/재시도/로깅·테스트 전략·CLI 11개 명세·환경 변수.
-7. **POLICY.md** 작성 (~600줄): 공정위 disclosure 표준 문구·truth 30+ 패턴·schema/disclosure/links 게이트·외부 단축 URL 목록·PIPA 개인정보처리방침·사업자 정보·접근성·보안·금지 행동.
-8. **OPS.md** 작성 (~600줄): 일/주/월/분기/반기 체크리스트·로그 90일 회전·알림 채널·장애 5종·자격증명 만료 캘린더·사업자 등록 절차·dashboard 화면 구성.
-9. **BACKUP.md** 작성 (~450줄): 백업 7대상 + 3계층 (외부 드라이브·클라우드·GitHub) + SQLite 일별 + secrets 암호화 + 사용자 사진 + D1 export + 복구 리허설 분기 1회 + 재난 시나리오.
-10. **MAINTENANCE.md** 작성 (~500줄): 의존성 업데이트·CVE 대응·페르소나/시나리오 확장·신규 어필리에이트 도입·사이트 마이그레이션·영어 확장·디자인 갱신·기술 부채·Cloudflare 보조 배포 결정.
-11. **SCHEDULE.md** 작성 (~500줄): Phase 0~7 산출물·게이트·월별 체크포인트·시즌 캘린더·KPI 시점·자격증명/세무 일정·백업/디자인 트리거·비상 일정.
-12. **STATE.md·TODO.md·EVENTS.md 갱신**: 12/12 설계 완료 반영, Phase 1 진입 대기 상태로 전환.
-
-**주요 결정** (본 세션 내 [추정] 채택):
-- 모듈 28개 (8개 주요 + 보조)
-- 듀얼 빌드 (로컬 1차 + GitHub Actions 2차)
-- 단순 HTML 대시보드 (별도 서버 없음)
-- 알리 어필리에이트 Phase 5 이후
-- ORM 미사용 (raw SQL + sqlite3)
-- 자체 SQL 마이그레이션 (Alembic 미사용)
-- manifest는 JSON 파일 (테이블 아님)
-- D1 ↔ SQLite 단방향 동기
-- 6 상태 머신 (collected→enriched→validated→approved→published + rejected)
-- Cloudflare 보조 배포는 Phase 4 트래픽 도달 후 재검토 (현재는 미적용)
-
-**잔존 미해결**:
-- 12개 설계 문서 사용자 검토 (전체)
-- Phase 1 진입 사용자 명시 OK
-- 핵심 결정 포인트 4건 (모듈 분리·manifest 형태·시나리오 우선순위·단축 URL 목록) 사용자 의견 수렴
-
-**추가 작업 (본 세션 후반, 컨텍스트 28% 시점에서 진행)**:
-13. **`docs/SUMMARY.md` 작성**: 12 문서 1페이지 요약 + 핵심 결정 25개 매트릭스 + 시나리오 10편 한눈에 + Phase 일정 + 비용·위험 + 사용자 검토 체크리스트 5단계. 비개발자 검토 게이트 역할.
-14. **12 문서 일관성 Grep 점검**: 모듈 167회·상태 머신 73회·페르소나/시나리오 슬러그 78회·등급 표기 211회·경로 43회. **모순 0건** — 같은 세션 같은 컨텍스트 작성의 효과.
-15. **사전 SQL 2편 작성**: `sql/migrations/001_initial_schema.sql` (DB 9테이블 + 트리거 + 인덱스 + schema_version) + `sql/seeds/001_personas_scenarios.sql` (personas 3 + scenarios 10). DB.md·SCENARIOS.md 결정 기반·폐기 위험 0. Phase 2에서 `src/common/migrations/`로 이동·적용.
-
-**추가 변경 (사용자 4건 요청, 세션 #2 마지막)**:
-16. **자동 게시 활성** (DECISIONS C6·C7): 윈도우 스케줄러 매일 11:00 KST `python -m honsalim scheduler-publish` 호출 → 큐 1편 published 전이 + 빌드 + 배포. 자동 "승인"은 절대 금지 유지 (E7).
-17. **발행 편수 최대화** (DECISIONS C8·C9): 매주 2~3편 폐기. 큐 기반·사용자 작성 역량 내 최대. KPI 12개월 100편 → 240편+ 상향.
-18. **보안 강화 7건** (DECISIONS I1~I7): GitHub 보안 다중 방어·보안 헤더·2FA 의무·의존성 보안·BitLocker·CodeQL·secrets 회전.
-19. **GitHub 보안 파일 차단**: .gitignore + pre-commit hook (gitleaks/detect-secrets) + Secret Scanning + 브랜치 보호 + CodeQL.
-
-**영향받은 파일 9개 갱신**:
-- DECISIONS.md (C4·C5 폐기 + C6·C7·C8·C9 + I1~I7 추가, 폐기 결정 표 신설)
-- CLAUDE.md (§7 운영 모델 + §8 시간 민감 제약)
-- POLICY.md (§13-0 자동 승인 vs 자동 게시 구분 + §13-3 transition 코드 + §13-4 스케줄러 큐 + §14-bis 보안 종합 7절 신규)
-- BACKEND.md (§2-7 deployer + §2-7-bis 스케줄러 모듈 신규 + §9 CLI 명령 scheduler-publish/status 추가 + §10-2 gitleaks·pip-audit)
-- PLAN.md (§6 KPI 상향 + §9 결정 표 인간 편집·발행 페이스)
-- SCENARIOS.md (§6-1 발행 페이스 큐 기반)
-- SCHEDULE.md (§3-6 Phase 5 자동 발행)
-- OPS.md (§2-2 주별 + §2-3 월별 보안 점검)
-- SUMMARY.md (§C 운영 갱신 + §F 보안 7건 신규)
-- STATE.md·TODO.md (Phase 1 보안 작업·스케줄러 등록 추가)
-
-**추가 작업 (세션 #2 끝부분, 사용자 비판적 검토 후)**:
-20. **사용자 비판 인정·정정**: "다음 세션에서" default 권장 패턴이 핑계임을 인정. 같은 세션 연속 작업이 캐시·일관성 우위.
-21. **메모리 시스템 구축** (사용자 명시 강조): `C:\Users\dugi2\.claude\projects\D--affiliate-hub\memory\` 폴더에 feedback 2건 저장 — `no-speculation` (추측 금지·조사 후 사실만) + `same-session-continuity` (같은 세션 default) + MEMORY.md 인덱스.
-22. **DECISIONS E7 정정**: 기존 "2024-03 16채널 47억뷰" 사례가 YouTube AI Slop 사례임을 명시·HCS 공식 정보 (2022-08 도입·2024-03 코어 통합·2023-02 AI 정책)로 갱신. 검증 안 된 사례 인용 제거 (no-speculation 원칙 적용).
-23. **사전 설정 파일 5건 작성** (Phase 1 즉시 적용 가능):
-    - `.gitignore` (POLICY §10-3 + I1)
-    - `.pre-commit-config.yaml` (gitleaks 옵션 A 활성·detect-secrets 옵션 B 주석) (I1)
-    - `.claude/settings.json` (AutoBlog 패턴 확장·deny 룰 24개·allow 룰 14개) (POLICY §10-2 + H4)
-    - `build_headers_draft.txt` (CSP·HSTS·XCTO·XFO·Referrer·Permissions, CSP 도메인은 Phase 4 확정) (I2)
-    - `docs/SCHEDULER_GUIDE.md` (윈도우 작업 스케줄러 GUI·PowerShell 양방향 가이드·진단) (C7)
-
-**세션 #2 마지막 추가 작업** (사용자 "추가 작업 진행" + "no-speculation 절대 지킴" 명시 후):
-
-24. **prompt_templates 5개 .md 작성**: system_base·article_main·meta_extract·faq_generate·product_recommendation_note. Phase 2 enricher 즉시 사용 (BACKEND §3-3).
-25. **빈 폴더 구조 + `.gitkeep`**: src/·src/common/·src/enricher/·tests/·templates/·static/·data/ (ARCH §3).
-26. **`docs/REVIEW_QUESTIONS.md`**: 다음 세션 사용자 검토 질문 25개 (SUMMARY §7 체크리스트 확장).
-27. **`docs/VALIDATOR_PATTERNS.md`**: validator 정규식·패턴 12 카테고리 (POLICY §3~§6 + BACKEND §2-3 기반·등급 엄격 적용).
-28. **SUMMARY.md §11 신설**: 세션 #2 사전 작성 산출물 11종 검토 대상 표.
-29. **STATE.md 동기화**: 추가 산출물 행 추가.
-
-**no-speculation 원칙 적용 사례 (세션 #2 후반)**:
-- 컨텍스트 사용량 "약 50%" 잘못 보고 → 사용자 지적 → 29% 정확 정정 + 메모리 영구 저장 ([[no-speculation]])
-- DECISIONS E7 정정: 16채널 47억뷰 사례가 YouTube임을 명시·검증 안 된 HCS 구체 사례 인용 제거
-- VALIDATOR_PATTERNS.md: 등급 [확정]/[관찰]/[추정] 패턴별 엄격 표시
-- prompt_templates: 출처 인용 (BACKEND·POLICY·DESIGN 결정 기반)
-- _headers CSP 도메인: [추정] 명시·Phase 4 확정 안내
-
-**세션 #2 옵션 A 진행 (사용자 선택, 추가 7건)**:
-
-30. **`pyproject.toml`** — Python 3.10·의존성·black·ruff·mypy·pytest·coverage (BACKEND §10 [확정])
-31. **`wrangler.toml`** — Workers·D1 binding·database_id placeholder (BACKEND §5-1 [확정])
-32. **`.github/workflows/build.yml`** — lint·test·build·diff·wrangler deploy·IndexNow (ARCH §8-2 [확정])
-33. **`.github/workflows/lint.yml`** — black·ruff·mypy·pip-audit + **CodeQL** (DECISIONS I6)
-34. **`README.md`** — GitHub 공개 저장소용·운영 원칙·보안 정책·Phase 진행·문서 인덱스
-35. **`src/enricher/prompt_templates/tone_examples.md`** — 페르소나 3 × 1인칭·객관 예시 + 회피 (BACKEND §3-3 명시되었으나 누락된 6번째 prompt template)
-36. **`docs/CHANGELOG.md`** — v1.0·v1.1·v1.2 누적 + 차기 v1.3 예정
-
-**세션 #2 Phase 1 외부 작업 (2026-05-28, 세션 후반 큰 산)**:
-
-37. **GitHub 저장소·보안**: `hangyundock/honsalim` Public 생성 + GitHub 2FA(Microsoft Authenticator) + 복구 코드 저장 + Advanced Security 활성 (Private vulnerability·Dependency graph·Dependabot alerts/security/grouped/malware·Push protection·CodeQL via lint.yml·Copilot Autofix)
-38. **Cloudflare 계정**: 신규 가입 시도 → 이메일 오타 (gmai.com) → 변경 시도 후 기존 계정 `Dugi2020@naver.com` 사용 결정 (kfood-buddy·kdrama-api 운영 중)
-39. **Cloudflare 2FA**: Mobile App Authentication + 복구 코드 저장
-40. **도메인 honsalim.com 결제**: Cloudflare Registrar 도매가 $10.46/년·만료 2027-05-28·Auto Renew·WHOIS 프라이버시 자동
-41. **Cloudflare Pages**: `honsalim` 프로젝트 + placeholder 배포 + Custom domain honsalim.com (Active + SSL enabled)
-42. **R2 + D1**: 버킷 `honsalim-images` + DB `honsalim-clicks` (ID: 9bae858e-456f-40e7-8084-c3b90e4ec3ca) + R2 구독 활성
-43. **Cloudflare API Token**: Edit Cloudflare Workers 템플릿 + D1 권한 수동 추가 + honsalim.com zone + `cloudflare.env` 작성
-44. **Anthropic API 키**: 기존 활성 + `claude.env` 작성
-45. **AliExpress Portals 가입 신청**: honsalim.com "ali" 문자열 거부 → primary site 임시 우회 (kcontenthubblog 사용) + 한국·Content/Blogs 카테고리 + 심사 대기 (1~2영업일)
-46. **쿠팡 정책 [확정 — 사용자 정보]**: 콘텐츠 있는 승인 URL만 광고 가능 → Phase 4 출시 후 재가입 필요. D1 우선순위 임시 강등·D2 알리 우선 진행
-47. **Git init + remote (hangyundock/honsalim) + main 브랜치 + pre-commit 설치 (gitleaks → V3 백신 차단 → detect-secrets 전환·.pre-commit-config.yaml 갱신)**
-48. **첫 commit (b413803, 51 files, 9578 lines, --no-verify)**: detect-secrets baseline fail (PowerShell 인코딩 [추정])·다음 세션 디버깅. trailing whitespace·black·ruff·mypy·check-yaml·check-json 모두 통과
-49. **첫 push 성공**: `git push -u origin main` (사용자 직접 PowerShell·자격증명 캐시)
-50. **wrangler.toml database_id 갱신**: 9bae858e-456f-40e7-8084-c3b90e4ec3ca
-51. **dependabot.yml 작성**: pip 주간·github-actions 월간 자동 업데이트
-52. **placeholder/index.html 작성**: Pages 첫 배포용 임시 페이지
-
-**보류·연기 결정** (세션 #2 후반):
-- **BitLocker** (DECISIONS I5): 사용자 결정 — "프로그램 완성도 우선·추후 일괄"
-- **쿠팡 재가입** (D1): Phase 4 출시 후 (콘텐츠 누적 + 쿠팡 정책 의존)
-- **Branch Protection**: 첫 push 후 추후 (지금 설정 시 push 차단 가능성 회피)
-- **윈도우 스케줄러 등록**: Phase 2 코드 작성 후
-
-**no-speculation 원칙 위반 사례 (세션 #2 후반)**:
-- 컨텍스트 사용량 "약 50%" 추측 보고 → 사용자 지적 → 정정 (29% 정확)
-- 메모리에 영구 저장 후에도 재발 → 사용자 재지적 → "절대 지켜라" 강조 → 모든 보고에 등급 명시 의무화
-- 사용자 스크린샷 잘못 읽음 (1~5번 Enable 미클릭 상태인데 완료 가정) → 사용자 비판 → 정확한 클릭 안내로 정정
-
-**다음 세션 할 일**:
-1. 알리 심사 결과 확인 (이메일·1~2영업일)
-2. 심사 통과 시 알리 API 키 발급 + `ali.env` 작성
-3. detect-secrets baseline 디버깅 (PowerShell 인코딩 또는 UTF-8 명시·`Out-File -Encoding utf8`)
-4. INDEXNOW_KEY 발급 + GitHub Repository Secrets (CF_API_TOKEN·CF_ACCOUNT_ID·INDEXNOW_KEY) 등록
-5. Branch Protection (main) 설정 — push 안정 확인 후
-6. **Phase 2 진입**: Python 모듈 8개 본격 작성 (collector·enricher·validator·writer·builder·dashboard·deployer·tracker·scheduler·cli) + 첫 시나리오 작성·발행 흐름 검증
-7. 사용자가 SUMMARY.md·REVIEW_QUESTIONS.md 정독·답변 (큰 결정 검토)
-8. BitLocker 활성 (사용자 결정 시점)
-
-(세션 #1 → docs/archive/EVENTS_202605.md 회전됨)
+(세션 #1·#2 → docs/archive/EVENTS_202605.md 회전됨)
