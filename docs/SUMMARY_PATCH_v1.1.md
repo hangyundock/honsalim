@@ -62,7 +62,7 @@
 | M7 | llms.txt·청킹·AI 재작성·특수 Schema 안 함 (Google 공식 부정) |
 
 **핵심**: Google "AEO/GEO = SEO". 기존 SEO 그대로 유지 + 6건 강화.
-**참조**: `docs/GOOGLE_AI_OPTIMIZATION.md` (공식 가이드 + 본 프로젝트 정합 매트릭스).
+**참조**: `docs/GOOGLE_AI_OPTIMIZATION.md` (공식 가이드 + 본 프로젝트 정합 매트릭스 + §9 AutoBlog 2주 조사 S1~S12 통합 12/12 정합).
 
 ---
 

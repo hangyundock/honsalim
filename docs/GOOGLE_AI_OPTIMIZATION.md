@@ -147,6 +147,76 @@
 - `D:\autoblog\tistory_revival\TISTORY_DECISIONS.md` §Q (마스터 참조·tistory 적용)
 - AutoBlog 발견 추가: AI Overview 별도 기준 없음 [확정 P1B S7] — 본 프로젝트 M7 정합 강화
 
+## 9. AutoBlog 2주 SEO 조사 (P1A+P1B) 통합 — 본 프로젝트 적용
+
+> 출처: `D:\autoblog\tasks\TASK_019_FINAL_SYNTHESIS.md` §2 + `D:\autoblog\AUTOBLOG_SEO_MASTER.md` (혼살림 세션 #6 cross-project 검증)
+> Google AI Guide (2026-05-15)는 본 결과의 **공식 확정·확장**. 본 §9는 본 프로젝트 정합 + 누락 6건 명시.
+
+### 9-1. S1~S12 본 프로젝트 정합 매트릭스
+
+| AutoBlog | 본 프로젝트 적용 | 상태 |
+|---------|---------------|------|
+| S1 AI 콘텐츠 자체 금지 X | enricher Claude API 활용 | ✅ |
+| S2 Scaled Content Abuse = "primary purpose manipulating + little value" | M3 확장 콘텐츠 악용 회피 | ✅ |
+| S3 QRG §4.5.3 가짜 author profile = Lowest | §9-2 author 거짓 금지 정책 | ⚠️ → 본 §9-2 신설 |
+| S4 가짜 1인칭 + AI 바이오 = §4.5.3 정면 | L3 1인칭 무조건 차단 | ✅ 회피 |
+| S5 Helpful Content "first-hand expertise" 충돌 | L3 + L7 AI 명시 표기 | ✅ |
+| S6 E-E-A-T 자체는 순위 요소 X — Trust 축이 본질 | §9-2 명시 | ⚠️ → 본 §9-2 신설 |
+| S7 AI Overview 별도 기준 없음 | M7 정합 | ✅ |
+| S8 Core Ranking = Page-level + site-wide + Topic-level 3축 | §9-2 명시 | ⚠️ → 본 §9-2 신설 |
+| S9 저품질 페이지가 site-wide 저해 | §9-2 정리 의무 | ⚠️ → 본 §9-2 신설 |
+| S10 "lots of content many topics" 경고 신호 | SCENARIOS 60 슬롯 = 동일 위험 영역 | ⚠️ → 본 §9-3 점검 |
+| S11 author "written or reviewed" + AI disclosure | publisher 명시 (M2 강화 Phase 4) | ⚠️ 부분 |
+| S12 제3자 DA/authority 점수는 Google 신호 X | §9-2 명시 | ⚠️ → 본 §9-2 신설 |
+
+**정합률**: 완전 5/12 + 부분 7/12 → 본 §9 갱신으로 12/12 정합 달성.
+
+### 9-2. 누락 6건 본 프로젝트 적용 명시 [확정 세션 #6]
+
+**N1 (S3 정합) — author 거짓 금지 [확정]**:
+- 본 프로젝트 운영자 = 사용자 본인 1인 (가상 페르소나 X — Hana Kim 류 위험 원천 차단)
+- about 페이지 운영자 정보 = 본인 실명·실 운영 (M2 Phase 4 의무)
+- 본 프로젝트 author 영역 약점 없음 [확정], 단 약점 발생 시 §4.5.3 정면 일치 위험 인지
+
+**N2 (S6 정합) — E-E-A-T는 순위 요소 X, Trust 축이 본질 [확정 P1B S6]**:
+- Helpful Content 공식 문서: "E-E-A-T itself isn't a specific ranking factor"
+- Trust (신뢰)가 family 최상위 — 진실성·정확성·투명성이 본질
+- 본 프로젝트 truth 게이트 4단계 (POLICY §3 + ARCH §9) 정합 — Trust 축 충족
+
+**N3 (S8 정합) — Core Ranking 3축 [확정 P1B S8]**:
+- (a) Page-level: 글 단위 품질
+- (b) Site-wide signals: 사이트 전체 신호 (저품질 페이지 영향)
+- (c) Topic-level expertise: 주제 영역 전문성 — **혼살림 = 1인 가구·자취·홈오피스 단일 주제 집중**으로 본 축 강함
+
+**N4 (S9 정합) — 저품질 페이지가 site-wide 저해 [확정]**:
+- Core Updates 공식: "deleting the unhelpful content can help the good content on your site perform better"
+- 본 프로젝트 운영 의무: 발행된 글 중 trafffic·체류 저조한 글은 정기 검토 → 보강 또는 비공개 처리 (Phase 5+ 운영 의무)
+- 대시보드에 "저성과 글 목록" 추가 검토 (tracker.report 확장)
+
+**N5 (S12 정합) — 제3자 DA/authority 점수는 Google 신호 X [확정]**:
+- 2024-03 Core+Spam Update 블로그 원문: 제3자 도구 점수 (Moz DA, Ahrefs DR 등)는 Google이 사용하는 신호 아님
+- 본 프로젝트 운영 의무: 외부 SEO 도구 점수에 의존하지 않음. Google Search Console·Cloudflare Analytics·실측 클릭/체류만 활용
+
+### 9-3. SCENARIOS 60 슬롯 = "lots of content many topics" 경고 신호 점검 [확정]
+
+AutoBlog S10 위험 신호 3건:
+1. **"extensive automation to produce content on many topics"** — 본 프로젝트 자동 게시 활성 (C7), 단일 주제 (1인 가구) 집중이므로 위험 작음
+2. **"producing lots of content on many different topics"** — SCENARIOS 60 슬롯 매트릭스 = 동일 주제 (1인 가구) 내 세부 분류이지 다른 주제 아님 → 위험 작음
+3. **"changing the date of pages to make them seem fresh"** — 본 프로젝트 정책 없음 — `unapprove → validated` 패턴은 콘텐츠 갱신 시 사용, 단순 날짜 변경 X. 명시 의무
+
+**판정**: 본 프로젝트 SCENARIOS 60 슬롯은 단일 주제 (1인 가구) 내 세부 결합이라 S10 위험 직접 해당 X. M3 차별화 의무 + N3 (c) Topic-level expertise로 강함. 단 단순 변형 글 양산은 여전히 금지 (M3 [확정]).
+
+### 9-4. 다음 세션 자동 인식 핵심 (§9 영역)
+
+- **S3+S4+S5** Hana Kim 위험 = 본 프로젝트 L3 1인칭 무조건 차단으로 원천 회피 (사용자 본인 1인 운영)
+- **S6** E-E-A-T 자체는 순위 요소 X — Trust 축이 본질
+- **S8** Core Ranking 3축 — 본 프로젝트 Topic-level (1인 가구 단일 주제) 강함
+- **S9** 저품질 페이지 정리 의무 — Phase 5+ 대시보드 확장
+- **S10** "lots of content many topics" = 본 프로젝트 SCENARIOS 60 슬롯 ≠ 위험 (단일 주제 세부 분류)
+- **S12** 제3자 DA 점수 X — Google Search Console·실측만 활용
+
+---
+
 ## 8. 다음 세션 자동 인식 핵심
 
 - Google AI 검색 = SEO 그대로 (별도 분야 X)
