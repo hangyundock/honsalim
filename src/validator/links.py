@@ -21,6 +21,8 @@ SHORT_URL_DOMAINS = (
     r"is\.gd",
     r"cutt\.ly",
     r"me2\.do",
+    r"n\.kakao\.com",  # DECISIONS K3 — POLICY §6-1 누락분 (세션 #5)
+    r"naver\.me",  # DECISIONS K3 — 국내 단축 빈번 [관찰] (세션 #5)
 )
 
 # VALIDATOR §2 — 허용 도메인 (Phase 5 알리 추가 시 확장)

@@ -41,11 +41,28 @@ dev = [
 ]
 
 [project.scripts]
-# BACKEND §9 CLI 명령 11개
-honsalim = "honsalim.cli:main"
+# BACKEND §9 CLI 명령 11개 (DECISIONS K4 — flat layout 정합, 세션 #5)
+honsalim = "cli:main"
+
+[tool.setuptools]
+# DECISIONS K4 [확정] — src/ flat layout 정합. cli.py는 top-level py-module.
+package-dir = { "" = "src" }
+py-modules = ["cli"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = [
+  "common*",
+  "collector*",
+  "enricher*",
+  "validator*",
+  "writer*",
+  "builder*",
+  "dashboard*",
+  "deployer*",
+  "tracker*",
+  "workers*",
+]
 
 # ─── Black [관찰 — 공식 기본값] ────────────────────────
 [tool.black]

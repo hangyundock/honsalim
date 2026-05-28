@@ -311,6 +311,25 @@ class TestLinks:
         assert ok is False
         assert any("vivoldi" in i for i in rpt["issues"])
 
+    def test_fail_short_url_n_kakao(self) -> None:
+        """DECISIONS K3 [확정] — n.kakao.com 카카오 단축 차단."""
+        ok, rpt = check_links("자세히는 https://n.kakao.com/abc123 참고")
+        assert ok is False
+        assert any("n" in i and "kakao" in i for i in rpt["issues"])
+
+    def test_fail_short_url_naver_me(self) -> None:
+        """DECISIONS K3 [확정] — naver.me 네이버 단축 차단."""
+        ok, rpt = check_links("링크: https://naver.me/xyz")
+        assert ok is False
+        assert any("naver" in i and "me" in i for i in rpt["issues"])
+
+    def test_fail_multiple_short_urls_in_body(self) -> None:
+        """여러 단축 동시 등장 시 모두 차단."""
+        body = "단축1 https://bit.ly/a 단축2 https://naver.me/b"
+        ok, rpt = check_links(body)
+        assert ok is False
+        assert len([i for i in rpt["issues"] if "short_url_blocked" in i]) >= 2
+
     def test_pass_internal_link(self) -> None:
         body = '<a href="https://honsalim.com/articles/abc">관련글</a>'
         ok, rpt = check_links(body)

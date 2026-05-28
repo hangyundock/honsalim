@@ -7,13 +7,13 @@
 
 - [ ] **알리 심사 결과 확인** (이메일, 2026-05-29~06-01)
 - [ ] **docs/SUMMARY.md / REVIEW_QUESTIONS.md 정독** — Phase 2 후반 본격 진입 게이트
-- [ ] 핵심 결정 4건 의견 수렴
-  - ARCH §4-2 모듈 분리: pyproject.toml `honsalim` 패키지 가정 vs `src/` flat layout 모순
-  - DB §10 manifest를 JSON 파일로 (테이블 아님)
-  - SCENARIOS §4 초기 10편 시나리오 우선순위
-  - POLICY §6-1 외부 단축 URL 차단 목록 추가/제외 검토
-- [ ] `pip install -e .[dev]` 사용자 명시 승인 (jinja2·markdown·pytest·ruff·black 등) — 회귀 재검증 게이트
-- [x] ~~push origin main 사용자 승인~~ (세션 #5 검증 `git rev-list --count origin/main..main = 0` → 이미 동기)
+- [x] ~~핵심 결정 4건 의견 수렴~~ (세션 #5 DECISIONS K1·K2·K3·K4 [확정])
+  - [x] K4 모듈 분리: 옵션 B (pyproject.toml flat 정합) 적용
+  - [x] K1 manifest: JSON 파일 그대로 [확정]
+  - [x] K2 시나리오 우선순위: 현재 명세 그대로 [확정]
+  - [x] K3 단축 URL: `n.kakao.com` + `naver.me` 추가 (11→13)
+- [ ] `pip install -e .[dev]` 사용자 명시 승인 (jinja2·markdown·pytest·ruff·black 등) — 회귀 320 재검증 게이트
+- [ ] push origin main 사용자 승인 — 본 세션 commit 누적
 
 ## Phase 1: 인프라 — 남음 ⏳
 

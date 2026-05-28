@@ -262,7 +262,8 @@ def check_truth(payload):
 | `is.gd` | 일반 단축 |
 | `cutt.ly` | 일반 단축 |
 | `me2.do` | 카카오 단축 |
-| `n.kakao.com` (특정 패턴) | 카카오 단축 |
+| `n.kakao.com` | 카카오 단축 (DECISIONS K3 활성 — 세션 #5) |
+| `naver.me` | 네이버 단축 (DECISIONS K3 추가 — 세션 #5) |
 
 추가 룰:
 - 도메인 길이 ≤ 7자 + 경로 매우 짧음 → 의심 (warn)

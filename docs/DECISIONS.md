@@ -113,6 +113,13 @@
 - **J7. disclosure_first 추출**: `extract_disclosure_first(body_md)` — 본문 첫 300자 첫 단락에서 "쿠팡 파트너스"+"수수료" 둘 다 포함된 텍스트 반환. POLICY §2-2 [확정] 추출 헬퍼. 검증 책임은 validator.disclosure 별도 (추출과 검증 분리) — 세션 #4 (`aef26c5`)
 - **J8. payload 책임 분리**: `validate_and_save(conn, draft_id, payload)`는 payload 구조를 호출자 책임으로. enriched_payload 구조는 [관찰] — validator.validate_all 호환 키 (body_md, schema_jsonld, products, photos) 가정. 향후 enriched_payload 형식 결정 후 정식 [확정] — 세션 #4 (`6d5cff1`)
 
+## K. 핵심 결정 4건 응답 [확정] — 세션 #5 신규
+
+- **K1. manifest 형태 — `data/manifest.json` 단일 JSON 파일 확정**: DB §10 추정을 확정으로 승격. 근거 4가지 — Git diff 가능·사람이 읽기 쉬움·jq 호환·sqlite3 .dump 등 추가 도구 불요. builder.manifest 모듈 (`b8d7cc7` 세션 #4)이 이미 본 형태로 stub 작성됨. 향후 변경 없음 — 세션 #5
+- **K2. 시나리오 우선순위 현재 명세 그대로 확정**: SCENARIOS §4-11 일정·페르소나 분배·슬러그 명명 모두 현 상태 유지. (a) 첫 발행 `#4 gaeul-cheot-jachi-30` 가을 신학기 (2026-06~07) — Phase 4 출시 직후 시즌 직격. (b) 페르소나 분배 A자취:4, B재택:3, C정착:3 — A 검색량 최대 [관찰]. (c) 한국어 로마자 슬러그 (`cheot-jachi`·`homeoffice`) — 한국 검색 친화·사용자 기억 용이. (d) 10편 시드로 충분, 확장은 SCENARIOS §2-1 후속 큐 — 세션 #5
+- **K3. 외부 단축 URL 차단 11→13개 확정**: `n.kakao.com` (POLICY §6-1 누락분) + `naver.me` (국내 사용 빈번 [관찰]) 신규 추가. 코드 `src/validator/links.py` SHORT_URL_DOMAINS + POLICY §6-1 표 + 회귀 3건 동시 갱신. `t.co`·기타 제외 검토 안 함 — 안전 우선 — 세션 #5
+- **K4. 모듈 분리 — 옵션 B (pyproject.toml flat 정합) 확정**: ARCH §4-2 모순(pyproject가 `honsalim.cli:main` 가정 vs 실제 `src/` flat) 해소. 코드 그대로 두고 `pyproject.toml` `[project.scripts]` + `packages.find.include` 수정. 옵션 A (src-layout 표준)는 변경 부담 큼(15+ 모듈·12 test 이동·회귀 모두 재검증)에 비해 본 프로젝트 규모·운영자 환경(비개발자·pytest 미설치 회귀 재검증 부담)에서 비용 대비 효익 약함. 향후 PyPA 표준 정합이 필요해지면 옵션 A로 마이그레이션 가능 — 세션 #5
+
 ## 폐기된 결정 (역사 참조용)
 
 | 폐기일 | 결정 | 폐기 사유 |
