@@ -15,6 +15,7 @@ payload는 dict로 받아 JSON 문자열로 저장 (DB §5).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from datetime import datetime, timezone
@@ -24,9 +25,54 @@ import validator
 
 from . import state_machine
 
+# POLICY §2-2 [확정] — 첫머리 disclosure 키워드 (두 단어 모두 포함 필수)
+DISCLOSURE_FIRST_KEYWORDS: tuple[str, ...] = ("쿠팡 파트너스", "수수료")
+
+# 첫머리 검사 범위 — POLICY §2-4 명시 200자보다 약간 여유 (단락 종료 우선)
+DISCLOSURE_SCAN_HEAD_LEN = 300
+
+# DB §4-1 / manifest 일관 — "sha256:" prefix + hex digest
+CONTENT_HASH_PREFIX = "sha256:"
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def compute_content_hash(body_md: str) -> str:
+    """본문 SHA256 — DB §4-1 + manifest §10 일관.
+
+    형식: 'sha256:' + 64자 hex digest. UTF-8 인코딩.
+    같은 body_md → 같은 hash (결정적). 빈 문자열도 처리.
+
+    용도: articles.content_hash 컬럼 + manifest articles[*].content_hash.
+    """
+    digest = hashlib.sha256(body_md.encode("utf-8")).hexdigest()
+    return f"{CONTENT_HASH_PREFIX}{digest}"
+
+
+def extract_disclosure_first(body_md: str) -> str | None:
+    """본문 첫머리에서 disclosure 문구 추출 (POLICY §2-2 표준 문구).
+
+    첫 단락(\\n\\n 전) 또는 처음 300자 안에서 "쿠팡 파트너스" + "수수료"
+    키워드 둘 다 포함된 텍스트를 추출해 반환. 찾지 못하면 None.
+
+    반환된 문자열은 articles.disclosure_first 컬럼에 그대로 저장 가능.
+    validator.disclosure 게이트는 별도로 본문 첫 200자 안의 키워드 존재를
+    검증 — 본 함수는 추출 헬퍼이고 검증 책임은 없음.
+    """
+    if not body_md:
+        return None
+    head = body_md[:DISCLOSURE_SCAN_HEAD_LEN]
+    # 첫 단락(빈 줄로 구분된 첫 블록) 또는 전체 head
+    para_end = head.find("\n\n")
+    first_para = head if para_end == -1 else head[:para_end]
+    first_para = first_para.strip()
+    if not first_para:
+        return None
+    if all(keyword in first_para for keyword in DISCLOSURE_FIRST_KEYWORDS):
+        return first_para
+    return None
 
 
 def create_draft(

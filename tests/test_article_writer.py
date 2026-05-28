@@ -277,6 +277,86 @@ class TestValidateAndSave:
             article_writer.validate_and_save(conn, did, payload)
 
 
+# ─── compute_content_hash — DB §4-1 본문 SHA256 ──────────────────────
+
+
+class TestComputeContentHash:
+    def test_returns_sha256_prefix_and_hex(self) -> None:
+        h = article_writer.compute_content_hash("본문 텍스트")
+        assert h.startswith("sha256:")
+        hex_part = h.split(":", 1)[1]
+        assert len(hex_part) == 64
+        assert all(c in "0123456789abcdef" for c in hex_part)
+
+    def test_deterministic_same_input(self) -> None:
+        h1 = article_writer.compute_content_hash("같은 본문")
+        h2 = article_writer.compute_content_hash("같은 본문")
+        assert h1 == h2
+
+    def test_different_body_different_hash(self) -> None:
+        h1 = article_writer.compute_content_hash("본문 A")
+        h2 = article_writer.compute_content_hash("본문 B")
+        assert h1 != h2
+
+    def test_korean_utf8_encoded(self) -> None:
+        """한국어 UTF-8 인코딩 — manifest 포터블성."""
+        # 같은 한국어 → 같은 hash (cp949 등 다른 인코딩이면 깨짐)
+        h = article_writer.compute_content_hash("원룸 자취 30만원")
+        # 알려진 SHA256 값과 비교 — 인코딩 안정성 회귀
+        import hashlib
+
+        expected = hashlib.sha256("원룸 자취 30만원".encode()).hexdigest()
+        assert h == f"sha256:{expected}"
+
+    def test_empty_body_handled(self) -> None:
+        """빈 본문도 유효한 hash 반환 (예외 없이)."""
+        h = article_writer.compute_content_hash("")
+        # SHA256 of empty string is e3b0c442...
+        assert h == "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+
+# ─── extract_disclosure_first — POLICY §2-2 첫머리 추출 ───────────────
+
+
+class TestExtractDisclosureFirst:
+    def test_extracts_standard_disclosure(self) -> None:
+        body = (
+            "이 글에는 쿠팡 파트너스 활동의 일환으로 일정 수수료를 제공받습니다.\n"
+            "(구매자에게 추가 비용은 발생하지 않습니다.)\n\n"
+            "# 본문 시작\n원룸 자취 가이드입니다."
+        )
+        out = article_writer.extract_disclosure_first(body)
+        assert out is not None
+        assert "쿠팡 파트너스" in out
+        assert "수수료" in out
+
+    def test_returns_none_when_both_keywords_missing(self) -> None:
+        body = "안녕하세요. 일반 가이드입니다.\n\n본문 본문."
+        assert article_writer.extract_disclosure_first(body) is None
+
+    def test_returns_none_when_only_one_keyword(self) -> None:
+        body = "쿠팡 파트너스 안내입니다.\n\n본문."
+        # '수수료' 누락 → None
+        assert article_writer.extract_disclosure_first(body) is None
+
+    def test_returns_none_when_disclosure_buried_deep(self) -> None:
+        """첫머리 300자 밖에 문구가 있으면 추출 안 함 (POLICY §2-4 위치 정확성)."""
+        body = "다른 텍스트.\n\n" + ("패딩 " * 100) + "\n\n쿠팡 파트너스 수수료 안내."
+        assert article_writer.extract_disclosure_first(body) is None
+
+    def test_empty_body_returns_none(self) -> None:
+        assert article_writer.extract_disclosure_first("") is None
+        assert article_writer.extract_disclosure_first("   ") is None
+
+    def test_returns_stripped_text(self) -> None:
+        """앞뒤 공백·줄바꿈은 제거된 텍스트 반환."""
+        body = "\n  이 글에는 쿠팡 파트너스 수수료 안내.  \n\n본문."
+        out = article_writer.extract_disclosure_first(body)
+        assert out is not None
+        assert not out.startswith(" ")
+        assert not out.endswith(" ")
+
+
 if __name__ == "__main__":
     if pytest is not None:
         pytest.main([__file__, "-v"])

@@ -32,7 +32,6 @@
 
 ### 안전 진척 (검토 의존 작음)
 - [ ] `builder.jsonld` ItemList·Product 빌더 추가 (현재 Article만)
-- [ ] `writer.article_writer` 보조 헬퍼 (content_hash·disclosure_first 자동 생성)
 
 ### 검토 의존 큼 (사용자 결정 후)
 - [ ] `collector.coupang` (쿠팡 가입 후·Phase 4)
