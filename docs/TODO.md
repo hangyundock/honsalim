@@ -44,13 +44,14 @@
 - [x] enricher.claude_client stub + prompt_loader (6 templates 로드)
 - [x] validator 4모듈 (truth·schema·disclosure·links) + 25 회귀 테스트
 - [x] writer.state_machine (DB §12 6 상태 머신) + 13 회귀 테스트
+- [x] writer.article_writer (drafts INSERT + promote_to_article) + 9 회귀 테스트
 - [x] collector.scenario_loader (DB scenarios → 큐) + 11 회귀 테스트
+- [x] tests/test_db.py (11) + tests/test_cli.py (13) — 안정성 강화
 - [x] GitHub Actions workflows (build.yml·lint.yml) — Phase 1 사전 작성·세션 #3 버전 bump
 - [x] cli doctor + db migrate + db seed (CLI 3 명령)
+- [x] **회귀 테스트 95/95 PASS** [확정]
 
 ### 남음 ⏳ (검토 영향 작음 — 안전 진척)
-- [ ] tests/test_db.py · tests/test_cli.py 보강 (안정성 강화)
-- [ ] writer.article_writer (drafts INSERT + enriched_payload 저장)
 - [ ] enricher.meta_extractor (META-JSON 분리 추출 — meta_extract.md 활용)
 
 ### 남음 ⏳ (검토 의존 큼)

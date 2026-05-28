@@ -33,6 +33,9 @@ Phase 2 핵심 모듈 9개 (8 commits):
 - `c3afbff`: src/writer/state_machine.py + 13 회귀 테스트 (DB §12 6상태 머신)
 - `3860159`: src/collector/scenario_loader.py + 11 회귀 테스트
 - `6e33c4e`: src/enricher/{prompt_loader,claude_client}.py + 13 회귀 테스트 (Anthropic SDK stub, dry_run 기본)
+- `2139004`: 세션 정리 — EVENTS·STATE·TODO 갱신 + 세션 #1 archive 회전 (cap 초과 회피)
+- `3b13da8`: tests/test_db.py (11) + tests/test_cli.py (13) — 안정성 강화 24 케이스
+- `3e450bd`: src/writer/article_writer.py + 9 회귀 테스트 (drafts·articles 승격·article_history 감사)
 
 **Phase 1 외부 작업 추가 완료**:
 - GitHub Repository Secrets 3개 등록 (사용자 Web UI): CF_API_TOKEN·CF_ACCOUNT_ID·INDEXNOW_KEY
@@ -43,7 +46,7 @@ Phase 2 핵심 모듈 9개 (8 commits):
 
 **DB 초기화 [확정]**: data/honsalim.db 생성 + schema_version v1 + 13 테이블 + personas 3 + scenarios 10.
 
-**회귀 테스트 62/62 PASS [확정]**: validator 25 + state_machine 13 + scenario_loader 11 + enricher 13. pytest 미설치 환경에서도 standard library로 직접 호출 가능 구조.
+**회귀 테스트 95/95 PASS [확정]**: validator 25 + state_machine 13 + scenario_loader 11 + enricher 13 + db 11 + cli 13 + article_writer 9. pytest 미설치 환경에서도 standard library로 직접 호출 가능 구조.
 
 **발견 사항 [관찰]**:
 - 시스템 환경 ANTHROPIC_API_KEY가 빈 문자열 상태 → load_dotenv override=False일 때 자격 증명 값 무시. override=True로 해결.
