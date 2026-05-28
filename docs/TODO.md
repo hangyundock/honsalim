@@ -5,12 +5,11 @@
 
 ## ★ 시급 (다음 세션)
 
-- [ ] **본 세션 #6 6 commits push origin main** — 사용자 명시 키워드 승인 후
-- [ ] **docs/SUMMARY.md / REVIEW_QUESTIONS.md + SUMMARY_PATCH_v1.1.md 정독** — Phase 3 진입 게이트 (2026-07 이전까지, 약 30분 예상)
-- [ ] **pip-audit 16건 환경 갱신** — `docs/PIP_AUDIT_ANALYSIS.md` 참조 (A/B/C 안). pip install -U 사용자 명시 승인 후
+- [ ] **docs/SUMMARY.md + REVIEW_QUESTIONS.md + SUMMARY_PATCH_v1.1.md 정독** (사용자 직접, 약 25~30분) — Phase 3 진입 게이트, 2026-07 이전까지
+- [ ] **Phase 3 사전 작업**: Google AI Studio API 키 발급 + 결제 활성화 + `D:\secrets\affiliate_hub\google.env` (`GOOGLE_API_KEY=<key>`)
+- [ ] dashboard 시안 진입 (Claude Design, 사용자 직접 claude.ai/design)
 
-## 세션 #6 잔존 사용자 결정 의존
-- [ ] **Phase 3 사전 작업**: Google AI Studio API 키 발급 + 결제 + `D:\secrets\affiliate_hub\google.env` (`GOOGLE_API_KEY=<key>`)
+## 세션 #6 잔존 (시점 의존)
 - [ ] **알리 이미지·상세페이지 정책 조사** — Phase 5 진입 전 (현재 docs 명시 없음)
 - [ ] **M2/M4/M5/M6 Phase 3~6 진척 시점 작업** — `docs/GOOGLE_AI_OPTIMIZATION.md` §6
 

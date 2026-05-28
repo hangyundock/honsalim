@@ -29,7 +29,7 @@
 | 프로젝트 폴더 | `D:\affiliate_hub\` (docs·archive·.claude/commands 하위) |
 | 사이트 / 도메인 | 혼살림 / **honsalim.com** (만료 2027-05-28·Auto Renew·SSL Active) |
 | 호스팅 | **Cloudflare Pages `honsalim`** + Custom domain (Dugi2020@naver.com) |
-| GitHub | **`hangyundock/honsalim` Public** — origin/main과 6 commit ahead (세션 #6 진행 중). build-and-deploy ✅ + CodeQL ✅ + Graph ✅ + lint ✅ (세션 #6 black 26.5.1 multiline str inline 정합 fix). 신규 workflow `security.yml` 월간 pip-audit + 90일 artifact |
+| GitHub | **`hangyundock/honsalim` Public** — 세션 #6 종료 시점 origin/main 동기 (17 commits 모두 push). build-and-deploy ✅ + CodeQL ✅ + Graph ✅ + lint ✅ + security ✅ (월간 pip-audit) |
 | GitHub Secrets / Branch Protection | CF_API_TOKEN · CF_ACCOUNT_ID · INDEXNOW_KEY 등록 / ruleset `main-protect` Active |
 | R2 / D1 | `honsalim-images` (APAC) / `honsalim-clicks` ID `9bae858e-456f-40e7-8084-c3b90e4ec3ca` |
 | Python | 3.10 32-bit (TIMA·AutoBlog 시스템 공유) |
