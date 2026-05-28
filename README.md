@@ -75,6 +75,7 @@ Phase 7  1년 결산     2027-06
 |------|------|
 | [SUMMARY.md](docs/SUMMARY.md) | 12편 1페이지 요약 + 결정 32개 매트릭스 |
 | [SUMMARY_PATCH_v1.1.md](docs/SUMMARY_PATCH_v1.1.md) | SUMMARY 진척 패치 — 결정 45 + REVIEW_QUESTIONS 23/25 자동 [확정] |
+| [PIP_AUDIT_ANALYSIS.md](docs/PIP_AUDIT_ANALYSIS.md) | pip-audit 16건 분류 표 + 환경 갱신 명령 (세션 #6) |
 | [PLAN.md](docs/PLAN.md) | 비전·KPI·로드맵·예산 |
 | [ARCH.md](docs/ARCH.md) | 시스템 아키텍처·모듈·외부 의존 |
 | [DB.md](docs/DB.md) | SQLite + D1 스키마 |

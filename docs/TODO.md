@@ -7,7 +7,7 @@
 
 - [ ] **본 세션 #6 6 commits push origin main** — 사용자 명시 키워드 승인 후
 - [ ] **docs/SUMMARY.md / REVIEW_QUESTIONS.md + SUMMARY_PATCH_v1.1.md 정독** — Phase 3 진입 게이트 (2026-07 이전까지, 약 30분 예상)
-- [ ] **pip-audit transitive 13건 환경 갱신** — pip install -U 사용자 명시 승인 후
+- [ ] **pip-audit 16건 환경 갱신** — `docs/PIP_AUDIT_ANALYSIS.md` 참조 (A/B/C 안). pip install -U 사용자 명시 승인 후
 
 ## 세션 #6 완료 항목 (참고)
 - [x] CI lint #15 Black format check fail fix (commit 90d60f6, test 3건 black 26.5.1 inline 정합)
