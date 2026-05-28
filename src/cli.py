@@ -219,6 +219,7 @@ def _check_phase2_modules() -> bool:
         ("enricher.meta_extractor", "MetaExtractor"),
         ("collector.scenario_loader", "list_active_scenarios"),
         ("collector.scenario_loader", "next_scenarios_for_collection"),
+        ("builder", "build_article_jsonld"),
     ]
     all_ok = True
     for mod_name, attr in checks:

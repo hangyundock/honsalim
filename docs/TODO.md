@@ -47,7 +47,8 @@
 - [x] tests/test_db.py (12) + tests/test_cli.py (12) — 안정성 강화
 - [x] GitHub Actions workflows (build.yml·lint.yml) — Phase 1 사전 작성·세션 #3 버전 bump
 - [x] cli doctor + db migrate + db seed (CLI 3 명령) + doctor §9~§12 보강 (Phase 2 게이트, 세션 #4)
-- [x] **회귀 테스트 149/149 PASS** [확정]
+- [x] builder.jsonld (Article Schema.org JSON-LD 빌더, 세션 #4) + 23 회귀
+- [x] **회귀 테스트 172/172 PASS** [확정]
 
 ### 남음 ⏳ (검토 의존 큼)
 - [ ] collector.coupang (쿠팡 가입 후·Phase 4)
