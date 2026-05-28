@@ -217,6 +217,8 @@ def _check_phase2_modules() -> bool:
         ("writer.state_machine", "VALID_TRANSITIONS"),
         ("enricher.claude_client", "ClaudeClient"),
         ("enricher.meta_extractor", "MetaExtractor"),
+        ("enricher.retry", "retry_with_backoff"),
+        ("enricher.retry", "RetryConfig"),
         ("collector.scenario_loader", "list_active_scenarios"),
         ("collector.scenario_loader", "next_scenarios_for_collection"),
         ("builder", "build_article_jsonld"),

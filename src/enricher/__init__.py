@@ -41,6 +41,7 @@ from .prompt_loader import (
     render,
     verify_known_templates_present,
 )
+from .retry import DEFAULT_CONFIG, RetryConfig, RetryExhausted, retry_with_backoff
 
 __all__ = (
     "ClaudeClient",
@@ -73,4 +74,8 @@ __all__ = (
     "parse_meta_json",
     "validate_meta",
     "normalize_meta",
+    "RetryConfig",
+    "RetryExhausted",
+    "DEFAULT_CONFIG",
+    "retry_with_backoff",
 )

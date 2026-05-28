@@ -136,13 +136,25 @@ class ClaudeClient:
             )
 
         # 실제 호출 경로 — Phase 2 후반 활성 (현재는 명시적 사용자 승인 후만)
+        # BACKEND §3-5 [확정] 재시도 정책 적용
         client = self._get_sdk_client()
-        response = client.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-            system=system_blocks,
-            messages=[{"role": "user", "content": user_prompt}],
+        import anthropic  # SDK가 _get_sdk_client에서 import 검증됨
+
+        from .retry import retry_with_backoff
+
+        response = retry_with_backoff(
+            lambda: client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                system=system_blocks,
+                messages=[{"role": "user", "content": user_prompt}],
+            ),
+            rate_limit_exc=anthropic.RateLimitError,
+            overload_exc=anthropic.OverloadedError,
+            timeout_exc=anthropic.APITimeoutError,
+            bad_request_exc=anthropic.BadRequestError,
+            api_error_exc=anthropic.APIError,
         )
         return GenerateResult(
             system_blocks=system_blocks,
