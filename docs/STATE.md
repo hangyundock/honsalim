@@ -7,10 +7,11 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 인프라 70% 진행 중** (외부 계정·도메인·인프라·Git 완료, 일부 보류) | #2 (2026-05-28) |
-| 운영 모델 갱신 (세션 #2 후반) | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건 + GitHub 보안 다중 방어 | #2 |
-| Phase 1 외부 작업 완료 | GitHub(2FA·보안 5종) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic 키 · secrets .env 2종 · Git init·push (commit b413803) · 알리 가입 신청 | #2 |
-| Phase 1 보류·대기 | BitLocker (사용자 결정) · 쿠팡 (Phase 4 후 콘텐츠 누적) · 알리 심사 대기 (1~2일) · detect-secrets baseline 디버깅 · Branch Protection | #2 |
+| 진행 단계 | **Phase 1 인프라 ~85% 진행** [추정] (외부·Git·보안 hook·Secrets·Branch Protection 완료) | #3 (2026-05-28) |
+| 운영 모델 (세션 #2 후반) | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건 + GitHub 보안 다중 방어 | #2 |
+| Phase 1 외부 작업 완료 | GitHub(2FA·보안 5종) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic 키 · secrets .env · Git init·push · 알리 가입 신청 | #2 |
+| Phase 1 세션 #3 진척 | detect-secrets baseline UTF-8 정합 (`46fe5b4`) · Dependabot PR 3건 일괄 처리 (`fe1a74e`) · TODO cap 해소 (`650eaa5`) · INDEXNOW_KEY 발급·indexnow.env · GitHub Secrets 3개 등록 (INDEXNOW_KEY·CF_API_TOKEN·CF_ACCOUNT_ID) · Branch Protection ruleset `main-protect` Active | #3 |
+| Phase 1 보류·대기 | BitLocker (사용자 결정) · 쿠팡 (Phase 4 후) · 알리 심사 대기 (1~2영업일) · Actions status check 등록 (Phase 2 코드 후) | #3 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (PLAN·ARCH·DB·SCENARIOS·DESIGN·FRONTEND·BACKEND·POLICY·OPS·BACKUP·MAINTENANCE·SCHEDULE + SUMMARY 비개발자 요약) | #2 |
 | 일관성 점검 | ✅ 모순 0건 (167+73+44+34+211+43회 일관 인용) | #2 |
 | 사전 작성 SQL | `sql/migrations/001_initial_schema.sql` + `sql/seeds/001_personas_scenarios.sql` | #2 |
@@ -36,47 +37,51 @@
 | 사이트명 | 혼살림 (Honsalim) |
 | 도메인 | **honsalim.com 등록 완료** (만료 2027-05-28·Auto Renew·SSL Active) |
 | 호스팅 | **Cloudflare Pages `honsalim` 프로젝트 생성** + Custom domain honsalim.com 연결 (Dugi2020@naver.com 계정) |
-| GitHub 저장소 | **`hangyundock/honsalim` Public 생성·첫 push 완료 (b413803)** |
+| GitHub 저장소 | **`hangyundock/honsalim` Public — main HEAD `650eaa5` (#2 + #3 commits push 완료)** |
+| GitHub Repository Secrets | **CF_API_TOKEN · CF_ACCOUNT_ID · INDEXNOW_KEY 등록 완료** (세션 #3) |
+| GitHub Branch Protection | **ruleset `main-protect` Active** — Restrict deletions + Block force pushes (세션 #3) |
 | R2 버킷 | **`honsalim-images` (APAC)** |
 | D1 DB | **`honsalim-clicks` ID: 9bae858e-456f-40e7-8084-c3b90e4ec3ca** |
 | Python 환경 | 3.10 32-bit (시스템 공유, TIMA·AutoBlog 동일) |
 | DB | `data/honsalim.db` (미생성, Phase 2) |
 | 로그 | `logs/honsalim.log` (미생성, Phase 2) |
-| secrets | **`D:\secrets\affiliate_hub\` 생성·자격증명 보관 중** (cloudflare.env·claude.env·github 복구 코드·cloudflare 복구 코드) |
+| secrets | **`D:\secrets\affiliate_hub\` 운영** (cloudflare.env [CF_API_TOKEN·CF_ACCOUNT_ID·SITE_BASE_URL·ANTHROPIC_API_KEY] · indexnow.env · github-recovery-codes.txt · cloudflare 복구 코드) |
 
 ## 자격증명 만료 (시급 사안)
 
 | 자격증명 | 발급 | 만료 | 갱신 |
 |---------|------|------|------|
-| 도메인 honsalim.com | 2026-05-28 | 2027-05-28 | Auto Renew (D-60) |
-| Cloudflare API Token | 2026-05-28 | 미정 | 6개월 회전 권장 (I7) |
-| Anthropic API Key | 기존 보유 | 영구 | 6개월 회전 권장 (I7) |
-| GitHub PAT | 미발급 | — | Actions 사용 시 발급 |
-| AliExpress Portals | 2026-05-28 신청 | 심사 대기 | — |
+| 도메인 honsalim.com | 2026-05-28 | 2027-05-28 | Auto Renew (D-60 알림) |
+| Cloudflare API Token | 2026-05-28 | 미정 (GUI 미지원) | 6개월 회전 권장 (I7) — **다음 회전 2026-11-28** [추정] |
+| Anthropic API Key | 기존 보유 | 영구 [관찰] | 6개월 회전 권장 (I7) — **다음 회전 2026-11-28** [추정] |
+| INDEXNOW_KEY | 2026-05-28 (세션 #3) | 영구 [확정 — 공개 키] | 회전 불요 (사이트 노출용) |
+| GitHub PAT | 미발급 | — | Actions는 GITHUB_TOKEN 자동 사용 → PAT 불요 [확정] |
+| AliExpress Portals | 2026-05-28 신청 | 심사 대기 (D+1~D+2) | — |
 | 쿠팡 파트너스 | 보류 | — | Phase 4 (콘텐츠 누적 후) 재가입 |
 
 ## 보안 / 권한
 
 | 항목 | 상태 |
 |------|------|
-| `.claude/settings.json` deny 룰 | 미설정 (Phase 1 POLICY §10-2 기준) |
-| `D:\secrets\affiliate_hub\` 격리 | 미생성 (Phase 1) |
+| `.claude/settings.json` deny 룰 | **사전 작성 완료** (deny 24·allow 14, AutoBlog 패턴 확장) — Phase 1 사용자 검토 대기 |
+| `D:\secrets\affiliate_hub\` 격리 | ✅ 운영 중 (cloudflare.env·indexnow.env·복구 코드 2종) |
+| pre-commit hook | ✅ detect-secrets v1.5.0·baseline UTF-8 + trim/eof/yaml/json/large-files/merge-conflict/private-key·black·ruff·mypy 모두 Passed (세션 #3) |
+| GitHub Secrets | ✅ CF_API_TOKEN·CF_ACCOUNT_ID·INDEXNOW_KEY 등록 (세션 #3) |
+| GitHub Branch Protection | ✅ ruleset `main-protect` Active (세션 #3) |
 
 ## 알려진 잔존 미해결
 
 ### ★ 시급 (다음 세션)
-1. 12개 설계 문서 사용자 검토 (특히 핵심 결정 사항 — 4개 결정 포인트 / 5개 결정 포인트 등)
-2. Phase 1 진입 사용자 명시 OK
+1. **알리 심사 결과 확인** (이메일, 2026-05-29~06-01 예상)
+2. **SUMMARY.md / REVIEW_QUESTIONS.md 사용자 검토** — Phase 2 진입 전 검토 게이트 (특히 핵심 결정 4건: 모듈 분리·manifest 형태·시나리오 우선순위·단축 URL 목록)
+3. GitHub Actions 첫 실행 결과 확인 — lint·codeql 통과 / build 실패는 예상 [추정] (honsalim 모듈 미구현)
+4. (선택) Phase 2 진입 — `python -m honsalim doctor` 구현부터
 
-### 중간 (Phase 1 인프라, 2026-06)
-1. 도메인 honsalim.com 가용성 재확인 + 결제 (Cloudflare Registrar)
-2. GitHub 공개 저장소 생성 + 초기 push (사용자 승인)
-3. Cloudflare 계정 + Pages 프로젝트 + R2 + D1 + Workers 라우트
-4. `D:\secrets\affiliate_hub\` 생성 + 자격증명 보관
-5. `.claude/settings.json` deny 룰 설정
-6. 쿠팡 파트너스 가입 + Open API 키 발급 (승인 1~3일)
-7. Anthropic API 키 (보유) 검증
-8. `python -m honsalim doctor` 전체 OK
+### Phase 1 잔존 (작은)
+- Actions status check Branch Protection 추가 — Phase 2 코드 통해 Actions 안정화 후
+- BitLocker 활성 (사용자 결정 시점)
+- 알리 승인 시 API 키 + `ali.env` 작성
+- `.claude/settings.json` deny 룰 사용자 검토
 
 ### Phase 2 핵심 시스템 (2026-06~07)
 - 모듈 8개·DB 마이그레이션·Claude 파이프라인·Jinja2 빌더·진실성 게이트·배포·테스트
@@ -95,8 +100,9 @@
 
 | 일자 | 이벤트 |
 |------|--------|
-| 2026-06 초 | Phase 1 인프라 구축 시작 |
-| 2026-06 중반 | Phase 2 핵심 시스템 |
+| 2026-05-28 | Phase 1 인프라 ~85% 도달 (예정 일정 앞당김) |
+| 2026-05-29~06-01 | 알리 심사 결과 (이메일) |
+| 2026-06 | Phase 2 핵심 시스템 (코드 본격 작성) |
 | 2026-07 중반 | Phase 3 디자인 시안·콘텐츠 |
 | 2026-07 말 | Phase 4 첫 출시 (사이트 오픈) |
 | 2026-08 | 운영 본격 시작·가을 신학기 시즌 |
