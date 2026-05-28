@@ -291,13 +291,18 @@
 
 - **`feedback_no_end_of_step_prompting` 신설** — 한 작업 끝날 때마다 마감 제안 출력 금지. 컨텍스트 80%+ 또는 사용자 명시 지시 또는 시급 작업 모두 소진일 때만. 세션 #6 사용자 비판 (컨텍스트 7% 시점) 반영
 
-### Changed (1인칭·사진 정책 위키바이형 재설계 — DECISIONS L 신설 5건)
+### Changed (1인칭·사진·AI 이미지 정책 — DECISIONS L 8건, 2차 재변경)
 
-- **L1·L2·L3·L4·L5 [확정]** — 사용자 지적 "수백~수천 제품 직접 보유 불가능" 반영. E8(한국어 1인칭 전면 허용)·D5(시나리오당 사진 1~3장 의무) **폐기 처리**
-- **POLICY §3-1-3·§3-1-7·§3-3** 갱신 — 1인칭 검출 시 `owned_products` 메타 명시 시만 허용 (기본 차단). 페르소나 사진 6~9장 사이트 전체 의무로 대체
-- **DESIGN §2-3·§11-2·§12** 갱신 — 벤치마크 차용 범위 명문화 (Wirecutter·오늘의집은 형식만, 위키바이가 실질 베이스). 페르소나 인테리어 분위기 사진 사전 촬영 가이드
-- **`src/validator/truth.py`** — `_check_first_person` 시그너처 변경 (has_user_photo → owned_products). 이슈 코드 `first_person_without_photo` → `first_person_without_owned_products`. 회귀 5건 갱신 (validator 42→43)
-- **회귀 342→343 PASS** [확정 pytest 2.70초]
+- **L1·L2·L3·L4·L5·L6·L7·L8 [확정]** — 사용자 결정 "사진 직접 촬영 없음, Google API로 AI 이미지 생성":
+  - E8(한국어 1인칭 허용)·D5(시나리오당 사진 의무)·L2/L3 1차 초안 **모두 폐기**
+  - 1인칭 **무조건 차단** (L3·L5) — AI 이미지로 거짓 광고 회피
+  - **Google Imagen 4 Fast 채택** (L6) — `imagen-4.0-fast-generate-001`, AutoBlog `D:\autoblog\tistory_revival\ai_image_gen.py` 패턴 이식
+  - AI 생성 명시 표기 (L7) + 상품 이미지는 쿠팡 공식 위젯만 (L8)
+- **`docs/IMAGE_GENERATION.md` 신설** — 도구·API·환경변수·프롬프트·법규·예산·AutoBlog 매핑 명세
+- **POLICY §3-1-3·§3-1-7·§3-3** 재갱신 — 1인칭 무조건 fail. 페르소나 사진 → AI 생성 이미지 (`source_type='ai_generated'` + `ai_model` + `prompt_used` 메타)
+- **DESIGN §11-2** 재갱신 — 사진 사전 촬영 폐기. Google AI Studio API 키 발급·결제 활성화로 대체
+- **`src/validator/truth.py`** — `_check_first_person` 단순화 (인자 없음, 무조건 차단). 이슈 코드 `first_person_forbidden`. 회귀 갱신 (validator 43→43, owned_products 우회 케이스 폐기)
+- **예산 영향** [관찰] — Imagen $0.02/장 × 100편 × 6장 = $24/월 ≈ 32,000원 → PLAN §8 갱신 의무 (다음 세션)
 
 ### Known (다음 세션 처리)
 

@@ -629,17 +629,17 @@ POLICY.md에서 확정 예정 사항:
 ⑦ 빌드 후 미리보기 → 사용자 검토 → 1클릭 승인 → 배포
 ```
 
-### 11-2. 사용자 작업 체크리스트 (Phase 3 시작 시, L2 [확정 세션 #6 재설계])
+### 11-2. 사용자 작업 체크리스트 (Phase 3 시작 시, L2·L6 [확정 세션 #6 2차 재변경])
 
 - [ ] Claude Pro/Max 활성 확인
 - [ ] claude.ai/design 접속 확인
 - [ ] DESIGN.md §3~§6 텍스트 복사 준비
-- [ ] **페르소나별 인테리어·분위기 사진 2~3장 사전 촬영** (사이트 전체 6~9장 — 상품 사진 X)
-  - 자취생 (jachisin): 본인 원룸 분위기 2~3장
-  - 재택 (jaetaek): 본인 홈오피스 분위기 2~3장
-  - 정착자 (jeongchakja): 본인 정착 공간 분위기 2~3장
+- [ ] **Google AI Studio API 키 발급** (https://aistudio.google.com) + 결제 활성화 (Imagen 무료티어 불가 [확정])
+- [ ] `D:\secrets\affiliate_hub\google.env` 신설 (`GOOGLE_API_KEY=<key>`)
 - [ ] 시안 3~5종 생성·비교 → 1개 선정
 - [ ] 선정 결과 `docs/design_drafts/CHOICE.md`에 메모
+
+> ~~페르소나 사진 6~9장 사전 촬영~~ 폐기 — AI 생성으로 대체 (`docs/IMAGE_GENERATION.md`).
 
 ### 11-3. 시안 평가 기준
 

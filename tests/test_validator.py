@@ -94,8 +94,8 @@ class TestTruth:
         assert ok is True
         assert rpt["issues"] == []
 
-    def test_fail_first_person_without_owned_products(self) -> None:
-        """DECISIONS L3 — 1인칭 검출 시 owned_products 메타 없으면 fail (위키바이형 톤 강제)."""
+    def test_fail_first_person_basic(self) -> None:
+        """L3·L5 [2차] — 1인칭 표현 무조건 fail (AI 이미지로 거짓 광고 회피)."""
         ok, rpt = check_truth(
             {
                 "body_md": "내 원룸에서 써본 결과 너무 편했습니다.",
@@ -103,33 +103,22 @@ class TestTruth:
             }
         )
         assert ok is False
-        assert any("first_person_without_owned_products" in i for i in rpt["issues"])
+        assert any("first_person_forbidden" in i for i in rpt["issues"])
 
-    def test_pass_first_person_with_owned_products(self) -> None:
-        """owned_products 메타 명시 시 1인칭 액센트 허용 (L3 본인 실보유 제품)."""
+    def test_fail_first_person_even_with_owned_products(self) -> None:
+        """L3 [2차] — owned_products 메타 우회 폐기. 1인칭은 무조건 차단."""
         ok, rpt = check_truth(
             {
                 "body_md": "내 원룸에서 사용해보니 편했습니다.",
                 "products": [],
-                "owned_products": ["sku-001"],
+                "owned_products": ["sku-001"],  # 우회 메타는 무시됨
             }
         )
-        assert ok is True
-        assert rpt["issues"] == []
+        assert ok is False
+        assert any("first_person_forbidden" in i for i in rpt["issues"])
 
-    def test_pass_first_person_with_multiple_owned(self) -> None:
-        """본인 실보유 5~10개 제품 패턴 — owned_products 리스트 비어 있지 않음."""
-        ok, _rpt = check_truth(
-            {
-                "body_md": "우리집에서 3개월 사용했더니 만족합니다.",
-                "products": [],
-                "owned_products": ["sku-001", "sku-002", "sku-003"],
-            }
-        )
-        assert ok is True
-
-    def test_fail_first_person_n_months_used_without_owned(self) -> None:
-        """N개월 사용 패턴도 owned_products 없으면 fail."""
+    def test_fail_first_person_n_months_used(self) -> None:
+        """N개월 사용 패턴도 무조건 fail."""
         ok, rpt = check_truth(
             {
                 "body_md": "이 제품을 6개월 사용해보았습니다.",
@@ -137,19 +126,18 @@ class TestTruth:
             }
         )
         assert ok is False
-        assert any("first_person_without_owned_products" in i for i in rpt["issues"])
+        assert any("first_person_forbidden" in i for i in rpt["issues"])
 
-    def test_photos_alone_does_not_allow_first_person(self) -> None:
-        """L2·L3 — 페르소나 사진(photos)만 있고 owned_products 없으면 1인칭 차단."""
+    def test_pass_third_person_information(self) -> None:
+        """3인칭 정보형은 pass (위키바이형 톤)."""
         ok, rpt = check_truth(
             {
-                "body_md": "내 원룸에서 써본 결과 편했습니다.",
+                "body_md": "이 제품은 ~한 특징이 있다. 예산별 비교 시 적합하다.",
                 "products": [],
-                "photos": [{"persona_slug": "jachisin"}],
             }
         )
-        assert ok is False
-        assert any("first_person_without_owned_products" in i for i in rpt["issues"])
+        assert ok is True
+        assert rpt["issues"] == []
 
     def test_fail_ai_trace_soft_threshold(self) -> None:
         """'훌륭한/완벽한/최고의' 패턴 5회 이상 → fail."""
