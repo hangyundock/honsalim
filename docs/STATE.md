@@ -7,11 +7,11 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 16개·회귀 295 PASS + 신규 15 [추정] + CLI 10/11 명령** [확정] | #5 (2026-05-28) |
+| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 16개·회귀 295 PASS + 신규 22 [추정] + CLI 10/11 명령** [확정] | #5 (2026-05-28) |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
 | Phase 2 핵심 모듈 16개 (#3~#4) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} · deployer/{git_push,wrangler,verify} · tracker/d1_aggregator | #4 |
-| Phase 2 회귀 테스트 | **295/295 PASS** [확정] — validator 39 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + manifest 22 + db 12 + cli 31 + article_writer 25 + integration_phase2 11 + deployer 14 + tracker 12 (14 test 파일) | #4 |
+| Phase 2 회귀 테스트 | **317** (295 PASS [확정 #4 pytest] + 신규 22 [#5, 직접 호출 17 PASS, tmp_path 5건 pytest 환경 대기]) — validator 39 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + manifest 22 + db 12 + cli **46** + article_writer 25 + integration_phase2 **18** + deployer 14 + tracker 12 | #5 |
 | tracker.d1_aggregator (세션 #4) | BACKEND §2-8 [확정] — aggregate(date, dry_run=True) wrangler d1 execute · export_to_sqlite(aggregates) articles.view_count_cached UPDATE. D1 SQL UPSERT 패턴 (ON CONFLICT) — 재실행 안전 | #4 |
 | deployer (세션 #4) | BACKEND §2-7 [확정] — git_push · wrangler_deploy · verify_deploy. 모두 dry_run=True 기본 (외부 영향 차단, DECISIONS H4). 실제 push·deploy·HEAD는 사용자 명시 승인 후 dry_run=False | #4 |
 | builder.manifest (세션 #4) | DB §10 [추정] JSON 인터페이스 — new/load/save/upsert_article/upsert_asset/upsert_template/needs_rebuild (ARCH §7-3 5조건). 형태 결정은 사용자 검토 후 [확정] | #4 |
@@ -71,7 +71,7 @@
 3. **핵심 결정 4건 사용자 답변** — 자료 완비:
    - 모듈 분리 → [ARCH_MODULE_DIAGNOSIS.md](ARCH_MODULE_DIAGNOSIS.md) 옵션 A/B/C
    - manifest 형태 · 시나리오 우선순위 · 단축 URL 목록 → [KEY_DECISIONS_REVIEW.md](KEY_DECISIONS_REVIEW.md)
-4. `pip install -e .[dev]` 사용자 명시 승인 — pytest·ruff·black·jinja2·markdown 정식 설치 후 회귀 295+15 재검증
+4. `pip install -e .[dev]` 사용자 명시 승인 — pytest·ruff·black·jinja2·markdown 정식 설치 후 회귀 317 재검증
 5. (완료) ~~push origin main 사용자 승인~~ — origin/main 동기 확인됨 (세션 #5)
 
 ### Phase 2 진척 가능 (검토 영향 작음)
