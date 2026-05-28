@@ -28,10 +28,10 @@
 
 ## Phase 2: 핵심 시스템 — 남음 ⏳
 
-> 완료 항목은 STATE.md "Phase 2 핵심 모듈 12개" + "회귀 225/225" + "CLI 6/11" 행 참조.
+> 완료 항목은 STATE.md "Phase 2 핵심 모듈 12개" + "회귀 232/232" + "CLI 8/11" 행 참조.
 
 ### 안전 진척 (검토 의존 작음)
-- [ ] CLI 나머지 5 명령 (collect·unapprove·dashboard·build·deploy) — Phase 2 후속
+- [ ] CLI 남은 3 명령 (dashboard·build·deploy) — builder/dashboard/deployer 모듈 의존
 - [ ] enricher.claude_client 실호출 에러 처리·재시도 (BACKEND §3-5)
 - [ ] DECISIONS.md 갱신 — 세션 #4 새 [확정] 사실 등록
 

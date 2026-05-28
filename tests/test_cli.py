@@ -185,6 +185,47 @@ class TestPhase2Commands:
         with raises(SystemExit):
             parser.parse_args(["approve"])
 
+    # collect (positional arg)
+    def test_collect_subcommand_recognized(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["collect", "wonroom-30man"])
+        assert args.command == "collect"
+        assert args.scenario_slug == "wonroom-30man"
+        assert args.func == cli.cmd_collect
+
+    def test_collect_requires_scenario_slug(self) -> None:
+        parser = cli.build_parser()
+        with raises(SystemExit):
+            parser.parse_args(["collect"])
+
+    # unapprove
+    def test_unapprove_subcommand_recognized(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["unapprove", "--draft", "1"])
+        assert args.command == "unapprove"
+        assert args.draft == 1
+        assert args.func == cli.cmd_unapprove
+
+    def test_unapprove_requires_draft_id(self) -> None:
+        parser = cli.build_parser()
+        with raises(SystemExit):
+            parser.parse_args(["unapprove"])
+
+
+class TestStateMachineMatrixUnapprove:
+    """세션 #4 — BACKEND §9 unapprove 정합: approved → validated 허용."""
+
+    def test_approved_to_validated_allowed(self) -> None:
+        from writer.state_machine import VALID_TRANSITIONS
+
+        assert "validated" in VALID_TRANSITIONS["approved"]
+
+    def test_approved_to_published_still_allowed(self) -> None:
+        """기존 정상 흐름 — promote_to_article."""
+        from writer.state_machine import VALID_TRANSITIONS
+
+        assert "published" in VALID_TRANSITIONS["approved"]
+
 
 if __name__ == "__main__":
     if pytest is not None:

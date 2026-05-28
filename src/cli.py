@@ -530,6 +530,44 @@ def cmd_approve(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def cmd_collect(args: argparse.Namespace) -> int:
+    """scenario slug → drafts INSERT (status='collected'). BACKEND §9 [확정]."""
+    from writer import article_writer
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        row = conn.execute(
+            "SELECT id, title_ko FROM scenarios WHERE slug = ?", (args.scenario_slug,)
+        ).fetchone()
+        if row is None:
+            print(f"{FAIL} scenario slug={args.scenario_slug!r} 없음")
+            return 2
+        scenario_id, title_ko = row[0], row[1]
+        draft_id = article_writer.create_draft(
+            conn,
+            scenario_id=scenario_id,
+            raw_payload={"source": "cli collect", "scenario_slug": args.scenario_slug},
+            working_title=title_ko,
+        )
+        print(f"{OK} draft {draft_id} 생성 (scenario={args.scenario_slug!r}, status=collected)")
+        return 0
+    finally:
+        conn.close()
+
+
+def cmd_unapprove(args: argparse.Namespace) -> int:
+    """approved draft → validated 회귀. BACKEND §9 [확정]."""
+    from writer import state_machine
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        state_machine.transition(conn, args.draft, "validated", reason="cli unapprove")
+        print(f"{OK} draft {args.draft} → validated (승인 취소)")
+        return 0
+    finally:
+        conn.close()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="honsalim",
@@ -572,6 +610,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_approve.add_argument("--draft", type=int, required=True, help="draft id")
     p_approve.add_argument("--note", type=str, default=None, help="승인 메모")
     p_approve.set_defaults(func=cmd_approve)
+
+    p_collect = sub.add_parser("collect", help="scenario slug → drafts 생성 (status=collected)")
+    p_collect.add_argument("scenario_slug", type=str, help="scenarios.slug")
+    p_collect.set_defaults(func=cmd_collect)
+
+    p_unapprove = sub.add_parser("unapprove", help="approved draft → validated 회귀")
+    p_unapprove.add_argument("--draft", type=int, required=True, help="draft id")
+    p_unapprove.set_defaults(func=cmd_unapprove)
 
     return parser
 

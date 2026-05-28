@@ -1,33 +1,34 @@
 """drafts.status 6 상태 전이 머신.
 
-출처: DB.md §12 [확정] + BACKEND §2-4 [확정].
+출처: DB.md §12 [확정] + BACKEND §2-4·§9 [확정].
 
 전이도 (DB §12-1):
     collector → collected → enriched → validated → approved → published
-                  ▲           │           │           │
-                  │           ▼           ▼           ▼
-                  └──── rejected ◄────────┴───────────┘
+                  ▲           │           │     ▲     │
+                  │           ▼           ▼     │     ▼
+                  └──── rejected ◄────────┴─────┴─────┘
+                                        (unapprove)
                   └── 재수집 시 ─┘
 
-DB §12-2 전이 매트릭스:
+전이 매트릭스:
     collected  → enriched
     enriched   → validated | rejected
     validated  → approved  | rejected
-    approved   → published
-    published  → rejected      (unpublish)
-    rejected   → collected     (재시도)
+    approved   → published | validated   (BACKEND §9 unapprove)
+    published  → rejected                (unpublish)
+    rejected   → collected               (재시도)
 """
 
 from __future__ import annotations
 
 import sqlite3
 
-# DB §12-2 전이 매트릭스
+# 전이 매트릭스 — DB §12-2 + BACKEND §9 unapprove 정합
 VALID_TRANSITIONS: dict[str, frozenset[str]] = {
     "collected": frozenset({"enriched"}),
     "enriched": frozenset({"validated", "rejected"}),
     "validated": frozenset({"approved", "rejected"}),
-    "approved": frozenset({"published"}),
+    "approved": frozenset({"published", "validated"}),  # unapprove (BACKEND §9)
     "published": frozenset({"rejected"}),  # unpublish
     "rejected": frozenset({"collected"}),  # 재수집·재시도
 }

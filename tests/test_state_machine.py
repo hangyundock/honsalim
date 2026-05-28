@@ -113,6 +113,14 @@ class TestValidTransitions:
         transition(conn, 1, "rejected", reason="unpublish")
         assert current_status(conn, 1) == "rejected"
 
+    def test_approved_to_validated_unapprove(self) -> None:
+        """BACKEND §9 unapprove — approved → validated 회귀 허용."""
+        conn = _fresh_db()
+        for s in ["enriched", "validated", "approved"]:
+            transition(conn, 1, s)
+        transition(conn, 1, "validated", reason="cli unapprove")
+        assert current_status(conn, 1) == "validated"
+
 
 # ─── 위반 전이 ────────────────────────────────────────────────────────
 
