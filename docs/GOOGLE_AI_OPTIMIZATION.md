@@ -161,6 +161,16 @@
 
 **결과**: AutoBlog/tistory_revival 매일 자동 발행 글에 본 정합 즉시 적용 (다음 호출부터).
 
+### 7-bis-3. tistory_revival seo_gate.py 코드 게이트 추가 [확정 세션 #6 2026-05-29]
+
+`D:\autoblog\tistory_revival\seo_gate.py`에 게이트 신규 추가:
+- **`_FAKE_AUTHOR` 패턴 3건** — "저자/에디터가 직접·체험·방문·테스트", "우리 팀·저희 팀이 직접·체험·테스트", "본 저자/에디터/블로그가 직접·체험·방문" 차단
+- `check_article()` `fake_author` 검출 시 issue 추가 — "가짜 author 주장 발견 (AUTOBLOG_SEO_MASTER §2 #9·QRG §4.5.3 Lowest 위험)"
+- `metrics["가짜author"]` 필드 추가 (재생성 피드백용)
+- 검증: 정상 글 통과 + 위반 글 차단 [확정 직접 테스트]
+
+**효과**: tistory_revival 매일 자동 발행 시 가짜 author 주장 자동 차단 (재생성 피드백 트리거). prompt (content_profiles)와 함께 2단계 방어.
+
 ## 9. AutoBlog 2주 SEO 조사 (P1A+P1B) 통합 — 본 프로젝트 적용
 
 > 출처: `D:\autoblog\tasks\TASK_019_FINAL_SYNTHESIS.md` §2 + `D:\autoblog\AUTOBLOG_SEO_MASTER.md` (혼살림 세션 #6 cross-project 검증)
