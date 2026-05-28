@@ -7,11 +7,11 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 18개 + common.size_caps·회귀 342 PASS [확정 pytest 9.0.3] + CLI 10/11 + 결정 K1~K5 + Workers + tracker.report + doctor §14 size cap + security.yml 월간** | #6 (2026-05-28) |
+| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 18개 + common.size_caps·회귀 343 PASS + CLI 10/11 + 결정 K1~K5 + L1~L5 (위키바이형 정책 재설계) + Workers + tracker.report + doctor §14** | #6 (2026-05-28) |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
 | Phase 2 핵심 모듈 18개 (#3~#5) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} · deployer/{git_push,wrangler,verify} · tracker/{d1_aggregator,**report**} · **workers/go_gateway.js** | #5 |
-| Phase 2 회귀 테스트 | **342 / 342 PASS** [확정 pytest 9.0.3, 2.74초] — 세션 #6 +9 (check_size_caps 7 → common.size_caps 통합 후 9). 분배: validator 42 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + manifest 22 + db 12 + cli 46 + article_writer 25 + integration_phase2 18 + deployer 14 + tracker 25 + check_size_caps 9 | #6 |
+| Phase 2 회귀 테스트 | **343 / 343 PASS** [확정 pytest 9.0.3, 2.70초] — 세션 #6 +10 (check_size_caps 9 + L 정책 validator 1). 분배: validator 43 (L3 1인칭/owned_products 5건 갱신) + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + manifest 22 + db 12 + cli 46 + article_writer 25 + integration_phase2 18 + deployer 14 + tracker 25 + check_size_caps 9 | #6 |
 | CLI 명령 (BACKEND §9) | **10/11** — doctor · db migrate/seed · collect · enrich(dry_run) · validate · approve · unapprove · deploy(dry_run, H4) · build(manifest stub). 남은 1개 (dashboard)는 Phase 3 디자인 의존 | #5 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + 4 게이트 통합(validate_and_save) + META-JSON + Article JSON-LD + 1인칭/사진 게이트. 영구화 세션 #4 시점 5개 사항(tracker.d1_aggregator·deployer·builder.manifest·enricher.retry·state_machine 매트릭스 보강) → DECISIONS J + EVENTS #4·#5 누적 | #4~#5 |
 | doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 37개 · §11 state_machine 매트릭스 · §12 tests 로드 · §13 Workers JS (go_gateway.js) · **§14 docs/ size cap (CLAUDE.md §3 자동 점검)** — Phase 2 진입 게이트 자동 점검 | #6 |

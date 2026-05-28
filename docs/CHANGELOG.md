@@ -291,11 +291,20 @@
 
 - **`feedback_no_end_of_step_prompting` 신설** — 한 작업 끝날 때마다 마감 제안 출력 금지. 컨텍스트 80%+ 또는 사용자 명시 지시 또는 시급 작업 모두 소진일 때만. 세션 #6 사용자 비판 (컨텍스트 7% 시점) 반영
 
+### Changed (1인칭·사진 정책 위키바이형 재설계 — DECISIONS L 신설 5건)
+
+- **L1·L2·L3·L4·L5 [확정]** — 사용자 지적 "수백~수천 제품 직접 보유 불가능" 반영. E8(한국어 1인칭 전면 허용)·D5(시나리오당 사진 1~3장 의무) **폐기 처리**
+- **POLICY §3-1-3·§3-1-7·§3-3** 갱신 — 1인칭 검출 시 `owned_products` 메타 명시 시만 허용 (기본 차단). 페르소나 사진 6~9장 사이트 전체 의무로 대체
+- **DESIGN §2-3·§11-2·§12** 갱신 — 벤치마크 차용 범위 명문화 (Wirecutter·오늘의집은 형식만, 위키바이가 실질 베이스). 페르소나 인테리어 분위기 사진 사전 촬영 가이드
+- **`src/validator/truth.py`** — `_check_first_person` 시그너처 변경 (has_user_photo → owned_products). 이슈 코드 `first_person_without_photo` → `first_person_without_owned_products`. 회귀 5건 갱신 (validator 42→43)
+- **회귀 342→343 PASS** [확정 pytest 2.70초]
+
 ### Known (다음 세션 처리)
 
-- 본 세션 7 commits push origin main — 사용자 명시 키워드 승인 후
-- pip-audit transitive 13건 환경 갱신 — pip install -U 사용자 명시 승인 후
+- 본 세션 push origin main — 사용자 명시 키워드 승인 후 (추가 commits 누적)
+- pip-audit 환경 갱신 — pip install -U 사용자 명시 승인 후 (A안 권장)
 - SUMMARY/REVIEW_QUESTIONS + SUMMARY_PATCH_v1.1.md 사용자 정독 (Phase 3 진입 게이트)
+- 페르소나별 인테리어 사진 6~9장 사전 촬영 (L2 — Phase 3 시작 전)
 
 ---
 

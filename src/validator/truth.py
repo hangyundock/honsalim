@@ -86,48 +86,62 @@ def _check_prices(body_md: str, products: list[dict[str, Any]]) -> list[str]:
     return issues
 
 
-def _check_first_person(body_md: str, has_user_photo: bool) -> list[str]:
-    """1인칭 검출 시 직접 사진 없으면 fail (POLICY §3-1-3 [확정]).
+def _check_first_person(body_md: str, owned_products: list[str]) -> list[str]:
+    """1인칭 검출 시 owned_products 메타 없으면 fail (DECISIONS L3 [확정 세션 #6]).
 
-    has_user_photo=True면 1인칭 허용. False일 때만 패턴 검사.
+    위키바이형 정보 분석 톤 기본. owned_products 비어 있으면 1인칭 자동 차단.
+    owned_products 명시되면 1인칭 액센트 허용 (본인 실보유 5~10개 제품).
     """
-    if has_user_photo:
+    if owned_products:
         return []
     for pat in FIRST_PERSON_PATTERNS:
         m = re.search(pat, body_md)
         if m:
-            return [f"first_person_without_photo: {m.group()}"]
+            return [f"first_person_without_owned_products: {m.group()}"]
     return []
 
 
 def _has_user_photo(payload: dict[str, Any]) -> bool:
-    """payload에서 직접 사진 보유 여부 추출. photos 리스트 또는 has_user_photo 플래그 둘 다 지원."""
+    """payload에서 페르소나 사진 보유 여부 추출 (L2 [확정 세션 #6]).
+
+    photos 리스트 또는 has_user_photo 플래그 모두 지원.
+    페르소나 사진 6~9장 사이트 풀에서 1+ 참조 시 True.
+    """
     photos = payload.get("photos")
     if isinstance(photos, list) and len(photos) > 0:
         return True
     return bool(payload.get("has_user_photo"))
 
 
+def _owned_products(payload: dict[str, Any]) -> list[str]:
+    """payload에서 owned_products SKU 리스트 추출 (L3 [확정 세션 #6])."""
+    owned = payload.get("owned_products")
+    if isinstance(owned, list):
+        return [str(s) for s in owned if s]
+    return []
+
+
 def check_truth(payload: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
-    """truth 게이트 검사.
+    """truth 게이트 검사 (DECISIONS L1·L2·L3 [확정 세션 #6 재설계]).
 
     payload 기대 키:
     - body_md         : 본문 Markdown
     - products        : [{id, price_krw, ...}, ...] 가격 검증용
-    - photos          : list — 비어 있지 않으면 1인칭 허용 (POLICY §3-1-3)
-    - has_user_photo  : bool — photos 대신 boolean으로도 지정 가능 (POLICY 코드 예시)
+    - photos          : list — 페르소나 사진 풀 참조 (L2)
+    - has_user_photo  : bool — photos 대신 boolean (POLICY 코드 예시)
+    - owned_products  : list[str] — 본인 실보유 제품 SKU (L3, 1인칭 액센트 허용 조건)
 
     반환: (pass, {"issues": [...], "gate": "truth"}).
     """
     body_md = payload.get("body_md") or ""
     products = payload.get("products") or []
-    has_user_photo = _has_user_photo(payload)
+    owned = _owned_products(payload)
 
     issues: list[str] = []
     issues.extend(_check_ai_trace(body_md))
     issues.extend(_check_ai_trace_soft(body_md))
     issues.extend(_check_absolute(body_md))
     issues.extend(_check_prices(body_md, products))
-    issues.extend(_check_first_person(body_md, has_user_photo))
+    issues.extend(_check_first_person(body_md, owned))
 
     return len(issues) == 0, {"issues": issues, "gate": "truth"}

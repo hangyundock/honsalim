@@ -10,6 +10,7 @@
 - [ ] **pip-audit 16건 환경 갱신** — `docs/PIP_AUDIT_ANALYSIS.md` 참조 (A/B/C 안). pip install -U 사용자 명시 승인 후
 
 ## 세션 #6 완료 항목 (참고)
+- [x] **DECISIONS L 카테고리 신설 (위키바이형 1인칭·사진 정책 재설계)** — L1~L5 + E8·D5 폐기 처리. POLICY §3-1-3/§3-1-7/§3-3 + DESIGN §11-2/§12 + validator/truth.py + 회귀 5건 갱신
 - [x] CI lint #15 Black format check fail fix (commit 90d60f6, test 3건 black 26.5.1 inline 정합)
 - [x] pyproject.toml 직접 의존 3건 lower-bound (pillow/requests/python-dotenv, commit 5f6dfde)
 - [x] scripts/check_size_caps.py + 회귀 9 (commit bf82c73 → 55243bc 통합)
