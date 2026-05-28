@@ -119,7 +119,7 @@ class TestTruth:
 
     def test_pass_first_person_with_has_user_photo_flag(self) -> None:
         """has_user_photo boolean 플래그도 지원 (POLICY 코드 예시 호환)."""
-        ok, rpt = check_truth(
+        ok, _rpt = check_truth(
             {
                 "body_md": "우리집에서 3개월 사용했더니 만족합니다.",
                 "products": [],
@@ -149,7 +149,7 @@ class TestTruth:
     def test_pass_ai_trace_soft_below_threshold(self) -> None:
         """4회는 임계 미만 → pass."""
         body = "이 제품은 훌륭한 디자인과 완벽한 마감, 그리고 최고의 가성비를 보였다."
-        ok, rpt = check_truth({"body_md": body, "products": []})
+        ok, _rpt = check_truth({"body_md": body, "products": []})
         # 훌륭한·완벽한·최고의 각 1회 → 임계 5 미만, soft 패턴 모두 통과
         assert ok is True
 
@@ -293,7 +293,7 @@ class TestDisclosure:
 
 class TestLinks:
     def test_pass_empty(self) -> None:
-        ok, rpt = check_links(None)
+        ok, _rpt = check_links(None)
         assert ok is True
 
     def test_pass_no_links(self) -> None:
@@ -344,7 +344,7 @@ class TestLinks:
 
     def test_pass_external_rel_correct(self) -> None:
         body = '<a href="https://link.coupang.com/x" rel="nofollow sponsored noopener">link</a>'
-        ok, rpt = check_links(body)
+        ok, _rpt = check_links(body)
         assert ok is True
 
     def test_fail_autoplay_ad(self) -> None:

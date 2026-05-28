@@ -24,11 +24,11 @@ from .report import (
 
 __all__ = (
     "aggregate",
-    "export_to_sqlite",
-    "aggregate_weekly",
     "aggregate_monthly",
-    "top_articles_by_clicks",
-    "render_html_stub",
-    "weekly",
+    "aggregate_weekly",
+    "export_to_sqlite",
     "monthly",
+    "render_html_stub",
+    "top_articles_by_clicks",
+    "weekly",
 )

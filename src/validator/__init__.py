@@ -21,12 +21,12 @@ from .schema import check_schema
 from .truth import check_truth
 
 __all__ = (
-    "check_truth",
-    "check_schema",
     "check_disclosure",
     "check_links",
-    "validate_all",
+    "check_schema",
+    "check_truth",
     "serialize_report",
+    "validate_all",
 )
 
 

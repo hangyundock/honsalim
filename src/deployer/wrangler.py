@@ -6,7 +6,7 @@
 dry_run=True 기본 — 실제 배포는 사용자 명시 승인 후만.
 """
 
-# ruff: noqa: S603, S607
+# ruff: noqa: S603
 # 사유: subprocess wrangler 호출 — 인자 list로만 사용.
 
 from __future__ import annotations

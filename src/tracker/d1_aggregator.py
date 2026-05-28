@@ -6,7 +6,7 @@ D1 API 의존 — 실제 호출은 dry_run=False + 사용자 명시 승인 후.
 현재 stub은 인터페이스와 plan 출력만. wrangler d1 execute 명령 빌드 + 결과 형식 정의.
 """
 
-# ruff: noqa: S603, S607
+# ruff: noqa: S603
 # 사유: subprocess wrangler 호출 — 인자 list, shell injection 위험 없음.
 
 from __future__ import annotations

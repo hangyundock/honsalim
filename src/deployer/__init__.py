@@ -14,4 +14,4 @@ from .git_push import git_push
 from .verify import verify_deploy
 from .wrangler import wrangler_deploy
 
-__all__ = ("git_push", "wrangler_deploy", "verify_deploy")
+__all__ = ("git_push", "verify_deploy", "wrangler_deploy")

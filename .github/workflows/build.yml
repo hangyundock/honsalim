@@ -41,11 +41,25 @@ jobs:
         run: pytest --maxfail=1
         # 회귀 게이트 — validator 100% 통과 의무 (BACKEND §8-1)
 
+      - name: Check renderer readiness (Phase 3 게이트)
+        id: renderer
+        run: |
+          if [ -f src/builder/renderer.py ] && [ -f src/builder/pages.py ]; then
+            echo "ready=true" >> $GITHUB_OUTPUT
+            echo "renderer 준비됨 — build/deploy 진행"
+          else
+            echo "ready=false" >> $GITHUB_OUTPUT
+            echo "::warning::renderer/pages 미작성 (Phase 3 진입 전) — build/verify/deploy skip"
+          fi
+        # 본 단계는 Phase 2 작성 기간 동안 자동 skip되도록 함 (세션 #5 추가)
+
       - name: Build site
+        if: steps.renderer.outputs.ready == 'true'
         run: python -m honsalim build --full
         # ARCH §8-2 단계 6
 
       - name: Verify build artifacts
+        if: steps.renderer.outputs.ready == 'true'
         run: |
           test -f build/index.html
           test -f build/sitemap.xml
@@ -54,6 +68,7 @@ jobs:
         # ARCH §8-2 단계 8
 
       - name: Setup wrangler
+        if: steps.renderer.outputs.ready == 'true'
         uses: cloudflare/wrangler-action@v4  # [관찰] 공식 액션
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
@@ -62,6 +77,7 @@ jobs:
         # ARCH §8-2 단계 9
 
       - name: Notify IndexNow
+        if: steps.renderer.outputs.ready == 'true'
         run: python -m honsalim sitemap-notify --indexnow
         env:
           INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}

@@ -1,4 +1,4 @@
-# ruff: noqa: S603, S607
+# ruff: noqa: S607
 # 사유: subprocess 호출은 git 등 PATH 검색 도구 인자 list로만 사용.
 # shell injection 위험 없음. 도구 가용성 확인이 본 파일 책임.
 """혼살림 CLI 진입점.
@@ -31,8 +31,8 @@ from pathlib import Path
 # (PYTHONIOENCODING 환경 변수가 없어도 동작하도록 코드에서 강제)
 if hasattr(sys.stdout, "reconfigure"):
     try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined,union-attr]
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined,union-attr]
     except (AttributeError, OSError):
         pass
 

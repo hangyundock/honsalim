@@ -151,7 +151,8 @@ class ClaudeClient:
                 messages=[{"role": "user", "content": user_prompt}],
             ),
             rate_limit_exc=anthropic.RateLimitError,
-            overload_exc=anthropic.OverloadedError,
+            # anthropic SDK 버전별 attribute 위치가 다를 수 있어 getattr fallback
+            overload_exc=getattr(anthropic, "OverloadedError", anthropic.APIError),
             timeout_exc=anthropic.APITimeoutError,
             bad_request_exc=anthropic.BadRequestError,
             api_error_exc=anthropic.APIError,

@@ -21,10 +21,10 @@ from .state_machine import (
 __all__ = (
     "VALID_TRANSITIONS",
     "IllegalStateError",
-    "transition",
-    "current_status",
     "create_draft",
+    "current_status",
+    "promote_to_article",
     "save_enriched",
     "save_validation_report",
-    "promote_to_article",
+    "transition",
 )
