@@ -5,16 +5,20 @@
 
 ## ★ 시급 (다음 세션)
 
-- [ ] **CI lint #15 Black format check fail fix** — GitHub Actions에서 raw log 캡쳐 → Claude fix → push (5~10분, 우선순위 낮음)
-- [ ] **docs/SUMMARY.md / REVIEW_QUESTIONS.md 정독** — Phase 2 후반 본격 진입 게이트 (2026-07 이전까지)
+- [ ] **본 세션 #6 6 commits push origin main** — 사용자 명시 키워드 승인 후
+- [ ] **docs/SUMMARY.md / REVIEW_QUESTIONS.md + SUMMARY_PATCH_v1.1.md 정독** — Phase 3 진입 게이트 (2026-07 이전까지, 약 30분 예상)
+- [ ] **pip-audit transitive 13건 환경 갱신** — pip install -U 사용자 명시 승인 후
 
-## 세션 #5 완료 항목 (참고)
-- [x] 알리 Tracking ID + `ali.env` (환경 변수 로드 검증 완료)
-- [x] 핵심 결정 5건 (K1·K2·K3·K4·K5) DECISIONS 등재
-- [x] `pip install -e .[dev]` — 회귀 333 PASS, `honsalim` entry point 작동
-- [x] push origin main — 11 commits 전부 동기
-- [x] Workers `go_gateway.js` + tracker.report + 회귀 헬퍼 + doctor §13
-- [x] CI build-and-deploy 정상화 (renderer skip 동작)
+## 세션 #6 완료 항목 (참고)
+- [x] CI lint #15 Black format check fail fix (commit 90d60f6, test 3건 black 26.5.1 inline 정합)
+- [x] pyproject.toml 직접 의존 3건 lower-bound (pillow/requests/python-dotenv, commit 5f6dfde)
+- [x] scripts/check_size_caps.py + 회귀 9 (commit bf82c73 → 55243bc 통합)
+- [x] .github/workflows/security.yml — pip-audit 월간 + JSON artifact 90일 (commit 987afed, DECISIONS I4 정합)
+- [x] docs/SUMMARY_PATCH_v1.1.md — 사용자 정독 보조 (commit f9299ab)
+- [x] doctor §14 docs/ size cap 통합 + common.size_caps 모듈 (commit 55243bc)
+- [x] 영구 메모리 신설 — [[no-end-of-step-prompting]] 세션 #6 사용자 비판 반영
+
+> 세션 #5 이전 완료 항목은 EVENTS.md / STATE.md "진행 단계" 행 참조.
 
 ## Phase 1: 인프라 — 남음 ⏳
 

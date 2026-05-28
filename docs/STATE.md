@@ -7,20 +7,14 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 18개·회귀 333 (331 PASS/0 FAIL/2 SKIP) [확정 직접 호출] + CLI 10/11 + 결정 K1~K4 + Workers + tracker.report** | #5 (2026-05-28) |
+| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 18개 + common.size_caps·회귀 342 PASS [확정 pytest 9.0.3] + CLI 10/11 + 결정 K1~K5 + Workers + tracker.report + doctor §14 size cap + security.yml 월간** | #6 (2026-05-28) |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
 | Phase 2 핵심 모듈 18개 (#3~#5) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} · deployer/{git_push,wrangler,verify} · tracker/{d1_aggregator,**report**} · **workers/go_gateway.js** | #5 |
-| Phase 2 회귀 테스트 | **333 / 333 PASS** [확정 pytest 9.0.3, 2.21초] — `pip install -e .[dev]` 후 일괄 재검증 (이전 직접 호출 331 PASS + tmp_path 2 SKIP에서 SKIP 0). 분배: validator 42 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + manifest 22 + db 12 + cli 46 + article_writer 25 + integration_phase2 18 + deployer 14 + tracker 25 | #5 |
-| tracker.d1_aggregator (세션 #4) | BACKEND §2-8 [확정] — aggregate(date, dry_run=True) wrangler d1 execute · export_to_sqlite(aggregates) articles.view_count_cached UPDATE. D1 SQL UPSERT 패턴 (ON CONFLICT) — 재실행 안전 | #4 |
-| deployer (세션 #4) | BACKEND §2-7 [확정] — git_push · wrangler_deploy · verify_deploy. 모두 dry_run=True 기본 (외부 영향 차단, DECISIONS H4). 실제 push·deploy·HEAD는 사용자 명시 승인 후 dry_run=False | #4 |
-| builder.manifest (세션 #4) | DB §10 [추정] JSON 인터페이스 — new/load/save/upsert_article/upsert_asset/upsert_template/needs_rebuild (ARCH §7-3 5조건). 형태 결정은 사용자 검토 후 [확정] | #4 |
-| enricher.retry (세션 #4) | BACKEND §3-5 [확정] — RateLimit 3회(1·2·4초+jitter) · Overloaded 1회(10초) · Timeout/BadRequest/APIError 즉시 fail · SDK 미설치 환경 mock 회귀 가능 | #4 |
-| CLI 명령 (BACKEND §9) | **10/11** — doctor · db migrate/seed · collect · enrich (dry_run) · validate · approve · unapprove · **deploy (dry_run 기본 H4)** · **build (manifest stub)**. 남은 1개 (dashboard)는 디자인 Phase 3 의존 | #5 |
-| state_machine 매트릭스 보강 (세션 #4) | `approved → validated` 추가 — BACKEND §9 unapprove 정합. DB §12-2 매트릭스 갱신 | #4 |
-| Phase 2 통합 회귀 (세션 #4) | `tests/test_integration_phase2.py` 11 케이스 — 정상 전체 흐름(collected→published) + truth/disclosure fail rejected + rejected 재수집 + state_machine 위반 차단 + builder↔validator 정합 + content_hash/disclosure_first 자동 생성 + validation_report 영속화 | #4 |
-| Phase 2 흐름 골격 [관찰] | collected→enriched→validated/rejected→approved→published 6 상태 + 4 게이트 통합 (validate_and_save) + META-JSON 추출 + Article JSON-LD 빌더 + 1인칭/사진 게이트. 남은 영역: collector(쿠팡)·builder.manifest·dashboard·deployer·tracker | #4 |
-| doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 **37개** (+tracker.report 5) · §11 state_machine 매트릭스 · §12 tests 로드 · **§13 Workers JS 파일 (go_gateway.js)** — Phase 2 진입 게이트 자동 점검 | #5 |
+| Phase 2 회귀 테스트 | **342 / 342 PASS** [확정 pytest 9.0.3, 2.74초] — 세션 #6 +9 (check_size_caps 7 → common.size_caps 통합 후 9). 분배: validator 42 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + manifest 22 + db 12 + cli 46 + article_writer 25 + integration_phase2 18 + deployer 14 + tracker 25 + check_size_caps 9 | #6 |
+| CLI 명령 (BACKEND §9) | **10/11** — doctor · db migrate/seed · collect · enrich(dry_run) · validate · approve · unapprove · deploy(dry_run, H4) · build(manifest stub). 남은 1개 (dashboard)는 Phase 3 디자인 의존 | #5 |
+| Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + 4 게이트 통합(validate_and_save) + META-JSON + Article JSON-LD + 1인칭/사진 게이트. 영구화 세션 #4 시점 5개 사항(tracker.d1_aggregator·deployer·builder.manifest·enricher.retry·state_machine 매트릭스 보강) → DECISIONS J + EVENTS #4·#5 누적 | #4~#5 |
+| doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 37개 · §11 state_machine 매트릭스 · §12 tests 로드 · §13 Workers JS (go_gateway.js) · **§14 docs/ size cap (CLAUDE.md §3 자동 점검)** — Phase 2 진입 게이트 자동 점검 | #6 |
 | DB 초기화 | `data/honsalim.db` v1 + 13 테이블 + personas 3 + scenarios 10 (seed idempotent) | #3 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (PLAN·ARCH·DB·SCENARIOS·DESIGN·FRONTEND·BACKEND·POLICY·OPS·BACKUP·MAINTENANCE·SCHEDULE). 일관성 모순 0건 | #2 |
 | 사전 작성 산출물 (#2) | SQL 2편 + 설정 5건 + prompt_templates 6종 + 인프라 7건 (pyproject·wrangler·workflows·README·CHANGELOG 등). 세부는 EVENTS_202605.md | #2 |
@@ -35,7 +29,7 @@
 | 프로젝트 폴더 | `D:\affiliate_hub\` (docs·archive·.claude/commands 하위) |
 | 사이트 / 도메인 | 혼살림 / **honsalim.com** (만료 2027-05-28·Auto Renew·SSL Active) |
 | 호스팅 | **Cloudflare Pages `honsalim`** + Custom domain (Dugi2020@naver.com) |
-| GitHub | **`hangyundock/honsalim` Public** — origin/main과 2 commit ahead (세션 #5 진행 중). build-and-deploy ✅ + CodeQL ✅ + Graph ✅ 통과. **lint ❌ Black format check fail** [확정 API conclusion=failure] — 원인 추가 진단용 `--diff` commit 작성 (다음 push 후 실패 메시지 정확 노출) |
+| GitHub | **`hangyundock/honsalim` Public** — origin/main과 6 commit ahead (세션 #6 진행 중). build-and-deploy ✅ + CodeQL ✅ + Graph ✅ + lint ✅ (세션 #6 black 26.5.1 multiline str inline 정합 fix). 신규 workflow `security.yml` 월간 pip-audit + 90일 artifact |
 | GitHub Secrets / Branch Protection | CF_API_TOKEN · CF_ACCOUNT_ID · INDEXNOW_KEY 등록 / ruleset `main-protect` Active |
 | R2 / D1 | `honsalim-images` (APAC) / `honsalim-clicks` ID `9bae858e-456f-40e7-8084-c3b90e4ec3ca` |
 | Python | 3.10 32-bit (TIMA·AutoBlog 시스템 공유) |
@@ -66,10 +60,11 @@
 ## 알려진 잔존 미해결
 
 ### ★ 시급 (다음 세션)
-1. **CI lint #15 Black format check fail fix** — 사용자가 GitHub Actions에서 commit `86f9bb4` lint #15 → Black step 로그 캡쳐 → Claude가 즉시 fix → push. 5~10분 작업. 우선순위 낮음 (코드 동작·CI 핵심·회귀 모두 정상)
-2. **SUMMARY.md / REVIEW_QUESTIONS.md 사용자 검토** — Phase 2 본격 진입 게이트 (2026-07 Phase 3 진입 전까지)
-3. (참고) Phase 5 시점 (2026-11 이후) 알리 App Key/Secret 발급
-4. (선택) BitLocker D 드라이브 활성 결정
+1. **본 세션 6 commits push origin main 사용자 승인 대기** — 90d60f6 lint fix · 5f6dfde security pyproject · bf82c73 scripts.check_size_caps · 987afed security workflow · f9299ab SUMMARY_PATCH · 55243bc doctor §14
+2. **SUMMARY.md / REVIEW_QUESTIONS.md + SUMMARY_PATCH_v1.1.md 사용자 정독** — 진척 매트릭스 보조로 단축 (~30분), Phase 3 진입 게이트
+3. **pip-audit transitive 13건 분석** — 직접 의존 3건 lower-bound는 적용. 환경 pip install -U 사용자 명시 승인 후 일괄 갱신 (cryptography·idna·lxml·pip·pyasn1·urllib3)
+4. (참고) Phase 5 시점 (2026-11 이후) 알리 App Key/Secret 발급
+5. (선택) BitLocker D 드라이브 활성 결정
 
 ### Phase 2 진척 가능 (검토 영향 작음)
 - (현재 안전 진척 후보 모두 소진 — 다음은 사용자 검토 4건 의존)
