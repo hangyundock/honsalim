@@ -24,10 +24,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python 3.10
-        uses: actions/setup-python@v5  # [관찰] 작성 시점 stable
+        uses: actions/setup-python@v6  # [관찰] 작성 시점 stable
         with:
           python-version: "3.10"
           cache: "pip"
@@ -54,7 +54,7 @@ jobs:
         # ARCH §8-2 단계 8
 
       - name: Setup wrangler
-        uses: cloudflare/wrangler-action@v3  # [관찰] 공식 액션
+        uses: cloudflare/wrangler-action@v4  # [관찰] 공식 액션
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
