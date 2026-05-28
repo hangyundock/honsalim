@@ -25,7 +25,12 @@ except ImportError:
         raise AssertionError(f"expected {exc_type.__name__}")
 
 
-from builder.jsonld import _normalize_keywords, build_article_jsonld
+from builder.jsonld import (
+    _normalize_keywords,
+    build_article_jsonld,
+    build_itemlist_jsonld,
+    build_product_jsonld,
+)
 from validator import check_schema
 
 
@@ -258,6 +263,140 @@ class TestEncoding:
 
     def test_output_is_valid_json(self) -> None:
         json.loads(_build_default())  # 예외 없으면 OK
+
+
+# ─── ItemList 빌더 ────────────────────────────────────────────────────
+
+
+class TestItemListBuilder:
+    def test_required_fields_present(self) -> None:
+        out = build_itemlist_jsonld([{"name": "상품 A"}, {"name": "상품 B"}])
+        doc = json.loads(out)
+        for field in ("@context", "@type", "itemListElement"):
+            assert field in doc
+        assert doc["@type"] == "ItemList"
+
+    def test_passes_validator_schema_gate(self) -> None:
+        out = build_itemlist_jsonld(
+            [{"name": "상품 A", "url": "https://honsalim.com/p/a"}],
+            list_name="원룸 추천",
+        )
+        ok, rpt = check_schema(out)
+        assert ok is True, f"schema fail: {rpt}"
+
+    def test_position_auto_assigned(self) -> None:
+        out = build_itemlist_jsonld([{"name": "A"}, {"name": "B"}, {"name": "C"}])
+        doc = json.loads(out)
+        positions = [el["position"] for el in doc["itemListElement"]]
+        assert positions == [1, 2, 3]
+
+    def test_position_explicit_respected(self) -> None:
+        out = build_itemlist_jsonld([{"name": "X", "position": 5}, {"name": "Y", "position": 2}])
+        doc = json.loads(out)
+        assert doc["itemListElement"][0]["position"] == 5
+        assert doc["itemListElement"][1]["position"] == 2
+
+    def test_url_optional(self) -> None:
+        out = build_itemlist_jsonld([{"name": "A"}])
+        doc = json.loads(out)
+        assert "url" not in doc["itemListElement"][0]
+
+    def test_url_included_when_present(self) -> None:
+        out = build_itemlist_jsonld([{"name": "A", "url": "https://x/a"}])
+        doc = json.loads(out)
+        assert doc["itemListElement"][0]["url"] == "https://x/a"
+
+    def test_list_name_optional(self) -> None:
+        out = build_itemlist_jsonld([{"name": "A"}])
+        doc = json.loads(out)
+        assert "name" not in doc
+
+    def test_list_name_included(self) -> None:
+        out = build_itemlist_jsonld([{"name": "A"}], list_name="원룸 추천")
+        doc = json.loads(out)
+        assert doc["name"] == "원룸 추천"
+
+    def test_empty_items_raises(self) -> None:
+        with raises(ValueError):
+            build_itemlist_jsonld([])
+
+    def test_missing_item_name_raises(self) -> None:
+        with raises(ValueError):
+            build_itemlist_jsonld([{"name": "A"}, {"url": "x"}])  # 두 번째 name 없음
+
+
+# ─── Product 빌더 ─────────────────────────────────────────────────────
+
+
+class TestProductBuilder:
+    def test_required_fields_present(self) -> None:
+        out = build_product_jsonld({"name": "원룸 책상", "price_krw": 89000})
+        doc = json.loads(out)
+        for field in ("@type", "name", "offers"):
+            assert field in doc
+        assert doc["@type"] == "Product"
+        for field in ("price", "priceCurrency"):
+            assert field in doc["offers"]
+
+    def test_passes_validator_schema_gate(self) -> None:
+        out = build_product_jsonld({"name": "원룸 책상", "price_krw": 89000})
+        ok, rpt = check_schema(out)
+        assert ok is True, f"schema fail: {rpt}"
+
+    def test_price_krw_accepted(self) -> None:
+        out = build_product_jsonld({"name": "x", "price_krw": 50000})
+        doc = json.loads(out)
+        assert doc["offers"]["price"] == "50000"
+        assert doc["offers"]["priceCurrency"] == "KRW"
+
+    def test_price_field_also_accepted(self) -> None:
+        """price_krw 대신 price 키도 허용."""
+        out = build_product_jsonld({"name": "x", "price": 99999})
+        doc = json.loads(out)
+        assert doc["offers"]["price"] == "99999"
+
+    def test_custom_currency(self) -> None:
+        out = build_product_jsonld({"name": "x", "price": 19.99}, currency="USD")
+        doc = json.loads(out)
+        assert doc["offers"]["priceCurrency"] == "USD"
+
+    def test_optional_image(self) -> None:
+        out = build_product_jsonld({"name": "x", "price_krw": 1000}, image_url="https://x/i.jpg")
+        doc = json.loads(out)
+        assert doc["image"] == "https://x/i.jpg"
+
+    def test_optional_description(self) -> None:
+        out = build_product_jsonld(
+            {"name": "x", "price_krw": 1000}, description="간결한 디자인의 책상"
+        )
+        doc = json.loads(out)
+        assert doc["description"] == "간결한 디자인의 책상"
+
+    def test_optional_brand(self) -> None:
+        out = build_product_jsonld({"name": "x", "price_krw": 1000}, brand_name="이케아")
+        doc = json.loads(out)
+        assert doc["brand"]["@type"] == "Brand"
+        assert doc["brand"]["name"] == "이케아"
+
+    def test_sku_optional(self) -> None:
+        out = build_product_jsonld({"name": "x", "price_krw": 1000, "sku": "SKU-001"})
+        doc = json.loads(out)
+        assert doc["sku"] == "SKU-001"
+
+    def test_offers_url_when_product_url(self) -> None:
+        out = build_product_jsonld(
+            {"name": "x", "price_krw": 1000, "url": "https://link.coupang.com/x"}
+        )
+        doc = json.loads(out)
+        assert doc["offers"]["url"] == "https://link.coupang.com/x"
+
+    def test_missing_name_raises(self) -> None:
+        with raises(ValueError):
+            build_product_jsonld({"price_krw": 1000})
+
+    def test_missing_price_raises(self) -> None:
+        with raises(ValueError):
+            build_product_jsonld({"name": "x"})
 
 
 if __name__ == "__main__":

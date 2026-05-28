@@ -1,14 +1,15 @@
-"""Schema.org JSON-LD 빌더 — Article 타입.
+"""Schema.org JSON-LD 빌더 — Article · ItemList · Product 타입.
 
 출처: POLICY §4 + VALIDATOR §8 + FRONTEND §5 [확정].
 
 용도:
 - enricher.meta_extractor 결과 + 시나리오 정보 → Schema.org Article JSON-LD 문자열
-- validator.check_schema의 ARTICLE_REQUIRED 10필드 모두 충족
+- 시나리오 페이지 상품 추천 목록 → ItemList JSON-LD
+- 개별 상품 → Product JSON-LD (가격·통화)
+- validator.check_schema의 타입별 필수 필드 모두 충족
 - 페이지 <head>에 <script type="application/ld+json"> 삽입용
 
 키워드는 Schema.org 권장에 따라 쉼표 구분 문자열로 출력 (list 입력도 허용).
-ItemList·Product·Review 등 다른 @type은 후속 (validator는 이미 지원).
 """
 
 from __future__ import annotations
@@ -97,5 +98,119 @@ def build_article_jsonld(
     keywords = _normalize_keywords(meta.get("meta_keywords"))
     if keywords:
         doc["keywords"] = keywords
+
+    return json.dumps(doc, ensure_ascii=False, separators=(", ", ": "))
+
+
+# ─── ItemList 빌더 (시나리오 페이지 상품 추천 목록) ───────────────────
+
+
+# VALIDATOR §8 — ITEMLIST_REQUIRED와 동일
+PRODUCT_DEFAULT_CURRENCY = "KRW"  # DB §6 / SCENARIOS 한국 기본
+
+
+def build_itemlist_jsonld(
+    items: list[dict[str, Any]],
+    list_name: str | None = None,
+) -> str:
+    """ItemList JSON-LD 문자열 생성.
+
+    인자:
+        items: 각 item dict 키 — name (필수), url (선택), position (선택, 1부터 자동)
+        list_name: 선택. 목록 제목 ("원룸 30만원 추천 상품" 등)
+
+    반환: JSON 문자열.
+
+    Raises:
+        ValueError: items 비어있거나 item.name 누락.
+    """
+    if not items:
+        raise ValueError("items 비어있음 — ItemList는 최소 1개 요소 필요")
+
+    elements: list[dict[str, Any]] = []
+    for idx, item in enumerate(items, start=1):
+        name = item.get("name")
+        if not name:
+            raise ValueError(f"items[{idx - 1}].name 누락")
+        element: dict[str, Any] = {
+            "@type": "ListItem",
+            "position": int(item.get("position", idx)),
+            "name": str(name),
+        }
+        url = item.get("url")
+        if url:
+            element["url"] = str(url)
+        elements.append(element)
+
+    doc: dict[str, Any] = {
+        "@context": SCHEMA_CONTEXT,
+        "@type": "ItemList",
+        "itemListElement": elements,
+    }
+    if list_name:
+        doc["name"] = list_name
+
+    return json.dumps(doc, ensure_ascii=False, separators=(", ", ": "))
+
+
+# ─── Product 빌더 (개별 상품 카드) ────────────────────────────────────
+
+
+def build_product_jsonld(
+    product: dict[str, Any],
+    image_url: str | None = None,
+    description: str | None = None,
+    brand_name: str | None = None,
+    currency: str = PRODUCT_DEFAULT_CURRENCY,
+) -> str:
+    """Product JSON-LD 문자열 생성.
+
+    인자:
+        product: 필수 키 — name, price_krw (또는 price). 선택 — url, sku, category.
+        image_url: 상품 이미지 절대 URL (선택)
+        description: 상품 설명 (선택)
+        brand_name: 브랜드 이름 — 있으면 brand 필드 추가 (선택)
+        currency: ISO 4217 (기본 'KRW')
+
+    반환: JSON 문자열.
+
+    Raises:
+        ValueError: name 또는 price 누락.
+    """
+    name = product.get("name")
+    if not name:
+        raise ValueError("product.name 누락")
+
+    price = (
+        product.get("price_krw") if product.get("price_krw") is not None else product.get("price")
+    )
+    if price is None:
+        raise ValueError("product.price (또는 price_krw) 누락")
+
+    doc: dict[str, Any] = {
+        "@context": SCHEMA_CONTEXT,
+        "@type": "Product",
+        "name": str(name),
+        "offers": {
+            "@type": "Offer",
+            "price": str(price),
+            "priceCurrency": currency,
+        },
+    }
+
+    url = product.get("url")
+    if url:
+        doc["offers"]["url"] = str(url)
+
+    if image_url:
+        doc["image"] = image_url
+    if description:
+        doc["description"] = description
+    if brand_name:
+        doc["brand"] = {"@type": "Brand", "name": brand_name}
+
+    sku = product.get("sku")
+    if sku:
+        doc["sku"] = str(sku)
 
     return json.dumps(doc, ensure_ascii=False, separators=(", ", ": "))

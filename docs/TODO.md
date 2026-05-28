@@ -31,7 +31,7 @@
 > 완료 항목은 STATE.md "Phase 2 핵심 모듈 12개" + "회귀 172/172" 행 참조.
 
 ### 안전 진척 (검토 의존 작음)
-- [ ] `builder.jsonld` ItemList·Product 빌더 추가 (현재 Article만)
+- (소진 — 다음은 사용자 검토 4건 의존)
 
 ### 검토 의존 큼 (사용자 결정 후)
 - [ ] `collector.coupang` (쿠팡 가입 후·Phase 4)

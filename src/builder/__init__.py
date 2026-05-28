@@ -7,6 +7,10 @@
 
 from __future__ import annotations
 
-from .jsonld import build_article_jsonld
+from .jsonld import build_article_jsonld, build_itemlist_jsonld, build_product_jsonld
 
-__all__ = ("build_article_jsonld",)
+__all__ = (
+    "build_article_jsonld",
+    "build_itemlist_jsonld",
+    "build_product_jsonld",
+)

@@ -7,11 +7,11 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 12개·회귀 183 PASS** [확정] | #4 (2026-05-28) |
+| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 12개·회귀 205 PASS** [확정] | #4 (2026-05-28) |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
 | Phase 2 핵심 모듈 12개 (#3~#4) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor} · builder/jsonld | #4 |
-| Phase 2 회귀 테스트 | **183/183 PASS** [확정] — validator 39 + state_machine 13 + scenario_loader 11 + enricher 13 + meta_extractor 31 + jsonld 23 + db 12 + cli 16 + article_writer 25 (9 test 파일) | #4 |
+| Phase 2 회귀 테스트 | **205/205 PASS** [확정] — validator 39 + state_machine 13 + scenario_loader 11 + enricher 13 + meta_extractor 31 + jsonld 45 + db 12 + cli 16 + article_writer 25 (9 test 파일) | #4 |
 | Phase 2 흐름 골격 [관찰] | collected→enriched→validated/rejected→approved→published 6 상태 + 4 게이트 통합 (validate_and_save) + META-JSON 추출 + Article JSON-LD 빌더 + 1인칭/사진 게이트. 남은 영역: collector(쿠팡)·builder.manifest·dashboard·deployer·tracker | #4 |
 | doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 17개 · §11 state_machine 매트릭스 · §12 tests 로드 가능 — Phase 2 진입 게이트 자동 점검 | #4 |
 | DB 초기화 | `data/honsalim.db` v1 + 13 테이블 + personas 3 + scenarios 10 (seed idempotent) | #3 |
@@ -66,7 +66,7 @@
 5. push origin main 사용자 승인 (6 commit ahead)
 
 ### Phase 2 진척 가능 (검토 영향 작음)
-- `builder.jsonld` ItemList·Product 빌더 추가 (현재 Article만)
+- (현재 안전 진척 후보 모두 소진 — 다음은 사용자 검토 4건 의존)
 
 ### Phase 2 진척 가능 (검토 의존 큼 — 사용자 결정 후)
 - `src/builder/manifest.py` 증분 빌드 (ARCH §7·DB §10)
