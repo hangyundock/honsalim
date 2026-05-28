@@ -111,16 +111,114 @@
 
 ---
 
-## 차기 v1.3 (Phase 1 진입 후 예정)
+## v1.3 — 2026-05-28 (세션 #3, Phase 1 마무리 + Phase 2 기초 모듈)
+
+### Added (Phase 2 핵심 모듈 9개·회귀 95)
+
+- **`src/cli.py`** — doctor + db migrate + db seed (BACKEND §9 [확정])
+- **`src/common/{config,logging,grading,db}.py`** — 4 파일 (BACKEND §7·§14·§15-1)
+- **`src/validator/{__init__,truth,schema,disclosure,links}.py`** — 4 게이트 패턴 (POLICY §3·§4·§2·§6 + VALIDATOR_PATTERNS [확정])
+- **`src/writer/state_machine.py`** — DB §12 6 상태 머신 (collected→enriched→validated→approved→published + rejected)
+- **`src/writer/article_writer.py`** — drafts INSERT + promote_to_article + article_history 감사
+- **`src/collector/scenario_loader.py`** — DB scenarios → 수집 큐
+- **`src/enricher/{prompt_loader,claude_client}.py`** — 6 templates 로드 + Anthropic SDK stub (dry_run 기본)
+- **회귀 테스트 95/95 PASS** [확정]: validator 25 + state_machine 13 + scenario_loader 11 + enricher 13 + db 11 + cli 13 + article_writer 9
+- **DB 초기화**: `data/honsalim.db` v1 + 13 테이블 + personas 3 + scenarios 10 (seed idempotent)
+
+### Phase 1 외부 작업 완료 (Phase 1 ~95%)
+
+- **GitHub Repository Secrets**: CF_API_TOKEN·CF_ACCOUNT_ID·INDEXNOW_KEY 등록 (사용자 Web UI)
+- **INDEXNOW_KEY 발급**: `indexnow.env` 작성
+- **Branch Protection** ruleset `main-protect` Active (Restrict deletions + Block force pushes)
+- **pre-commit hook 9종 모두 Passed**: detect-secrets v1.5.0 + trim/eof/yaml/json/large-files/merge-conflict/private-key + black·ruff·mypy
+- **Dependabot PR 3건 일괄 처리** (checkout·setup-python·wrangler-action)
+
+### Fixed (no-speculation 원칙 적용 사례)
+
+- **detect-secrets baseline** UTF-16 LE → UTF-8 재생성 (PowerShell `>` 기본 인코딩 함정·CLAUDE.md 명시) + hook v1.4.0 → v1.5.0 정합
+- **load_dotenv override=True** — 시스템 환경 변수가 빈 문자열일 때 secrets 무시 문제 해결
+- **sys.stdout.reconfigure(utf-8)** — Windows cp949 콘솔 한국어 출력 보장
+- **SQLite isolation_level=None vs executescript** 충돌 해결
+
+---
+
+## v1.4 — 2026-05-28 (세션 #4, Phase 2 후반 본격 + 사용자 검토 자료)
+
+### Added (Phase 2 모듈 4종 추가·회귀 95→247)
+
+- **`src/enricher/meta_extractor.py`** — META-JSON 분리 추출 (BACKEND §49 시그니처). parse_meta_json·validate_meta·normalize_meta 분리. dry_run=True 기본.
+- **`src/enricher/retry.py`** — BACKEND §3-5 [확정] 재시도 정책. RateLimit 3회(1·2·4초+jitter) · Overloaded 1회(10초) · Timeout/BadRequest/APIError 즉시 fail. 의존성 주입 패턴 (SDK 미설치 환경 mock 회귀 가능).
+- **`src/builder/__init__.py`** + **`src/builder/jsonld.py`** — Schema.org JSON-LD 빌더 4종 (Article·ItemList·Product + keywords 정규화). POLICY §4 + VALIDATOR §8 [확정] 필드 모두 충족.
+- **회귀 테스트 247/247 PASS** [확정] — validator 39 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + db 12 + cli 31 + article_writer 25 + integration_phase2 11 (11 test 파일)
+
+### Changed (기존 모듈 보강)
+
+- **`src/validator/truth.py`**: 1인칭/사진 게이트 (POLICY §3-1-3 [확정] FIRST_PERSON_PATTERNS + photos/has_user_photo) + AI soft 임계 (VALIDATOR §4 [관찰])
+- **`src/validator/schema.py`**: ItemList·Product 필수 필드 추가 (VALIDATOR §8 [확정])
+- **`src/validator/__init__.py`**: serialize_report 헬퍼 — JSON 직렬화 가능 형태로 변환
+- **`src/writer/article_writer.py`**: validate_and_save (BACKEND §2-3 흐름 통합) + compute_content_hash + extract_disclosure_first 헬퍼
+- **`src/writer/state_machine.py`**: 매트릭스 보강 `approved → validated` (BACKEND §9 unapprove 정합)
+- **`src/cli.py`**: 5 명령 추가 (collect·enrich(dry_run)·validate·approve·unapprove) + doctor §9~§12 보강 (prompt_templates·Phase 2 모듈 진입점·매트릭스·tests 로드)
+
+### Added (CLI 명령 8/11 활성, BACKEND §9 [확정])
+
+- `doctor` · `db migrate` · `db seed` · `collect <slug>` · `enrich --draft <id> [--no-dry-run]` · `validate --draft <id>` · `approve --draft <id> [--note]` · `unapprove --draft <id>`
+- 남은 3개: `dashboard` · `build` · `deploy` (builder/dashboard/deployer 모듈 의존)
+
+### Added (통합 회귀 — Phase 2 모듈 결합 검증)
+
+- **`tests/test_integration_phase2.py`** 11 케이스
+  * 정상 전체 흐름 (collected→enriched→validated→approved→published)
+  * truth/disclosure fail rejected
+  * rejected → collected 재수집 → 재처리
+  * state_machine 위반 차단 (skip·미승인 promote)
+  * builder.jsonld ↔ validator.check_schema 정합
+  * content_hash·disclosure_first 자동 생성 + articles 컬럼 저장
+  * validation_report 영속화
+
+### Added (DECISIONS J 카테고리 신규, 8건)
+
+- **J1** 모듈 의존 방향: writer → validator 단방향
+- **J2** state_machine 매트릭스 보강 (approved → validated)
+- **J3** CLI 명령 8/11 활성
+- **J4** enrich 기본 dry_run (Claude API 비용 보호)
+- **J5** JSON-LD 빌더 4 인터페이스
+- **J6** content_hash 형식: `sha256:` + 64자 hex
+- **J7** disclosure_first 추출 헬퍼 (POLICY §2-2 [확정])
+- **J8** payload 책임 분리 — enriched_payload 구조는 [관찰]
+
+### Added (사용자 검토 자료 2건 — 핵심 결정 4건 자료 완비)
+
+- **`docs/ARCH_MODULE_DIAGNOSIS.md`** — `src/` flat vs pyproject.toml `honsalim` 패키지 모순 진단 + 옵션 A/B/C 비교 + 권장 [추정]
+- **`docs/KEY_DECISIONS_REVIEW.md`** — manifest 형태 · 시나리오 우선순위 · 단축 URL 차단 목록 3건 검토 자료
+
+### Updated (운영 문서)
+
+- **STATE.md**: cap 98% → 66% 정돈 (운영 현황 표 통합·중복 제거)
+- **TODO.md**: cap 96% → 62% 정돈
+- **EVENTS.md**: 세션 #2 archive 회전 (cap 20KB 초과 회피, 22.9KB → 9.4KB)
+- **DECISIONS.md**: J 카테고리 신설
+
+### Memory (Claude 영구 원칙 강화)
+
+- **`feedback_same_session_continuity` 강화**: 위반 사례 3회 누적 기록 (세션 #2·#3·#4). 종료 추천 전 의무 자문 4질문 + "종료는 사용자 명시 요청 시에만" 룰
+
+---
+
+## 차기 v1.5 (사용자 검토 후 예정)
 
 ### To Do (사용자 검토 후)
 
-- REVIEW_QUESTIONS.md 응답 반영
-- pre-commit hook 도구 선택 (gitleaks vs detect-secrets)
-- 자동 게시 시각 사용자 확인 (11:00 KST 유지 또는 변경)
-- 외부 계정 발급 (Cloudflare·쿠팡·GitHub)
-- secrets/.env 5종 생성
-- 윈도우 작업 스케줄러 등록
+- 핵심 결정 4건 사용자 답변 → 코드 반영
+  * 옵션 A/B/C 모듈 분리 → src/ 구조 재배치 또는 pyproject.toml 수정
+  * manifest 형태 → builder.manifest 구현
+  * 시나리오 우선순위 → scenarios seed 갱신 (필요 시)
+  * 단축 URL 차단 목록 → links.py 확장 (필요 시)
+- `pip install -e .[dev]` 사용자 명시 승인 → jinja2·markdown·pytest 정상 설치
+- push origin main 사용자 승인 (현재 16+ commit ahead)
+- AliExpress 심사 통과 → API 키 발급 → `ali.env` 작성
+- Phase 2 남은 모듈: builder.manifest·dashboard·deployer·tracker·collector.coupang(Phase 4)
+- 윈도우 작업 스케줄러 등록 (Phase 2 코드 안정화 후)
 
 ---
 
@@ -139,3 +237,4 @@
 | 버전 | 일자 | 변경 | 작성자 |
 |------|------|------|--------|
 | 1.0 | 2026-05-28 | 최초 작성 (v1.0·v1.1·v1.2 누적 + 차기 v1.3) | Claude Opus 4.7 |
+| 1.1 | 2026-05-28 | v1.3 (세션 #3) + v1.4 (세션 #4) 정식 추가, 차기 v1.5 명시 | Claude Opus 4.7 |
