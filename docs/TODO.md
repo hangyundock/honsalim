@@ -5,15 +5,16 @@
 
 ## ★ 시급 (다음 세션)
 
-- [x] ~~알리 API 키 발급 + `ali.env` 작성~~ — Tracking ID `honsalim` 발급·기본값 설정·환경 변수 로드 검증 [확정 doctor] (세션 #5)
-- [ ] **docs/SUMMARY.md / REVIEW_QUESTIONS.md 정독** — Phase 2 후반 본격 진입 게이트
-- [x] ~~핵심 결정 4건 의견 수렴~~ (세션 #5 DECISIONS K1·K2·K3·K4 [확정])
-  - [x] K4 모듈 분리: 옵션 B (pyproject.toml flat 정합) 적용
-  - [x] K1 manifest: JSON 파일 그대로 [확정]
-  - [x] K2 시나리오 우선순위: 현재 명세 그대로 [확정]
-  - [x] K3 단축 URL: `n.kakao.com` + `naver.me` 추가 (11→13)
-- [x] ~~`pip install -e .[dev]` 사용자 명시 승인~~ — 세션 #5 설치·검증 완료 (회귀 333 PASS·`honsalim` entry point)
-- [x] ~~push origin main 사용자 승인~~ — 세션 #5 "푸시해" 명시 승인 후 7 commits 푸시 완료 [확정 `c3e206f..6f14c42`]
+- [ ] **CI lint #15 Black format check fail fix** — GitHub Actions에서 raw log 캡쳐 → Claude fix → push (5~10분, 우선순위 낮음)
+- [ ] **docs/SUMMARY.md / REVIEW_QUESTIONS.md 정독** — Phase 2 후반 본격 진입 게이트 (2026-07 이전까지)
+
+## 세션 #5 완료 항목 (참고)
+- [x] 알리 Tracking ID + `ali.env` (환경 변수 로드 검증 완료)
+- [x] 핵심 결정 5건 (K1·K2·K3·K4·K5) DECISIONS 등재
+- [x] `pip install -e .[dev]` — 회귀 333 PASS, `honsalim` entry point 작동
+- [x] push origin main — 11 commits 전부 동기
+- [x] Workers `go_gateway.js` + tracker.report + 회귀 헬퍼 + doctor §13
+- [x] CI build-and-deploy 정상화 (renderer skip 동작)
 
 ## Phase 1: 인프라 — 남음 ⏳
 

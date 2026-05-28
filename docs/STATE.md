@@ -35,7 +35,7 @@
 | 프로젝트 폴더 | `D:\affiliate_hub\` (docs·archive·.claude/commands 하위) |
 | 사이트 / 도메인 | 혼살림 / **honsalim.com** (만료 2027-05-28·Auto Renew·SSL Active) |
 | 호스팅 | **Cloudflare Pages `honsalim`** + Custom domain (Dugi2020@naver.com) |
-| GitHub | **`hangyundock/honsalim` Public** — origin/main 동기 [확정 세션 #5, 9 commits push]. **GitHub Actions 모두 ✅** [확정 `9911b41` lint 1m35s + build-and-deploy 37s + Graph 1m2s + CodeQL] |
+| GitHub | **`hangyundock/honsalim` Public** — origin/main과 2 commit ahead (세션 #5 진행 중). build-and-deploy ✅ + CodeQL ✅ + Graph ✅ 통과. **lint ❌ Black format check fail** [확정 API conclusion=failure] — 원인 추가 진단용 `--diff` commit 작성 (다음 push 후 실패 메시지 정확 노출) |
 | GitHub Secrets / Branch Protection | CF_API_TOKEN · CF_ACCOUNT_ID · INDEXNOW_KEY 등록 / ruleset `main-protect` Active |
 | R2 / D1 | `honsalim-images` (APAC) / `honsalim-clicks` ID `9bae858e-456f-40e7-8084-c3b90e4ec3ca` |
 | Python | 3.10 32-bit (TIMA·AutoBlog 시스템 공유) |
@@ -66,11 +66,10 @@
 ## 알려진 잔존 미해결
 
 ### ★ 시급 (다음 세션)
-1. (완료) ~~알리 API 키 발급 + `ali.env` 작성~~ — Tracking ID `honsalim` 발급·기본값 설정·환경 변수 로드 검증 (세션 #5)
-2. **SUMMARY.md / REVIEW_QUESTIONS.md 사용자 검토** — Phase 2 본격 진입 게이트
-3. (완료) ~~핵심 결정 4건~~ — DECISIONS K1·K2·K3·K4 [확정] 등재 (세션 #5)
-4. (완료) ~~`pip install -e .[dev]`~~ — 세션 #5 사용자 승인 후 설치. pytest 9.0.3·black 26.5.1·ruff 0.15.14·mypy 2.1.0·jinja2 3.1.6·markdown 3.10.2 등 모두 설치. 회귀 333/333 PASS + `honsalim` entry point 작동 + doctor 의존성 7/7 OK [확정]
-5. (완료) ~~push origin main~~ — 세션 #5 사용자 명시 승인 "푸시해" 후 7 commits 푸시 완료 [확정]
+1. **CI lint #15 Black format check fail fix** — 사용자가 GitHub Actions에서 commit `86f9bb4` lint #15 → Black step 로그 캡쳐 → Claude가 즉시 fix → push. 5~10분 작업. 우선순위 낮음 (코드 동작·CI 핵심·회귀 모두 정상)
+2. **SUMMARY.md / REVIEW_QUESTIONS.md 사용자 검토** — Phase 2 본격 진입 게이트 (2026-07 Phase 3 진입 전까지)
+3. (참고) Phase 5 시점 (2026-11 이후) 알리 App Key/Secret 발급
+4. (선택) BitLocker D 드라이브 활성 결정
 
 ### Phase 2 진척 가능 (검토 영향 작음)
 - (현재 안전 진척 후보 모두 소진 — 다음은 사용자 검토 4건 의존)
