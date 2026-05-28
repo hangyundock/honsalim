@@ -14,6 +14,12 @@
 - [ ] **알리 이미지·상세페이지 정책 조사** — Phase 5 진입 전 (현재 docs 명시 없음)
 - [ ] **M2/M4/M5/M6 Phase 3~6 진척 시점 작업** — `docs/GOOGLE_AI_OPTIMIZATION.md` §6
 
+## 세션 #6 SEO 정합 통합 후 잔존 (cross-project · 별도 세션 권장)
+
+- [ ] **AutoBlog Hana Kim 잔존 5편 처리** — `D:\autoblog\tasks\TASK_019_v1.md` 후속. post_id 1~5 기존 글에 author/publisher 메타 Organization으로 갱신 + Hana Kim 1인칭 본문 재작성 또는 비공개. QRG §4.5.3 Lowest 위험 영구 차단
+- [ ] **Scaled Content Abuse 키워드 클러스터 중복 회피 모듈** — AutoBlog/tistory_revival 양쪽 적용. DB의 발행된 글들 간 본문 중복률(seq similarity) 점검 → 새 글 생성 시 70%+ 중복 fail. `D:\autoblog\AUTOBLOG_SEO_MASTER.md` §3 [필수 금지]
+- [ ] **혼살림 M2 Person Schema + about 페이지 운영자 정보** — Phase 4 진입 시 (E-E-A-T author 강화, M2 영구 결정)
+
 > 세션 #6 완료 commits·항목은 docs/CHANGELOG.md v1.6 / EVENTS.md / STATE.md 참조.
 > 세션 #5 이전 완료 항목은 EVENTS.md / STATE.md "진행 단계" 행 참조.
 
