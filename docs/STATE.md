@@ -35,7 +35,7 @@
 | 프로젝트 폴더 | `D:\affiliate_hub\` (docs·archive·.claude/commands 하위) |
 | 사이트 / 도메인 | 혼살림 / **honsalim.com** (만료 2027-05-28·Auto Renew·SSL Active) |
 | 호스팅 | **Cloudflare Pages `honsalim`** + Custom domain (Dugi2020@naver.com) |
-| GitHub | **`hangyundock/honsalim` Public** — origin/main 동기 [확정 세션 #5 push 후 `c3e206f..6f14c42`, 7 commits fast-forward]. GitHub Actions 자동 트리거 [관찰] |
+| GitHub | **`hangyundock/honsalim` Public** — origin/main 동기 [확정 세션 #5, 9 commits push]. **GitHub Actions 모두 ✅** [확정 `9911b41` lint 1m35s + build-and-deploy 37s + Graph 1m2s + CodeQL] |
 | GitHub Secrets / Branch Protection | CF_API_TOKEN · CF_ACCOUNT_ID · INDEXNOW_KEY 등록 / ruleset `main-protect` Active |
 | R2 / D1 | `honsalim-images` (APAC) / `honsalim-clicks` ID `9bae858e-456f-40e7-8084-c3b90e4ec3ca` |
 | Python | 3.10 32-bit (TIMA·AutoBlog 시스템 공유) |

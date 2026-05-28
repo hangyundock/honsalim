@@ -103,11 +103,18 @@ doctor §10 진입점 **37개** (+5 tracker.report) + **§13 신설** Workers JS
   - doctor 검증: `[OK] secrets/ali.env (loaded)` + 환경 변수 길이/값 매칭 확인 (값 노출 없음, POLICY §14-bis-1 정합)
   - App Key/Secret은 Phase 5 시점 발급 (현재 본 프로젝트 Phase 1·2·3은 알리 미사용)
 
-- **push origin main 명시 승인·푸시 완료** [확정 세션 #5]:
-  - 사용자 "푸시해" 명시 승인 후 `git push origin main` 실행
-  - 결과: `c3e206f..6f14c42  main -> main` (fast-forward, force push 아님) — 본 세션 7 commits 모두 외부 백업
-  - origin/main..main = 0 (동기 검증)
-  - GitHub Actions 워크플로 자동 트리거 [관찰] (CodeQL·테스트 등)
+- **push origin main 2회 명시 승인·푸시 완료** [확정 세션 #5]:
+  - 1차: `c3e206f..6f14c42` (7 commits) — 사용자 "푸시해" 명시 승인
+  - 2차: `6f14c42..9911b41` (2 commits, 734fcf6 docs + 9911b41 CI fix) — 사용자 두 번째 "푸시해" 명시 승인
+  - 본 세션 총 9 commits 모두 외부 백업
+
+- **CI 인프라 완전 정상화** [확정]:
+  - 이전 모든 push의 build-and-deploy + lint 워크플로 ❌ 실패 → 사용자가 GitHub Actions 페이지 캡쳐 보고로 발견
+  - GitHub API + 로컬 black/ruff/mypy 진단으로 원인 파악:
+    - build: `build/index.html` 없음 (renderer 미작성, Phase 3 의존)
+    - lint: pre-commit black 24.1.0 vs system pip black 26.5.1 버전 차이로 reformat 결과 충돌. 옛 파일 3건 + ruff 13건 + mypy 11건 누적 오류 드러남
+  - 해결: build.yml renderer step check + if 조건 / 8개 py.typed marker / pyproject mypy_path / anthropic.OverloadedError getattr fallback / pre-commit 버전 일괄 upgrade (black 26.5.1 / ruff 0.15.14 / mypy 2.1.0)
+  - 결과: **9911b41 commit의 lint ✅(1m35s) + build-and-deploy ✅(37s, renderer skip 동작) + CodeQL ✅ + Graph Update ✅** [확정 화면 캡쳐]
 
 - **`pip install -e .[dev]` 명시 승인·설치·검증 완료** [확정]:
   - 사용자 "pip install 진행해" 명시 승인 (세션 #5)
