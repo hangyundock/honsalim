@@ -96,7 +96,12 @@ doctor §10 진입점 **37개** (+5 tracker.report) + **§13 신설** Workers JS
 - collector.coupang — Phase 4 (쿠팡 재가입 후)
 
 **세션 #5 종료 직전 사용자 추가 보고 [확정]**:
-- AliExpress Affiliate Program **승인 완료** — 2026-05-28 (당일 가입, D+0 승인. 신청 → 심사 통과 매우 빠름 [관찰]). 이메일 "Your affiliate account is ready" + portals.aliexpress.com 활성. API 키 발급 + `ali.env` 작성은 다음 세션 사용자 직접 작업.
+- AliExpress Affiliate Program **승인 완료** — 2026-05-28 (당일 가입, D+0 승인. 신청 → 심사 통과 매우 빠름 [관찰]). 이메일 "Your affiliate account is ready" + portals.aliexpress.com 활성.
+- **본 세션 내 ali.env 작성·검증 완료** [확정]:
+  - portals.aliexpress.com → 트래킹ID 페이지에서 `honsalim` 신규 발급 → Set as default 클릭으로 기본값 변경
+  - 사용자 직접 메모장으로 `D:\secrets\affiliate_hub\ali.env` 작성 (`ALI_TRACKING_ID=honsalim`)
+  - doctor 검증: `[OK] secrets/ali.env (loaded)` + 환경 변수 길이/값 매칭 확인 (값 노출 없음, POLICY §14-bis-1 정합)
+  - App Key/Secret은 Phase 5 시점 발급 (현재 본 프로젝트 Phase 1·2·3은 알리 미사용)
 
 **다음 세션 할 일**:
 1. SUMMARY.md / REVIEW_QUESTIONS.md 정독 — Phase 2 본격 진입 게이트 (사용자 직접)
