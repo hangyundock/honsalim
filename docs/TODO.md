@@ -23,13 +23,10 @@
 ### 남음 ⏳
 - [ ] AliExpress 심사 결과 확인 (이메일 1~2영업일)
 - [ ] 알리 승인 후 API 키 발급 + `ali.env` 작성
-- [ ] INDEXNOW_KEY 발급 + GitHub Repository Secrets 등록 (CF_API_TOKEN·CF_ACCOUNT_ID·INDEXNOW_KEY)
-- [ ] Dependabot PR 3건 검토·머지 (actions/checkout-6·setup-python-6·wrangler-action-4)
-- [ ] Branch Protection (main) 설정 — push 안정 확인 후
 - [ ] `.claude/settings.json` deny 룰 사용자 검토 (사전 작성 완료, AutoBlog 패턴 확장 deny 24·allow 14)
 - [ ] **윈도우 작업 스케줄러 등록**: Phase 2 코드 작성 후 (DECISIONS C7)
 - [ ] python -m honsalim doctor 전체 OK (Phase 2 진입 게이트)
-- [ ] STATE.md "자격증명 만료" 표 발급일·만료일 기재
+- [ ] Branch Protection에 Actions status check 추가 — Phase 2 코드 안정화 후
 
 ### 보류
 - BitLocker (사용자 결정 — "프로그램 완성도 우선·추후 일괄")
@@ -37,22 +34,20 @@
 
 ## Phase 2: 핵심 시스템 (2026-06~07)
 
-### 완료 ✅ (세션 #3)
+### 완료 ✅ (세션 #3~#4)
 - [x] pyproject.toml + 의존성 명세 (Phase 1 사전 작성)
 - [x] common 모듈 (config·logging·db·grading) — 4 파일
 - [x] DB 마이그레이션 적용 — `data/honsalim.db` v1 + 13 테이블 + personas 3·scenarios 10
 - [x] enricher.claude_client stub + prompt_loader (6 templates 로드)
+- [x] enricher.meta_extractor (META-JSON 분리 추출) + 31 회귀 테스트 — 세션 #4
 - [x] validator 4모듈 (truth·schema·disclosure·links) + 25 회귀 테스트
 - [x] writer.state_machine (DB §12 6 상태 머신) + 13 회귀 테스트
 - [x] writer.article_writer (drafts INSERT + promote_to_article) + 9 회귀 테스트
 - [x] collector.scenario_loader (DB scenarios → 큐) + 11 회귀 테스트
-- [x] tests/test_db.py (11) + tests/test_cli.py (13) — 안정성 강화
+- [x] tests/test_db.py (12) + tests/test_cli.py (12) — 안정성 강화
 - [x] GitHub Actions workflows (build.yml·lint.yml) — Phase 1 사전 작성·세션 #3 버전 bump
 - [x] cli doctor + db migrate + db seed (CLI 3 명령)
-- [x] **회귀 테스트 95/95 PASS** [확정]
-
-### 남음 ⏳ (검토 영향 작음 — 안전 진척)
-- [ ] enricher.meta_extractor (META-JSON 분리 추출 — meta_extract.md 활용)
+- [x] **회귀 테스트 126/126 PASS** [확정]
 
 ### 남음 ⏳ (검토 의존 큼)
 - [ ] collector.coupang (쿠팡 가입 후·Phase 4)
