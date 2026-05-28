@@ -5,14 +5,14 @@
 
 ## ★ 시급 (다음 세션)
 
-- [ ] **docs/SUMMARY.md 정독** (1페이지 요약 + 결정 25개 매트릭스 + 검토 체크리스트) — 12 문서 검토 게이트
-- [ ] 12개 설계 문서 사용자 검토 (PLAN·ARCH·DB·SCENARIOS·DESIGN·FRONTEND·BACKEND·POLICY·OPS·BACKUP·MAINTENANCE·SCHEDULE) — SUMMARY로 우선, 의심 부분만 원본
+- [ ] **알리 심사 결과 확인** (이메일, 2026-05-29~06-01)
+- [ ] **docs/SUMMARY.md / REVIEW_QUESTIONS.md 정독** — Phase 2 후반 본격 진입 게이트
 - [ ] 핵심 결정 포인트 사용자 의견 수렴
-  - ARCH §4-2 모듈 28개 분리 적정성
+  - ARCH §4-2 모듈 분리 적정성 + pyproject.toml `honsalim` 패키지 가정 vs `src/` flat layout 모순
   - DB §10 manifest를 JSON 파일로 (테이블 아님)
   - SCENARIOS §4 초기 10편 시나리오 우선순위
   - POLICY §6-1 외부 단축 URL 차단 목록 추가/제외 검토
-- [ ] Phase 1 진입 사용자 명시 OK
+- [ ] `pip install -e .[dev]` 사용자 명시 승인 (jinja2·markdown·pytest 등)
 
 ## Phase 1: 인프라 (2026-06) — 진행 상황
 
@@ -37,19 +37,29 @@
 
 ## Phase 2: 핵심 시스템 (2026-06~07)
 
-- [ ] pyproject.toml + 의존성 (anthropic·jinja2·requests·pillow 등)
-- [ ] common 모듈 (config·logging·db·grading)
-- [ ] DB 마이그레이션 001 (스키마 + personas·scenarios seed) — **사전 작성 완료**: `sql/migrations/001_initial_schema.sql`·`sql/seeds/001_personas_scenarios.sql`. Phase 2에서 검토 후 `src/common/migrations/`로 이동·적용
-- [ ] collector.coupang
-- [ ] enricher.claude_client + prompt_templates/*.md
-- [ ] validator 4모듈 (truth·schema·disclosure·links) — 회귀 테스트 30+ 케이스
-- [ ] writer.state_machine
+### 완료 ✅ (세션 #3)
+- [x] pyproject.toml + 의존성 명세 (Phase 1 사전 작성)
+- [x] common 모듈 (config·logging·db·grading) — 4 파일
+- [x] DB 마이그레이션 적용 — `data/honsalim.db` v1 + 13 테이블 + personas 3·scenarios 10
+- [x] enricher.claude_client stub + prompt_loader (6 templates 로드)
+- [x] validator 4모듈 (truth·schema·disclosure·links) + 25 회귀 테스트
+- [x] writer.state_machine (DB §12 6 상태 머신) + 13 회귀 테스트
+- [x] collector.scenario_loader (DB scenarios → 큐) + 11 회귀 테스트
+- [x] GitHub Actions workflows (build.yml·lint.yml) — Phase 1 사전 작성·세션 #3 버전 bump
+- [x] cli doctor + db migrate + db seed (CLI 3 명령)
+
+### 남음 ⏳ (검토 영향 작음 — 안전 진척)
+- [ ] tests/test_db.py · tests/test_cli.py 보강 (안정성 강화)
+- [ ] writer.article_writer (drafts INSERT + enriched_payload 저장)
+- [ ] enricher.meta_extractor (META-JSON 분리 추출 — meta_extract.md 활용)
+
+### 남음 ⏳ (검토 의존 큼)
+- [ ] collector.coupang (쿠팡 가입 후·Phase 4)
 - [ ] builder (manifest·renderer·pages·sitemap·assets)
-- [ ] dashboard.render·approve
+- [ ] dashboard.render·approve (디자인 시안 Phase 3 의존)
 - [ ] deployer (git_push·wrangler·verify)
 - [ ] tracker.d1_aggregator + Workers go_gateway.js
-- [ ] GitHub Actions workflows (build.yml·lint.yml)
-- [ ] python -m honsalim build --full 성공
+- [ ] python -m honsalim build --full 성공 (Phase 2 종착)
 
 ## Phase 3: 디자인·콘텐츠 (2026-07)
 

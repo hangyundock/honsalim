@@ -7,11 +7,14 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 인프라 ~85% 진행** [추정] (외부·Git·보안 hook·Secrets·Branch Protection 완료) | #3 (2026-05-28) |
+| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 9개·회귀 62 PASS** [확정] | #3 (2026-05-28) |
 | 운영 모델 (세션 #2 후반) | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건 + GitHub 보안 다중 방어 | #2 |
 | Phase 1 외부 작업 완료 | GitHub(2FA·보안 5종) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic 키 · secrets .env · Git init·push · 알리 가입 신청 | #2 |
-| Phase 1 세션 #3 진척 | detect-secrets baseline UTF-8 정합 (`46fe5b4`) · Dependabot PR 3건 일괄 처리 (`fe1a74e`) · TODO cap 해소 (`650eaa5`) · INDEXNOW_KEY 발급·indexnow.env · GitHub Secrets 3개 등록 (INDEXNOW_KEY·CF_API_TOKEN·CF_ACCOUNT_ID) · Branch Protection ruleset `main-protect` Active | #3 |
-| Phase 1 보류·대기 | BitLocker (사용자 결정) · 쿠팡 (Phase 4 후) · 알리 심사 대기 (1~2영업일) · Actions status check 등록 (Phase 2 코드 후) | #3 |
+| Phase 1 세션 #3 정합성 | detect-secrets baseline UTF-8 + hook v1.5.0 · Dependabot PR 3건 일괄 처리 · gitignore SQLite WAL · settings.json Glob 차단 · INDEXNOW_KEY 발급·GitHub Secrets 3개 등록 · Branch Protection ruleset `main-protect` Active | #3 |
+| Phase 2 핵심 모듈 9개 (세션 #3) | `src/cli.py` (doctor + db migrate + db seed) · `src/common/{config,logging,grading,db}.py` · `src/validator/{truth,schema,disclosure,links}.py` · `src/writer/state_machine.py` · `src/collector/scenario_loader.py` · `src/enricher/{prompt_loader,claude_client}.py` | #3 |
+| Phase 2 회귀 테스트 | **62/62 PASS** [확정] — validator 25 + state_machine 13 + scenario_loader 11 + enricher 13. `tests/conftest.py` + 4 test 파일. pytest 미설치 환경에서도 standard library 직접 호출 가능 구조 | #3 |
+| DB 초기화 | `data/honsalim.db` 생성 + schema_version v1 + 13 테이블 + personas 3 + scenarios 10 (seed idempotent INSERT OR IGNORE) | #3 |
+| Phase 1 보류·대기 | BitLocker (사용자 결정) · 쿠팡 (Phase 4 후) · 알리 심사 대기 (1~2영업일) · Actions status check 등록 (Phase 2 코드 후) · pip install -e .[dev] (jinja2·markdown·pytest 등 사용자 승인) | #3 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (PLAN·ARCH·DB·SCENARIOS·DESIGN·FRONTEND·BACKEND·POLICY·OPS·BACKUP·MAINTENANCE·SCHEDULE + SUMMARY 비개발자 요약) | #2 |
 | 일관성 점검 | ✅ 모순 0건 (167+73+44+34+211+43회 일관 인용) | #2 |
 | 사전 작성 SQL | `sql/migrations/001_initial_schema.sql` + `sql/seeds/001_personas_scenarios.sql` | #2 |
@@ -73,15 +76,24 @@
 
 ### ★ 시급 (다음 세션)
 1. **알리 심사 결과 확인** (이메일, 2026-05-29~06-01 예상)
-2. **SUMMARY.md / REVIEW_QUESTIONS.md 사용자 검토** — Phase 2 진입 전 검토 게이트 (특히 핵심 결정 4건: 모듈 분리·manifest 형태·시나리오 우선순위·단축 URL 목록)
-3. GitHub Actions 첫 실행 결과 확인 — lint·codeql 통과 / build 실패는 예상 [추정] (honsalim 모듈 미구현)
-4. (선택) Phase 2 진입 — `python -m honsalim doctor` 구현부터
+2. **SUMMARY.md / REVIEW_QUESTIONS.md 사용자 검토** — Phase 2 후반 본격 진입 게이트 (핵심 결정 4건: 모듈 분리·manifest 형태·시나리오 우선순위·단축 URL 목록)
+3. ARCH §4 모듈 분리 결정 검토 — pyproject.toml `honsalim` 패키지 가정과 ARCH §3 `src/` flat layout 모순 해결
+4. `pip install -e .[dev]` 사용자 명시 승인 (jinja2·markdown·pytest 정상 설치 → 의존성 7/7·표준 pytest 실행)
+
+### Phase 2 진척 가능 (사용자 검토 영향 작음)
+- `tests/test_db.py` · `tests/test_cli.py` 보강 (안정성 강화)
+- `src/writer/article_writer.py` (drafts INSERT + enriched_payload 저장 — DB §5 활용)
+
+### Phase 2 진척 가능 (검토 의존 큼 — 사용자 결정 후)
+- `src/builder/manifest.py` 증분 빌드 JSON 인프라 (ARCH §7·DB §10)
+- `src/dashboard/{render,approve}.py` (디자인 시안 Phase 3 의존)
+- `src/deployer/{git_push,wrangler}.py` · `src/tracker/d1_aggregator.py`
+- `src/workers/go_gateway.js` (Cloudflare Workers JS)
 
 ### Phase 1 잔존 (작은)
-- Actions status check Branch Protection 추가 — Phase 2 코드 통해 Actions 안정화 후
+- Actions status check Branch Protection 추가 — Phase 2 코드 안정화 후
 - BitLocker 활성 (사용자 결정 시점)
 - 알리 승인 시 API 키 + `ali.env` 작성
-- `.claude/settings.json` deny 룰 사용자 검토
 
 ### Phase 2 핵심 시스템 (2026-06~07)
 - 모듈 8개·DB 마이그레이션·Claude 파이프라인·Jinja2 빌더·진실성 게이트·배포·테스트
