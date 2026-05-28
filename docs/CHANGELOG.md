@@ -205,20 +205,97 @@
 
 ---
 
-## 차기 v1.5 (사용자 검토 후 예정)
+## v1.5 — 2026-05-28 (세션 #5, Phase 2 ~95% 도달 + K1~K5 [확정] + 회귀 333)
 
-### To Do (사용자 검토 후)
+### Added (핵심 결정 5건 [확정] — DECISIONS K 신설)
 
-- 핵심 결정 4건 사용자 답변 → 코드 반영
-  * 옵션 A/B/C 모듈 분리 → src/ 구조 재배치 또는 pyproject.toml 수정
-  * manifest 형태 → builder.manifest 구현
-  * 시나리오 우선순위 → scenarios seed 갱신 (필요 시)
-  * 단축 URL 차단 목록 → links.py 확장 (필요 시)
-- `pip install -e .[dev]` 사용자 명시 승인 → jinja2·markdown·pytest 정상 설치
-- push origin main 사용자 승인 (현재 16+ commit ahead)
-- AliExpress 심사 통과 → API 키 발급 → `ali.env` 작성
-- Phase 2 남은 모듈: builder.manifest·dashboard·deployer·tracker·collector.coupang(Phase 4)
-- 윈도우 작업 스케줄러 등록 (Phase 2 코드 안정화 후)
+- **K1** manifest 형태 `data/manifest.json` 단일 JSON [확정]
+- **K2** 시나리오 우선순위 SCENARIOS §4-11 현 명세 그대로 [확정]
+- **K3** 외부 단축 URL 차단 11→13 (`n.kakao.com`+`naver.me`) — links.py + POLICY §6-1 + 회귀 3
+- **K4** 모듈 분리 옵션 B (pyproject.toml flat 정합) — `honsalim` entry point 검증 [확정]
+- **K5** prompt_loader Jinja2 `ChainableUndefined` 채택 — 회귀 환경 호환
+
+### Added (Phase 2 잔존 모듈)
+
+- **`src/workers/go_gateway.js`** (BACKEND §5 [확정]) — Cloudflare Workers /go/<slug> → D1 lookup → 302. 보안: IP 미저장·UA SHA-256 16자·referrer hostname만·bot UA flag
+- **`src/tracker/report.py`** (BACKEND §2-8) — aggregate_weekly·aggregate_monthly·top_articles_by_clicks·render_html_stub
+- **`scripts/run_tests.py`** — pytest 미설치 환경 일괄 회귀 헬퍼
+
+### Added (CLI deploy/build 10/11)
+
+- **`cmd_deploy`** dry_run=True 기본 (DECISIONS H4) — deployer 3단계
+- **`cmd_build`** — builder.manifest stub 호출 (renderer Phase 3 의존)
+
+### Added (doctor §13 + 진입점 37)
+
+- §13 Workers JS 파일 점검 (export default 패턴)
+- §10 진입점 37/37 OK (+ tracker.report 5 + writer 헬퍼 2)
+
+### Updated (CI 인프라)
+
+- pre-commit 버전 일괄 upgrade (Black 24.1→26.5 등) → 9 hook 모두 Passed [확정]
+- build.yml: renderer 미작성 시 자동 skip (Phase 3 전 build/deploy 건너뜀)
+- mypy: 8개 py.typed marker + mypy_path = "src" — flat src layout 정합 (K4)
+- anthropic.OverloadedError getattr fallback (SDK 버전 미확정 호환)
+
+### Updated (운영 환경)
+
+- `pip install -e .[dev]` 사용자 명시 승인·적용 → pytest 9.0.3·black 26.5.1·ruff 0.15.14·mypy 2.1.0 등 설치
+- `honsalim.exe` entry point 정상 작동 — K4 검증 [확정]
+- 회귀: 247 → 333 (+86) PASS / 0 FAIL / 0 SKIP [확정 pytest 2.21초]
+- push origin main 2회 명시 승인·푸시 (11 commits 모두 외부 백업)
+
+### Updated (외부)
+
+- AliExpress Affiliate 승인 [확정 2026-05-28 D+0] + Tracking ID `honsalim` + `D:\secrets\affiliate_hub\ali.env` 작성·검증
+- doctor `[OK] secrets/ali.env (loaded)` 정합
+
+### Known (다음 세션 처리)
+
+- CI lint #15 Black format check fail (commit 86f9bb4) — 코드 동작·CI 핵심·회귀 모두 정상
+
+---
+
+## v1.6 — 2026-05-28 (세션 #6, 보안 강화 + 운영 인프라 + 회귀 333→342)
+
+### Fixed (CI lint)
+
+- **CI lint #15 Black format check fail 해소** (90d60f6) — test 3건 (`test_state_machine.py`·`test_tracker.py`·`test_article_writer.py`) black 26.5.1 multiline str inline 정합. 코드 동작 무영향, 격식 변경만. pre-commit 9 hook 모두 Passed
+
+### Added (보안 강화)
+
+- **`pyproject.toml` 직접 의존 3건 lower-bound** (5f6dfde) — pillow≥12.2 (5 CVE) · requests≥2.33 (CVE-2026-25645) · python-dotenv≥1.2.2 (CVE-2026-28684). pip-audit 16건 / 9 패키지 진단 결과 직접 영향 3건 [확정]
+- **`.github/workflows/security.yml` 신규** (987afed) — pip-audit 월간 cron (매월 1일 09:00 UTC) + workflow_dispatch + JSON artifact 90일 + GitHub Step Summary. DECISIONS I4 정합
+
+### Added (운영 인프라)
+
+- **`src/common/size_caps.py` + `scripts/check_size_caps.py`** (bf82c73 → 55243bc) — docs/ size cap 자동 점검 (CLAUDE.md §3 STATE 10KB·EVENTS 20KB·TODO 5KB). CAPS dict + check(project_root) + format_human. CLI + doctor §14 통합
+- **`src/cli.py` doctor §14** (55243bc) — size cap 운영 게이트 자동 점검. cap 초과는 WARN (회전·정돈 신호), 파일 누락은 FAIL (5파일 시스템 손상)
+
+### Added (사용자 정독 보조)
+
+- **`docs/SUMMARY_PATCH_v1.1.md`** (f9299ab) — SUMMARY/REVIEW_QUESTIONS 진척 패치. 결정 매트릭스 25→45 (J 8 + K 5) · Phase 진척 · 사전 작성 산출물 사용 상태 · REVIEW_QUESTIONS 23/25 자동 [확정]. 정독 시간 40~60분 → 25~30분 단축
+
+### Updated (운영 문서 + cap 정돈)
+
+- **STATE.md**: 9.37 → 8.05 KB (93.7% → 80.5%) — 세션 #4 영구화 5개 행 정돈 (DECISIONS J + EVENTS 누적)
+- **TODO.md**: 4.35 → 4.00 KB (87.1% → 80.0%) — 세션 #5 완료 항목 EVENTS·STATE 누적분 제거
+- 본 세션 7 commits 누적 (90d60f6·5f6dfde·bf82c73·987afed·f9299ab·55243bc·5f50025)
+
+### Updated (회귀 테스트)
+
+- 333 → 342 / 342 PASS [확정 pytest 9.0.3, 2.74초] — `tests/test_check_size_caps.py` +9 (TestCommonModule 7 + TestCliWrapper 2)
+- common.size_caps 직접 회귀: CAPS schema·check·format_human·missing file·over cap 케이스
+
+### Memory (Claude 영구 원칙 강화)
+
+- **`feedback_no_end_of_step_prompting` 신설** — 한 작업 끝날 때마다 마감 제안 출력 금지. 컨텍스트 80%+ 또는 사용자 명시 지시 또는 시급 작업 모두 소진일 때만. 세션 #6 사용자 비판 (컨텍스트 7% 시점) 반영
+
+### Known (다음 세션 처리)
+
+- 본 세션 7 commits push origin main — 사용자 명시 키워드 승인 후
+- pip-audit transitive 13건 환경 갱신 — pip install -U 사용자 명시 승인 후
+- SUMMARY/REVIEW_QUESTIONS + SUMMARY_PATCH_v1.1.md 사용자 정독 (Phase 3 진입 게이트)
 
 ---
 
@@ -238,3 +315,4 @@
 |------|------|------|--------|
 | 1.0 | 2026-05-28 | 최초 작성 (v1.0·v1.1·v1.2 누적 + 차기 v1.3) | Claude Opus 4.7 |
 | 1.1 | 2026-05-28 | v1.3 (세션 #3) + v1.4 (세션 #4) 정식 추가, 차기 v1.5 명시 | Claude Opus 4.7 |
+| 1.2 | 2026-05-28 | v1.5 (세션 #5) + v1.6 (세션 #6) 정식 추가, 차기 섹션 폐기 | Claude Opus 4.7 |
