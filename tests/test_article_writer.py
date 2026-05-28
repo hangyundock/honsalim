@@ -37,12 +37,10 @@ MIGRATION_001 = PROJECT_ROOT / "sql" / "migrations" / "001_initial_schema.sql"
 def _seeded_db() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:")
     conn.executescript(MIGRATION_001.read_text(encoding="utf-8"))
-    conn.executescript(
-        """
+    conn.executescript("""
         INSERT INTO personas (slug, title_ko, description) VALUES ('p1', 'P', 'd');
         INSERT INTO scenarios (slug, title_ko, description, persona_id) VALUES ('s1', 'S', 'd', 1);
-        """
-    )
+        """)
     conn.commit()
     return conn
 

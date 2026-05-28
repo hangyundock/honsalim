@@ -85,8 +85,7 @@ class TestAggregate:
 def _seeded_db_with_article() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:")
     conn.executescript(MIGRATION_001.read_text(encoding="utf-8"))
-    conn.executescript(
-        """
+    conn.executescript("""
         INSERT INTO personas (slug, title_ko, description) VALUES ('p', 'P', 'd');
         INSERT INTO scenarios (slug, title_ko, description, persona_id) VALUES ('s', 'S', 'd', 1);
         INSERT INTO articles (
@@ -100,8 +99,7 @@ def _seeded_db_with_article() -> sqlite3.Connection:
             'published', '2026-05-28', 'sha256:abc',
             '2026-05-28T11:00:00Z', '2026-05-28T11:05:00Z'
         );
-        """
-    )
+        """)
     conn.commit()
     return conn
 
@@ -129,8 +127,7 @@ class TestExportToSqlite:
         conn = sqlite3.connect(str(db_path))
         try:
             conn.executescript(MIGRATION_001.read_text(encoding="utf-8"))
-            conn.executescript(
-                """
+            conn.executescript("""
                 INSERT INTO personas (slug, title_ko, description) VALUES ('p', 'P', 'd');
                 INSERT INTO scenarios (slug, title_ko, description, persona_id)
                 VALUES ('s', 'S', 'd', 1);
@@ -145,8 +142,7 @@ class TestExportToSqlite:
                     'published', '2026-05-28', 'sha256:abc',
                     '2026-05-28T11:00:00Z', '2026-05-28T11:05:00Z'
                 );
-                """
-            )
+                """)
             conn.commit()
         finally:
             conn.close()

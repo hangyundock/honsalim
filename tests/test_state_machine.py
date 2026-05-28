@@ -45,15 +45,13 @@ def _fresh_db() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:")
     conn.executescript(MIGRATION_001.read_text(encoding="utf-8"))
     # 테스트용 persona + scenario 1건 + draft 1건
-    conn.executescript(
-        """
+    conn.executescript("""
         INSERT INTO personas (slug, title_ko, description) VALUES ('test-p', 'P', 'desc');
         INSERT INTO scenarios (slug, title_ko, description, persona_id)
             VALUES ('test-s', 'S', 'sdesc', 1);
         INSERT INTO drafts (scenario_id, working_title, status)
             VALUES (1, 'test draft', 'collected');
-        """
-    )
+        """)
     return conn
 
 
