@@ -12,7 +12,7 @@
   - [x] K1 manifest: JSON 파일 그대로 [확정]
   - [x] K2 시나리오 우선순위: 현재 명세 그대로 [확정]
   - [x] K3 단축 URL: `n.kakao.com` + `naver.me` 추가 (11→13)
-- [ ] `pip install -e .[dev]` 사용자 명시 승인 (jinja2·markdown·pytest·ruff·black 등) — 회귀 320 재검증 게이트
+- [x] ~~`pip install -e .[dev]` 사용자 명시 승인~~ — 세션 #5 설치·검증 완료 (회귀 333 PASS·`honsalim` entry point)
 - [ ] push origin main 사용자 승인 — 본 세션 commit 누적
 
 ## Phase 1: 인프라 — 남음 ⏳

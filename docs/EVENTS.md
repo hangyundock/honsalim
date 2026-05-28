@@ -103,6 +103,15 @@ doctor §10 진입점 **37개** (+5 tracker.report) + **§13 신설** Workers JS
   - doctor 검증: `[OK] secrets/ali.env (loaded)` + 환경 변수 길이/값 매칭 확인 (값 노출 없음, POLICY §14-bis-1 정합)
   - App Key/Secret은 Phase 5 시점 발급 (현재 본 프로젝트 Phase 1·2·3은 알리 미사용)
 
+- **`pip install -e .[dev]` 명시 승인·설치·검증 완료** [확정]:
+  - 사용자 "pip install 진행해" 명시 승인 (세션 #5)
+  - Python 3.10.11 32-bit 시스템 Python에 editable 설치 — honsalim-0.1.0 wheel build 성공
+  - 설치 패키지 (주요): pytest 9.0.3 · black 26.5.1 · ruff 0.15.14 · mypy 2.1.0 · jinja2 3.1.6 · markdown 3.10.2 · pip-audit 2.10.0 · responses 0.26.1
+  - **K4 검증**: `honsalim.exe` Scripts 경로 등록 + `honsalim doctor` 정상 작동 → pyproject.toml flat 정합 옵션 B 작동 [확정]
+  - **doctor 모든 필수 체크 통과** — Phase 2 진입 가능. 의존성 7/7 OK (이전 5/7 WARN 해소)
+  - **pytest 일괄 회귀**: 333 / 333 PASS / 0 FAIL / 0 SKIP (2.21초). 이전 직접 호출에서 SKIP되던 tmp_path 케이스 2건도 정상 PASS
+  - **`src/enricher/prompt_loader.py` 보강**: jinja2 활성 환경에서 missing dict key 체이닝 시 `UndefinedError` 발생 → `ChainableUndefined` 적용으로 `render_simple` 동작과 일치 (회귀 환경 호환)
+
 **다음 세션 할 일**:
 1. SUMMARY.md / REVIEW_QUESTIONS.md 정독 — Phase 2 본격 진입 게이트 (사용자 직접)
 2. **알리 API 키 발급 + ali.env 작성** (2026-05-28 승인 완료)

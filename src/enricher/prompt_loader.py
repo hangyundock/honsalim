@@ -92,6 +92,9 @@ def render(template_name: str, **vars: Any) -> str:
             autoescape=False,  # noqa: S701 - 본 결과는 HTML 아니라 LLM 프롬프트
             trim_blocks=True,
             lstrip_blocks=True,
+            # ChainableUndefined: missing dict key/attr 체이닝 시 조용히 빈 문자열
+            # — render_simple과 동작 일치. 회귀 테스트의 부분 dict 케이스 호환.
+            undefined=jinja2.ChainableUndefined,
         )
         return str(env.from_string(raw).render(**vars))
     except ImportError:

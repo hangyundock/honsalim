@@ -11,7 +11,7 @@
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
 | Phase 2 핵심 모듈 18개 (#3~#5) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} · deployer/{git_push,wrangler,verify} · tracker/{d1_aggregator,**report**} · **workers/go_gateway.js** | #5 |
-| Phase 2 회귀 테스트 | **333** (직접 호출 331 PASS / 0 FAIL / 2 SKIP — pytest tmp_path 의존) [확정 `scripts/run_tests.py`] — validator 42 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + manifest 22 + db 12 + cli 46 + article_writer 25 + integration_phase2 18 + deployer 14 + tracker **25** (+13 report) | #5 |
+| Phase 2 회귀 테스트 | **333 / 333 PASS** [확정 pytest 9.0.3, 2.21초] — `pip install -e .[dev]` 후 일괄 재검증 (이전 직접 호출 331 PASS + tmp_path 2 SKIP에서 SKIP 0). 분배: validator 42 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + manifest 22 + db 12 + cli 46 + article_writer 25 + integration_phase2 18 + deployer 14 + tracker 25 | #5 |
 | tracker.d1_aggregator (세션 #4) | BACKEND §2-8 [확정] — aggregate(date, dry_run=True) wrangler d1 execute · export_to_sqlite(aggregates) articles.view_count_cached UPDATE. D1 SQL UPSERT 패턴 (ON CONFLICT) — 재실행 안전 | #4 |
 | deployer (세션 #4) | BACKEND §2-7 [확정] — git_push · wrangler_deploy · verify_deploy. 모두 dry_run=True 기본 (외부 영향 차단, DECISIONS H4). 실제 push·deploy·HEAD는 사용자 명시 승인 후 dry_run=False | #4 |
 | builder.manifest (세션 #4) | DB §10 [추정] JSON 인터페이스 — new/load/save/upsert_article/upsert_asset/upsert_template/needs_rebuild (ARCH §7-3 5조건). 형태 결정은 사용자 검토 후 [확정] | #4 |
@@ -69,7 +69,7 @@
 1. (완료) ~~알리 API 키 발급 + `ali.env` 작성~~ — Tracking ID `honsalim` 발급·기본값 설정·환경 변수 로드 검증 (세션 #5)
 2. **SUMMARY.md / REVIEW_QUESTIONS.md 사용자 검토** — Phase 2 본격 진입 게이트
 3. (완료) ~~핵심 결정 4건~~ — DECISIONS K1·K2·K3·K4 [확정] 등재 (세션 #5)
-4. `pip install -e .[dev]` 사용자 명시 승인 — pytest·ruff·black·jinja2·markdown 정식 설치 후 회귀 320 재검증 (K3 +3 추가)
+4. (완료) ~~`pip install -e .[dev]`~~ — 세션 #5 사용자 승인 후 설치. pytest 9.0.3·black 26.5.1·ruff 0.15.14·mypy 2.1.0·jinja2 3.1.6·markdown 3.10.2 등 모두 설치. 회귀 333/333 PASS + `honsalim` entry point 작동 + doctor 의존성 7/7 OK [확정]
 5. push origin main — 본 세션 추가 commit 누적 (사용자 승인 후)
 
 ### Phase 2 진척 가능 (검토 영향 작음)
