@@ -5,7 +5,7 @@
 
 ## ★ 시급 (다음 세션)
 
-- [ ] **알리 심사 결과 확인** (이메일, 2026-05-29~06-01)
+- [ ] **알리 API 키 발급 + `ali.env` 작성** — 2026-05-28 승인 완료. portals.aliexpress.com 사용자 직접 로그인
 - [ ] **docs/SUMMARY.md / REVIEW_QUESTIONS.md 정독** — Phase 2 후반 본격 진입 게이트
 - [x] ~~핵심 결정 4건 의견 수렴~~ (세션 #5 DECISIONS K1·K2·K3·K4 [확정])
   - [x] K4 모듈 분리: 옵션 B (pyproject.toml flat 정합) 적용
@@ -17,7 +17,7 @@
 
 ## Phase 1: 인프라 — 남음 ⏳
 
-- [ ] AliExpress 승인 후 API 키 발급 + `ali.env` 작성
+- [ ] (시급으로 이동) AliExpress API 키 발급 + `ali.env` 작성 — 2026-05-28 승인 [확정]
 - [ ] `.claude/settings.json` deny 룰 사용자 검토 (deny 24·allow 14)
 - [ ] **윈도우 작업 스케줄러 등록** — Phase 2 코드 작성 후 (DECISIONS C7)
 - [ ] Branch Protection에 Actions status check — Phase 2 안정 후

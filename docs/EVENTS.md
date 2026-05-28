@@ -95,9 +95,12 @@ doctor §10 진입점 **37개** (+5 tracker.report) + **§13 신설** Workers JS
 - dashboard.render/approve — Phase 3 디자인 의존
 - collector.coupang — Phase 4 (쿠팡 재가입 후)
 
+**세션 #5 종료 직전 사용자 추가 보고 [확정]**:
+- AliExpress Affiliate Program **승인 완료** — 2026-05-28 (당일 가입, D+0 승인. 신청 → 심사 통과 매우 빠름 [관찰]). 이메일 "Your affiliate account is ready" + portals.aliexpress.com 활성. API 키 발급 + `ali.env` 작성은 다음 세션 사용자 직접 작업.
+
 **다음 세션 할 일**:
 1. SUMMARY.md / REVIEW_QUESTIONS.md 정독 — Phase 2 본격 진입 게이트 (사용자 직접)
-2. AliExpress 심사 결과 확인 (D+1~D+4)
+2. **알리 API 키 발급 + ali.env 작성** (2026-05-28 승인 완료)
 3. `pip install -e .[dev]` 명시 승인 → pytest로 회귀 333 일괄 재검증 + entry point `honsalim` 명령 작동 확인 (K4 검증)
 4. push origin main 승인 (본 세션 commit 4건 누적 예정)
 5. dashboard 시안 진입 (Phase 3 — Claude Design, 사용자 직접)

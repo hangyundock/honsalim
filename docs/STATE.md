@@ -51,7 +51,7 @@
 | Anthropic API Key | 영구 [관찰] | 6개월 회전 권장 — **2026-11-28** [추정] |
 | INDEXNOW_KEY | 영구 [확정 — 공개 키] | 회전 불요 |
 | GitHub PAT | 미발급 (Actions는 GITHUB_TOKEN 자동) [확정] | — |
-| AliExpress Portals | 2026-05-28 신청 / 심사 대기 (D+1~D+4) | — |
+| AliExpress Portals | **2026-05-28 승인 완료** [확정 — 이메일 "Your affiliate account is ready"] | API 키 발급·`ali.env` 작성 사용자 작업 대기 |
 | 쿠팡 파트너스 | 보류 | Phase 4 (콘텐츠 누적 후) 재가입 |
 
 ## 보안 / 권한
@@ -66,7 +66,7 @@
 ## 알려진 잔존 미해결
 
 ### ★ 시급 (다음 세션)
-1. **알리 심사 결과 확인** (이메일, 2026-05-29~06-01 예상)
+1. **알리 API 키 발급 + `ali.env` 작성** — 승인 완료 (2026-05-28). portals.aliexpress.com 로그인 후 Tracking ID·App Key 발급
 2. **SUMMARY.md / REVIEW_QUESTIONS.md 사용자 검토** — Phase 2 본격 진입 게이트
 3. (완료) ~~핵심 결정 4건~~ — DECISIONS K1·K2·K3·K4 [확정] 등재 (세션 #5)
 4. `pip install -e .[dev]` 사용자 명시 승인 — pytest·ruff·black·jinja2·markdown 정식 설치 후 회귀 320 재검증 (K3 +3 추가)
@@ -84,7 +84,7 @@
 ### Phase 1 잔존 (작음)
 - Actions status check Branch Protection 추가 (Phase 2 안정 후)
 - BitLocker 활성 (사용자 결정)
-- 알리 승인 시 ali.env 작성
+- (다음 세션) 알리 API 키 발급 → ali.env 작성 — 승인 완료 (2026-05-28)
 
 ### 보류
 - AdSense 신청 (Phase 6, 2026-12)
@@ -95,7 +95,7 @@
 
 | 일자 | 이벤트 |
 |------|--------|
-| 2026-05-29~06-01 | 알리 심사 결과 (이메일) |
+| ~~2026-05-29~06-01~~ | ~~알리 심사 결과~~ → **2026-05-28 승인 [확정]** |
 | 2026-06 | Phase 2 핵심 시스템 본격 |
 | 2026-07 중반 | Phase 3 디자인·콘텐츠 |
 | 2026-07 말 | Phase 4 첫 출시 |
