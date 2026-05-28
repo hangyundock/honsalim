@@ -213,6 +213,8 @@ def _check_phase2_modules() -> bool:
         ("writer.article_writer", "save_enriched"),
         ("writer.article_writer", "validate_and_save"),
         ("writer.article_writer", "promote_to_article"),
+        ("writer.article_writer", "compute_content_hash"),
+        ("writer.article_writer", "extract_disclosure_first"),
         ("writer.state_machine", "transition"),
         ("writer.state_machine", "VALID_TRANSITIONS"),
         ("enricher.claude_client", "ClaudeClient"),
@@ -235,6 +237,7 @@ def _check_phase2_modules() -> bool:
         ("tracker", "export_to_sqlite"),
     ]
     all_ok = True
+    found = 0
     for mod_name, attr in checks:
         try:
             mod = importlib.import_module(mod_name)
@@ -244,12 +247,14 @@ def _check_phase2_modules() -> bool:
                 all_ok = False
             else:
                 print(f"{OK} {mod_name}.{attr}")
+                found += 1
         except ImportError as e:
             print(f"{FAIL} {mod_name} import 실패: {e}")
             all_ok = False
         except AttributeError:
             print(f"{FAIL} {mod_name}.{attr} 누락")
             all_ok = False
+    print(f"  → 진입점 {found}/{len(checks)} OK")
     return all_ok
 
 
@@ -579,6 +584,92 @@ def cmd_unapprove(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def cmd_deploy(args: argparse.Namespace) -> int:
+    """deployer 3 단계: git_push → wrangler_deploy → verify_deploy.
+
+    출처: BACKEND §9 + DECISIONS H4 [확정] — dry_run=True 기본.
+    """
+    from deployer import git_push, verify_deploy, wrangler_deploy
+
+    dry_run: bool = args.dry_run
+    mode = "[DRY]" if dry_run else "[LIVE]"
+    print(f"{mode} deploy 시작 (project={args.project!r}, build_dir={args.build_dir!r})")
+
+    if not args.skip_push:
+        push_res = git_push(
+            cwd=str(PROJECT_ROOT),
+            remote=args.remote,
+            branch=args.branch,
+            dry_run=dry_run,
+        )
+        if push_res.returncode != 0:
+            print(f"{FAIL} git push 실패 rc={push_res.returncode}: {push_res.stderr.strip()}")
+            return 2
+        print(f"{OK} git push {' '.join(push_res.command)} → rc={push_res.returncode}")
+    else:
+        print("[SKIP] git push (--skip-push)")
+
+    if not args.skip_wrangler:
+        wrangler_res = wrangler_deploy(
+            build_dir=args.build_dir,
+            project_name=args.project,
+            cwd=str(PROJECT_ROOT),
+            dry_run=dry_run,
+        )
+        if wrangler_res.returncode != 0:
+            print(
+                f"{FAIL} wrangler deploy 실패 rc={wrangler_res.returncode}: "
+                f"{wrangler_res.stderr.strip()}"
+            )
+            return 3
+        print(f"{OK} wrangler deploy → rc={wrangler_res.returncode}")
+    else:
+        print("[SKIP] wrangler deploy (--skip-wrangler)")
+
+    if args.verify_url:
+        verify_res = verify_deploy(args.verify_url, dry_run=dry_run)
+        if not verify_res.ok:
+            print(
+                f"{FAIL} verify {args.verify_url} → status={verify_res.status_code} "
+                f"err={verify_res.error}"
+            )
+            return 4
+        suffix = f"status={verify_res.status_code}" if verify_res.status_code is not None else "DRY"
+        print(f"{OK} verify {args.verify_url} → {suffix}")
+
+    return 0
+
+
+def cmd_build(args: argparse.Namespace) -> int:
+    """builder.manifest 인터페이스 호출 — Phase 2 stub.
+
+    출처: BACKEND §9 + DB §10 [추정]. renderer/pages/sitemap 미작성 — manifest 로드·요약만.
+    """
+    from builder import manifest as manifest_mod
+
+    manifest_path = Path(args.manifest) if args.manifest else manifest_mod.DEFAULT_MANIFEST_PATH
+    if not manifest_path.is_absolute():
+        manifest_path = PROJECT_ROOT / manifest_path
+
+    manifest = manifest_mod.load(manifest_path)
+    print(
+        f"{OK} manifest 로드 path={manifest_path} "
+        f"schema_v={manifest.get('schema_version')} "
+        f"articles={len(manifest.get('articles', {}))} "
+        f"assets={len(manifest.get('assets', {}))} "
+        f"templates={len(manifest.get('templates', {}))}"
+    )
+
+    if args.full:
+        print("[NOTE] --full: renderer/pages/sitemap 미작성 — 본 명령은 manifest 로드만 수행")
+
+    if args.save_empty and not manifest_path.exists():
+        manifest_mod.save(manifest_path, manifest)
+        print(f"{OK} 빈 manifest 저장 → {manifest_path}")
+
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="honsalim",
@@ -629,6 +720,58 @@ def build_parser() -> argparse.ArgumentParser:
     p_unapprove = sub.add_parser("unapprove", help="approved draft → validated 회귀")
     p_unapprove.add_argument("--draft", type=int, required=True, help="draft id")
     p_unapprove.set_defaults(func=cmd_unapprove)
+
+    # BACKEND §9 [확정] — deploy: git_push + wrangler + verify (dry_run 기본)
+    p_deploy = sub.add_parser(
+        "deploy",
+        help="git push + wrangler pages deploy + verify (DECISIONS H4 — 기본 dry_run)",
+    )
+    p_deploy.add_argument(
+        "--no-dry-run",
+        dest="dry_run",
+        action="store_false",
+        help="실제 push·배포 호출 (외부 영향 — 명시 승인 후)",
+    )
+    p_deploy.add_argument("--skip-push", action="store_true", help="git push 단계 건너뛰기")
+    p_deploy.add_argument(
+        "--skip-wrangler", action="store_true", help="wrangler deploy 단계 건너뛰기"
+    )
+    p_deploy.add_argument(
+        "--verify-url",
+        type=str,
+        default=None,
+        help="배포 후 HEAD 검증 URL (지정 시 verify_deploy 호출)",
+    )
+    p_deploy.add_argument("--remote", type=str, default="origin", help="git push remote")
+    p_deploy.add_argument("--branch", type=str, default="main", help="git push branch")
+    p_deploy.add_argument("--build-dir", type=str, default="build", help="wrangler 배포 디렉토리")
+    p_deploy.add_argument(
+        "--project", type=str, default="honsalim", help="Cloudflare Pages 프로젝트 이름"
+    )
+    p_deploy.set_defaults(func=cmd_deploy, dry_run=True)
+
+    # BACKEND §9 [확정] — build: manifest 로드 (Phase 2 stub, renderer 미작성)
+    p_build = sub.add_parser(
+        "build",
+        help="builder.manifest 로드·요약 (renderer 미작성 — Phase 3 디자인 후 본격)",
+    )
+    p_build.add_argument(
+        "--manifest",
+        type=str,
+        default=None,
+        help="manifest 파일 경로 (기본 data/manifest.json)",
+    )
+    p_build.add_argument(
+        "--full",
+        action="store_true",
+        help="전체 빌드 (현재 stub — renderer/pages/sitemap 미작성)",
+    )
+    p_build.add_argument(
+        "--save-empty",
+        action="store_true",
+        help="manifest 없으면 빈 manifest 파일 생성·저장",
+    )
+    p_build.set_defaults(func=cmd_build)
 
     return parser
 

@@ -390,6 +390,134 @@ class TestValidationReportPersistence:
         assert set(rpt["gates"]) == {"truth", "schema", "disclosure", "links"}
 
 
+# ─── 시나리오 9: deployer 3단계 dry_run 결합 ──────────────────────────
+
+
+class TestDeployerDryRunChain:
+    """세션 #5 — deployer.git_push + wrangler_deploy + verify_deploy 결합.
+
+    DECISIONS H4 [확정] — 모든 외부 영향 함수 dry_run=True 기본.
+    """
+
+    def test_three_stage_dry_run_chain(self) -> None:
+        from deployer import git_push, verify_deploy, wrangler_deploy
+
+        push_res = git_push(dry_run=True)
+        assert push_res.dry_run is True
+        assert push_res.returncode == 0
+        assert push_res.command == ["git", "push", "origin", "main"]
+
+        wrangler_res = wrangler_deploy(dry_run=True)
+        assert wrangler_res.dry_run is True
+        assert wrangler_res.returncode == 0
+        assert "wrangler" in wrangler_res.command[0]
+        assert "honsalim" in wrangler_res.command
+
+        verify_res = verify_deploy("https://honsalim.com/", dry_run=True)
+        assert verify_res.ok is True
+        assert verify_res.status_code is None
+        assert "[DRY]" in (verify_res.error or "")
+
+    def test_verify_rejects_non_http_url(self) -> None:
+        from deployer import verify_deploy
+
+        with raises(ValueError):
+            verify_deploy("ftp://example.com/", dry_run=True)
+
+
+# ─── 시나리오 10: tracker.aggregate → export_to_sqlite 결합 ────────────
+
+
+class TestTrackerAggregateExportChain:
+    """세션 #5 — tracker.d1_aggregator.aggregate + export_to_sqlite.
+
+    dry_run plan 검증 + export_to_sqlite 실 SQLite UPDATE 동작 검증.
+    """
+
+    def test_aggregate_dry_run_builds_wrangler_command(self) -> None:
+        from tracker import d1_aggregator
+
+        result = d1_aggregator.aggregate("2026-05-28", dry_run=True)
+        assert result.dry_run is True
+        assert result.date == "2026-05-28"
+        assert result.command[:3] == ["wrangler", "d1", "execute"]
+        assert "--remote" in result.command
+        assert "honsalim-clicks" in result.command
+
+    def test_aggregate_rejects_bad_date(self) -> None:
+        from tracker import d1_aggregator
+
+        with raises(ValueError):
+            d1_aggregator.aggregate("2026/05/28", dry_run=True)
+
+    def test_export_updates_view_count_cached(self) -> None:
+        """실 SQLite — articles row UPDATE 동작 확인 (dry_run=False).
+
+        published article 1편 만든 뒤 같은 DB 경로(임시 파일)로 export 호출 →
+        view_count_cached UPDATE rowcount=1 확인.
+        """
+        import tempfile
+
+        from tracker import d1_aggregator
+
+        # 임시 파일 DB (export_to_sqlite가 별도 connect 하므로 :memory: 불가)
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.executescript(MIGRATION_001.read_text(encoding="utf-8"))
+            conn.executescript(SEED_001.read_text(encoding="utf-8"))
+            conn.commit()
+
+            scenarios = scenario_loader.list_active_scenarios(conn, limit=1)
+            did = article_writer.create_draft(conn, scenario_id=scenarios[0].id)
+            transition(conn, did, "enriched")
+            article_writer.validate_and_save(conn, did, _good_payload())
+            transition(conn, did, "approved")
+            fields = _article_fields_from(scenarios[0].id, GOOD_BODY)
+            article_id = article_writer.promote_to_article(conn, did, fields)
+            slug = conn.execute("SELECT slug FROM articles WHERE id = ?", (article_id,)).fetchone()[
+                0
+            ]
+            conn.close()
+
+            result = d1_aggregator.export_to_sqlite(
+                [{"slug": slug, "clicks": 42}],
+                db_path=db_path,
+                dry_run=False,
+            )
+            assert result.dry_run is False
+            assert result.error is None
+            assert result.articles_updated == 1
+
+            # UPDATE 적용 확인
+            conn2 = sqlite3.connect(db_path)
+            try:
+                row = conn2.execute(
+                    "SELECT view_count_cached FROM articles WHERE slug = ?", (slug,)
+                ).fetchone()
+                assert row[0] == 42
+            finally:
+                conn2.close()
+        finally:
+            Path(db_path).unlink(missing_ok=True)
+
+    def test_export_dry_run_returns_plan(self) -> None:
+        from tracker import d1_aggregator
+
+        result = d1_aggregator.export_to_sqlite([{"slug": "test", "clicks": 10}], dry_run=True)
+        assert result.dry_run is True
+        assert result.articles_updated == 1
+        assert result.aggregates_loaded == [{"slug": "test", "clicks": 10}]
+
+    def test_export_rejects_missing_keys(self) -> None:
+        from tracker import d1_aggregator
+
+        with raises(ValueError):
+            d1_aggregator.export_to_sqlite([{"slug": "x"}], dry_run=True)
+
+
 if __name__ == "__main__":
     if pytest is not None:
         pytest.main([__file__, "-v"])

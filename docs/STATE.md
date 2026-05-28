@@ -7,7 +7,7 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 16개·회귀 295 PASS + CLI 8 명령** [확정] | #4 (2026-05-28) |
+| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 16개·회귀 295 PASS + 신규 15 [추정] + CLI 10/11 명령** [확정] | #5 (2026-05-28) |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
 | Phase 2 핵심 모듈 16개 (#3~#4) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} · deployer/{git_push,wrangler,verify} · tracker/d1_aggregator | #4 |
@@ -16,11 +16,11 @@
 | deployer (세션 #4) | BACKEND §2-7 [확정] — git_push · wrangler_deploy · verify_deploy. 모두 dry_run=True 기본 (외부 영향 차단, DECISIONS H4). 실제 push·deploy·HEAD는 사용자 명시 승인 후 dry_run=False | #4 |
 | builder.manifest (세션 #4) | DB §10 [추정] JSON 인터페이스 — new/load/save/upsert_article/upsert_asset/upsert_template/needs_rebuild (ARCH §7-3 5조건). 형태 결정은 사용자 검토 후 [확정] | #4 |
 | enricher.retry (세션 #4) | BACKEND §3-5 [확정] — RateLimit 3회(1·2·4초+jitter) · Overloaded 1회(10초) · Timeout/BadRequest/APIError 즉시 fail · SDK 미설치 환경 mock 회귀 가능 | #4 |
-| CLI 명령 (BACKEND §9) | 8/11 — doctor · db migrate/seed · collect · enrich (dry_run) · validate · approve · unapprove. 남은 3개 (dashboard·build·deploy)는 builder/dashboard/deployer 모듈 의존 | #4 |
+| CLI 명령 (BACKEND §9) | **10/11** — doctor · db migrate/seed · collect · enrich (dry_run) · validate · approve · unapprove · **deploy (dry_run 기본 H4)** · **build (manifest stub)**. 남은 1개 (dashboard)는 디자인 Phase 3 의존 | #5 |
 | state_machine 매트릭스 보강 (세션 #4) | `approved → validated` 추가 — BACKEND §9 unapprove 정합. DB §12-2 매트릭스 갱신 | #4 |
 | Phase 2 통합 회귀 (세션 #4) | `tests/test_integration_phase2.py` 11 케이스 — 정상 전체 흐름(collected→published) + truth/disclosure fail rejected + rejected 재수집 + state_machine 위반 차단 + builder↔validator 정합 + content_hash/disclosure_first 자동 생성 + validation_report 영속화 | #4 |
 | Phase 2 흐름 골격 [관찰] | collected→enriched→validated/rejected→approved→published 6 상태 + 4 게이트 통합 (validate_and_save) + META-JSON 추출 + Article JSON-LD 빌더 + 1인칭/사진 게이트. 남은 영역: collector(쿠팡)·builder.manifest·dashboard·deployer·tracker | #4 |
-| doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 17개 · §11 state_machine 매트릭스 · §12 tests 로드 가능 — Phase 2 진입 게이트 자동 점검 | #4 |
+| doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 **32개** (deployer/tracker/manifest/compute_content_hash/extract_disclosure_first 등 망라) · §11 state_machine 매트릭스 · §12 tests 로드 가능 — Phase 2 진입 게이트 자동 점검 | #5 |
 | DB 초기화 | `data/honsalim.db` v1 + 13 테이블 + personas 3 + scenarios 10 (seed idempotent) | #3 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (PLAN·ARCH·DB·SCENARIOS·DESIGN·FRONTEND·BACKEND·POLICY·OPS·BACKUP·MAINTENANCE·SCHEDULE). 일관성 모순 0건 | #2 |
 | 사전 작성 산출물 (#2) | SQL 2편 + 설정 5건 + prompt_templates 6종 + 인프라 7건 (pyproject·wrangler·workflows·README·CHANGELOG 등). 세부는 EVENTS_202605.md | #2 |
@@ -35,7 +35,7 @@
 | 프로젝트 폴더 | `D:\affiliate_hub\` (docs·archive·.claude/commands 하위) |
 | 사이트 / 도메인 | 혼살림 / **honsalim.com** (만료 2027-05-28·Auto Renew·SSL Active) |
 | 호스팅 | **Cloudflare Pages `honsalim`** + Custom domain (Dugi2020@naver.com) |
-| GitHub | **`hangyundock/honsalim` Public** — origin/main과 **6 commit ahead** (#4 미푸시) |
+| GitHub | **`hangyundock/honsalim` Public** — origin/main 동기 (세션 #5 검증 `git rev-list --count origin/main..main = 0`) [확정] |
 | GitHub Secrets / Branch Protection | CF_API_TOKEN · CF_ACCOUNT_ID · INDEXNOW_KEY 등록 / ruleset `main-protect` Active |
 | R2 / D1 | `honsalim-images` (APAC) / `honsalim-clicks` ID `9bae858e-456f-40e7-8084-c3b90e4ec3ca` |
 | Python | 3.10 32-bit (TIMA·AutoBlog 시스템 공유) |
@@ -71,8 +71,8 @@
 3. **핵심 결정 4건 사용자 답변** — 자료 완비:
    - 모듈 분리 → [ARCH_MODULE_DIAGNOSIS.md](ARCH_MODULE_DIAGNOSIS.md) 옵션 A/B/C
    - manifest 형태 · 시나리오 우선순위 · 단축 URL 목록 → [KEY_DECISIONS_REVIEW.md](KEY_DECISIONS_REVIEW.md)
-4. `pip install -e .[dev]` 사용자 명시 승인
-5. push origin main 사용자 승인 (16 commit ahead)
+4. `pip install -e .[dev]` 사용자 명시 승인 — pytest·ruff·black·jinja2·markdown 정식 설치 후 회귀 295+15 재검증
+5. (완료) ~~push origin main 사용자 승인~~ — origin/main 동기 확인됨 (세션 #5)
 
 ### Phase 2 진척 가능 (검토 영향 작음)
 - (현재 안전 진척 후보 모두 소진 — 다음은 사용자 검토 4건 의존)

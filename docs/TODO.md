@@ -12,8 +12,8 @@
   - DB §10 manifest를 JSON 파일로 (테이블 아님)
   - SCENARIOS §4 초기 10편 시나리오 우선순위
   - POLICY §6-1 외부 단축 URL 차단 목록 추가/제외 검토
-- [ ] `pip install -e .[dev]` 사용자 명시 승인 (jinja2·markdown·pytest 등)
-- [ ] push origin main 사용자 승인 (현재 6 commit ahead)
+- [ ] `pip install -e .[dev]` 사용자 명시 승인 (jinja2·markdown·pytest·ruff·black 등) — 회귀 재검증 게이트
+- [x] ~~push origin main 사용자 승인~~ (세션 #5 검증 `git rev-list --count origin/main..main = 0` → 이미 동기)
 
 ## Phase 1: 인프라 — 남음 ⏳
 
@@ -31,7 +31,9 @@
 > 완료 항목은 STATE.md "Phase 2 핵심 모듈 16개" + "회귀 295/295" + "CLI 8/11" 행 참조.
 
 ### 안전 진척 (검토 의존 작음)
-- [ ] CLI 남은 3 명령 (dashboard·build·deploy) — builder/dashboard/deployer 모듈 의존
+- [x] ~~CLI deploy 명령~~ (세션 #5, dry_run=True 기본, deployer 3단계 호출)
+- [x] ~~CLI build 명령 (manifest stub)~~ (세션 #5, renderer 미작성 — manifest 로드·요약만)
+- [ ] CLI dashboard 명령 — Phase 3 디자인 후 본격
 
 ### 검토 의존 큼 (사용자 결정 후)
 - [ ] `collector.coupang` (쿠팡 가입 후·Phase 4)

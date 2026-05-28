@@ -12,6 +12,66 @@
 
 ## 최근 5세션
 
+### 세션 #5 — 2026-05-28 (Opus 4.7, Auto Mode, CLI 8→10/11 + deployer/tracker 통합 회귀 + doctor §10 보강, 회귀 295→317 [추정], 5 파일 변경)
+
+**시작 상황**: `/honsalim-start` → 세션 #4 정합성 양호 (Phase 2 핵심 모듈 16개·CLI 8/11·회귀 295). 사용자 "자율 판단해서 진행" 지시 → A(통합 회귀)→B(doctor)→C(/honsalim-end) 추천 채택.
+
+**정합성 검증 결과 [확정]**:
+- `git rev-list --count origin/main..main = 0` — STATE.md L38 "6 commit ahead" 및 EVENTS #4 L75 "22 commit ahead 추정" **모두 사실 아님**. origin/main이 c3e206f까지 동기 상태. push 승인 항목은 이미 무효.
+- doctor 정상 (jinja2/markdown WARN은 pip install -e .[dev] 대기 — 알려진 사항)
+- pytest 미설치 — 본 세션 회귀 재실행 불가, 직접 호출만 가능
+
+**진척 [확정]**:
+
+CLI 명령 신규 2건 (BACKEND §9, src/cli.py +145):
+- `cmd_deploy` — deployer.git_push + wrangler_deploy + verify_deploy 3단계. **dry_run=True 기본** (DECISIONS H4). `--no-dry-run`·`--skip-push`·`--skip-wrangler`·`--verify-url`·`--remote`·`--branch`·`--build-dir`·`--project` 옵션.
+- `cmd_build` — builder.manifest stub 호출 (renderer/pages/sitemap 미작성 — Phase 3 디자인 후). `--manifest`·`--full`·`--save-empty` 옵션.
+
+회귀 추가 (직접 호출 PASS [확정], pytest 환경 재검증 대기):
+- tests/test_cli.py +104: TestDeployParser 9 + TestBuildParser 6 = **15 케이스** (tmp_path 2건은 pytest 환경 필요)
+- tests/test_integration_phase2.py +130: 시나리오 9 (deployer 3단계 dry_run chain) 2 + 시나리오 10 (tracker aggregate→export chain) 5 = **7 케이스**
+- 총 22 신규 [관찰] 직접 호출 17 PASS [확정], 5 케이스는 pytest 픽스처(tmp_path) 의존
+
+doctor §10 보강:
+- writer.article_writer.{compute_content_hash, extract_disclosure_first} 진입점 등록
+- 진입점 카운트 표시 (32/32 OK) — 끝줄 1행 추가
+
+문서·정돈:
+- STATE.md: CLI 8/11 → **10/11** · origin 동기 사실 정정 · doctor §10 17→32 · 회귀 295→317 [추정] · 진행 단계 갱신
+- TODO.md: deploy/build 항목 완료 처리 · push 승인 항목 무효 처리 · CLI dashboard 1건만 남음
+
+**동작 검증 [확정]**:
+```
+$ python -m src.cli deploy
+[DRY] deploy 시작 (project='honsalim', build_dir='build')
+[OK] git push git push origin main → rc=0
+[OK] wrangler deploy → rc=0
+
+$ python -m src.cli build
+[OK] manifest 로드 schema_v=1 articles=0 assets=0 templates=0
+
+$ python -m src.cli doctor | grep 진입점
+  → 진입점 32/32 OK
+```
+
+**발견 사항 [관찰]**:
+- STATE.md L14 (회귀 카운트) 갱신 시 일시적으로 Auto Mode classifier 불가 응답 — 잠시 후 재시도로 해결 가능 [관찰]
+- 워크트리(condescending-perlman-ac222a) HEAD가 claude/condescending-perlman-ac222a 브랜치라 `origin/main..HEAD = 0` 결과만으로는 main 동기 여부 판단 불가. `origin/main..main` 비교가 정확 [확정]
+- linter (ruff·black·pytest) 모두 미설치 — pre-commit hook에 위임 (commit 시 자동 실행)
+
+**잔존 미해결**:
+- pytest 환경 재검증 (pip install -e .[dev] 사용자 명시 승인 후) — tmp_path 의존 5 케이스 + 전체 회귀 317 일괄 PASS 확인
+- 핵심 결정 4건 사용자 답변 대기 (자료 2건 완비)
+- AliExpress 심사 결과 (D+1~D+4)
+- CLI dashboard 명령 — Phase 3 디자인 후
+
+**다음 세션 할 일**:
+1. SUMMARY.md/REVIEW_QUESTIONS.md/ARCH_MODULE_DIAGNOSIS.md/KEY_DECISIONS_REVIEW.md 정독 후 핵심 결정 4건 응답
+2. AliExpress 심사 결과 확인
+3. `pip install -e .[dev]` 명시 승인 → pytest로 회귀 317 일괄 재검증
+4. 결정 4건 응답 후 코드 반영
+5. dashboard 시안 진입 (Phase 3 — Claude Design)
+
 ### 세션 #4 — 2026-05-28 (Opus 4.7, Phase 2 풀 골격 + 검토 자료 + 메모리 강화, 회귀 95→295, 21 commits)
 
 **시작 상황**: `/honsalim-start` → 세션 #3 정합성 양호. Phase 2 핵심 모듈 10개 + 회귀 95/95 PASS. STATE.md 첫 행 모순 발견 (모듈 수 9 vs 10 vs 11, 회귀 62 vs 95). 다음 작업 안전 후보 검토.

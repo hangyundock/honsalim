@@ -227,6 +227,108 @@ class TestStateMachineMatrixUnapprove:
         assert "published" in VALID_TRANSITIONS["approved"]
 
 
+class TestDeployParser:
+    """세션 #5 — BACKEND §9 deploy 명령. DECISIONS H4 dry_run 기본."""
+
+    def test_deploy_subcommand_recognized(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["deploy"])
+        assert args.command == "deploy"
+        assert args.func == cli.cmd_deploy
+
+    def test_deploy_dry_run_default_true(self) -> None:
+        """DECISIONS H4 [확정] — 외부 영향 작업 기본 dry_run=True."""
+        parser = cli.build_parser()
+        args = parser.parse_args(["deploy"])
+        assert args.dry_run is True
+
+    def test_deploy_no_dry_run_flag(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["deploy", "--no-dry-run"])
+        assert args.dry_run is False
+
+    def test_deploy_skip_flags_default_false(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["deploy"])
+        assert args.skip_push is False
+        assert args.skip_wrangler is False
+        assert args.verify_url is None
+
+    def test_deploy_skip_push_flag(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["deploy", "--skip-push"])
+        assert args.skip_push is True
+
+    def test_deploy_skip_wrangler_flag(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["deploy", "--skip-wrangler"])
+        assert args.skip_wrangler is True
+
+    def test_deploy_verify_url_arg(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["deploy", "--verify-url", "https://honsalim.com/"])
+        assert args.verify_url == "https://honsalim.com/"
+
+    def test_deploy_remote_branch_defaults(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["deploy"])
+        assert args.remote == "origin"
+        assert args.branch == "main"
+        assert args.build_dir == "build"
+        assert args.project == "honsalim"
+
+    def test_deploy_dry_run_executes_without_external_call(self) -> None:
+        """dry_run=True 호출 시 외부 git·wrangler 실행 없이 rc=0 반환."""
+        parser = cli.build_parser()
+        args = parser.parse_args(["deploy"])
+        rc = cli.cmd_deploy(args)
+        assert rc == 0
+
+
+class TestBuildParser:
+    """세션 #5 — BACKEND §9 build 명령 (Phase 2 stub — manifest 로드만)."""
+
+    def test_build_subcommand_recognized(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["build"])
+        assert args.command == "build"
+        assert args.func == cli.cmd_build
+
+    def test_build_default_flags(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["build"])
+        assert args.manifest is None
+        assert args.full is False
+        assert args.save_empty is False
+
+    def test_build_full_flag(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["build", "--full"])
+        assert args.full is True
+
+    def test_build_manifest_arg(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["build", "--manifest", "data/test-manifest.json"])
+        assert args.manifest == "data/test-manifest.json"
+
+    def test_build_loads_manifest(self, tmp_path: Any) -> None:
+        """빈 manifest 경로 → new_manifest 로드 (파일 없어도 OK)."""
+        parser = cli.build_parser()
+        manifest_path = tmp_path / "manifest.json"
+        args = parser.parse_args(["build", "--manifest", str(manifest_path)])
+        rc = cli.cmd_build(args)
+        assert rc == 0
+
+    def test_build_save_empty_creates_file(self, tmp_path: Any) -> None:
+        """--save-empty + 파일 없음 → 빈 manifest 생성."""
+        parser = cli.build_parser()
+        manifest_path = tmp_path / "new-manifest.json"
+        args = parser.parse_args(["build", "--manifest", str(manifest_path), "--save-empty"])
+        rc = cli.cmd_build(args)
+        assert rc == 0
+        assert manifest_path.exists()
+
+
 if __name__ == "__main__":
     if pytest is not None:
         pytest.main([__file__, "-v"])
