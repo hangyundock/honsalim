@@ -87,6 +87,65 @@ class TestTruth:
         assert ok is True
         assert rpt["issues"] == []
 
+    def test_fail_first_person_without_photo(self) -> None:
+        """POLICY §3-1-3 — 1인칭 검출 시 직접 사진 없으면 fail."""
+        ok, rpt = check_truth(
+            {
+                "body_md": "내 원룸에서 써본 결과 너무 편했습니다.",
+                "products": [],
+            }
+        )
+        assert ok is False
+        assert any("first_person_without_photo" in i for i in rpt["issues"])
+
+    def test_pass_first_person_with_photos_list(self) -> None:
+        """photos 리스트 비어있지 않으면 1인칭 허용."""
+        ok, rpt = check_truth(
+            {
+                "body_md": "내 원룸에서 사용해보니 편했습니다.",
+                "products": [],
+                "photos": [{"product_slug": "x"}],
+            }
+        )
+        assert ok is True
+        assert rpt["issues"] == []
+
+    def test_pass_first_person_with_has_user_photo_flag(self) -> None:
+        """has_user_photo boolean 플래그도 지원 (POLICY 코드 예시 호환)."""
+        ok, rpt = check_truth(
+            {
+                "body_md": "우리집에서 3개월 사용했더니 만족합니다.",
+                "products": [],
+                "has_user_photo": True,
+            }
+        )
+        assert ok is True
+
+    def test_fail_first_person_n_months_used(self) -> None:
+        """N개월 사용 패턴도 직접 사진 없으면 fail."""
+        ok, rpt = check_truth(
+            {
+                "body_md": "이 제품을 6개월 사용해보았습니다.",
+                "products": [],
+            }
+        )
+        assert ok is False
+        assert any("first_person_without_photo" in i for i in rpt["issues"])
+
+    def test_fail_ai_trace_soft_threshold(self) -> None:
+        """'훌륭한/완벽한/최고의' 패턴 5회 이상 → fail."""
+        body = " ".join(["훌륭한"] * 5)
+        ok, rpt = check_truth({"body_md": body, "products": []})
+        assert ok is False
+        assert any("ai_trace_soft" in i for i in rpt["issues"])
+
+    def test_pass_ai_trace_soft_below_threshold(self) -> None:
+        """4회는 임계 미만 → pass."""
+        body = "이 제품은 훌륭한 디자인과 완벽한 마감, 그리고 최고의 가성비를 보였다."
+        ok, rpt = check_truth({"body_md": body, "products": []})
+        # 훌륭한·완벽한·최고의 각 1회 → 임계 5 미만, soft 패턴 모두 통과
+        assert ok is True
+
 
 # ─── schema 게이트 (POLICY §4 + VALIDATOR §8) ────────────────────────
 
@@ -125,6 +184,67 @@ class TestSchema:
         ok, rpt = check_schema(review)
         assert ok is False
         assert "review_author_organization_forbidden" in rpt["issues"]
+
+    def test_pass_itemlist_complete(self) -> None:
+        """VALIDATOR §8 — ItemList 필수 3필드 + 요소 1개 이상."""
+        itemlist = json.dumps(
+            {
+                "@context": "https://schema.org",
+                "@type": "ItemList",
+                "itemListElement": [{"@type": "ListItem", "position": 1, "name": "x"}],
+            }
+        )
+        ok, rpt = check_schema(itemlist)
+        assert ok is True
+        assert rpt["issues"] == []
+
+    def test_fail_itemlist_missing_element(self) -> None:
+        itemlist = json.dumps(
+            {
+                "@context": "https://schema.org",
+                "@type": "ItemList",
+            }
+        )
+        ok, rpt = check_schema(itemlist)
+        assert ok is False
+        assert "missing_field: itemListElement" in rpt["issues"]
+
+    def test_fail_itemlist_empty_elements(self) -> None:
+        itemlist = json.dumps(
+            {
+                "@context": "https://schema.org",
+                "@type": "ItemList",
+                "itemListElement": [],
+            }
+        )
+        ok, rpt = check_schema(itemlist)
+        assert ok is False
+        assert "itemlist_empty" in rpt["issues"]
+
+    def test_pass_product_complete(self) -> None:
+        """VALIDATOR §8 — Product + offers.price·priceCurrency."""
+        product = json.dumps(
+            {
+                "@type": "Product",
+                "name": "원룸 자취 패키지",
+                "offers": {"price": "290000", "priceCurrency": "KRW"},
+            }
+        )
+        ok, rpt = check_schema(product)
+        assert ok is True
+        assert rpt["issues"] == []
+
+    def test_fail_product_missing_offers_price(self) -> None:
+        product = json.dumps(
+            {
+                "@type": "Product",
+                "name": "x",
+                "offers": {"priceCurrency": "KRW"},
+            }
+        )
+        ok, rpt = check_schema(product)
+        assert ok is False
+        assert "missing_offers_field: price" in rpt["issues"]
 
 
 # ─── disclosure 게이트 (POLICY §2 + VALIDATOR §3) ────────────────────

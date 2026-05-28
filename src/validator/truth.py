@@ -1,7 +1,7 @@
 """truth 게이트 — 가격·재고·1인칭·AI 흔적·단정형.
 
 출처: POLICY §3 + VALIDATOR_PATTERNS §4·§5·§6·§7 [확정].
-Phase 2 stub: hard 패턴 + 가격·단정형 구현. soft 임계 튜닝은 후속.
+세션 #4: hard 패턴 + 가격 + 단정형 + 1인칭/사진 게이트 + AI soft 임계 구현.
 """
 
 from __future__ import annotations
@@ -20,6 +20,22 @@ AI_TRACE_PATTERNS_HARD = (
     r"\$\$",
 )
 
+# VALIDATOR §4 — AI 흔적 soft 패턴 (임계 이상 등장 시 fail) [관찰]
+AI_TRACE_PATTERNS_SOFT: tuple[tuple[str, int], ...] = (
+    (r"~로 알려져 있습니다", 3),
+    (r"(훌륭한|완벽한|최고의)", 5),
+)
+
+# VALIDATOR §5 — 1인칭 표현 (POLICY §3-1-3 [확정] — 직접 사진 없을 시 fail)
+FIRST_PERSON_PATTERNS = (
+    r"써본 (결과|이후|후)",
+    r"사용해보(니|면서)",
+    r"내 (원룸|책상|방|집|자취)",
+    r"우리(집|원룸)",
+    r"(지난|작년) (여름|겨울|봄|가을)에 (사용|샀|샀더니)",
+    r"(\d+개월|\d+년) (사용|썼)",
+)
+
 # VALIDATOR §7 — 단정형·과장 (POLICY §3-1-5 그대로)
 ABSOLUTE_FORBIDDEN = (
     r"100% 효과",
@@ -35,6 +51,16 @@ PRICE_TOLERANCE = 0.05  # POLICY §3-1-1 — collector 가격 ±5%
 
 def _check_ai_trace(body_md: str) -> list[str]:
     return [f"ai_trace_hard: {p}" for p in AI_TRACE_PATTERNS_HARD if re.search(p, body_md)]
+
+
+def _check_ai_trace_soft(body_md: str) -> list[str]:
+    """AI 흔적 soft 패턴 — 임계 이상 등장 시 fail (VALIDATOR §4 [관찰])."""
+    issues: list[str] = []
+    for pat, threshold in AI_TRACE_PATTERNS_SOFT:
+        count = len(re.findall(pat, body_md))
+        if count >= threshold:
+            issues.append(f"ai_trace_soft: {pat} ({count}>={threshold})")
+    return issues
 
 
 def _check_absolute(body_md: str) -> list[str]:
@@ -60,18 +86,48 @@ def _check_prices(body_md: str, products: list[dict[str, Any]]) -> list[str]:
     return issues
 
 
+def _check_first_person(body_md: str, has_user_photo: bool) -> list[str]:
+    """1인칭 검출 시 직접 사진 없으면 fail (POLICY §3-1-3 [확정]).
+
+    has_user_photo=True면 1인칭 허용. False일 때만 패턴 검사.
+    """
+    if has_user_photo:
+        return []
+    for pat in FIRST_PERSON_PATTERNS:
+        m = re.search(pat, body_md)
+        if m:
+            return [f"first_person_without_photo: {m.group()}"]
+    return []
+
+
+def _has_user_photo(payload: dict[str, Any]) -> bool:
+    """payload에서 직접 사진 보유 여부 추출. photos 리스트 또는 has_user_photo 플래그 둘 다 지원."""
+    photos = payload.get("photos")
+    if isinstance(photos, list) and len(photos) > 0:
+        return True
+    return bool(payload.get("has_user_photo"))
+
+
 def check_truth(payload: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     """truth 게이트 검사.
 
-    payload: body_md + products (가격 검증용).
+    payload 기대 키:
+    - body_md         : 본문 Markdown
+    - products        : [{id, price_krw, ...}, ...] 가격 검증용
+    - photos          : list — 비어 있지 않으면 1인칭 허용 (POLICY §3-1-3)
+    - has_user_photo  : bool — photos 대신 boolean으로도 지정 가능 (POLICY 코드 예시)
+
     반환: (pass, {"issues": [...], "gate": "truth"}).
     """
     body_md = payload.get("body_md") or ""
     products = payload.get("products") or []
+    has_user_photo = _has_user_photo(payload)
 
     issues: list[str] = []
     issues.extend(_check_ai_trace(body_md))
+    issues.extend(_check_ai_trace_soft(body_md))
     issues.extend(_check_absolute(body_md))
     issues.extend(_check_prices(body_md, products))
+    issues.extend(_check_first_person(body_md, has_user_photo))
 
     return len(issues) == 0, {"issues": issues, "gate": "truth"}
