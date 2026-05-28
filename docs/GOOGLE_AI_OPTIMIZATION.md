@@ -171,6 +171,17 @@
 
 **효과**: tistory_revival 매일 자동 발행 시 가짜 author 주장 자동 차단 (재생성 피드백 트리거). prompt (content_profiles)와 함께 2단계 방어.
 
+### 7-bis-4. AutoBlog FAQPage Schema 자동 생성 [확정 세션 #6 2026-05-29]
+
+`D:\autoblog\src\content\enhancer.py` `inject_eeat_signals()` 보강:
+- **`_extract_faqs(content)` 신설** — 본문 끝 `<h3>Q?</h3><p>A</p>` 패턴 자동 추출 (질문이 ?로 끝나는 H3만, 일반 섹션 오탐 X)
+- **FAQPage JSON-LD 자동 추가** — FAQ 1+ 있을 때만, BlogPosting JSON-LD 다음에 삽입
+- Google 공식 리치 결과 권장 (Q&A 검색 노출 가능) — AUTOBLOG_SEO_MASTER §2 #1 명시
+- 영향: FAQ 없는 글 0, FAQ 있는 글만 Schema 추가
+- 검증: 2개 Q/A 추출·일반 h3 오탐 X [확정 직접 테스트]
+
+**효과**: AutoBlog system_prompt Rule 10 ("End the post with a short FAQ section containing 2-3 questions using <h3> tags")이 이미 강제 — 본 세션 이전 발행 글도 자동 적용 (재처리 시).
+
 ## 9. AutoBlog 2주 SEO 조사 (P1A+P1B) 통합 — 본 프로젝트 적용
 
 > 출처: `D:\autoblog\tasks\TASK_019_FINAL_SYNTHESIS.md` §2 + `D:\autoblog\AUTOBLOG_SEO_MASTER.md` (혼살림 세션 #6 cross-project 검증)
