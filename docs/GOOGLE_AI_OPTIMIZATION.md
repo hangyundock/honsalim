@@ -138,6 +138,15 @@
 
 ---
 
+## 7-bis. AutoBlog/tistory_revival 통합 (cross-project)
+
+본 가이드는 AutoBlog 영역에도 적용됨 (사용자 명시 통합 지시, 세션 #6):
+
+- `D:\autoblog\AUTOBLOG_SEO_MASTER.md` — TASK_019 Phase 1A+1B (약 2주 SEO 조사) + 본 가이드 통합 마스터 (글쓰기 직전 1 페이지)
+- `D:\autoblog\AUTOBLOG_DECISIONS.md` §H4 (AI Guide 인지, 세션 #89) + §H6·H7 (마스터 참조·non-commodity)
+- `D:\autoblog\tistory_revival\TISTORY_DECISIONS.md` §Q (마스터 참조·tistory 적용)
+- AutoBlog 발견 추가: AI Overview 별도 기준 없음 [확정 P1B S7] — 본 프로젝트 M7 정합 강화
+
 ## 8. 다음 세션 자동 인식 핵심
 
 - Google AI 검색 = SEO 그대로 (별도 분야 X)
