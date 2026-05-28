@@ -7,11 +7,12 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 13개·회귀 247 PASS + CLI 8 명령** [확정] | #4 (2026-05-28) |
+| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 14개·회귀 269 PASS + CLI 8 명령** [확정] | #4 (2026-05-28) |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
-| Phase 2 핵심 모듈 13개 (#3~#4) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/jsonld | #4 |
-| Phase 2 회귀 테스트 | **247/247 PASS** [확정] — validator 39 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + db 12 + cli 31 + article_writer 25 + integration_phase2 11 (11 test 파일) | #4 |
+| Phase 2 핵심 모듈 14개 (#3~#4) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} | #4 |
+| Phase 2 회귀 테스트 | **269/269 PASS** [확정] — validator 39 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + manifest 22 + db 12 + cli 31 + article_writer 25 + integration_phase2 11 (12 test 파일) | #4 |
+| builder.manifest (세션 #4) | DB §10 [추정] JSON 인터페이스 — new/load/save/upsert_article/upsert_asset/upsert_template/needs_rebuild (ARCH §7-3 5조건). 형태 결정은 사용자 검토 후 [확정] | #4 |
 | enricher.retry (세션 #4) | BACKEND §3-5 [확정] — RateLimit 3회(1·2·4초+jitter) · Overloaded 1회(10초) · Timeout/BadRequest/APIError 즉시 fail · SDK 미설치 환경 mock 회귀 가능 | #4 |
 | CLI 명령 (BACKEND §9) | 8/11 — doctor · db migrate/seed · collect · enrich (dry_run) · validate · approve · unapprove. 남은 3개 (dashboard·build·deploy)는 builder/dashboard/deployer 모듈 의존 | #4 |
 | state_machine 매트릭스 보강 (세션 #4) | `approved → validated` 추가 — BACKEND §9 unapprove 정합. DB §12-2 매트릭스 갱신 | #4 |

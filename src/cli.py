@@ -224,6 +224,10 @@ def _check_phase2_modules() -> bool:
         ("builder", "build_article_jsonld"),
         ("builder", "build_itemlist_jsonld"),
         ("builder", "build_product_jsonld"),
+        ("builder.manifest", "new_manifest"),
+        ("builder.manifest", "load"),
+        ("builder.manifest", "save"),
+        ("builder.manifest", "needs_rebuild"),
     ]
     all_ok = True
     for mod_name, attr in checks:
