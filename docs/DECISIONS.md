@@ -102,6 +102,17 @@
 - **I6. CodeQL 활성**: GitHub 공개 저장소 CodeQL 자동 스캔 — 세션 #2
 - **I7. secrets 회전 정기 의무화**: GitHub PAT 90일 / Cloudflare API token 180일 / Anthropic key 180일 / 쿠팡 키 정책 확인 후 — 세션 #2
 
+## J. Phase 2 아키텍처 [확정] — 세션 #4 신규
+
+- **J1. 모듈 의존 방향**: `writer → validator` 단방향. `writer.article_writer`가 `validator` 모듈을 import해서 `validate_and_save` 통합 함수 제공. 역방향 금지 (validator → writer는 순환 위험). 코드 명시 — 세션 #4 (`6d5cff1`)
+- **J2. state_machine 매트릭스 보강**: `approved → validated` 전이 추가. BACKEND §9 `unapprove` 명령 정합. DB §12-2 원본 매트릭스를 갱신함. 다른 전이는 변경 없음 — 세션 #4 (`07c6fc8`)
+- **J3. CLI 명령 8/11 활성**: doctor · db migrate/seed · collect · enrich · validate · approve · unapprove. 남은 3 (dashboard·build·deploy)은 builder/dashboard/deployer 모듈 의존 — 세션 #4
+- **J4. `enrich` 기본 dry_run**: Claude API 비용 보호 — 기본은 `dry_run=True` (prompt 빌드 + 상태 전이만, API 호출 없음). `--no-dry-run` 명시 시에만 실호출. 사용자 부주의 비용 발생 방어 — 세션 #4
+- **J5. JSON-LD 빌더 4 인터페이스**: `build_article_jsonld(meta, scenario, ...)` · `build_itemlist_jsonld(items, list_name)` · `build_product_jsonld(product, image_url, description, brand_name, currency='KRW')` · `_normalize_keywords` 헬퍼. POLICY §4 + VALIDATOR §8 [확정] 필드 모두 충족·validator.check_schema 정합 검증 통과 — 세션 #4 (`d492483`, `225122d`)
+- **J6. content_hash 형식**: `"sha256:" + 64자hex` (UTF-8 인코딩). DB §4-1 + manifest §10 일관. `compute_content_hash(body_md)` 헬퍼 — 결정적 (같은 입력 → 같은 hash) — 세션 #4 (`aef26c5`)
+- **J7. disclosure_first 추출**: `extract_disclosure_first(body_md)` — 본문 첫 300자 첫 단락에서 "쿠팡 파트너스"+"수수료" 둘 다 포함된 텍스트 반환. POLICY §2-2 [확정] 추출 헬퍼. 검증 책임은 validator.disclosure 별도 (추출과 검증 분리) — 세션 #4 (`aef26c5`)
+- **J8. payload 책임 분리**: `validate_and_save(conn, draft_id, payload)`는 payload 구조를 호출자 책임으로. enriched_payload 구조는 [관찰] — validator.validate_all 호환 키 (body_md, schema_jsonld, products, photos) 가정. 향후 enriched_payload 형식 결정 후 정식 [확정] — 세션 #4 (`6d5cff1`)
+
 ## 폐기된 결정 (역사 참조용)
 
 | 폐기일 | 결정 | 폐기 사유 |
