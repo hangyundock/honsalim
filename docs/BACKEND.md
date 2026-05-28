@@ -561,7 +561,7 @@ ARCH §4-3에서 정의한 CLI 명령들의 상세 인터페이스.
 | `scheduler-publish` | (없음) | 큐 1편 자동 발행 (스케줄러 호출용) |
 | `scheduler-status` | (없음) | 큐 N편 + 다음 발행 예정 |
 | `report --weekly|--monthly` | 주기 | HTML 리포트 + dashboard |
-| `doctor` | — | secrets·DB·외부 API 헬스 체크 |
+| `doctor` | — | 14 게이트 헬스 체크 — Python·의존성·secrets·DB·외부 도구·git·DB 상태·prompt_templates·진입점 37·state_machine·tests 로드·Workers JS·docs/ size cap (CLAUDE.md §3, 세션 #6) |
 | `db migrate [--dry-run]` | 옵션 | 마이그레이션 실행·dryRun |
 
 ### 9-1. 공통 옵션

@@ -126,7 +126,8 @@ D:\affiliate_hub\
 ├── .github/
 │   └── workflows/
 │       ├── build.yml          ← 빌드 + 배포 (Phase 2)
-│       └── lint.yml           ← Black·Ruff·Mypy (Phase 2)
+│       ├── lint.yml           ← Black·Ruff·Mypy + pip-audit warn (Phase 2)
+│       └── security.yml       ← pip-audit 월간 + JSON artifact 90일 (Phase 2, 세션 #6)
 ├── .claude/
 │   ├── commands/              ← 슬래시 명령 3개 (구축 완료)
 │   │   ├── honsalim-start.md
@@ -510,9 +511,15 @@ Cloudflare Pages
 - 긴급 수정 (typo·링크 깨짐 등)
 - 사용자 명시 승인 후
 
-### 8-2. GitHub Actions 빌드 워크플로 (개념)
+### 8-2. GitHub Actions 워크플로 3종 (Phase 2 [확정])
 
-`.github/workflows/build.yml` 단계 [추정, Phase 2 확정]:
+| 파일 | 트리거 | 책임 | 비고 |
+|------|--------|------|------|
+| `build.yml` | push main + workflow_dispatch | lint → test → build → wrangler deploy → IndexNow | renderer 미작성 시 build/deploy 자동 skip (Phase 3 게이트) |
+| `lint.yml` | push main + PR | Black·Ruff·Mypy 정합 + pip-audit (continue-on-error) + CodeQL | 코드 품질 게이트, 매 push |
+| `security.yml` | cron 매월 1일 09:00 UTC + workflow_dispatch | pip-audit 전수 + JSON artifact 90일 + GitHub Step Summary | DECISIONS I4 정기 보안 점검 |
+
+`.github/workflows/build.yml` 단계 [확정 세션 #5 build ✅]:
 
 | 단계 | 내용 | 실패 시 |
 |------|------|---------|
