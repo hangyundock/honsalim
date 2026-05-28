@@ -639,10 +639,12 @@ def transition(draft_id, to_status, reason=None, actor=None):
 
 ### 14-bis-4. 의존성 보안 (I4)
 
-- **GitHub Dependabot Alerts**: 공개 저장소 자동 활성
-- **pip-audit 월 1회**: OPS §2-3에 등록
+- **GitHub Dependabot Alerts**: 공개 저장소 자동 활성 [확정 세션 #2]
+- **pip-audit 자동 — 2단계** [확정 세션 #6]:
+  - `lint.yml` step (continue-on-error) — PR/push 시 알림만, block X
+  - `security.yml` cron 매월 1일 09:00 UTC — 전수 점검 + JSON artifact 90일 + GitHub Step Summary
 - **npm audit (wrangler 빌드 시)**: 분기 1회
-- 알림 시 우선순위 평가 후 패치 (MAINTENANCE §3)
+- 알림 시 우선순위 평가 후 패치 (MAINTENANCE §3) — `pyproject.toml` lower-bound 갱신 + `pip install -U` 사용자 명시 승인 후
 
 ### 14-bis-5. 로컬 보안 (I5)
 

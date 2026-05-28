@@ -54,7 +54,7 @@
 | 비용 집계 (Claude API·도메인) | 매월 1일 | PLAN §8 비교 |
 | EVENTS.md 회전 점검 | 매월 1일 | CLAUDE.md §3 (6세션 시) |
 | 사용자 직접 사진 라이브러리 점검 | 매월 1일 | 누락·고화질 보강 |
-| **보안 점검 (I4)**: pip-audit + GitHub Dependabot 알림 정리 | 매월 1일 | POLICY §14-bis-4 |
+| **보안 점검 (I4)**: pip-audit (security.yml 자동·09:00 UTC) + Dependabot 알림 정리 | 매월 1일 09:00 UTC (18:00 KST) | POLICY §14-bis-4 — JSON artifact 90일 보존 |
 | **GitHub Secret Scanning 알림 점검** | 매월 1일 | POLICY §14-bis-1 |
 
 ### 2-4. 분기별
