@@ -1,0 +1,84 @@
+# .github/workflows/security.yml — 정기 의존성 보안 점검
+# 출처: DECISIONS I4 [확정] — pip-audit 월간, POLICY §14-bis-4
+# 작성: 2026-05-28 세션 #6
+#
+# 트리거: 매월 1일 09:00 UTC (18:00 KST) + 수동
+# 동작: pip-audit 전체 의존성(직접+transitive) 점검 → JSON artifact 업로드
+#
+# lint.yml의 pip-audit step은 PR/push 시 알림용(continue-on-error).
+# 본 workflow는 정기 전수 점검 + 결과 보존 (artifact 90일).
+
+name: security
+
+on:
+  schedule:
+    - cron: "0 9 1 * *"  # 매월 1일 09:00 UTC = 18:00 KST
+  workflow_dispatch:  # 수동 트리거
+
+permissions:
+  contents: read
+
+jobs:
+  pip-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: pip-audit (JSON artifact 보존)
+        id: audit
+        run: |
+          echo "--- pip-audit version ---"
+          pip-audit --version
+          echo "--- 전수 점검 ---"
+          set +e
+          pip-audit --format json --output pip-audit-result.json
+          AUDIT_EXIT=$?
+          echo "exit=$AUDIT_EXIT"
+          echo "audit_exit=$AUDIT_EXIT" >> $GITHUB_OUTPUT
+          if [ $AUDIT_EXIT -ne 0 ]; then
+            echo "::warning::pip-audit 취약점 발견 — artifact 확인 후 pyproject lower-bound 갱신"
+          fi
+          # exit 0으로 강제 (artifact 업로드 위해) — 실패 정보는 artifact + summary
+          exit 0
+
+      - name: Upload pip-audit result
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pip-audit-result
+          path: pip-audit-result.json
+          retention-days: 90
+
+      - name: Summary (사람 판독)
+        if: always()
+        run: |
+          echo "## pip-audit 요약" >> $GITHUB_STEP_SUMMARY
+          if [ -f pip-audit-result.json ]; then
+            python -c "
+          import json
+          with open('pip-audit-result.json') as f:
+              data = json.load(f)
+          deps = data.get('dependencies', [])
+          vuln_count = sum(len(d.get('vulns', [])) for d in deps)
+          affected = sum(1 for d in deps if d.get('vulns'))
+          print(f'- 취약점 총 {vuln_count}건 / 영향 패키지 {affected}건')
+          for d in deps:
+              if d.get('vulns'):
+                  for v in d['vulns']:
+                      fix = ','.join(v.get('fix_versions', [])) or '없음'
+                      print(f'  - {d[\"name\"]} {d[\"version\"]} → {v[\"id\"]} (fix: {fix})')
+          " >> $GITHUB_STEP_SUMMARY
+          fi
