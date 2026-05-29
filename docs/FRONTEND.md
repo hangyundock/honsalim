@@ -272,6 +272,66 @@ base.html이 정의하는 블록:
 
 - 운영자 소개 + 신뢰 정책 + 사업자 정보 + 개인정보처리방침 링크
 
+**운영자 정보 [확정 DECISIONS M2-1~M2-7, 세션 #7]**:
+- **필명**: 혼살다 (혼자+살다 합성, 사이트명 정합)
+- **운영 철학 (헤드라인)**: "혼자 살아도 충분히 따뜻한 일상을, 가성비 좋게."
+- **전문성 영역**: 1인 가구 살림 · 자취 · 홈오피스 · 일상 살림
+- **사진**: 없음 (사용자 사진 일체 없음 + AI 사진은 거짓 → 사이트 브랜드 이미지/일러스트로 대체)
+- **이메일**: dugihappyending@gmail.com
+- **사업자 등록 전 표기**: "개인 운영자, 사업자 등록 진행 중" (POLICY §8-4 정합)
+- **콘텐츠 검증 표기**: "본 사이트의 모든 글은 운영자가 1클릭 검토·승인 후 게시됩니다" (CLAUDE.md §2-마 정합)
+
+**about.html 본문 텍스트 초안 (Phase 4 진입 시 적용)**:
+```
+혼자 살아도 충분히 따뜻한 일상을, 가성비 좋게.
+
+혼살림은 1인 가구·자취·홈오피스·일상살림을 다루는 어필리에이트 사이트입니다.
+운영자 혼살다가 시나리오·페르소나·예산·시즌을 결합해 검증된 제품과 정보를 추천합니다.
+
+[검증 정책]
+모든 글은 운영자가 직접 검토하고 1클릭 승인한 뒤에만 게시됩니다.
+자동 검증 게이트(진실성·Schema·공정위 disclosure·링크)를 통과한 글만 검토 대기열에 진입합니다.
+
+[수익 모델]
+쿠팡 파트너스 + AliExpress 어필리에이트로 수익을 얻습니다.
+모든 글 첫머리에 "쿠팡 파트너스/AliExpress 활동의 일환으로 일정액의 수수료를 제공받습니다" 명시됩니다.
+
+[운영자 정보]
+- 운영자명: 혼살다
+- 이메일: dugihappyending@gmail.com
+- 사업자: 개인 운영자, 사업자 등록 진행 중
+
+[관련 문서]
+- 개인정보처리방침 → /privacy/
+- 어필리에이트 disclosure → 각 글 첫머리
+```
+
+### 4-5-bis. _macros/person.html (Person Schema 매크로, 세션 #7 사전 명세)
+
+```jinja2
+{# Person Schema JSON-LD — about 페이지 + author 메타 (M2 [확정]) #}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": "혼살다",
+  "url": "{{ site.base_url }}/about/",
+  "email": "mailto:dugihappyending@gmail.com",
+  "description": "혼자 살아도 충분히 따뜻한 일상을, 가성비 좋게.",
+  "knowsAbout": ["1인 가구 살림", "자취", "홈오피스", "일상 살림"],
+  "worksFor": {
+    "@type": "Organization",
+    "name": "혼살림",
+    "url": "{{ site.base_url }}/"
+  }
+}
+</script>
+```
+
+- 사용처: about.html `{% block schema %}` + 글 BlogPosting `author` 필드 참조
+- 운영자 사진 없음 → `image` 필드 미설정 (Phase 4 진입 시 사이트 브랜드 이미지로 대체 검토)
+- Phase 4 사업자 등록 후 `Organization` 부분에 사업자등록번호 추가 (POLICY §8 정합)
+
 ---
 
 ## 5. meta · OG · Twitter Card 표준

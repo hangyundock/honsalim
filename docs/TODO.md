@@ -10,21 +10,21 @@
 - [ ] dashboard 시안 진입 (Claude Design, 사용자 직접 claude.ai/design)
 
 ## 세션 #6 잔존 (시점 의존)
+
 - [ ] **알리 이미지·상세페이지 정책 조사** — Phase 5 진입 전 (현재 docs 명시 없음)
 - [ ] **M2/M4/M5/M6 Phase 3~6 진척 시점 작업** — `docs/GOOGLE_AI_OPTIMIZATION.md` §6
 
 ## 세션 #6 SEO 정합 통합 후 잔존 (cross-project · 별도 세션 권장)
 
-- [ ] **AutoBlog Hana Kim 잔존 5편 처리** — `D:\autoblog\tasks\TASK_019_v1.md` 후속. post_id 1~5 기존 글에 author/publisher 메타 Organization으로 갱신 + Hana Kim 1인칭 본문 재작성 또는 비공개. QRG §4.5.3 Lowest 위험 영구 차단
-- [ ] **Scaled Content Abuse 키워드 클러스터 중복 회피 모듈** — AutoBlog/tistory_revival 양쪽 적용. DB의 발행된 글들 간 본문 중복률(seq similarity) 점검 → 새 글 생성 시 70%+ 중복 fail. `D:\autoblog\AUTOBLOG_SEO_MASTER.md` §3 [필수 금지]
-- [ ] **혼살림 M2 Person Schema + about 페이지 운영자 정보** — Phase 4 진입 시 (E-E-A-T author 강화, M2 영구 결정)
+- [x] ~~**AutoBlog Hana Kim 잔존 5편 처리**~~ ✅ 세션 #7 완료. 본질 작업(author/publisher Organization 갱신 + 1인칭 재작성) 이미 완료 확인 + post 5 FAQ 구조 정상화·FAQPage Schema 추가 + content_text 재동기화 (AUTOBLOG_TODO TASK_024 갱신)
+- [x] ~~**Scaled Content Abuse 모듈 Step 1 dry-run**~~ ✅ 세션 #7 완료. AutoBlog `src/content/similarity.py` (4-gram word Jaccard) + tistory_revival `keyword_cluster.py` (어절+바이그램) + seo_gate hook + 회귀 13/13 PASS. Step 2 (fail 게이트 승격) 별도 세션 (1~2주 운영 데이터 후)
+- [ ] **혼살림 M2 Person Schema + about 페이지 운영자 정보** — Phase 4 진입 시 (E-E-A-T author 강화)
+  - 세션 #7 사전 결정 완료: 필명 "혼살다" / 운영 철학 / 전문성 영역 / 사진 없음 (DECISIONS M2-1~M2-7)
+  - 코드 작업: `_macros/person.html` 매크로 작성 (FRONTEND §4-5-bis 명세) + `about.html` 본문 적용 (FRONTEND §4-5 초안)
+  - 작업 시점: Phase 3 디자인 후 Phase 4 진입 직전
 
-> 세션 #6 완료 commits·항목은 docs/CHANGELOG.md v1.6 / EVENTS.md / STATE.md 참조.
-> 세션 #5 이전 완료 항목은 EVENTS.md / STATE.md "진행 단계" 행 참조.
+## Phase 1: 인프라 — 남음
 
-## Phase 1: 인프라 — 남음 ⏳
-
-- [x] ~~(완료)~~ AliExpress Tracking ID 발급 + `ali.env` 작성 (세션 #5)
 - [ ] AliExpress App Key/Secret 발급 — Phase 5 시점 (2026-11 이후)
 - [ ] `.claude/settings.json` deny 룰 사용자 검토 (deny 24·allow 14)
 - [ ] **윈도우 작업 스케줄러 등록** — Phase 2 코드 작성 후 (DECISIONS C7)
@@ -34,22 +34,14 @@
 - BitLocker (사용자 결정 — "프로그램 완성도 우선·추후 일괄")
 - 쿠팡 파트너스 재가입 — Phase 4 출시 후
 
-## Phase 2: 핵심 시스템 — 남음 ⏳
+## Phase 2: 핵심 시스템 — 남음
 
-> 완료 항목은 STATE.md "Phase 2 핵심 모듈 16개" + "회귀 295/295" + "CLI 8/11" 행 참조.
+> 완료 항목은 STATE.md "Phase 2 핵심 모듈 18개" + "회귀 342/342" + "CLI 10/11" 행 참조.
 
-### 안전 진척 (검토 의존 작음)
-- [x] ~~CLI deploy 명령~~ (세션 #5, dry_run=True 기본, deployer 3단계 호출)
-- [x] ~~CLI build 명령 (manifest stub)~~ (세션 #5, renderer 미작성 — manifest 로드·요약만)
 - [ ] CLI dashboard 명령 — Phase 3 디자인 후 본격
-
-### 검토 의존 큼 (사용자 결정 후)
 - [ ] `collector.coupang` (쿠팡 가입 후·Phase 4)
-- [x] ~~`builder.manifest` 형태 결정~~ (K1 [확정] JSON 파일)
 - [ ] `builder.renderer/pages/sitemap/assets` (Jinja2 + DESIGN 시안)
 - [ ] `dashboard.render/approve` (디자인 시안 Phase 3 의존)
-- [x] ~~`tracker.report`~~ (세션 #5 데이터 집계 함수 완료, HTML 렌더는 dashboard 통합 시 jinja2 — `render_html_stub`만)
-- [x] ~~Workers `go_gateway.js`~~ (세션 #5 BACKEND §5 명세 충실 구현 — wrangler deploy는 사용자 명시 승인 후)
 - [ ] `python -m honsalim build --full` 성공 (Phase 2 종착)
 
 ## Phase 3: 디자인·콘텐츠 (2026-07)
@@ -57,7 +49,7 @@
 - [ ] Claude Design 시안 3~5종 (사용자 claude.ai/design)
 - [ ] 시안 1개 선정 + DESIGN.md 토큰 미세 조정
 - [ ] Jinja2 템플릿 5종 + partials 18종 + Critical CSS + Pretendard preload
-- [ ] 사용자 직접 사진 (페르소나별 2~3장)
+- [ ] AI 이미지 생성 (페르소나별 2~3장, Imagen 4 Fast)
 - [ ] 시즌 신학기·홈오피스 시나리오 5편 작성 (#5~#10)
 - [ ] 진실성 게이트 통과 + 사용자 1클릭 승인 + 시범 1편 로컬 미리보기·배포
 

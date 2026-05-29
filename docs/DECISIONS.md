@@ -145,6 +145,13 @@
 
 - **M1. non-commodity content 의무 [확정]**: Claude API enricher prompt에 "일반 지식 reword 회피, 시나리오 페르소나×예산×시즌 결합 고유 인사이트 의무" 명시. Google 예시: ❌ "7 Tips for First-Time Homebuyers" / ✅ "Why We Waived the Inspection & Saved Money". `src/enricher/prompt_templates/article_main.md` 갱신 의무 (Phase 2 진척) — 세션 #6
 - **M2. E-E-A-T author 강화 [확정]**: `Person` Schema (운영자) + author 메타 + about 페이지 운영자 정보 명시 (Phase 4 진입 시). publisher Schema(이미 [확정 POLICY §4-1])와 정합 — 세션 #6
+  - **M2-1. 운영자 정체성 = 필명 + 운영 철학 [확정 세션 #7]**: 실명 비공개. E-E-A-T author 일부 충족 + 사생활 보호. 사용자 1인 운영 사적 결정 정합.
+  - **M2-2. 필명 = "혼살다" [확정 세션 #7]**: 혼자+살다 합성. 사이트명 "혼살림"과 일관 + 함축도·친근감. Person Schema name + about 페이지 byline + 글 푸터 표시.
+  - **M2-3. 운영 철학 핵심 메시지 [확정 세션 #7]**: "혼자 살아도 충분히 따뜻한 일상을, 가성비 좋게." 혼살림 컨셉(미니멀+따뜻함) + 1인 가구 타깃 독자 공감. Person Schema description + about 페이지 헤드라인.
+  - **M2-4. 전문성 영역 (knowsAbout) [확정 세션 #7]**: 1인 가구 살림 · 자취 · 홈오피스 · 일상 살림. SCENARIOS 페르소나 매트릭스 정합. Person Schema knowsAbout 배열.
+  - **M2-5. 운영자 사진 미게재 [확정 세션 #7]**: 사용자 직접 사진 일체 없음 [확정 L2] + AI 생성 사진은 실제 사람 X → 거짓 광고. 사진 대신 사이트 브랜드 이미지·일러스트 사용. POLICY §6 review.author Person + L 카테고리 정합.
+  - **M2-6. 이메일 = dugihappyending@gmail.com [확정 세션 #7]**: 사용자 등록 이메일 그대로. Person Schema email (선택) + about 페이지 연락처 + footer.
+  - **M2-7. 사업자 등록 전 임시 운영자 표기 [확정 세션 #7]**: "개인 운영자, 사업자 등록 진행 중" 명시 (POLICY §8-4 정합). PLAN §9 D4 (월 10만원 누적) 후 사업자 등록 → publisher Organization 사업자등록번호 추가.
 - **M3. 시나리오 매트릭스 "확장 콘텐츠 악용" 회피 [확정]**: SCENARIOS §2-1 60 슬롯 매트릭스 — 페르소나×예산×시즌 결합 진짜 다른 가치 의무. 단순 변형 (예: "30만 자취"·"35만 자취" 만 다른 글) 회피. Google 공식 "확장된 콘텐츠 악용 = 모든 검색 변형에 별도 콘텐츠 = 스팸 정책 위반" 정합. SCENARIOS §2-1 차별화 기준 명시 의무 — 세션 #6
 - **M4. AI 이미지 시각 검수 [확정]**: AutoBlog `D:\autoblog\tistory_revival\image_qa.py` 패턴 이식 → `src/validator/image_qa.py` 신설 (Phase 3 시점). 가짜 보임·일관성 자동 점검. Google "고화질 멀티미디어" 권장 정합 — 세션 #6
 - **M5. Google Business Profile 등록 [확정]**: Phase 4 사업자 등록 후 등록 (운영자 신뢰성·로컬 노출). Google 공식 권장 — 세션 #6
