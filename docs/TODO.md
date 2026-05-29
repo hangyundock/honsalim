@@ -7,7 +7,7 @@
 
 - [x] ~~**docs/SUMMARY.md + REVIEW_QUESTIONS.md + SUMMARY_PATCH_v1.1.md 정독**~~ ✅ 세션 #9 완료 — Phase 3 진입 게이트 통과 [확정 사용자]
 - [x] ~~**Phase 3 사전 작업**: Google AI Studio API 키 발급~~ ✅ 세션 #9 완료 — `D:\secrets\honsalim.env` (보안상 secrets/ 바로 아래 단일 파일로 결정, DECISIONS L6 갱신)
-- [ ] dashboard 시안 진입 (Claude Design, 사용자 직접 claude.ai/design)
+- [ ] **공개 사이트 5종 시안** (홈·시나리오 허브·글·페르소나·About) — 사용자 claude.ai/design, DESIGN §11. dashboard(관리자)는 별도 stub HTML (DECISIONS G3 [확정 #9])
 - [ ] (선택) 본 워크트리들(`peaceful-gagarin-b7fda4`·`dazzling-roentgen-b550f7` 등) 폐기 검토 — 세션 #8·#9 main 직접 작업 후 사용 가치 낮음
 
 ## 세션 #8 분리 완료 ★

@@ -82,6 +82,7 @@
 
 - **G1. 하이브리드 워크플로**: Claude Design 시안 → DESIGN.md 명세 추출 → Claude Code로 Jinja2 템플릿 생성 — 세션 #1
 - **G2. Claude Design**: claude.ai/design (Pro/Max 플랜 포함, 2026-04-17 출시, research preview) — 세션 #1
+- **G3. Claude Design 적용 범위 [확정 세션 #9]**: **공개 사이트 5종(홈·시나리오 허브·글·페르소나·About)만**. dashboard(관리자 페이지, BACKEND §2-6)는 Claude Design 미사용 — 단순 stub HTML로 충분 (사용자 1인 운영, 외부 노출 없음). STATE/TODO "dashboard 시안" 표기는 stale — "공개 사이트 5종 시안"이 정확.
 
 ## H. Git 운영 [확정]
 

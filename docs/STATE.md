@@ -60,7 +60,7 @@
 ## 알려진 잔존 미해결
 
 ### ★ 시급 (다음 세션)
-1. dashboard 시안 진입 (Claude Design 시안 3~5종, 사용자 claude.ai/design)
+1. **공개 사이트 5종 시안** (홈·시나리오 허브·글·페르소나·About) — 사용자 claude.ai/design, DESIGN §11 + DECISIONS G3 [확정 #9]. dashboard는 별도 stub HTML
 2. (참고) Phase 5 시점 (2026-11 이후) 알리 App Key/Secret 발급
 3. (선택) BitLocker D 드라이브 활성 결정
 4. (선택) 본 워크트리들 폐기 검토 (`peaceful-gagarin-b7fda4`·`dazzling-roentgen-b550f7`)
