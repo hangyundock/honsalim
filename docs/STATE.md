@@ -7,7 +7,7 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 18개 + common.size_caps·회귀 342 PASS + CLI 10/11 + 결정 K1~K5 + L1~L8 (위키바이형 + AI Imagen) + M1~M7 (Google AI Optimization 정합) + Workers + tracker.report + doctor §14 + IMAGE_GENERATION + GOOGLE_AI_OPTIMIZATION** | #6 (2026-05-28) |
+| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 18개 + 회귀 342 PASS + CLI 10/11 + 결정 K1~K5 + L1~L8 + M1~M7 + M2-1~M2-7 사전 결정 (운영자 정체성 "혼살다"·운영 철학·전문성·사진 없음·사업자 전 표기) + cross-project 잔존 3건 완료 (Hana Kim 5편·M2 사전·Scaled Content Abuse Step 1)** | #7 (2026-05-29) |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
 | Phase 2 핵심 모듈 18개 (#3~#5) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} · deployer/{git_push,wrangler,verify} · tracker/{d1_aggregator,**report**} · **workers/go_gateway.js** | #5 |
@@ -18,7 +18,7 @@
 | DB 초기화 | `data/honsalim.db` v1 + 13 테이블 + personas 3 + scenarios 10 (seed idempotent) | #3 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (PLAN·ARCH·DB·SCENARIOS·DESIGN·FRONTEND·BACKEND·POLICY·OPS·BACKUP·MAINTENANCE·SCHEDULE). 일관성 모순 0건 | #2 |
 | 사전 작성 산출물 (#2) | SQL 2편 + 설정 5건 + prompt_templates 6종 + 인프라 7건 (pyproject·wrangler·workflows·README·CHANGELOG 등). 세부는 EVENTS_202605.md | #2 |
-| 메모리 시스템 | feedback 2건 ([[no-speculation]] · [[same-session-continuity]] — 세션 #4 위반 사례 3회 누적 기록·강화) + MEMORY.md | #4 |
+| 메모리 시스템 | feedback 4건 ([[no-speculation]] · [[same-session-continuity]] · [[no-excessive-approval]] #4 · [[no-end-of-step-prompting]] #6) + project naver + reference market_research + MEMORY.md | #6 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
 | 사이트 게시글 / 트래픽 / 수익 | 0편 (Phase 4 출시 전) / N/A / N/A | #2 |
 

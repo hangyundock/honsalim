@@ -11,8 +11,68 @@
   - 세션 #2 (2026-05-27~28 Phase 0 설계 12/12 + Phase 1 외부 작업: GitHub·Cloudflare·도메인·R2·D1·Git push)
   - 세션 #3 (2026-05-28 Phase 1 마무리·Phase 2 핵심 모듈 9개·회귀 95·14 commits)
   - 세션 #4 (2026-05-28 Phase 2 풀 골격 + 검토 자료 2건 + DECISIONS J 8건·메모리 no-excessive-approval·회귀 95→295·21 commits)
+  - 세션 #5 (2026-05-28 CLI 10/11 deployer/build + 핵심 결정 K1~K4 + 알리 승인 + pip install -e .[dev] + 회귀 333 PASS + 11 commits)
 
 ## 최근 5세션
+
+### 세션 #7 — 2026-05-29 (Opus 4.7, Auto Mode, cross-project 잔존 3건 처리 + M2 사전 결정 + pip-audit 재검증, 2 commits)
+
+**시작 상황**: `/honsalim-start` → 세션 #6 정합성 양호. TODO.md cap 임박 (4,556 B / 5KB 91%) 사용자 지적 → 정리 진행 (~22% 축소). 사용자 "어제 작업 이어서" 지시 → cross-project 잔존 3건 (Hana Kim 5편·M2 Person Schema·Scaled Content Abuse) "3건 모두 순차 진행" 결정.
+
+**핵심 진척 [확정]**:
+
+1. **TODO.md cap 정리**:
+   - 4,556 B (91%) → **3,549 B (71%)** [확정] — ~~취소선~~ 완료 항목 6건 삭제 + Phase 2 소제목 통합 + STATE 카운트 정합
+
+2. **Task #1 — AutoBlog Hana Kim 5편 처리 [확정]**:
+   - 본질 작업 (author/publisher Organization 갱신 + 1인칭 재작성)은 세션 #6 이전 이미 완료된 사실 확인 — post_id 1~5 본문 Hana Kim 0건 · author-bio K-Content Hub · JSON-LD author/publisher Organization 5/5편 완료
+   - 보강 작업: post 5 FAQ 비정상 구조 `<p><h3>Q</h3>A</p>` → `<h3>Q</h3><p>A</p>` 정상화 3건 + FAQPage JSON-LD Schema 3 Q&A 추가
+   - post 1~5 content_text 재동기화 — 알려진 이슈 #16 stale 1인칭 잔존 (1~4건 each) → **0건** [확정]
+   - DB 백업: `D:\autoblog\data\autoblog.db.before_task024_20260529_084403`
+   - AUTOBLOG_TODO.md TASK_024 완료 표기
+
+3. **Task #2 — 혼살림 M2 Person Schema + about 사전 결정 7건 [확정]**:
+   - 운영자 정체성 = 필명 + 운영 철학 (사용자 결정 A안)
+   - **필명 = "혼살다"** (혼자+살다 합성, 사이트명 정합) · 운영 철학 = "혼자 살아도 충분히 따뜻한 일상을, 가성비 좋게."
+   - 전문성 (knowsAbout) = 1인 가구 살림·자취·홈오피스·일상 살림 · 사진 미게재 (사용자 사진 없음 + AI 사진은 거짓) · 이메일 dugihappyending@gmail.com · 사업자 등록 진행 중 표기
+   - DECISIONS M2-1~M2-7 추가 + FRONTEND §4-5 about.html 본문 텍스트 초안 + §4-5-bis Person Schema 매크로(_macros/person.html) 사전 명세 + POLICY §8-4 운영자명·이메일 정합 추가
+
+4. **Task #3 — Scaled Content Abuse 모듈 Step 1 dry-run [확정]**:
+   - 사용자 결정 B안 (dry-run + 단계적, fail 게이트 별도 세션)
+   - `D:\autoblog\src\content\similarity.py` 신설 — 4-gram word Jaccard + HTML/JSON-LD/script 정규화 + `compute_similarity` / `find_duplicates` / `check_duplicate_dry_run` / `check_post_against_published` (DB 통합 헬퍼)
+   - `D:\autoblog\tistory_revival\keyword_cluster.py` 신설 — tistory posts 본문 미저장 대응 (어절+바이그램 키워드 Jaccard)
+   - `D:\autoblog\tistory_revival\seo_gate.py` 수정 — `check_article(published_keywords=None)` 옵션 인자 추가, dry-run hook (metrics 필드만, issues 추가 X, 기존 호출자 영향 0)
+   - `D:\autoblog\test_similarity.py` 신설 — 회귀 **13/13 PASS** [확정] (similarity 7 + keyword_cluster 6)
+
+5. **pip-audit 재검증 [확정]**:
+   - 현재 pip-audit = **0건** ("No known vulnerabilities found") — 세션 #6 결과 유지
+   - STATE.md 시급 #3 "transitive 13건 분석" stale 해소
+   - STATE.md 시급 #1 "세션 #6 push 대기" stale 해소 (이미 push 완료)
+   - 단순 outdated 패키지는 시스템 Python 공유 (TIMA·AutoBlog) — CLAUDE.md §12 환경 변경 금지 정합 → 무차별 -U 안 함
+
+6. **AutoBlog git 저장소 결정 [확정 사용자]**:
+   - D:\autoblog는 git 저장소 아님 확인 — **로컬만 유지** (사용자 결정, git init·remote 만들지 않음)
+   - AutoBlog 변경 사항은 로컬 파일·DB 백업으로만 영구화
+
+**누적 commits 2건 [확정 origin/main 모두 동기]**:
+- `9f1a37a` cross-project 잔존 3건 처리 + M2 사전 결정 7건 (혼살림 docs 4 파일)
+- `78096b2` STATE 시급 정리 - stale 2건 해소
+
+**AutoBlog 측 변경 (로컬만)**: similarity.py 신설 + keyword_cluster.py 신설 + seo_gate.py 수정 + test_similarity.py 신설 + AUTOBLOG_TODO.md TASK_024·TASK_025 갱신 + data/autoblog.db (post 5 FAQ + post 1~5 content_text)
+
+**잔존 미해결 (다음 세션)**:
+- SUMMARY.md / REVIEW_QUESTIONS.md / SUMMARY_PATCH_v1.1.md 사용자 정독 (Phase 3 진입 게이트)
+- Google AI Studio API 키 발급 + `D:\secrets\affiliate_hub\google.env` (Phase 3 진입 전)
+- Scaled Content Abuse Step 2 (fail 게이트 승격) — 1~2주 운영 데이터 후 별도 세션
+- (참고) AutoBlog Blogger 사이드바 gadget "Hana Kim — Seoul, Korea" 수동 편집 (API 관할 밖)
+- (참고) AutoBlog post 6·7·9·13·22 내부 링크 anchor text stale (알려진 이슈 #17, 별도)
+
+**다음 세션 할 일**:
+1. 사용자 정독 시간 (SUMMARY + PATCH, 약 25~30분)
+2. Google AI Studio API 키 발급 + 결제 + google.env (사용자 외부 작업)
+3. dashboard 시안 진입 (Claude Design, 사용자 직접)
+
+---
 
 ### 세션 #6 — 2026-05-28~29 (Opus 4.7, Auto Mode, 정책 대재설계 + Google AI 정합 + cross-project 통합, 17 commits)
 
@@ -69,140 +129,3 @@
 4. dashboard 시안 진입 (Claude Design, 사용자 직접)
 
 ---
-
-### 세션 #5 — 2026-05-28 (Opus 4.7, Auto Mode, CLI 8→10/11 + deployer/tracker 통합 회귀 + doctor §10 보강, 회귀 295→317 [추정], 5 파일 변경)
-
-**시작 상황**: `/honsalim-start` → 세션 #4 정합성 양호 (Phase 2 핵심 모듈 16개·CLI 8/11·회귀 295). 사용자 "자율 판단해서 진행" 지시 → A(통합 회귀)→B(doctor)→C(/honsalim-end) 추천 채택.
-
-**정합성 검증 결과 [확정]**:
-- `git rev-list --count origin/main..main = 0` — STATE.md L38 "6 commit ahead" 및 EVENTS #4 L75 "22 commit ahead 추정" **모두 사실 아님**. origin/main이 c3e206f까지 동기 상태. push 승인 항목은 이미 무효.
-- doctor 정상 (jinja2/markdown WARN은 pip install -e .[dev] 대기 — 알려진 사항)
-- pytest 미설치 — 본 세션 회귀 재실행 불가, 직접 호출만 가능
-
-**진척 [확정]**:
-
-CLI 명령 신규 2건 (BACKEND §9, src/cli.py +145):
-- `cmd_deploy` — deployer.git_push + wrangler_deploy + verify_deploy 3단계. **dry_run=True 기본** (DECISIONS H4). `--no-dry-run`·`--skip-push`·`--skip-wrangler`·`--verify-url`·`--remote`·`--branch`·`--build-dir`·`--project` 옵션.
-- `cmd_build` — builder.manifest stub 호출 (renderer/pages/sitemap 미작성 — Phase 3 디자인 후). `--manifest`·`--full`·`--save-empty` 옵션.
-
-회귀 추가 (직접 호출 PASS [확정], pytest 환경 재검증 대기):
-- tests/test_cli.py +104: TestDeployParser 9 + TestBuildParser 6 = **15 케이스** (tmp_path 2건은 pytest 환경 필요)
-- tests/test_integration_phase2.py +130: 시나리오 9 (deployer 3단계 dry_run chain) 2 + 시나리오 10 (tracker aggregate→export chain) 5 = **7 케이스**
-- 총 22 신규 [관찰] 직접 호출 17 PASS [확정], 5 케이스는 pytest 픽스처(tmp_path) 의존
-
-doctor §10 보강:
-- writer.article_writer.{compute_content_hash, extract_disclosure_first} 진입점 등록
-- 진입점 카운트 표시 (32/32 OK) — 끝줄 1행 추가
-
-문서·정돈:
-- STATE.md: CLI 8/11 → **10/11** · origin 동기 사실 정정 · doctor §10 17→32 · 회귀 295→317 [추정] · 진행 단계 갱신
-- TODO.md: deploy/build 항목 완료 처리 · push 승인 항목 무효 처리 · CLI dashboard 1건만 남음
-
-**동작 검증 [확정]**:
-```
-$ python -m src.cli deploy
-[DRY] deploy 시작 (project='honsalim', build_dir='build')
-[OK] git push git push origin main → rc=0
-[OK] wrangler deploy → rc=0
-
-$ python -m src.cli build
-[OK] manifest 로드 schema_v=1 articles=0 assets=0 templates=0
-
-$ python -m src.cli doctor | grep 진입점
-  → 진입점 32/32 OK
-```
-
-**발견 사항 [관찰]**:
-- STATE.md L14 (회귀 카운트) 갱신 시 일시적으로 Auto Mode classifier 불가 응답 — 잠시 후 재시도로 해결 가능 [관찰]
-- 워크트리(condescending-perlman-ac222a) HEAD가 claude/condescending-perlman-ac222a 브랜치라 `origin/main..HEAD = 0` 결과만으로는 main 동기 여부 판단 불가. `origin/main..main` 비교가 정확 [확정]
-- linter (ruff·black·pytest) 모두 미설치 — pre-commit hook에 위임 (commit 시 자동 실행)
-
-**잔존 미해결**:
-- pytest 환경 재검증 (pip install -e .[dev] 사용자 명시 승인 후) — tmp_path 의존 5 케이스 + 전체 회귀 317 일괄 PASS 확인
-- 핵심 결정 4건 사용자 답변 대기 (자료 2건 완비)
-- AliExpress 심사 결과 (D+1~D+4)
-- CLI dashboard 명령 — Phase 3 디자인 후
-
-**세션 #5 후반 진척 (사용자 "추천대로 진행 + 가능한 부분 다") [확정]**:
-
-핵심 결정 4건 모두 [확정] 응답 (DECISIONS K 카테고리 신설, commit `087035c`):
-- K1. manifest = `data/manifest.json` 단일 JSON 파일 [확정]
-- K2. 시나리오 우선순위 SCENARIOS §4-11 현재 명세 그대로 [확정]
-- K3. 외부 단축 URL 차단 11→13 (`n.kakao.com`+`naver.me`) — `src/validator/links.py` + POLICY §6-1 + 회귀 3 추가
-- K4. 모듈 분리 **옵션 B** (pyproject.toml flat 정합) — 옵션 A 변경 부담 큼(15+ 모듈)에 비해 효익 약함 판단. 코드 변경 0, pyproject만 수정
-
-Phase 2 잔존 모듈 본 세션 완료:
-- **`src/workers/go_gateway.js`** (BACKEND §5 [확정]) — Cloudflare Workers JS. /go/<slug> → D1 slug_map lookup → 302 redirect + 클릭 로그 비차단 INSERT. 보안 — IP 미저장 · UA SHA-256 16자 · referrer hostname만 · bot UA 별도 flag. wrangler deploy는 사용자 명시 승인 후
-- **`src/tracker/report.py`** (BACKEND §2-8 진입점) — `aggregate_weekly` · `aggregate_monthly` · `top_articles_by_clicks` · `weekly`/`monthly` 진입점 · `render_html_stub`. dashboard 디자인 의존 부분은 stub
-- **`scripts/run_tests.py`** — pytest 미설치 환경 일괄 회귀 헬퍼. Test* 클래스 자동 수집, tmp_path 의존은 자동 SKIP
-
-doctor §10 진입점 **37개** (+5 tracker.report) + **§13 신설** Workers JS 파일 점검 (export default 패턴 확인)
-
-회귀 일괄 검증 [확정 `scripts/run_tests.py`]:
-- **total=333 / pass=331 / fail=0 / skip=2** (tmp_path 픽스처 의존만 SKIP)
-- 신규: validator +3 (K3) + tracker +13 (report) + cli +15 (deploy/build) + integration +7 (deployer/tracker chain) = +38
-
-**합계 commit 진척 본 세션**:
-- `c77730d` CLI deploy/build + 통합 회귀 + doctor §10 보강
-- `1b09e8e` STATE 회귀 카운트 정정
-- `087035c` 핵심 결정 4건 [확정] (K1·K2·K3·K4)
-- (다음) Workers + tracker.report + 회귀 헬퍼 + doctor §13 등 본 보강 commit
-
-**잔존 (남은 Phase 2 코드 작업)**:
-- builder.renderer/pages/sitemap/assets — Phase 3 디자인 시안 의존
-- dashboard.render/approve — Phase 3 디자인 의존
-- collector.coupang — Phase 4 (쿠팡 재가입 후)
-
-**세션 #5 종료 직전 사용자 추가 보고 [확정]**:
-- AliExpress Affiliate Program **승인 완료** — 2026-05-28 (당일 가입, D+0 승인. 신청 → 심사 통과 매우 빠름 [관찰]). 이메일 "Your affiliate account is ready" + portals.aliexpress.com 활성.
-- **본 세션 내 ali.env 작성·검증 완료** [확정]:
-  - portals.aliexpress.com → 트래킹ID 페이지에서 `honsalim` 신규 발급 → Set as default 클릭으로 기본값 변경
-  - 사용자 직접 메모장으로 `D:\secrets\affiliate_hub\ali.env` 작성 (`ALI_TRACKING_ID=honsalim`)
-  - doctor 검증: `[OK] secrets/ali.env (loaded)` + 환경 변수 길이/값 매칭 확인 (값 노출 없음, POLICY §14-bis-1 정합)
-  - App Key/Secret은 Phase 5 시점 발급 (현재 본 프로젝트 Phase 1·2·3은 알리 미사용)
-
-- **push origin main 2회 명시 승인·푸시 완료** [확정 세션 #5]:
-  - 1차: `c3e206f..6f14c42` (7 commits) — 사용자 "푸시해" 명시 승인
-  - 2차: `6f14c42..9911b41` (2 commits, 734fcf6 docs + 9911b41 CI fix) — 사용자 두 번째 "푸시해" 명시 승인
-  - 본 세션 총 9 commits 모두 외부 백업
-
-- **CI 인프라 부분 정상화** [확정]:
-  - 이전 모든 push의 build-and-deploy + lint 워크플로 ❌ 실패 → 사용자 GitHub Actions 페이지 캡쳐 보고로 발견
-  - GitHub API + 로컬 black/ruff/mypy 진단으로 원인 파악:
-    - build: `build/index.html` 없음 (renderer 미작성, Phase 3 의존)
-    - lint: pre-commit black 24.1.0 vs system pip black 26.5.1 버전 차이 + 옛 파일 3건 + ruff 13건 + mypy 11건 누적
-  - 해결: build.yml renderer step check + if 조건 / 8개 py.typed marker / pyproject mypy_path / anthropic.OverloadedError getattr fallback / pre-commit 버전 일괄 upgrade
-  - **결과**: build-and-deploy ✅ (37s, renderer skip 동작) + CodeQL ✅ + Graph ✅. **lint ❌ Black format check만 잔존** (commit 86f9bb4, 1m40s)
-  - 진단용 `.gitattributes` LF normalize + lint.yml `black --version + --diff` 추가 — 다음 push 시 raw log에 reformat 필요 파일·라인 정확 노출 (현재 무인증 raw log 접근 불가, 사용자 GitHub UI 직접 확인 필요)
-  - 코드 동작·외부 영향 모두 ✅ — lint는 정합성 한 단계만 잔존
-
-**세션 #5 누적 11 commits [확정]**: `c77730d` · `1b09e8e` · `087035c` · `32a6ae2` · `f332d21` · `44b7954` · `6f14c42` · `734fcf6` · `9911b41` · `bb8435c` · `86f9bb4`. 모두 origin/main push 완료.
-
-**세션 #5 잔존 미해결 [확정]**:
-- **lint #15 Black format check fail** (commit 86f9bb4) — 다음 세션 사용자가 raw log 캡쳐 → 1~2 commit으로 fix 가능. 코드 동작·CI 핵심·회귀 모두 정상이라 우선순위 낮음.
-- SUMMARY.md / REVIEW_QUESTIONS.md 사용자 직접 정독 (Phase 2 본격 진입 게이트 — 시급 아님, 2026-07 Phase 3 진입 전까지 통과면 충분)
-- App Key/Secret (알리) — Phase 5 시점 (2026-11 이후)
-- BitLocker D 드라이브 활성 (사용자 결정 보류)
-
-**다음 세션 즉시 시작 가이드** (5단계):
-1. https://github.com/hangyundock/honsalim/actions
-2. 최상단 lint #15 (commit 86f9bb4) 클릭
-3. `lint` job → `Black format check` step 클릭
-4. `would reformat ...` 또는 `--- src/...py` 부분 캡쳐
-5. 채팅 첨부 → Claude가 즉시 fix → push → 통과
-
-- **`pip install -e .[dev]` 명시 승인·설치·검증 완료** [확정]:
-  - 사용자 "pip install 진행해" 명시 승인 (세션 #5)
-  - Python 3.10.11 32-bit 시스템 Python에 editable 설치 — honsalim-0.1.0 wheel build 성공
-  - 설치 패키지 (주요): pytest 9.0.3 · black 26.5.1 · ruff 0.15.14 · mypy 2.1.0 · jinja2 3.1.6 · markdown 3.10.2 · pip-audit 2.10.0 · responses 0.26.1
-  - **K4 검증**: `honsalim.exe` Scripts 경로 등록 + `honsalim doctor` 정상 작동 → pyproject.toml flat 정합 옵션 B 작동 [확정]
-  - **doctor 모든 필수 체크 통과** — Phase 2 진입 가능. 의존성 7/7 OK (이전 5/7 WARN 해소)
-  - **pytest 일괄 회귀**: 333 / 333 PASS / 0 FAIL / 0 SKIP (2.21초). 이전 직접 호출에서 SKIP되던 tmp_path 케이스 2건도 정상 PASS
-  - **`src/enricher/prompt_loader.py` 보강**: jinja2 활성 환경에서 missing dict key 체이닝 시 `UndefinedError` 발생 → `ChainableUndefined` 적용으로 `render_simple` 동작과 일치 (회귀 환경 호환)
-
-**다음 세션 할 일**:
-1. SUMMARY.md / REVIEW_QUESTIONS.md 정독 — Phase 2 본격 진입 게이트 (사용자 직접)
-2. **알리 API 키 발급 + ali.env 작성** (2026-05-28 승인 완료)
-3. `pip install -e .[dev]` 명시 승인 → pytest로 회귀 333 일괄 재검증 + entry point `honsalim` 명령 작동 확인 (K4 검증)
-4. push origin main 승인 (본 세션 commit 4건 누적 예정)
-5. dashboard 시안 진입 (Phase 3 — Claude Design, 사용자 직접)
