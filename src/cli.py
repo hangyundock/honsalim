@@ -240,6 +240,10 @@ def _check_phase2_modules() -> bool:
         ("tracker", "top_articles_by_clicks"),
         ("tracker", "weekly"),
         ("tracker", "monthly"),
+        ("dashboard.render", "render_dashboard"),
+        ("dashboard.render", "render_html"),
+        ("dashboard.render", "fetch_drafts_by_status"),
+        ("dashboard.approve", "approve"),
     ]
     all_ok = True
     found = 0
@@ -701,6 +705,30 @@ def cmd_deploy(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dashboard(args: argparse.Namespace) -> int:
+    """drafts 단일 HTML 미리보기 생성 (BACKEND §2-6 + DECISIONS G3 [확정 #9]).
+
+    --open 옵션 시 브라우저 자동 열기 (webbrowser.open).
+    """
+    from dashboard import render as dash_render
+
+    output_path = Path(args.output) if args.output else dash_render.DEFAULT_OUTPUT
+    if not output_path.is_absolute():
+        output_path = PROJECT_ROOT / output_path
+
+    out = dash_render.render_dashboard(output_path=output_path)
+    print(f"{OK} dashboard 생성 → {out}")
+
+    if args.open:
+        import webbrowser
+
+        webbrowser.open(out.as_uri())
+        print(f"{OK} 브라우저 열기")
+    else:
+        print(f"     수동 열기: file:///{out.as_posix()}")
+    return 0
+
+
 def cmd_build(args: argparse.Namespace) -> int:
     """builder.manifest 인터페이스 호출 — Phase 2 stub.
 
@@ -833,6 +861,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="manifest 없으면 빈 manifest 파일 생성·저장",
     )
     p_build.set_defaults(func=cmd_build)
+
+    # BACKEND §2-6 + DECISIONS G3 [확정 #9] — dashboard: drafts 단일 HTML 미리보기
+    p_dashboard = sub.add_parser(
+        "dashboard",
+        help="drafts 단일 HTML 미리보기 생성 (data/dashboard/index.html)",
+    )
+    p_dashboard.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="출력 HTML 경로 (기본 data/dashboard/index.html)",
+    )
+    p_dashboard.add_argument(
+        "--open",
+        action="store_true",
+        help="생성 후 브라우저 자동 열기",
+    )
+    p_dashboard.set_defaults(func=cmd_dashboard)
 
     return parser
 
