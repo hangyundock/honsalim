@@ -37,11 +37,12 @@
 - EVENTS.md > 20KB → 단일 세션 비대 점검
 - TODO.md > 5KB → 옛 작업 정리
 
-## 7. ★ (git 도입 후) 자동 commit
+## 7. ★ 자동 commit + push (DECISIONS N1 [확정 #9])
 - `git add -A` (`.gitignore` 제외 파일만)
 - `git commit -m "[YYYY-MM-DD #N] <한 줄 요약>"`
-- **자동 push 금지** — 사용자 명시 승인 후만
-- git 도입 전에는 본 단계 생략
+- **자동 `git push origin main`** — `/honsalim-end` 호출 자체가 사용자 명시 승인
+- push 실패 시 (CI fail · branch protection 충돌 등) 사용자 보고 + 다음 세션 재시도
+- **force push·rebase·reset 등 destructive op는 절대 자동 금지** (`.claude/settings.json` deny rule)
 
 ## 8. 사용자 보고
 - 갱신된 파일 목록
@@ -53,4 +54,5 @@
 - 보고만 절대 X. 실제 파일 변경.
 - 변경 후 read 검증.
 - 비개발자 친화 — diff 요약만 채팅 출력.
-- 외부 push 등 위험 작업 매번 명시 승인.
+- 외부 배포(Cloudflare Pages 등) 매번 명시 승인. 본 명령의 `git push origin main`은 호출 자체가 승인 (DECISIONS N1).
+- force push·rebase·reset 등 destructive op는 절대 자동 금지.

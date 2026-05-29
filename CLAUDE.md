@@ -27,7 +27,8 @@
 1. 요약 보고 → 2. 사용자 확인 → 3. dryRun(가능 시) → 4. 적용 → 5. read 검증
 
 ### (라) 안전 규칙
-- 외부 게시(Cloudflare Pages 배포·git push 등) 매번 명시 승인
+-  외부 게시(Cloudflare Pages 배포 등) 매번 명시 승인
+- **git push**: `/honsalim-end` 호출 시 자동 (호출 자체가 사용자 명시 승인). 그 외 시점은 명시 승인 후만. force push·rebase·reset 등 destructive op는 절대 자동 금지 (DECISIONS N1 [확정 #9])
 - 어필리에이트 게시: 자동 검증 게이트 통과 후 사용자 1클릭 승인 패턴
 - 본인·가족 구매 금지 (쿠팡·알리 양사)
 - 자동 실행·납치 광고 금지 (쿠팡 30일 수익 몰수 [확정 ZDNet 2025-10-03])
@@ -128,7 +129,8 @@
 - `.gitignore` 엄격 — secrets/data/build/.env/*.pickle 제외
 - 커밋 패턴: `[YYYY-MM-DD #N] <한 줄>`
 - `/honsalim-end` 자동 commit 1회
-- **자동 push 금지** — 사용자 승인 후만
+- - **자동 push**: `/honsalim-end` 호출 시만 (commit + push 일괄). 그 외 시점은 명시 승인 후만
+- **force push·rebase·reset 등 destructive op는 절대 자동 금지** (DECISIONS N1 [확정 #9])
 
 ## 12. 실행 환경
 

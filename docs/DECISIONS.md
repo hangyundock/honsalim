@@ -158,6 +158,15 @@
 - **M6. UCP 프로토콜 (AI Agent) [확정 검토 보류]**: Universal Commerce Protocol (ucp.dev) Phase 6+ 검토. Google AI Agent (Search 내 챗) 대응 — 세션 #6
 - **M7. llms.txt·콘텐츠 청킹·AI 재작성·특수 Schema 안 함 [확정]**: Google 공식 명시 부정 — 본 프로젝트 추가 작업 의무 없음. 본 결정 영구화로 다음 세션 재검토 회피 — 세션 #6
 
+## N. 자동화 정책 [확정] — 세션 #9 신규
+
+- **N1. `/honsalim-end` 자동 push [확정 세션 #9, 사용자 결정]**:
+  마감 명령 호출 자체가 사용자 명시 승인. `git push origin main` 자동 실행 (commit + push 일괄).
+  사유: 매 세션 종료마다 push 확인 부담 제거. branch protection `main-protect` + pre-commit hook 9종 + secrets D:\secrets 격리로 안전망 확보. 본 세션 #5·#6·#7·#8 모두 사용자가 push 승인했음 — 실질적 명시 승인 패턴 영구화.
+  **자동 금지 유지**: force push(`--force`·`-f`·`--mirror`·`--delete`·refspec `:`) · rebase · reset --hard · branch -D · checkout -- · restore -- · clean · worktree remove --force · tag -d · update-ref -d (모두 `.claude/settings.json` deny rule + CLAUDE.md §2-라 보호).
+  **그 외 시점 push**: 명시 승인 후만 (변동 없음).
+  적용 파일: `CLAUDE.md` §2(라)·§11 / `.claude/commands/honsalim-end.md` §7+규칙 / `.claude/settings.json` deny+allow.
+
 ## 폐기된 결정 (역사 참조용)
 
 | 폐기일 | 결정 | 폐기 사유 |
