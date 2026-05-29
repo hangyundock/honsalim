@@ -8,6 +8,11 @@
 - [ ] **docs/SUMMARY.md + REVIEW_QUESTIONS.md + SUMMARY_PATCH_v1.1.md 정독** (사용자 직접, 약 25~30분) — Phase 3 진입 게이트, 2026-07 이전까지
 - [ ] **Phase 3 사전 작업**: Google AI Studio API 키 발급 + 결제 활성화 + `D:\secrets\affiliate_hub\google.env` (`GOOGLE_API_KEY=<key>`)
 - [ ] dashboard 시안 진입 (Claude Design, 사용자 직접 claude.ai/design)
+- [ ] (선택) 본 워크트리 `dazzling-roentgen-b550f7` 폐기 검토 — 세션 #8 분리 작업 commit 후 사용 가치 낮음
+
+## 세션 #8 분리 완료 ★
+
+- [x] ~~**네이버 보조 채널 분리 작업**~~ ✅ 세션 #8 완료 (6 Phase). `D:\naver_blog\` 별도 프로젝트 셋업·push·dazzling-hermann 폐기·마스터 동기화. 네이버 작업은 본 TODO에서 모두 제거 (이후 D:\naver_blog\docs\TODO.md 참조)
 
 ## 세션 #6 잔존 (시점 의존)
 

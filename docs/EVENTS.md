@@ -15,6 +15,55 @@
 
 ## 최근 5세션
 
+### 세션 #8 — 2026-05-29 (Opus 4.7, Auto Mode, 네이버 분리 작업 6 Phase + D:\naver_blog\ 신규 프로젝트 셋업·push·dazzling-hermann 폐기, 1 commit)
+
+**시작 상황**: `/honsalim-start @docs/NAVER_SEPARATION_PLAN.md 따라 네이버 분리 작업 진행해줘` 명시 지시. SEPARATION_PLAN은 옛 dazzling-hermann-7d1424 워크트리 5 commits에만 존재 (main에 push 없음). 본 워크트리(roentgen)는 bfb0cbb 시점 분기 → 작업 중 main이 별도 흐름으로 #7 종료된 상태 발견.
+
+**Phase 1 사전 확인 — 중대 발견 [확정]**:
+- 혼살림 main(600caff)에 **네이버 흔적 0건** [확정 Glob·Grep]: `docs/NAVER_PLAN.md` 없음 · `DECISIONS §J` = "Phase 2 아키텍처"(네이버 무관) · `CLAUDE.md` 네이버 행 0건 · GitHub `hangyundock/honsalim` public 유지
+- 네이버 D안 작업은 `dazzling-hermann-7d1424` 워크트리 5 commits(`c94f617`·`b2748b9`·`96e89f9`·`311371c`·`69d6956`)에 격리 (push 없음)
+- → SEPARATION_PLAN 원안(6 Phase) Phase 4(혼살림 정리)는 거의 불필요 → 수정안(4 Phase + 축소된 Phase 4)으로 진행
+
+**Phase 2 — D:\naver_blog\ 신규 폴더 셋업 [확정]**:
+- 폴더: `D:\naver_blog\{.claude\commands, docs\archive}`
+- 5파일: `CLAUDE.md`(8.5KB·네이버 §2(라) 자동 발행 금지 등) · `docs/STATE.md`(4.8KB) · `docs/EVENTS.md`(4.4KB·세션 #0 분리 작업) · `docs/TODO.md`(3.7KB·Phase 0~5 단계별) · `docs/DECISIONS.md`(10.8KB·옛 §J 18건 → §A~F 재분류·J14 폐기)
+- 설정: `.claude/settings.json`(deny 22·allow 9·네이버 자동 게시 함수 deny) · `.gitignore`(secrets·data·storage_state·user_photos 제외) · `README.md`
+
+**Phase 3 — 산출물 이전 [확정]**:
+- `dazzling-hermann:docs/NAVER_PLAN.md`(477줄) → `D:\naver_blog\docs\PROJECT_PLAN.md`(35.9KB) — 통합 가정 수정: `src/naver/` → `src/`·"혼살림 저장소 private 전환" → "본 프로젝트 별도 private repo"·`§J` 참조 → `§A~F`
+- 메모리 `project_naver_channel.md` → `C:\Users\dugi2\.claude\projects\D--naver_blog\memory\`로 이전 + `MEMORY.md` 신규 인덱스 작성
+
+**Phase 4 — 혼살림 정리 (축소) [확정]**:
+- main 코드/문서 변경 0건 (이미 깔끔 — Phase 1 검증 결과)
+- 혼살림 영역 메모리 `MEMORY.md` 행 redirect 갱신 + 옛 `project_naver_channel.md`를 짧은 redirect stub으로 덮어쓰기
+- 잔존 grep 검증: `naver` 흔적은 모두 Cloudflare 이메일·서치어드바이저 등록·IndexNow·외부 단축 URL 차단 등 본 분리와 무관한 정상 흔적 [확정]
+
+**Phase 5 — GitHub 처리 [확정]**:
+- 사용자 직접: GitHub `hangyundock/naver_blog` private repo 생성 (Add README/.gitignore/license 모두 off)
+- Claude: `git init -b main` + `user.name/email` config + initial commit `6cfd67b`(9 files·1082 lines) + `git remote add origin` + `git push -u origin main` 명시 승인 → 성공 `* [new branch] main -> main`
+- dazzling-hermann-7d1424 워크트리·브랜치 폐기 명시 승인 → `git worktree remove --force` + `git branch -D claude/dazzling-hermann-7d1424` (was 69d6956)
+
+**Phase 6 — 마스터·메모리 동기화 [확정]**:
+- `D:\templates\CLAUDE_PROJECT_SETUP.md §14` 실전 운영 listing: 혼살림 항목 갱신 + `D:\naver_blog\` 신규 항목 추가 (별도 polder·별도 private repo 명시)
+- `D:\templates\PROJECT_MARKET_RESEARCH_FRAMEWORK.md §8.1` 사례 갱신: D안→C안 분리 작전 변경 반영 + 교훈 #1 갱신 ("통합 vs 분리 — STATE/TODO/EVENTS 혼동 회피 우선") + 분리 작업 기록 추가
+- `D:\templates\naver\` 3 마스터 그대로 (양 프로젝트 공통 참조)
+
+**작전 변경 의의**:
+- 원안(D안 통합 + 혼살림 public→private) → 변경안(C안 별도 폴더 D:\naver_blog\) — 사유: 통합으로 STATE/TODO/EVENTS에 혼살림·네이버 섞여 혼동 + private 전환 시 CodeQL·Secret Scanning Alerts 유료화 부작용
+- 결과: 혼살림 main public 유지·코드/docs 깔끔·CI 무료 활성 그대로 + 네이버는 별도 격리
+
+**잔존 미해결 (다음 세션)**:
+- 본 세션 commit 1건 push 사용자 명시 승인 (EVENTS #8·STATE 갱신)
+- 본 워크트리(dazzling-roentgen-b550f7) 폐기 검토 — 분리 작업 후 사용 가치 낮음 (선택, 다음 세션은 main 또는 새 워크트리에서 시작 가능)
+
+**다음 세션 할 일**:
+1. SUMMARY/REVIEW_QUESTIONS/SUMMARY_PATCH 정독 (Phase 3 진입 게이트, 시급 아님 — 2026-07 이전까지)
+2. Google AI Studio API 키 발급 + 결제 + google.env
+3. dashboard 시안 (claude.ai/design)
+4. (네이버 작업은 본 프로젝트 D:\naver_blog\로 분리됨 — 본 워크트리 작업 없음)
+
+---
+
 ### 세션 #7 — 2026-05-29 (Opus 4.7, Auto Mode, cross-project 잔존 3건 처리 + M2 사전 결정 + pip-audit 재검증, 2 commits)
 
 **시작 상황**: `/honsalim-start` → 세션 #6 정합성 양호. TODO.md cap 임박 (4,556 B / 5KB 91%) 사용자 지적 → 정리 진행 (~22% 축소). 사용자 "어제 작업 이어서" 지시 → cross-project 잔존 3건 (Hana Kim 5편·M2 Person Schema·Scaled Content Abuse) "3건 모두 순차 진행" 결정.
