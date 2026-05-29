@@ -46,8 +46,9 @@ Response:
 
 ## 3. 환경변수·secrets
 
-- `D:\secrets\affiliate_hub\google.env` 신설 [예정 Phase 3]
+- **`D:\secrets\honsalim.env`** [✅ 세션 #9 사용자 작성·결제 활성화]
   - `GOOGLE_API_KEY=<key>` — Google AI Studio 발급 (https://aistudio.google.com)
+  - 보안상 secrets/ 바로 아래 단일 파일로 격리 (기존 `D:\secrets\affiliate_hub\*.env`와 분리, DECISIONS L6 #9 갱신)
   - 결제 활성화 필수 (무료티어 불가 [확정])
 - `.gitignore`에 이미 `D:\secrets\` 외부 격리됨
 

@@ -132,7 +132,7 @@
 - **L3. validator/truth 1인칭 완전 차단 [확정 세션 #6 2차 재변경]**: 본문에서 1인칭 표현 (POLICY §3-1-3 패턴) 감지 시 **무조건 fail**. AI 생성 이미지는 본인 실사용 증거 아님 — 1인칭 "내가 써봤다" 사용 시 거짓 광고·공정위 위반. owned_products 메타 우회 폐기 — 1인칭 완전 차단 강제 — 세션 #6
 - **L4. 벤치마크 차용 범위 명문화 [확정]**: Wirecutter는 **추천 표·진실성 표기 형식만** (실제 직접 사용 모델 차용 X — 1인 운영 불가능). 오늘의집은 **시각 톤·시나리오 카드 레이아웃 영감만** (UGC 사진 풍부함 차용 X — 회원 시스템 필요). 위키바이가 **실질 베이스** (정보 집계·한국어 SEO·표). DESIGN §12 매핑 정합 갱신 의무 — 세션 #6
 - **L5. E8 폐기·D5 폐기 [확정 세션 #6 2차 재변경]**: E8 (한국어 1인칭 허용) **전면 폐기** — 1인칭 완전 차단 (L3). D5 (직접 사진 1~3장 의무) **전면 폐기** — 사용자 직접 촬영 일체 없음 (L2). 사진은 AI 생성 + 쿠팡 위젯만 — 세션 #6
-- **L6. Google Imagen 4 Fast 채택 [확정 세션 #6]**: AI 이미지 생성 도구는 **Google `imagen-4.0-fast-generate-001`** (Gemini API REST). AutoBlog (`D:\autoblog\tistory_revival\ai_image_gen.py`) 패턴 이식. 환경변수 `GOOGLE_API_KEY` (D:\secrets\affiliate_hub\google.env Phase 3 신설). 가격 $0.02/장. 무료티어 불가 — 결제 활성화 필수. 본 프로젝트 적용 명세 `docs/IMAGE_GENERATION.md` [확정] — 세션 #6
+- **L6. Google Imagen 4 Fast 채택 [확정 세션 #6, 경로 갱신 #9]**: AI 이미지 생성 도구는 **Google `imagen-4.0-fast-generate-001`** (Gemini API REST). AutoBlog (`D:\autoblog\tistory_revival\ai_image_gen.py`) 패턴 이식. 환경변수 `GOOGLE_API_KEY` (**`D:\secrets\honsalim.env`** 세션 #9 사용자 보안 결정 — secrets/ 바로 아래 단일 파일로 격리. 기존 `D:\secrets\affiliate_hub\*.env`와 분리). 가격 $0.02/장. 무료티어 불가 — 결제 활성화 필수. 본 프로젝트 적용 명세 `docs/IMAGE_GENERATION.md` [확정] — 세션 #6·#9
 - **L7. AI 이미지 명시 표기 [확정 세션 #6]**: 글 footer에 "이미지는 AI 생성 일러스트레이션" 한 줄 명시 의무. 한국 표시광고법상 명시 의무는 없으나 [확인 불가, 2026-05], 신뢰도·Google Helpful Content 안전 + 1인칭 차단 정합. 인물 이미지는 자제 (인테리어 분위기만) — 세션 #6
 - **L8. 상품 이미지 = 쿠팡 공식 위젯 [확정 세션 #6]**: 추천 상품 이미지는 **쿠팡 공식 위젯 embed**만 사용. Imagen으로 상품 이미지 생성 금지 (실제 제품 정확성·법규 — 가짜 제품 이미지 = 소비자 기만). 쿠팡 CDN 직접 다운로드 금지 유지 — 세션 #6
 

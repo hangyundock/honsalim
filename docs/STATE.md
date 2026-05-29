@@ -34,7 +34,7 @@
 | R2 / D1 | `honsalim-images` (APAC) / `honsalim-clicks` ID `9bae858e-456f-40e7-8084-c3b90e4ec3ca` |
 | Python | 3.10 32-bit (TIMA·AutoBlog 시스템 공유) |
 | DB / 로그 | `data/honsalim.db` (v1) / `logs/honsalim.log` (Phase 2) |
-| secrets | **`D:\secrets\affiliate_hub\`** (cloudflare.env·indexnow.env·복구 코드 2종) |
+| secrets | **`D:\secrets\affiliate_hub\`** (cloudflare.env·indexnow.env·ali.env·복구 코드 2종) + **`D:\secrets\honsalim.env`** (GOOGLE_API_KEY, 세션 #9 사용자 보안 결정 — secrets/ 바로 아래 단일 파일) |
 
 ## 자격증명 만료 (시급 사안)
 
@@ -60,10 +60,14 @@
 ## 알려진 잔존 미해결
 
 ### ★ 시급 (다음 세션)
-1. **SUMMARY.md / REVIEW_QUESTIONS.md + SUMMARY_PATCH_v1.1.md 사용자 정독** — 진척 매트릭스 보조로 단축 (~30분), Phase 3 진입 게이트
-2. **Google AI Studio API 키 발급 + 결제 + `D:\secrets\affiliate_hub\google.env`** — Phase 3 진입 전 사용자 외부 작업 (M4 AI 이미지 검수 의존)
-3. (참고) Phase 5 시점 (2026-11 이후) 알리 App Key/Secret 발급
-4. (선택) BitLocker D 드라이브 활성 결정
+1. dashboard 시안 진입 (Claude Design 시안 3~5종, 사용자 claude.ai/design)
+2. (참고) Phase 5 시점 (2026-11 이후) 알리 App Key/Secret 발급
+3. (선택) BitLocker D 드라이브 활성 결정
+4. (선택) 본 워크트리들 폐기 검토 (`peaceful-gagarin-b7fda4`·`dazzling-roentgen-b550f7`)
+
+### 해소 (세션 #9)
+- ~~SUMMARY.md / REVIEW_QUESTIONS.md + SUMMARY_PATCH_v1.1.md 정독~~ → ✅ 세션 #9 사용자 완료 [확정]. **Phase 3 진입 게이트 통과**.
+- ~~Google AI Studio API 키 발급~~ → ✅ 세션 #9 사용자 완료 [확정]. **`D:\secrets\honsalim.env`** (보안상 secrets/ 바로 아래 단일 파일로 결정, DECISIONS L6 갱신).
 
 ### 해소 (세션 #7)
 - ~~세션 #6 6 commits push origin main 승인~~ → 세션 #6 종료 시점 이미 push 완료 (EVENTS #6 "누적 17건 [확정 origin/main 모두 동기]"). 본 STATE 시급 #1 stale 정정.

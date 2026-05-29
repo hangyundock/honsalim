@@ -634,8 +634,8 @@ POLICY.md에서 확정 예정 사항:
 - [ ] Claude Pro/Max 활성 확인
 - [ ] claude.ai/design 접속 확인
 - [ ] DESIGN.md §3~§6 텍스트 복사 준비
-- [ ] **Google AI Studio API 키 발급** (https://aistudio.google.com) + 결제 활성화 (Imagen 무료티어 불가 [확정])
-- [ ] `D:\secrets\affiliate_hub\google.env` 신설 (`GOOGLE_API_KEY=<key>`)
+- [x] ~~**Google AI Studio API 키 발급**~~ ✅ 세션 #9 완료 (결제 활성화 포함)
+- [x] ~~`D:\secrets\affiliate_hub\google.env` 신설~~ → **`D:\secrets\honsalim.env`** ✅ 세션 #9 완료 (보안상 secrets/ 바로 아래 단일 파일, DECISIONS L6 #9 갱신)
 - [ ] 시안 3~5종 생성·비교 → 1개 선정
 - [ ] 선정 결과 `docs/design_drafts/CHOICE.md`에 메모
 
