@@ -7,14 +7,14 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 18개 + 회귀 342 PASS + CLI 10/11 + 결정 K1~K5 + L1~L8 + M1~M7 + M2-1~M2-7 사전 결정 + cross-project 잔존 3건 완료 (Hana Kim 5편·M2 사전·Scaled Content Abuse Step 1) + 네이버 보조 채널 별도 프로젝트로 분리 (D:\naver_blog\, 세션 #8)** | #8 (2026-05-29) |
+| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 19개 + 회귀 352 PASS + CLI 11/11 완성 (dashboard 추가) + 결정 K1~K5 + L1~L8 + M1~M7 + M2-1~M2-7 + G3·N1 (자동 push 정책) + SUMMARY 정독 완료·Google API 키 발급 완료 (D:\secrets\honsalim.env)** | #9 (2026-05-29) |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
 | Phase 2 핵심 모듈 18개 (#3~#5) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} · deployer/{git_push,wrangler,verify} · tracker/{d1_aggregator,**report**} · **workers/go_gateway.js** | #5 |
-| Phase 2 회귀 테스트 | **342 / 342 PASS** [확정 pytest 9.0.3, 2.63초] — 세션 #6 +9 (check_size_caps 9 + L 정책 validator 0 net: +1 신규 −1 폐기). 분배: validator 42 (L3 2차 1인칭 무조건 차단·owned_products 우회 케이스 폐기) + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + manifest 22 + db 12 + cli 46 + article_writer 25 + integration_phase2 18 + deployer 14 + tracker 25 + check_size_caps 9 | #6 |
-| CLI 명령 (BACKEND §9) | **10/11** — doctor · db migrate/seed · collect · enrich(dry_run) · validate · approve · unapprove · deploy(dry_run, H4) · build(manifest stub). 남은 1개 (dashboard)는 Phase 3 디자인 의존 | #5 |
+| Phase 2 회귀 테스트 | **352 / 352 PASS** [확정 pytest 9.0.3, 3.18초] — 세션 #9 +10 (dashboard render 7 + approve 3). 분배: validator 42 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + manifest 22 + db 12 + cli 46 + article_writer 25 + integration_phase2 18 + deployer 14 + tracker 25 + check_size_caps 9 + **dashboard 10** | #9 |
+| CLI 명령 (BACKEND §9) | **11/11 완성** — doctor · db migrate/seed · collect · enrich · validate · approve · unapprove · deploy · build · **dashboard** (drafts 단일 HTML, --open 옵션). DECISIONS G3 [확정 #9] (Claude Design 미사용·stub HTML) | #9 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + 4 게이트 통합(validate_and_save) + META-JSON + Article JSON-LD + 1인칭/사진 게이트. 영구화 세션 #4 시점 5개 사항(tracker.d1_aggregator·deployer·builder.manifest·enricher.retry·state_machine 매트릭스 보강) → DECISIONS J + EVENTS #4·#5 누적 | #4~#5 |
-| doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 37개 · §11 state_machine 매트릭스 · §12 tests 로드 · §13 Workers JS (go_gateway.js) · **§14 docs/ size cap (CLAUDE.md §3 자동 점검)** — Phase 2 진입 게이트 자동 점검 | #6 |
+| doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 **41개** (+4 dashboard) · §11 state_machine 매트릭스 · §12 tests 로드 · §13 Workers JS (go_gateway.js) · §14 docs/ size cap | #9 |
 | DB 초기화 | `data/honsalim.db` v1 + 13 테이블 + personas 3 + scenarios 10 (seed idempotent) | #3 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (PLAN·ARCH·DB·SCENARIOS·DESIGN·FRONTEND·BACKEND·POLICY·OPS·BACKUP·MAINTENANCE·SCHEDULE). 일관성 모순 0건 | #2 |
 | 사전 작성 산출물 (#2) | SQL 2편 + 설정 5건 + prompt_templates 6종 + 인프라 7건 (pyproject·wrangler·workflows·README·CHANGELOG 등). 세부는 EVENTS_202605.md | #2 |
@@ -60,14 +60,18 @@
 ## 알려진 잔존 미해결
 
 ### ★ 시급 (다음 세션)
-1. **공개 사이트 5종 시안** (홈·시나리오 허브·글·페르소나·About) — 사용자 claude.ai/design, DESIGN §11 + DECISIONS G3 [확정 #9]. dashboard는 별도 stub HTML
+1. **공개 사이트 5종 시안** (홈·시나리오 허브·글·페르소나·About) — 사용자 claude.ai/design, DESIGN §11 + DECISIONS G3 [확정 #9]
 2. (참고) Phase 5 시점 (2026-11 이후) 알리 App Key/Secret 발급
 3. (선택) BitLocker D 드라이브 활성 결정
 4. (선택) 본 워크트리들 폐기 검토 (`peaceful-gagarin-b7fda4`·`dazzling-roentgen-b550f7`)
+5. (Phase 4 진입 시) about.html · Person Schema 적용 (M2-1~M2-7 사전 결정)
+6. Scaled Content Abuse Step 2 (fail 게이트 승격) — 1~2주 운영 데이터 후 별도 세션
 
 ### 해소 (세션 #9)
-- ~~SUMMARY.md / REVIEW_QUESTIONS.md + SUMMARY_PATCH_v1.1.md 정독~~ → ✅ 세션 #9 사용자 완료 [확정]. **Phase 3 진입 게이트 통과**.
-- ~~Google AI Studio API 키 발급~~ → ✅ 세션 #9 사용자 완료 [확정]. **`D:\secrets\honsalim.env`** (보안상 secrets/ 바로 아래 단일 파일로 결정, DECISIONS L6 갱신).
+- ~~SUMMARY 정독~~ ✅ + ~~Google API 키 발급~~ ✅ (`D:\secrets\honsalim.env`)
+- ~~dashboard 시안 진입~~ → DECISIONS G3 [확정 #9] (Claude Design 미사용·stub HTML)
+- ~~dashboard 모듈 구현~~ ✅ CLI 11/11 완성·회귀 +10 (BACKEND §2-6 명세)
+- ~~settings.json N1 정책 적용~~ ✅ force·rebase·reset 등 destructive op 자동 차단
 
 ### 해소 (세션 #7)
 - ~~세션 #6 6 commits push origin main 승인~~ → 세션 #6 종료 시점 이미 push 완료 (EVENTS #6 "누적 17건 [확정 origin/main 모두 동기]"). 본 STATE 시급 #1 stale 정정.

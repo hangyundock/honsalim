@@ -5,10 +5,9 @@
 
 ## ★ 시급 (다음 세션)
 
-- [x] ~~**docs/SUMMARY.md + REVIEW_QUESTIONS.md + SUMMARY_PATCH_v1.1.md 정독**~~ ✅ 세션 #9 완료 — Phase 3 진입 게이트 통과 [확정 사용자]
-- [x] ~~**Phase 3 사전 작업**: Google AI Studio API 키 발급~~ ✅ 세션 #9 완료 — `D:\secrets\honsalim.env` (보안상 secrets/ 바로 아래 단일 파일로 결정, DECISIONS L6 갱신)
-- [ ] **공개 사이트 5종 시안** (홈·시나리오 허브·글·페르소나·About) — 사용자 claude.ai/design, DESIGN §11. dashboard(관리자)는 별도 stub HTML (DECISIONS G3 [확정 #9])
+- [ ] **공개 사이트 5종 시안** (홈·시나리오 허브·글·페르소나·About) — 사용자 claude.ai/design, DESIGN §11 (DECISIONS G3 [확정 #9])
 - [ ] (선택) 본 워크트리들(`peaceful-gagarin-b7fda4`·`dazzling-roentgen-b550f7` 등) 폐기 검토 — 세션 #8·#9 main 직접 작업 후 사용 가치 낮음
+- [ ] Scaled Content Abuse Step 2 (fail 게이트 승격) — 1~2주 운영 데이터 후 별도 세션
 
 ## 세션 #8 분리 완료 ★
 
@@ -43,7 +42,7 @@
 
 > 완료 항목은 STATE.md "Phase 2 핵심 모듈 18개" + "회귀 342/342" + "CLI 10/11" 행 참조.
 
-- [ ] CLI dashboard 명령 — Phase 3 디자인 후 본격
+- [x] ~~CLI dashboard 명령~~ ✅ 세션 #9 완료 (G3 결정으로 Claude Design 미사용, stub HTML)
 - [ ] `collector.coupang` (쿠팡 가입 후·Phase 4)
 - [ ] `builder.renderer/pages/sitemap/assets` (Jinja2 + DESIGN 시안)
 - [ ] `dashboard.render/approve` (디자인 시안 Phase 3 의존)

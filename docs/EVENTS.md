@@ -15,6 +15,61 @@
 
 ## 최근 5세션
 
+### 세션 #9 — 2026-05-29 (Opus 4.7, Auto Mode, 자동 push 정책 N1 + dashboard 모듈 (CLI 11/11 완성) + secrets 경로 정정, 9 commits)
+
+**시작 상황**: `/honsalim-start` → 세션 #8 직후 상태 확인. 본 워크트리(peaceful-gagarin-b7fda4)는 #6 종료(bfb0cbb)에서 분기, main은 #8 (da69624)까지 진행. 메인 D:\affiliate_hub에서 직접 main 브랜치로 작업 진행.
+
+**핵심 진척 [확정]**:
+
+1. **N1 자동 push 정책 신설** [확정 사용자 결정]:
+   - 사용자 요청: "매 세션 종료마다 push 챙기는 부담 제거"
+   - CLAUDE.md §2(라)·§11 갱신 (사용자 직접 — Auto Mode classifier가 agent config 자체 수정 차단)
+   - `.claude/commands/honsalim-end.md` §7+규칙 갱신 (자동 push 단계 + destructive op 금지 명시)
+   - `.claude/settings.json` deny 확장 — force(`--force`·`-f`·`--force-with-lease`·`--force-if-includes`·`--mirror`·`--delete`·refspec)·reset --hard·rebase·branch -D·checkout --·restore --·clean·worktree remove --force·tag -d·update-ref -d·commit --amend·reflog expire·filter-branch·filter-repo (Bash·PowerShell 양쪽 21+ 패턴) / allow에 `git push origin main`+`HEAD:main` 추가
+   - DECISIONS N. 자동화 정책 신설 — **N1** 영구화
+
+2. **사용자 외부 작업 완료** [확정 사용자 보고]:
+   - SUMMARY/REVIEW_QUESTIONS/SUMMARY_PATCH_v1.1 정독 완료 (Phase 3 진입 게이트 통과)
+   - Google AI Studio API 키 발급 + 결제 활성화 + `D:\secrets\honsalim.env` (사용자 보안 결정: secrets/ 바로 아래 단일 파일로 격리)
+   - DECISIONS L6 경로 갱신 + DESIGN §11·IMAGE_GENERATION §3 정합 + STATE/TODO 시급 해소
+
+3. **DECISIONS G3 신설** [확정 사용자 결정]:
+   - Claude Design 적용 범위 = **공개 사이트 5종만** (홈·시나리오 허브·글·페르소나·About)
+   - dashboard(관리자 페이지)는 **Claude Design 미사용** — 단순 stub HTML로 충분 (1인 운영·외부 노출 X)
+   - STATE/TODO "dashboard 시안" stale 표기 정정 ("공개 사이트 5종 시안"이 정확)
+
+4. **dashboard 모듈 신설 — CLI 11/11 완성** [확정 회귀 10/10 PASS]:
+   - `src/dashboard/{__init__,render,approve}.py` 신설 (Jinja2 미사용, 단순 f-string + html.escape, BACKEND §2-6 명세)
+   - `render_dashboard(conn, output_path)` — 6 상태 그룹별 카드 + 1클릭 승인 명령 (복사 버튼) + validator fail 24h 3건+ 빨간 배너 + XSS escape
+   - `approve(conn, draft_id, user_note)` — state_machine.transition(validated→approved) + `.approve/<id>.flag` 파일 생성 (JSON)
+   - `src/cli.py` cmd_dashboard 추가 — `--output`·`--open` (브라우저 자동) 옵션
+   - `tests/test_dashboard.py` 신설 — render 7 + approve 3 = **10/10 PASS**
+   - doctor §10 진입점 37 → **41** (+4 dashboard.{render,render_html,fetch_drafts_by_status,approve})
+   - 회귀 342 → **352 PASS** [확정 pytest 3.18초]
+
+**누적 commits 9건 [확정 origin/main 모두 동기 — N1 자동 push 첫 적용]**:
+- 7705431 CLAUDE.md 포맷 정정 (사용자 직접 §2-라·§11 수정)
+- 433cbe3 N1 자동 push 정책 (4 파일 + DECISIONS N 신설)
+- 07a75e3 SUMMARY 정독 완료 + secrets honsalim.env 경로 정정
+- a788648 settings.json deny 보완 - force-with-lease 등 5 패턴
+- b8457ad G3 신설 - Claude Design은 공개 사이트 5종만
+- e5ee0e0 dashboard 모듈 구현 (CLI 11/11 완성)
+- (이 endcommit) /honsalim-end #9 종료
+
+**메모리 신설**: [[no-unfounded-priority]] — "다음 진행" 질문 = 작업 계속 의도. 마감 명령 추천 금지. 같은 답변 반복 금지 (세션 #9 사용자 비판).
+
+**잔존 미해결 (다음 세션)**:
+- 공개 사이트 5종 시안 (사용자 claude.ai/design 직접)
+- Phase 4 진입 시 about.html · Person Schema 적용 (M2-1~M2-7 사전 결정)
+- Scaled Content Abuse Step 2 (fail 게이트 승격) — 1~2주 운영 데이터 후 별도 세션
+- (선택) 본 워크트리들 폐기 검토
+
+**다음 세션 할 일**:
+1. 사용자 외부 작업 (claude.ai/design 5종 시안 생성·1개 선정)
+2. 시안 선정 후 Claude Code → DESIGN.md 토큰 갱신 + Jinja2 템플릿 작성 진입
+
+---
+
 ### 세션 #8 — 2026-05-29 (Opus 4.7, Auto Mode, 네이버 분리 작업 6 Phase + D:\naver_blog\ 신규 프로젝트 셋업·push·dazzling-hermann 폐기, 1 commit)
 
 **시작 상황**: `/honsalim-start @docs/NAVER_SEPARATION_PLAN.md 따라 네이버 분리 작업 진행해줘` 명시 지시. SEPARATION_PLAN은 옛 dazzling-hermann-7d1424 워크트리 5 commits에만 존재 (main에 push 없음). 본 워크트리(roentgen)는 bfb0cbb 시점 분기 → 작업 중 main이 별도 흐름으로 #7 종료된 상태 발견.
