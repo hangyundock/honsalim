@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% from "_macros/components.html" import icon, image_block, breadcrumb, section_head %}
+
+{% block title %}About | 혼살림{% endblock %}
+
+{% block main %}
+<section class="about-hero">
+  <div class="wrap about-hero-in">
+    <div>
+      {{ breadcrumb([{'label': '홈', 'url': '/'}, {'label': 'About'}]) }}
+      <div class="eyebrow" style="margin-top:14px">About</div>
+      <h1>혼자 살아도, 살림은 따뜻하게</h1>
+      <p class="about-hero-lead">
+        혼살림은 1인 가구의 살림을 상황별로 정리해 추천하는 작은 가이드입니다.
+        광고가 아니라 실제 경험에서 출발합니다.
+      </p>
+    </div>
+    <div class="about-hero-art">{{ image_block('var(--wood-2)', '혼살림 작업실', 'leaf') }}</div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap about-cols">
+    <div class="about-block">
+      <div class="ab-num">01</div>
+      <h2>왜 만들었나</h2>
+      <p>
+        처음 독립했을 때, 무엇부터 사야 할지 몰라 검색에 며칠을 썼습니다. 정작 후기는
+        광고와 협찬으로 뒤덮여 있어 <b>진짜 필요한 것</b>을 가려내기 어려웠습니다.
+      </p>
+      <p>
+        혼살림은 그때의 막막함에서 시작했습니다. "내가 그때 봤으면 좋았을 가이드"를 만든다는
+        마음으로, 상황과 예산에 맞춰 살림을 정리합니다.
+      </p>
+    </div>
+    <div class="about-block">
+      <div class="ab-num">02</div>
+      <h2>어떻게 추천하나</h2>
+      <ul class="about-principles">
+        <li><span class="ap-tick">{{ icon('check', 14, 2.4) }}</span>실제 1인 가구 사용성과 내구성, 가격 대비 만족도를 기준으로 고릅니다.</li>
+        <li><span class="ap-tick">{{ icon('check', 14, 2.4) }}</span>광고비를 더 낸 제품을 위로 올리지 않습니다.</li>
+        <li><span class="ap-tick">{{ icon('check', 14, 2.4) }}</span>상단·본문에 배너 광고를 넣지 않습니다.</li>
+        <li><span class="ap-tick">{{ icon('check', 14, 2.4) }}</span>제휴 링크는 글 맨 위에서 항상 먼저 고지합니다.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+{# 신뢰·고지 풀버전 #}
+<section class="section trust-sec">
+  <div class="wrap">
+    {{ section_head(eyebrow='신뢰·고지', title='운영 정책 풀버전', lead='추천의 신뢰를 위해 지키는 세 가지 정책을 투명하게 공개합니다.') }}
+    <div class="trust-grid">
+      <div class="trust-card">
+        <h3 class="trust-h"><span class="trust-no">01</span> 제휴(어필리에이트) 정책</h3>
+        <p>일부 콘텐츠에는 제휴 링크가 포함됩니다. 독자가 링크를 통해 구매하면 혼살림이 판매자로부터 일정액의 수수료를 받을 수 있습니다.</p>
+        <ul>
+          <li>수수료는 <b>독자의 구매 가격에 전혀 영향을 주지 않습니다.</b></li>
+          <li>추천 제품의 선정·순서는 수수료 액수와 <b>무관하게</b> 결정됩니다.</li>
+          <li>제휴 관계가 있는 글은 본문 최상단에 "대가성 안내"를 표기합니다.</li>
+          <li>수수료는 사이트 운영·콘텐츠 제작 비용으로만 사용됩니다.</li>
+        </ul>
+      </div>
+      <div class="trust-card">
+        <h3 class="trust-h"><span class="trust-no">02</span> AI 사용 정책</h3>
+        <p>혼살림은 글의 초안 정리·교정·요약 등에 AI를 보조 도구로 사용할 수 있습니다.</p>
+        <ul>
+          <li>제품 선정과 최종 추천은 <b>사람(운영자)의 판단</b>으로 검수합니다.</li>
+          <li>AI가 생성한 사실·수치는 게시 전 출처를 확인합니다.</li>
+          <li>경험·사용 후기는 실제 사용을 바탕으로 작성합니다.</li>
+          <li>AI 활용 비중이 큰 글에는 별도 표기를 검토합니다.</li>
+        </ul>
+      </div>
+      <div class="trust-card">
+        <h3 class="trust-h"><span class="trust-no">03</span> 이미지 출처 정책</h3>
+        <p>혼살림의 분위기 이미지는 AI로 생성하며, 제품 이미지는 공식 위젯·제휴사 제공 이미지를 사용합니다.</p>
+        <ul>
+          <li>AI로 생성한 이미지에는 <b>AI 생성임을 표기</b>합니다.</li>
+          <li>제품 이미지는 쿠팡 등 <b>공식 위젯·제휴사 제공</b> 이미지를 출처와 함께 사용합니다.</li>
+          <li>타인의 저작물을 무단으로 사용하지 않습니다.</li>
+          <li>가격·사양 변동 시 정보와 이미지를 함께 갱신합니다.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# 사업자 정보 + 문의 #}
+<section class="section">
+  <div class="wrap about-foot-grid">
+    <div class="biz-card" id="privacy">
+      <h3>사업자 정보</h3>
+      <dl class="biz-dl">
+        <div><dt>상호</dt><dd>{{ business_info.name }}</dd></div>
+        <div><dt>대표</dt><dd>{{ business_info.rep }}</dd></div>
+        <div><dt>사업자등록번호</dt><dd>{{ business_info.bizno }}</dd></div>
+        <div><dt>통신판매업신고</dt><dd>{{ business_info.mailorder }}</dd></div>
+        <div><dt>주소</dt><dd>{{ business_info.addr }}</dd></div>
+        <div><dt>이메일</dt><dd>{{ business_info.email }}</dd></div>
+      </dl>
+    </div>
+    <div class="contact-card" id="contact">
+      <h3>개인정보처리방침 · 문의</h3>
+      <p class="muted">
+        혼살림은 방문 통계 외 개인정보를 수집하지 않으며, 제휴 링크 클릭 시 제휴사 정책이 적용됩니다.
+        자세한 내용은 개인정보처리방침에서 확인하실 수 있습니다.
+      </p>
+      <div class="contact-actions">
+        <a class="btn btn-ghost" href="#privacy">개인정보처리방침</a>
+        <a class="btn btn-primary" href="mailto:{{ business_info.email }}">문의하기</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

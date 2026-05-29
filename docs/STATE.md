@@ -7,11 +7,11 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 19개 + 회귀 352 PASS + CLI 11/11 완성 (dashboard 추가) + 결정 K1~K5 + L1~L8 + M1~M7 + M2-1~M2-7 + G3·N1 (자동 push 정책) + SUMMARY 정독 완료·Google API 키 발급 완료 (D:\secrets\honsalim.env)** | #9 (2026-05-29) |
+| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 19개 + 회귀 352 PASS + CLI 11/11 완성 (dashboard 추가) + 결정 K1~K5 + L1~L8 + M1~M7 + M2-1~M2-7 + G3·N1 (자동 push 정책) + SUMMARY 정독 완료·Google API 키 발급 완료 + G4 공개 사이트 5종 Jinja2 템플릿 + builder.renderer (`build --full` DB→정적 5종+sitemap+SEO 메타·JSON-LD(OG·Breadcrumb·WebSite·Org), 회귀 365)** | 2026-05-30 |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
 | Phase 2 핵심 모듈 18개 (#3~#5) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} · deployer/{git_push,wrangler,verify} · tracker/{d1_aggregator,**report**} · **workers/go_gateway.js** | #5 |
-| Phase 2 회귀 테스트 | **352 / 352 PASS** [확정 pytest 9.0.3, 3.18초] — 세션 #9 +10 (dashboard render 7 + approve 3). 분배: validator 42 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 45 + manifest 22 + db 12 + cli 46 + article_writer 25 + integration_phase2 18 + deployer 14 + tracker 25 + check_size_caps 9 + **dashboard 10** | #9 |
+| Phase 2 회귀 테스트 | **378 / 378 PASS** [확정 pytest 9.0.3, 4.61초] — 2026-05-30 +26 (renderer 9 + jsonld 4 + cli-enrich 1 + aliexpress 12). 분배: validator 42 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 49 + manifest 22 + db 12 + cli 47 + article_writer 25 + integration_phase2 18 + deployer 14 + tracker 25 + check_size_caps 9 + dashboard 10 + renderer 9 + **aliexpress 12** | 2026-05-30 |
 | CLI 명령 (BACKEND §9) | **11/11 완성** — doctor · db migrate/seed · collect · enrich · validate · approve · unapprove · deploy · build · **dashboard** (drafts 단일 HTML, --open 옵션). DECISIONS G3 [확정 #9] (Claude Design 미사용·stub HTML) | #9 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + 4 게이트 통합(validate_and_save) + META-JSON + Article JSON-LD + 1인칭/사진 게이트. 영구화 세션 #4 시점 5개 사항(tracker.d1_aggregator·deployer·builder.manifest·enricher.retry·state_machine 매트릭스 보강) → DECISIONS J + EVENTS #4·#5 누적 | #4~#5 |
 | doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 **41개** (+4 dashboard) · §11 state_machine 매트릭스 · §12 tests 로드 · §13 Workers JS (go_gateway.js) · §14 docs/ size cap | #9 |
@@ -60,7 +60,7 @@
 ## 알려진 잔존 미해결
 
 ### ★ 시급 (다음 세션)
-1. **공개 사이트 5종 시안** (홈·시나리오 허브·글·페르소나·About) — 사용자 claude.ai/design, DESIGN §11 + DECISIONS G3 [확정 #9]
+1. ~~**공개 사이트 5종 시안**~~ ✅ 2026-05-30 — 시안 확정(우드/그림자/미니멀) + Jinja2 템플릿 5종·CSS 구현 (G4). **차기: 정식 빌더 `builder.renderer`·DB 연동·JSON-LD 매크로·Pretendard self-host**
 2. (참고) Phase 5 시점 (2026-11 이후) 알리 App Key/Secret 발급
 3. (선택) BitLocker D 드라이브 활성 결정
 4. (Phase 4 진입 시) about.html · Person Schema 적용 (M2-1~M2-7 사전 결정)

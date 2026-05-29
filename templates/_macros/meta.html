@@ -1,0 +1,17 @@
+{# ===== 혼살림 메타·OG·Twitter Card 매크로 =====
+   출처: FRONTEND §5. canonical은 base.html에서 별도 처리(중복 방지). #}
+
+{% macro meta_tags(title, description, url='', og_image='', og_type='website', site_name='혼살림') -%}
+<meta name="description" content="{{ description }}">
+<meta property="og:type" content="{{ og_type }}">
+<meta property="og:site_name" content="{{ site_name }}">
+<meta property="og:title" content="{{ title }}">
+<meta property="og:description" content="{{ description }}">
+<meta property="og:locale" content="ko_KR">
+{% if url %}<meta property="og:url" content="{{ url }}">{% endif %}
+{% if og_image %}<meta property="og:image" content="{{ og_image }}">{% endif %}
+<meta name="twitter:card" content="{{ 'summary_large_image' if og_image else 'summary' }}">
+<meta name="twitter:title" content="{{ title }}">
+<meta name="twitter:description" content="{{ description }}">
+{% if og_image %}<meta name="twitter:image" content="{{ og_image }}">{% endif %}
+{%- endmacro %}

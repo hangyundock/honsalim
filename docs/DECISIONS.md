@@ -55,6 +55,12 @@
 - **D6. 외부 단축 URL 금지** (쿠팡 회색지대) — G5 조사
 - **D7. 자체 redirect 게이트웨이 OK**: `/go/<slug>` Cloudflare Workers 패턴 — G3 조사
 - **D8. 쿠팡 + YouTube Shopping 통합**: 2024-06-04~ (장기 YouTube 채널 도입 시 활용) — G4 조사 [확정]
+- **D9. 알리 우선 통합 (쿠팡 게이팅) [확정 2026-05-30]**: 쿠팡 파트너스는 **사이트 완성 후 승인 신청** 가능(승인된 사이트만 API 사용) — 출시 전엔 불가. 따라서 **AliExpress를 첫 상품 소스로 앞당김** (원래 Phase 5 예정 → Phase 3 착수).
+  - **계정**: 기존 제휴 계정(dugi2020@naver.com, 사이트 "다비교" 보유) 사용. 이번에 만든 새 계정은 사용자 실수로 삭제 → 기존 계정으로 진행.
+  - **차단 이슈**: honsalim.com 사이트 등록이 **"ali" 부분문자열 오탐**(hons**ali**m)으로 거부 → AliExpress **whitelist 수동 승인 필요** (사용자 문의 진행 중). 가짜 URL 우회 금지.
+  - **자격 증명**: `ALI_TRACKING_ID` 발급 완료 ✅. **App Key/Secret 미발급**(App 심사 대기 1~2일) — 발급 후 ali.env에 `ALI_APP_KEY`/`ALI_APP_SECRET` 추가.
+  - **API 스펙** (Open Platform Affiliate API Guidance): `aliexpress.affiliate.product.query`(키워드·페이지 50/쿼리 5000) · `productdetail.get` · `category.get`. 서명 sha256 HMAC(정렬 key+value, app_secret), app_signature 비필수. 게이트웨이 `api-sg.aliexpress.com/sync`.
+  - **구현**: `src/collector/aliexpress.py` dry-run 골격 (서명이 문서 4.5 예시와 일치 검증, 회귀 +12). 라이브 실호출은 App Key/Secret 발급 후 검증 — timestamp 형식·응답 JSON 경로 최종 확인 필요.
 
 ## E. 정책·법무 [확정]
 
@@ -83,6 +89,11 @@
 - **G1. 하이브리드 워크플로**: Claude Design 시안 → DESIGN.md 명세 추출 → Claude Code로 Jinja2 템플릿 생성 — 세션 #1
 - **G2. Claude Design**: claude.ai/design (Pro/Max 플랜 포함, 2026-04-17 출시, research preview) — 세션 #1
 - **G3. Claude Design 적용 범위 [확정 세션 #9]**: **공개 사이트 5종(홈·시나리오 허브·글·페르소나·About)만**. dashboard(관리자 페이지, BACKEND §2-6)는 Claude Design 미사용 — 단순 stub HTML로 충분 (사용자 1인 운영, 외부 노출 없음). STATE/TODO "dashboard 시안" 표기는 stale — "공개 사이트 5종 시안"이 정확.
+- **G4. 디자인 시안 확정 [확정 2026-05-30 디자인 핸드오프 구현]**: Claude Design "클로드 코드 인계" 핸드오프(`api.anthropic.com/v1/design` → WebFetch로 4MB gzip 수신 → `docs/design_drafts/honsalim/`)로 5종 시안 수령.
+  - **확정 조합 = 톤 우드 / 카드 그림자 / 밀도 미니멀** (사용자 승인). 디자인 토큰(`#FAF6F1`·`#A87F4D`·`#7A5530` 등)은 DESIGN.md §3과 일치 확인.
+  - **산출물**: Jinja2 템플릿 5종(`base`·`home`·`scenario_list`·`article`·`persona_hub`·`about`) + `partials/{header,footer}` + `_macros/components.html` + `static/css/{tokens,components,pages}.css`(변형 토글 제거·확정값 baked-in) + `static/js/hub-filter.js`(허브 필터 점진적 향상). 미리보기 `scripts/preview_build.py`(목업 데이터 19페이지) → 사용자 확인 완료.
+  - **정책 정정**: 디자인 About의 "직접 촬영" 이미지 문구 → **"AI 생성+AI 표기, 제품은 공식 위젯"**으로 수정 (L2 [확정] 정합). 운영자 "혼살다"·이메일 확정·사업자번호 "등록 진행 중"(M2) 반영. 제휴 링크 `rel="sponsored nofollow"`.
+  - **미반영(차기)**: 정식 빌더(`builder.renderer`)·DB 연동·meta/JSON-LD 매크로·Pretendard self-host·critical CSS·Person Schema(M2-1~M2-7)는 Phase 3 후속.
 
 ## H. Git 운영 [확정]
 

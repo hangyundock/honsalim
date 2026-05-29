@@ -99,7 +99,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101"]  # tests 안 assert 허용
+"tests/*" = ["S101", "S105", "S106"]  # tests: assert·더미 시크릿(테스트 고정값) 허용
 
 # ─── Mypy [관찰 — 공식 권장] ───────────────────────────
 [tool.mypy]
@@ -108,7 +108,7 @@ strict = false                      # Phase 2 안정화 후 true 검토
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false       # 점진 도입
-exclude = ["build/", "data/", "logs/"]
+exclude = ["build/", "data/", "logs/", "scripts/"]  # scripts/는 개발 유틸(목업 빌드) — 타입검사 제외
 # flat src layout 정합 — packages.find.where=["src"] + py.typed marker (세션 #5)
 mypy_path = "src"
 explicit_package_bases = true

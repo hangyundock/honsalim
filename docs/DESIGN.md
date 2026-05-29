@@ -631,13 +631,15 @@ POLICY.md에서 확정 예정 사항:
 
 ### 11-2. 사용자 작업 체크리스트 (Phase 3 시작 시, L2·L6 [확정 세션 #6 2차 재변경])
 
-- [ ] Claude Pro/Max 활성 확인
-- [ ] claude.ai/design 접속 확인
-- [ ] DESIGN.md §3~§6 텍스트 복사 준비
+- [x] ~~Claude Pro/Max 활성 확인~~ ✅
+- [x] ~~claude.ai/design 접속 확인~~ ✅
+- [x] ~~DESIGN.md §3~§6 텍스트 복사 준비~~ → 불요 (Claude Design이 토큰 자동 생성, DESIGN §3과 일치)
 - [x] ~~**Google AI Studio API 키 발급**~~ ✅ 세션 #9 완료 (결제 활성화 포함)
 - [x] ~~`D:\secrets\affiliate_hub\google.env` 신설~~ → **`D:\secrets\honsalim.env`** ✅ 세션 #9 완료 (보안상 secrets/ 바로 아래 단일 파일, DECISIONS L6 #9 갱신)
-- [ ] 시안 3~5종 생성·비교 → 1개 선정
-- [ ] 선정 결과 `docs/design_drafts/CHOICE.md`에 메모
+- [x] ~~시안 3~5종 생성·비교 → 1개 선정~~ ✅ 2026-05-30 — **우드/그림자/미니멀** 확정 (변형 토글 1안)
+- [x] ~~선정 결과 `docs/design_drafts/CHOICE.md`에 메모~~ ✅ [CHOICE.md](design_drafts/CHOICE.md)
+
+> **2026-05-30 핸드오프 구현 완료** [확정 DECISIONS G4]: "클로드 코드 인계"로 5종 시안 수령(`docs/design_drafts/honsalim/`) → Jinja2 템플릿 5종 + CSS 3종 + 매크로 + hub-filter.js 생성 → 미리보기(`scripts/preview_build.py`) 사용자 확인 완료. 차기: 정식 빌더(`builder.renderer`)·DB 연동·JSON-LD 매크로·Pretendard self-host.
 
 > ~~페르소나 사진 6~9장 사전 촬영~~ 폐기 — AI 생성으로 대체 (`docs/IMAGE_GENERATION.md`).
 

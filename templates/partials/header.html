@@ -1,0 +1,17 @@
+{% from "_macros/components.html" import icon %}
+<header class="hdr">
+  <div class="wrap hdr-in">
+    <a class="wordmark" href="/">
+      <span class="wm-main">혼살림</span><span class="wm-dot">.</span><span class="wm-sub">HONSALIM</span>
+    </a>
+    <nav class="nav" id="site-nav">
+      <a href="/"{% if active_nav == 'home' %} class="on"{% endif %}>홈</a>
+      <a href="/scenarios/"{% if active_nav == 'hub' %} class="on"{% endif %}>시나리오</a>
+      <a href="/personas/"{% if active_nav == 'persona' %} class="on"{% endif %}>페르소나</a>
+      <a href="/about/"{% if active_nav == 'about' %} class="on"{% endif %}>About</a>
+      <a class="hdr-cta" href="/scenarios/">시나리오 보기</a>
+    </nav>
+    <button class="burger" type="button" aria-label="메뉴"
+            onclick="document.getElementById('site-nav').classList.toggle('open')">{{ icon('menu', 20) }}</button>
+  </div>
+</header>

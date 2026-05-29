@@ -214,3 +214,61 @@ def build_product_jsonld(
         doc["sku"] = str(sku)
 
     return json.dumps(doc, ensure_ascii=False, separators=(", ", ": "))
+
+
+# ─── 구조화 스키마 (FRONTEND §6-1) — 콘텐츠 무관 ──────────────────────
+
+
+def build_breadcrumb_jsonld(crumbs: list[dict[str, Any]], site_base_url: str) -> str:
+    """BreadcrumbList JSON-LD.
+
+    crumbs: [{name, url}] — url은 상대("/scenarios/") 또는 절대. 마지막(현재)은 url 생략 가능.
+    """
+    if not crumbs:
+        raise ValueError("crumbs 비어있음 — BreadcrumbList 생성 불가")
+    base = site_base_url.rstrip("/")
+    elements: list[dict[str, Any]] = []
+    for idx, c in enumerate(crumbs, start=1):
+        name = c.get("name")
+        if not name:
+            raise ValueError(f"crumbs[{idx - 1}].name 누락")
+        el: dict[str, Any] = {"@type": "ListItem", "position": idx, "name": str(name)}
+        url = c.get("url")
+        if url:
+            el["item"] = str(url) if str(url).startswith("http") else f"{base}{url}"
+        elements.append(el)
+    doc = {"@context": SCHEMA_CONTEXT, "@type": "BreadcrumbList", "itemListElement": elements}
+    return json.dumps(doc, ensure_ascii=False, separators=(", ", ": "))
+
+
+def build_website_jsonld(site_base_url: str, site_name: str = DEFAULT_PUBLISHER_NAME) -> str:
+    """WebSite JSON-LD (홈)."""
+    base = site_base_url.rstrip("/")
+    doc = {"@context": SCHEMA_CONTEXT, "@type": "WebSite", "name": site_name, "url": f"{base}/"}
+    return json.dumps(doc, ensure_ascii=False, separators=(", ", ": "))
+
+
+def build_organization_jsonld(
+    site_base_url: str, name: str = DEFAULT_PUBLISHER_NAME, email: str | None = None
+) -> str:
+    """Organization JSON-LD (발행처)."""
+    base = site_base_url.rstrip("/")
+    doc: dict[str, Any] = {
+        "@context": SCHEMA_CONTEXT,
+        "@type": "Organization",
+        "name": name,
+        "url": f"{base}/",
+    }
+    if email:
+        doc["email"] = email
+    return json.dumps(doc, ensure_ascii=False, separators=(", ", ": "))
+
+
+def as_script_tags(jsonld_strings: list[str]) -> str:
+    """JSON-LD 문자열들을 <script type="application/ld+json"> 블록으로 래핑.
+
+    빈/None 항목은 건너뜀. 페이지 <head>의 schema 블록에 그대로 주입 (|safe).
+    """
+    return "\n".join(
+        f'<script type="application/ld+json">{s}</script>' for s in jsonld_strings if s
+    )

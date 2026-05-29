@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% from "_macros/components.html" import icon, image_block, scenario_card, breadcrumb, section_head %}
+
+{% block title %}{{ persona.name }} | 혼살림 페르소나{% endblock %}
+
+{% block main %}
+{# 페르소나 전환 탭 #}
+<section class="persona-tabs-wrap">
+  <div class="wrap persona-tabs">
+    {% for x in personas %}
+    <a class="ptab {{ 'on' if x.id == persona.id else '' }}" href="{{ x.url }}">{{ icon(x.icon, 16, 1.7) }}{{ x.name }}</a>
+    {% endfor %}
+  </div>
+</section>
+
+{# 헤더 #}
+<section class="persona-hero">
+  <div class="wrap persona-hero-in">
+    <div class="ph-copy">
+      {{ breadcrumb([{'label': '홈', 'url': '/'}, {'label': '페르소나', 'url': '/personas/'}, {'label': persona.name}]) }}
+      <div class="eyebrow" style="margin-top:14px">페르소나</div>
+      <h1>{{ persona.name }}</h1>
+      <p class="ph-line">{{ persona.line }}</p>
+      <p class="ph-desc">{{ persona.desc }}</p>
+    </div>
+    <div class="ph-art">
+      {{ image_block(persona.img, persona.name ~ ' 공간', persona.icon) }}
+    </div>
+  </div>
+</section>
+
+<section class="section persona-body">
+  <div class="wrap persona-layout">
+    {# 좌측 정보 #}
+    <aside class="persona-info">
+      {% if persona.bullets %}
+      <div class="rec-box">
+        <h3>이런 분께 추천</h3>
+        <ul class="rec-list">
+          {% for b in persona.bullets %}
+          <li><span class="rec-tick">{{ icon('check', 13, 2.4) }}</span>{{ b }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      <div class="stat-box">
+        {% if persona.avgBudget %}
+        <div class="stat">
+          <span class="stat-label">{{ icon('won', 14) }} 평균 예산</span>
+          <span class="stat-val">{{ persona.avgBudget }}</span>
+        </div>
+        {% endif %}
+        {% if persona.peak %}
+        <div class="stat">
+          <span class="stat-label">{{ icon('winter', 14) }} 시즌 피크</span>
+          <span class="stat-val sm">{{ persona.peak }}</span>
+        </div>
+        {% endif %}
+        {% if persona.keywords %}
+        <div class="stat col">
+          <span class="stat-label">{{ icon('search', 14) }} 많이 찾는 검색어</span>
+          <div class="kw-row">{% for k in persona.keywords %}<span class="kw">{{ k }}</span>{% endfor %}</div>
+        </div>
+        {% endif %}
+      </div>
+    </aside>
+
+    {# 우측 시나리오 카드 #}
+    <div class="persona-scenarios">
+      {{ section_head(
+          title=persona.name ~ ' 시나리오',
+          lead=(scenarios | length) | string ~ '개의 가이드가 준비돼 있어요.',
+          action_label='전체 시나리오', action_url='/scenarios/', action_class='btn btn-text'
+      ) }}
+      <div class="grid-2">
+        {% for s in scenarios %}{{ scenario_card(s) }}{% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

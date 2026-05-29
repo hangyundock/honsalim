@@ -82,3 +82,9 @@ wrangler.toml.local
 *.bak
 *.log
 *.cache
+
+# =====================================================
+# Claude Design 핸드오프 원본 (대용량 ~9.7MB) — 기록 CHOICE.md만 추적
+# =====================================================
+docs/design_drafts/honsalim/
+docs/design_drafts/*.tar.gz

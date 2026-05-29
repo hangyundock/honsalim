@@ -27,9 +27,13 @@ except ImportError:
 
 from builder.jsonld import (
     _normalize_keywords,
+    as_script_tags,
     build_article_jsonld,
+    build_breadcrumb_jsonld,
     build_itemlist_jsonld,
+    build_organization_jsonld,
     build_product_jsonld,
+    build_website_jsonld,
 )
 from validator import check_schema
 
@@ -397,6 +401,39 @@ class TestProductBuilder:
     def test_missing_price_raises(self) -> None:
         with raises(ValueError):
             build_product_jsonld({"name": "x"})
+
+
+class TestStructuredSchemas:
+    """FRONTEND §6-1 — Breadcrumb / WebSite / Organization (콘텐츠 무관)."""
+
+    def test_breadcrumb_positions_and_absolute_urls(self) -> None:
+        doc = json.loads(
+            build_breadcrumb_jsonld(
+                [{"name": "홈", "url": "/"}, {"name": "시나리오"}], "https://honsalim.com"
+            )
+        )
+        assert doc["@type"] == "BreadcrumbList"
+        els = doc["itemListElement"]
+        assert els[0]["position"] == 1 and els[1]["position"] == 2
+        assert els[0]["item"] == "https://honsalim.com/"  # 상대→절대 변환
+        assert "item" not in els[1]  # 마지막(현재) url 생략
+
+    def test_breadcrumb_empty_raises(self) -> None:
+        with raises(ValueError):
+            build_breadcrumb_jsonld([], "https://honsalim.com")
+
+    def test_website_and_organization(self) -> None:
+        web = json.loads(build_website_jsonld("https://honsalim.com", "혼살림"))
+        assert web["@type"] == "WebSite" and web["url"] == "https://honsalim.com/"
+        org = json.loads(
+            build_organization_jsonld("https://honsalim.com", "혼살림", "dugihappyending@gmail.com")
+        )
+        assert org["@type"] == "Organization" and org["email"] == "dugihappyending@gmail.com"
+
+    def test_as_script_tags_wraps_and_skips_empty(self) -> None:
+        out = as_script_tags([build_website_jsonld("https://honsalim.com"), ""])
+        assert out.count('<script type="application/ld+json">') == 1
+        assert "WebSite" in out
 
 
 if __name__ == "__main__":

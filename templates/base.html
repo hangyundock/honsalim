@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>{% block title %}혼살림{% endblock %}</title>
+
+  {% block meta %}
+    {% from "_macros/meta.html" import meta_tags %}
+    {{ meta_tags(
+        title=meta_title | default('혼살림'),
+        description=meta_description | default('1인 가구·자취·홈오피스·일상살림 추천 가이드. 혼자 살림을 따뜻하게 시작하세요.'),
+        url=canonical_url | default(''),
+        og_image=og_image | default(''),
+        og_type=og_type | default('website')
+    ) }}
+  {% endblock %}
+
+  {% block schema %}{% if schema_jsonld %}{{ schema_jsonld | safe }}{% endif %}{% endblock %}
+
+  {# Pretendard — Phase 3 빌더에서 self-host woff2 + preload로 전환 예정 (FRONTEND §9-3) #}
+  <link rel="stylesheet" as="style" crossorigin
+        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+
+  {# CSS — Phase 3 빌더에서 main.{hash}.css 단일화 + critical CSS 인라인 예정 (FRONTEND §9-1) #}
+  <link rel="stylesheet" href="{{ asset_base | default('/static') }}/css/tokens.css">
+  <link rel="stylesheet" href="{{ asset_base | default('/static') }}/css/components.css">
+  <link rel="stylesheet" href="{{ asset_base | default('/static') }}/css/pages.css">
+
+  {% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+  {% include "partials/header.html" %}
+
+  <main id="main-content">
+    {% block breadcrumb %}{% endblock %}
+    {% block main %}{% endblock %}
+  </main>
+
+  {% include "partials/footer.html" %}
+  {% block footer_extra %}{% endblock %}
+</body>
+</html>

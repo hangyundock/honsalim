@@ -329,6 +329,32 @@ class TestBuildParser:
         assert manifest_path.exists()
 
 
+class TestEnrichCommandExecution:
+    """enrich 명령 실제 실행 — `s.keywords`(스키마에 없는 컬럼) 회귀 방지 (2026-05-30 버그 수정).
+
+    기존 CLI 테스트는 인자 파싱만 검증해 SQL 실행 경로가 빠져 있었다.
+    """
+
+    def test_collect_then_enrich_dry_run(self, tmp_path: Any, monkeypatch: Any) -> None:
+        from common import db
+
+        tmp_db = tmp_path / "cli_enrich.db"
+        monkeypatch.setattr(db, "DB_PATH", tmp_db)
+        db.migrate(db_path=tmp_db)
+        db.seed(db_path=tmp_db)
+
+        assert cli.cmd_collect(argparse.Namespace(scenario_slug="wonroom-cheot-jachi-30")) == 0
+        # dry-run: API 호출 없음. s.keywords OperationalError 없이 enriched 전이해야 함.
+        assert cli.cmd_enrich(argparse.Namespace(draft=1, dry_run=True)) == 0
+
+        conn = db.connect(tmp_db)
+        try:
+            status = conn.execute("SELECT status FROM drafts WHERE id = 1").fetchone()[0]
+        finally:
+            conn.close()
+        assert status == "enriched"
+
+
 if __name__ == "__main__":
     if pytest is not None:
         pytest.main([__file__, "-v"])

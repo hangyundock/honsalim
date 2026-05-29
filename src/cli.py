@@ -489,7 +489,7 @@ def cmd_enrich(args: argparse.Namespace) -> int:
     try:
         row = conn.execute(
             """
-            SELECT s.slug, s.title_ko, s.season_peak, s.keywords,
+            SELECT s.slug, s.title_ko, s.season_peak, s.description,
                    p.slug, p.title_ko, p.description, p.age_range
             FROM drafts d
             JOIN scenarios s ON d.scenario_id = s.id
@@ -506,7 +506,10 @@ def cmd_enrich(args: argparse.Namespace) -> int:
             "slug": row[0],
             "title_ko": row[1],
             "season_peak": row[2],
-            "keywords": row[3],
+            "description": row[3],
+            # scenarios 스키마에 keywords 컬럼 없음 (DB §7-1) — 검색 키워드 힌트는 비우고
+            # 본문 생성 후 meta_extractor가 meta_keywords를 추출한다 (BACKEND §3).
+            "keywords": "",
         }
         persona_dict = {
             "slug": row[4],
@@ -750,7 +753,19 @@ def cmd_build(args: argparse.Namespace) -> int:
     )
 
     if args.full:
-        print("[NOTE] --full: renderer/pages/sitemap 미작성 — 본 명령은 manifest 로드만 수행")
+        from builder import renderer
+
+        summary = renderer.render_site()
+        print(
+            f"{OK} 사이트 렌더 → {summary['out_dir']} "
+            f"(페이지 {summary['pages']} · 시나리오 {summary['scenarios']} · "
+            f"페르소나 {summary['personas']} · 게시글 {summary['articles_published']})"
+        )
+        if summary["articles_published"] == 0:
+            print(
+                "[NOTE] 게시 article 0편 — 상세글 미렌더. "
+                "시나리오 카드 링크(/articles/<slug>/)는 콘텐츠 게시(Phase 3~4) 후 활성"
+            )
 
     if args.save_empty and not manifest_path.exists():
         manifest_mod.save(manifest_path, manifest)

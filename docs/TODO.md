@@ -5,13 +5,17 @@
 
 ## ★ 시급 (다음 세션)
 
-- [ ] **공개 사이트 5종 시안** (홈·시나리오 허브·글·페르소나·About) — 사용자 claude.ai/design, DESIGN §11 (DECISIONS G3 [확정 #9])
-- [x] ~~본 워크트리들 폐기~~ ✅ 세션 #10 완료 — 6개 워크트리·6개 브랜치 폐기 [확정]. 본 세션 진행 중인 `gallant-swartz-56b6c0`은 다음 세션 main 시작 시 자기 자신 제거 + 빈 폴더 `peaceful-gagarin-b7fda4` 정리
+> 공개 사이트 5종 시안·정식 빌더 renderer 완료 (2026-05-30, DECISIONS G4 / STATE) — 상세는 그쪽 참조.
+
+- [ ] **빌더 잔여**: 상세글(article) 렌더(게시 콘텐츠 + body_html↔템플릿 매핑) · Pretendard self-host · critical CSS · feed.xml · robots.txt (FRONTEND §7·§9). [SEO 메타·JSON-LD ✅ 2026-05-30: OG·Breadcrumb·WebSite·Org]
 - [ ] Scaled Content Abuse Step 2 (fail 게이트 승격) — 1~2주 운영 데이터 후 별도 세션
 
-## 세션 #8 분리 완료 ★
+## 알리 통합 (D9 — 쿠팡 게이팅으로 앞당김, 2026-05-30)
 
-- [x] ~~**네이버 보조 채널 분리 작업**~~ ✅ 세션 #8 완료 (6 Phase). `D:\naver_blog\` 별도 프로젝트 셋업·push·dazzling-hermann 폐기·마스터 동기화. 네이버 작업은 본 TODO에서 모두 제거 (이후 D:\naver_blog\docs\TODO.md 참조)
+- [ ] **honsalim.com 사이트 등록 whitelist** — "ali" 부분문자열 오탐 거부 → AliExpress 문의·수동 승인 대기 (사용자)
+- [ ] **AliExpress App Key/Secret 발급** — Open Platform App Console → Affiliate API 신청(심사 1~2일) → ali.env에 `ALI_APP_KEY`/`ALI_APP_SECRET` 추가 (사용자)
+- [ ] **`collector.aliexpress` 라이브 검증** — 키 발급 후 실호출 → timestamp 형식·응답 JSON 경로 확인 → products 적재 (dry-run 골격·서명 ✅ 회귀 +12)
+- [ ] **상품 적재 → 첫 글 enrich·발행** — enrich --no-dry-run(API 비용·1클릭 승인) → 4게이트 통과 → 발행
 
 ## 세션 #6 잔존 (시점 의존)
 
@@ -20,8 +24,6 @@
 
 ## 세션 #6 SEO 정합 통합 후 잔존 (cross-project · 별도 세션 권장)
 
-- [x] ~~**AutoBlog Hana Kim 잔존 5편 처리**~~ ✅ 세션 #7 완료. 본질 작업(author/publisher Organization 갱신 + 1인칭 재작성) 이미 완료 확인 + post 5 FAQ 구조 정상화·FAQPage Schema 추가 + content_text 재동기화 (AUTOBLOG_TODO TASK_024 갱신)
-- [x] ~~**Scaled Content Abuse 모듈 Step 1 dry-run**~~ ✅ 세션 #7 완료. AutoBlog `src/content/similarity.py` (4-gram word Jaccard) + tistory_revival `keyword_cluster.py` (어절+바이그램) + seo_gate hook + 회귀 13/13 PASS. Step 2 (fail 게이트 승격) 별도 세션 (1~2주 운영 데이터 후)
 - [ ] **혼살림 M2 Person Schema + about 페이지 운영자 정보** — Phase 4 진입 시 (E-E-A-T author 강화)
   - 세션 #7 사전 결정 완료: 필명 "혼살다" / 운영 철학 / 전문성 영역 / 사진 없음 (DECISIONS M2-1~M2-7)
   - 코드 작업: `_macros/person.html` 매크로 작성 (FRONTEND §4-5-bis 명세) + `about.html` 본문 적용 (FRONTEND §4-5 초안)
@@ -29,7 +31,6 @@
 
 ## Phase 1: 인프라 — 남음
 
-- [ ] AliExpress App Key/Secret 발급 — Phase 5 시점 (2026-11 이후)
 - [ ] `.claude/settings.json` deny 룰 사용자 검토 (deny 24·allow 14)
 - [ ] **윈도우 작업 스케줄러 등록** — Phase 2 코드 작성 후 (DECISIONS C7)
 - [ ] Branch Protection에 Actions status check — Phase 2 안정 후
@@ -52,7 +53,7 @@
 
 - [ ] Claude Design 시안 3~5종 (사용자 claude.ai/design)
 - [ ] 시안 1개 선정 + DESIGN.md 토큰 미세 조정
-- [ ] Jinja2 템플릿 5종 + partials 18종 + Critical CSS + Pretendard preload
+- [x] ~~Jinja2 템플릿 5종 + partials~~ ✅ 2026-05-30 (base·home·scenario_list·article·persona_hub·about + header/footer + _macros/components). 잔여: Critical CSS·Pretendard preload·JSON-LD 매크로 (정식 빌더 시)
 - [ ] AI 이미지 생성 (페르소나별 2~3장, Imagen 4 Fast)
 - [ ] 시즌 신학기·홈오피스 시나리오 5편 작성 (#5~#10)
 - [ ] 진실성 게이트 통과 + 사용자 1클릭 승인 + 시범 1편 로컬 미리보기·배포

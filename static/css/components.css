@@ -1,0 +1,148 @@
+/* ===== 혼살림 — 공통 컴포넌트 스타일 =====
+   출처: Claude Design 핸드오프. 카드=그림자 확정값 baked-in. */
+
+/* ---------- 헤더 ---------- */
+.hdr {
+  position: sticky; top: 0; z-index: 50;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(1.1) blur(10px);
+  border-bottom: 1px solid var(--divider);
+}
+.hdr-in { display: flex; align-items: center; gap: 28px; height: 66px; }
+.wordmark { display: flex; align-items: baseline; gap: 2px; cursor: pointer; user-select: none; }
+.wordmark .wm-main { font-size: 22px; font-weight: 800; color: var(--brand); letter-spacing: -.01em; }
+.wordmark .wm-dot { color: var(--accent); font-weight: 800; }
+.wordmark .wm-sub { font-size: 11px; font-weight: 600; color: var(--meta); letter-spacing: .12em; margin-left: 4px; }
+.nav { display: flex; gap: 6px; margin-left: auto; align-items: center; }
+.nav a {
+  font-size: 14.5px; font-weight: 500; color: var(--sub);
+  padding: 8px 13px; border-radius: 8px; transition: background-color .15s, color .15s;
+}
+.nav a:hover { background-color: var(--card-bg); color: var(--brand); }
+.nav a.on { color: var(--brand); font-weight: 700; background-color: color-mix(in srgb, var(--border) 38%, transparent); }
+.hdr-cta {
+  font-size: 14px; font-weight: 600; color: #fff; background: var(--accent);
+  padding: 9px 16px; border-radius: 9px; border: none;
+}
+.hdr-cta:hover { background: var(--accent-ink); }
+.burger { display: none; margin-left: auto; background: none; border: 1px solid var(--border); border-radius: 8px; width: 40px; height: 40px; font-size: 18px; color: var(--brand); }
+
+/* ---------- 버튼 ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-weight: 600; border-radius: 10px; border: 1px solid transparent;
+  padding: 12px 20px; font-size: 15px; transition: all .15s ease;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-ink); color: #fff; }
+.btn-ghost { background: var(--surface); color: var(--brand); border-color: var(--border); }
+.btn-ghost:hover { background: var(--card-bg); }
+.btn-text { background: none; color: var(--accent); padding: 0; font-weight: 600; }
+
+/* ---------- 칩 / 태그 ---------- */
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12.5px; font-weight: 600; padding: 4px 11px; border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 30%, transparent);
+  color: var(--brand); border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  white-space: nowrap;
+}
+.chip.solid { background: var(--accent); color: #fff; border-color: var(--accent); }
+.chip.ghost { background: transparent; color: var(--meta); border-color: var(--divider); }
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---------- 이미지 placeholder 블록 ---------- */
+.img-block {
+  position: relative; width: 100%; border-radius: var(--radius-sm);
+  overflow: hidden; background: var(--wood-3);
+  display: flex; align-items: flex-end;
+}
+.img-block .cap {
+  position: relative; z-index: 2; font-size: 12px; font-weight: 600;
+  color: rgba(255,255,255,.95); padding: 10px 12px; letter-spacing: .02em;
+  text-shadow: 0 1px 3px rgba(60,40,20,.45);
+}
+.img-block .ph-icon {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,.55); z-index: 1;
+}
+.img-block::after { /* subtle vignette so caption is legible */
+  content: ""; position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(180deg, rgba(60,40,20,0) 45%, rgba(60,40,20,.34) 100%);
+}
+
+/* ---------- 시나리오 카드 (카드=그림자 확정) ---------- */
+.s-card {
+  border-radius: var(--radius); overflow: hidden; cursor: pointer;
+  display: flex; flex-direction: column; text-align: left;
+  background: var(--surface); border: 1px solid transparent; box-shadow: var(--shadow-card);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.s-card:hover {
+  box-shadow: 0 4px 10px rgba(28,26,23,.06), 0 16px 44px rgba(122,85,48,.12);
+  transform: translateY(-3px);
+}
+.s-card .img-block { aspect-ratio: 16 / 10; }
+.s-card .body { padding: var(--pad-card); display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.s-card .title { font-size: var(--fs-h3); font-weight: 700; color: var(--text); line-height: 1.35; letter-spacing: -.01em; }
+.s-card .desc { font-size: 14px; color: var(--sub); line-height: 1.6; }
+.s-card .meta-row { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 6px; font-size: var(--fs-meta); color: var(--meta); flex-wrap: wrap; }
+.s-card .price { font-weight: 700; color: var(--brand); }
+.s-card .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--border); }
+
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); }
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--gap); }
+
+/* ---------- 섹션 헤더 ---------- */
+.sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 36px; }
+.sec-head h2 { font-size: var(--fs-h2); font-weight: 800; letter-spacing: -.02em; }
+.sec-head .lead { font-size: 15px; color: var(--meta); margin-top: 8px; max-width: 52ch; line-height: 1.6; }
+
+/* ---------- 푸터 ---------- */
+.ftr { background: #F1E7D8; border-top: 1px solid var(--border); margin-top: 40px; }
+.ftr-in { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 40px; padding: 56px 0 28px; }
+.ftr h4 { font-size: 13px; font-weight: 700; color: var(--brand); margin-bottom: 14px; letter-spacing: .02em; }
+.ftr a, .ftr p { display: block; font-size: 13.5px; color: var(--sub); margin-bottom: 9px; line-height: 1.55; }
+.ftr a:hover { color: var(--accent-ink); }
+.ftr a { cursor: pointer; }
+.ftr-bottom { border-top: 1px solid var(--border); padding: 20px 0 40px; font-size: 12.5px; color: var(--meta); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.ftr-biz { font-size: 12px; color: var(--meta); line-height: 1.7; max-width: 60ch; }
+
+/* ---------- 고지 배너 ---------- */
+.disclosure {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: color-mix(in srgb, var(--border) 22%, var(--bg));
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 14px 18px; font-size: 13.5px; color: var(--sub); line-height: 1.6;
+}
+.disclosure b { color: var(--brand); }
+.disclosure .ic { color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+
+/* ---------- 페이지네이션 ---------- */
+.pager { display: flex; gap: 6px; justify-content: center; margin-top: 44px; }
+.pager button {
+  min-width: 40px; height: 40px; border-radius: 9px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--sub); font-weight: 600; font-size: 14px;
+}
+.pager button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.pager button:hover:not(.on):not(:disabled) { background: var(--card-bg); }
+.pager button:disabled { opacity: .4; cursor: default; }
+
+/* ---------- 브레드크럼 ---------- */
+.crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--meta); flex-wrap: wrap; }
+.crumb a { color: var(--meta); font-weight: 500; cursor: pointer; }
+.crumb a:hover { color: var(--accent); }
+.crumb-sep { color: var(--border); }
+.crumb-cur { color: var(--brand); font-weight: 600; }
+
+/* ---------- 반응형: 모바일 1열 ---------- */
+@media (max-width: 860px) {
+  .grid-3, .grid-2 { grid-template-columns: 1fr; }
+  .nav { display: none; }
+  .nav.open { display: flex; position: absolute; top: 66px; left: 0; right: 0; flex-direction: column; background: var(--bg); border-bottom: 1px solid var(--divider); padding: 12px 24px; gap: 2px; }
+  .nav.open a { padding: 12px; }
+  .burger { display: block; }
+  .ftr-in { grid-template-columns: 1fr 1fr; gap: 28px; }
+  .sec-head { flex-direction: column; align-items: flex-start; }
+  .hdr-cta { display: none; }
+}

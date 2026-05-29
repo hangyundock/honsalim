@@ -1,0 +1,156 @@
+{# ===== 혼살림 공통 컴포넌트 매크로 =====
+   출처: Claude Design 핸드오프 shared.jsx → 정적 Jinja2 이식.
+   React onClick → 정적 <a href>, 인라인 SVG 아이콘 → icon() 매크로. #}
+
+{# ---- 아이콘 (페르소나·시즌·UI) ---- #}
+{% macro icon(name, size=18, stroke=1.6) -%}
+  {%- set paths = {
+    'key':    '<circle cx="8" cy="8" r="4"/><path d="M11 11l8 8M16 16l2-2M19 19l2-2"/>',
+    'laptop': '<rect x="3" y="5" width="18" height="12" rx="1.5"/><path d="M2 20h20"/>',
+    'plant':  '<path d="M12 21v-7"/><path d="M12 14c-3 0-5-2-5-5 3 0 5 2 5 5z"/><path d="M12 12c2.5 0 4-1.6 4-4-2.5 0-4 1.6-4 4z"/>',
+    'spring': '<circle cx="12" cy="12" r="3.5"/><path d="M12 5v-2M12 21v-2M5 12H3M21 12h-2"/>',
+    'summer': '<circle cx="12" cy="12" r="4"/><path d="M12 3v1.5M12 19.5V21M3 12h1.5M19.5 12H21M5.6 5.6l1 1M17.4 17.4l1 1M18.4 5.6l-1 1M6.6 17.4l-1 1"/>',
+    'fall':   '<path d="M12 21c0-6 4-9 4-13 0-2-2-3-4-3s-4 1-4 3c0 4 4 7 4 13z"/>',
+    'winter': '<path d="M12 3v18M5 7l14 10M19 7L5 17"/>',
+    'arrow':  '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    'info':   '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+    'menu':   '<path d="M4 7h16M4 12h16M4 17h16"/>',
+    'filter': '<path d="M3 5h18M6 12h12M10 19h4"/>',
+    'check':  '<path d="M4 12l5 5L20 6"/>',
+    'won':    '<path d="M5 7l3 10 4-8 4 8 3-10"/><path d="M4 11h16"/>',
+    'search': '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>',
+    'leaf':   '<path d="M4 20c8 0 16-4 16-16C12 4 4 8 4 20z"/><path d="M9 15c3-3 6-4 8-5"/>'
+  } -%}
+  {%- if paths.get(name) -%}
+<svg width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ stroke }}" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0">{{ paths[name]|safe }}</svg>
+  {%- endif -%}
+{%- endmacro %}
+
+{# ---- 이미지 placeholder 블록 (우드톤 단색 + 캡션) ---- #}
+{% macro image_block(color='var(--wood-3)', cap='', icon_name='', cls='') -%}
+<div class="img-block {{ cls }}" style="background: {{ color }};">
+  {%- if icon_name %}<div class="ph-icon">{{ icon(icon_name, 30, 1.3) }}</div>{% endif -%}
+  {%- if cap %}<span class="cap">{{ cap }}</span>{% endif -%}
+</div>
+{%- endmacro %}
+
+{# ---- 칩 ---- #}
+{% macro chip(text, variant='') -%}
+<span class="chip {{ variant }}">{{ text }}</span>
+{%- endmacro %}
+
+{% macro persona_chip(pid, name, solid=False, icon_name='') -%}
+<span class="chip {{ 'solid' if solid else '' }}">{{ icon(icon_name, 13, 1.8) }}{{ name }}</span>
+{%- endmacro %}
+
+{# ---- 섹션 헤더 (선택: 우측 '전체 보기' 링크 버튼) ---- #}
+{% macro section_head(eyebrow='', title='', lead='', action_label='', action_url='', action_class='btn btn-ghost') -%}
+<div class="sec-head">
+  <div>
+    {%- if eyebrow %}<div class="eyebrow" style="margin-bottom:10px">{{ eyebrow }}</div>{% endif %}
+    <h2>{{ title }}</h2>
+    {%- if lead %}<p class="lead">{{ lead }}</p>{% endif %}
+  </div>
+  {%- if action_label %}<a class="{{ action_class }}" href="{{ action_url }}">{{ action_label }} {{ icon('arrow', 16) }}</a>{% endif %}
+</div>
+{%- endmacro %}
+
+{# ---- 페르소나 진입 버튼 (홈 hero) ---- #}
+{% macro persona_button(p) -%}
+<a class="pe-btn" href="{{ p.url }}">
+  <span class="pe-ic">{{ icon(p.icon, 22, 1.5) }}</span>
+  <span class="pe-name">{{ p.name }}</span>
+  <span class="pe-arrow">{{ icon('arrow', 16) }}</span>
+</a>
+{%- endmacro %}
+
+{# ---- 시나리오 카드 ---- #}
+{% macro scenario_card(s) -%}
+  {%- set SI = {'봄':'spring','여름':'summer','가을':'fall','겨울':'winter'} -%}
+<a class="s-card" href="{{ s.url }}" data-persona="{{ s.persona }}" data-season="{{ s.season }}" data-budget="{{ s.budget_tier | default('') }}">
+  {{ image_block(s.img, s.cap, SI.get(s.season, '')) }}
+  <div class="body">
+    <div class="chip-row">
+      {{ persona_chip(s.persona, s.persona_name, icon_name=s.persona_icon | default('')) }}
+      {{ chip(s.season, 'ghost') }}
+    </div>
+    <h3 class="title">{{ s.title }}</h3>
+    <p class="desc">{{ s.desc }}</p>
+    <div class="meta-row">
+      <span class="price">{{ s.budget }}</span>
+      {% if s.count %}<span class="dot"></span><span>추천 {{ s.count }}개</span>{% endif %}
+    </div>
+  </div>
+</a>
+{%- endmacro %}
+
+{# ---- 브레드크럼 ---- #}
+{% macro breadcrumb(items) -%}
+<nav class="crumb" aria-label="현재 위치">
+  {%- for it in items %}
+  {%- if not loop.first %}<span class="crumb-sep">›</span>{% endif %}
+  {%- if it.url and not loop.last %}<a href="{{ it.url }}">{{ it.label }}</a>
+  {%- else %}<span class="crumb-cur">{{ it.label }}</span>{% endif %}
+  {%- endfor %}
+</nav>
+{%- endmacro %}
+
+{# ---- 고지 배너 (글 첫머리 E1) ---- #}
+{% macro disclosure(short=False) -%}
+<div class="disclosure">
+  <span class="ic">{{ icon('info', 18) }}</span>
+  <span><b>대가성 안내</b> · 이 글에는 제휴(어필리에이트) 링크가 포함되어 있습니다.{% if not short %} 링크를 통해 구매가 이뤄지면 혼살림이 일정액의 수수료를 받을 수 있으나, 독자의 구매 가격은 동일하며 추천 순서에 영향을 주지 않습니다.{% endif %}</span>
+</div>
+{%- endmacro %}
+
+{# ---- 상품 카드 (/go/ 게이트웨이 예정, 제휴 링크 rel 표기) ---- #}
+{% macro product_card(p) -%}
+<div class="p-card s-card">
+  {{ image_block(p.img, p.cat, '') }}
+  <div class="body">
+    <div class="p-top">
+      <span class="p-tag t-{{ p.tag }}">{{ p.tag }}</span>
+      <span class="p-cat">{{ p.cat }}</span>
+    </div>
+    <h3 class="title" style="font-size:var(--fs-h3)">{{ p.name }}</h3>
+    <p class="desc">{{ p.why }}</p>
+    <div class="p-foot">
+      <span class="price">{{ p.price }}</span>
+      <a class="btn btn-ghost p-buy" href="{{ p.url | default('#') }}" rel="sponsored nofollow">추천 보기 {{ icon('arrow', 14) }}</a>
+    </div>
+  </div>
+</div>
+{%- endmacro %}
+
+{# ---- 예산 분배표 ---- #}
+{% macro budget_table(budget) -%}
+<div class="budget">
+  <div class="budget-head">
+    <h3>예산 분배표</h3>
+    <span class="budget-total">합계 약 <b>{{ budget.total }}</b></span>
+  </div>
+  <div class="budget-rows">
+    {%- for r in budget.rows %}
+    <div class="brow">
+      <span class="bcat">{{ r.cat }}</span>
+      <span class="bbar"><span class="bfill" style="width: {{ r.pct }}%"></span></span>
+      <span class="bamt">{{ r.amt }}</span>
+      <span class="bpct">{{ r.pct }}%</span>
+    </div>
+    {%- endfor %}
+  </div>
+  <p class="budget-note">* 추천 구성을 모두 갖췄을 때 기준입니다. 필수 항목만 먼저 사도 충분합니다.</p>
+</div>
+{%- endmacro %}
+
+{# ---- FAQ (정적: 네이티브 details/summary 아코디언) ---- #}
+{% macro faq_section(faqs) -%}
+<div class="faq">
+  {%- for f in faqs %}
+  <details class="faq-item"{% if loop.first %} open{% endif %}>
+    <summary class="faq-q"><span>{{ f.q }}</span><span class="faq-ic" aria-hidden="true"></span></summary>
+    <p class="faq-a">{{ f.a }}</p>
+  </details>
+  {%- endfor %}
+</div>
+{%- endmacro %}

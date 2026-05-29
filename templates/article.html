@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "_macros/components.html" import icon, image_block, chip, persona_chip, scenario_card, breadcrumb, disclosure, product_card, budget_table, faq_section %}
+
+{% block title %}{{ article.title }} | 혼살림{% endblock %}
+{% block meta %}
+<meta name="description" content="{{ article.desc }}">
+{% endblock %}
+
+{% block main %}
+<div class="article">
+  <div class="wrap art-wrap">
+    {{ breadcrumb([
+        {'label': '홈', 'url': '/'},
+        {'label': '시나리오', 'url': '/scenarios/'},
+        {'label': article.title}
+    ]) }}
+
+    {{ disclosure() }}
+
+    <div class="chip-row" style="margin:22px 0 14px">
+      {{ persona_chip(article.persona, article.persona_name, solid=True, icon_name=article.persona_icon | default('')) }}
+      {{ chip(article.season) }}
+      <span class="chip ghost">{{ icon('won', 13) }} {{ article.budget }}</span>
+    </div>
+
+    <h1 class="art-title">{{ article.title }}</h1>
+    <p class="art-summary">
+      {{ article.desc }} 아래 추천은 <b>필수 → 추천 → 선택</b> 순서로 정리했습니다.
+      예산이 빠듯하면 필수 항목만 먼저 갖추고, 나머지는 천천히 채워도 됩니다.
+    </p>
+
+    <div class="art-hero-img">
+      {{ image_block(article.img, article.cap, article.season_icon) }}
+    </div>
+
+    {# 추천 상품 #}
+    <div class="art-sec">
+      <div class="art-sec-head">
+        <h2>추천 구성 <span class="muted" style="font-weight:600;font-size:16px">{{ products | length }}개</span></h2>
+        <p class="muted">각 항목의 "추천 보기"는 제휴 링크로 연결됩니다.</p>
+      </div>
+      <div class="grid-3 art-products">
+        {% for p in products %}{{ product_card(p) }}{% endfor %}
+      </div>
+    </div>
+
+    {# 예산 분배표 #}
+    <div class="art-sec">{{ budget_table(budget) }}</div>
+
+    {# FAQ #}
+    <div class="art-sec">
+      <h2 style="margin-bottom:18px">자주 묻는 질문</h2>
+      {{ faq_section(faqs) }}
+    </div>
+
+    {# 관련 시나리오 #}
+    {% if related %}
+    <div class="art-sec">
+      <h2 style="margin-bottom:24px">관련 시나리오</h2>
+      <div class="grid-3">
+        {% for r in related %}{{ scenario_card(r) }}{% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# 풀 고지 + 사업자 정보 #}
+    <div class="art-legal">
+      <h4>고지 및 사업자 정보</h4>
+      <p>
+        혼살림은 위 추천 항목 중 일부에 대해 제휴(어필리에이트) 링크를 사용하며, 링크를 통한 구매 시
+        판매자로부터 일정액의 수수료를 받을 수 있습니다. 이는 <b>독자의 구매 가격에 영향을 주지 않으며</b>,
+        추천 순서·내용은 수수료와 무관하게 실제 사용성과 만족도를 기준으로 정합니다. 가격·재고는 변동될 수 있습니다.
+      </p>
+      <div class="biz-grid">
+        <span>상호 {{ business_info.name }}</span><span>대표 {{ business_info.rep }}</span>
+        <span>사업자등록번호 {{ business_info.bizno }}</span><span>통신판매업 {{ business_info.mailorder }}</span>
+        <span>문의 {{ business_info.email }}</span><span>주소 {{ business_info.addr }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
