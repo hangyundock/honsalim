@@ -6,7 +6,7 @@
 ## ★ 시급 (다음 세션)
 
 - [ ] **공개 사이트 5종 시안** (홈·시나리오 허브·글·페르소나·About) — 사용자 claude.ai/design, DESIGN §11 (DECISIONS G3 [확정 #9])
-- [ ] (선택) 본 워크트리들(`peaceful-gagarin-b7fda4`·`dazzling-roentgen-b550f7` 등) 폐기 검토 — 세션 #8·#9 main 직접 작업 후 사용 가치 낮음
+- [x] ~~본 워크트리들 폐기~~ ✅ 세션 #10 완료 — 6개 워크트리·6개 브랜치 폐기 [확정]. 본 세션 진행 중인 `gallant-swartz-56b6c0`은 다음 세션 main 시작 시 자기 자신 제거 + 빈 폴더 `peaceful-gagarin-b7fda4` 정리
 - [ ] Scaled Content Abuse Step 2 (fail 게이트 승격) — 1~2주 운영 데이터 후 별도 세션
 
 ## 세션 #8 분리 완료 ★

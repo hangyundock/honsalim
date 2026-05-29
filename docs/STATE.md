@@ -63,9 +63,11 @@
 1. **공개 사이트 5종 시안** (홈·시나리오 허브·글·페르소나·About) — 사용자 claude.ai/design, DESIGN §11 + DECISIONS G3 [확정 #9]
 2. (참고) Phase 5 시점 (2026-11 이후) 알리 App Key/Secret 발급
 3. (선택) BitLocker D 드라이브 활성 결정
-4. (선택) 본 워크트리들 폐기 검토 (`peaceful-gagarin-b7fda4`·`dazzling-roentgen-b550f7`)
-5. (Phase 4 진입 시) about.html · Person Schema 적용 (M2-1~M2-7 사전 결정)
-6. Scaled Content Abuse Step 2 (fail 게이트 승격) — 1~2주 운영 데이터 후 별도 세션
+4. (Phase 4 진입 시) about.html · Person Schema 적용 (M2-1~M2-7 사전 결정)
+5. Scaled Content Abuse Step 2 (fail 게이트 승격) — 1~2주 운영 데이터 후 별도 세션
+
+### 해소 (세션 #10)
+- ~~본 워크트리들 폐기~~ ✅ — 7개 워크트리 중 6개 + 6개 브랜치(`claude/{busy-hermann,condescending-perlman,dazzling-roentgen,elastic-blackwell,peaceful-gagarin,sharp-volhard}`) 폐기 [확정 git worktree remove + branch -d]. 모두 main 조상 commit·uncommitted 변경 0 확인 후 안전 폐기. 잔존: `gallant-swartz-56b6c0`(본 세션 진행 워크트리) + `peaceful-gagarin-b7fda4` 빈 폴더 1개(Windows 잠금·TIMA-GUARD가 Remove-Item 차단, 다음 세션 main 시작 후 정리)
 
 ### 해소 (세션 #9)
 - ~~SUMMARY 정독~~ ✅ + ~~Google API 키 발급~~ ✅ (`D:\secrets\honsalim.env`)
