@@ -60,11 +60,14 @@
 ## 알려진 잔존 미해결
 
 ### ★ 시급 (다음 세션)
-1. **본 세션 6 commits push origin main 사용자 승인 대기** — 90d60f6 lint fix · 5f6dfde security pyproject · bf82c73 scripts.check_size_caps · 987afed security workflow · f9299ab SUMMARY_PATCH · 55243bc doctor §14
-2. **SUMMARY.md / REVIEW_QUESTIONS.md + SUMMARY_PATCH_v1.1.md 사용자 정독** — 진척 매트릭스 보조로 단축 (~30분), Phase 3 진입 게이트
-3. **pip-audit transitive 13건 분석** — 직접 의존 3건 lower-bound는 적용. 환경 pip install -U 사용자 명시 승인 후 일괄 갱신 (cryptography·idna·lxml·pip·pyasn1·urllib3)
-4. (참고) Phase 5 시점 (2026-11 이후) 알리 App Key/Secret 발급
-5. (선택) BitLocker D 드라이브 활성 결정
+1. **SUMMARY.md / REVIEW_QUESTIONS.md + SUMMARY_PATCH_v1.1.md 사용자 정독** — 진척 매트릭스 보조로 단축 (~30분), Phase 3 진입 게이트
+2. **Google AI Studio API 키 발급 + 결제 + `D:\secrets\affiliate_hub\google.env`** — Phase 3 진입 전 사용자 외부 작업 (M4 AI 이미지 검수 의존)
+3. (참고) Phase 5 시점 (2026-11 이후) 알리 App Key/Secret 발급
+4. (선택) BitLocker D 드라이브 활성 결정
+
+### 해소 (세션 #7)
+- ~~세션 #6 6 commits push origin main 승인~~ → 세션 #6 종료 시점 이미 push 완료 (EVENTS #6 "누적 17건 [확정 origin/main 모두 동기]"). 본 STATE 시급 #1 stale 정정.
+- ~~pip-audit transitive 13건 분석~~ → **pip-audit 0건 [확정 세션 #7 재검증]**. 세션 #6 `pip install -U` 16건 적용 결과 유지 중. 시스템 Python 공유 (TIMA·AutoBlog) — 단순 outdated 무차별 -U는 환경 변경 금지(CLAUDE.md §12). 보안 작업 완료.
 
 ### Phase 2 진척 가능 (검토 영향 작음)
 - (현재 안전 진척 후보 모두 소진 — 다음은 사용자 검토 4건 의존)
