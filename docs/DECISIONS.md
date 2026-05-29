@@ -58,9 +58,10 @@
 - **D9. 알리 우선 통합 (쿠팡 게이팅) [확정 2026-05-30]**: 쿠팡 파트너스는 **사이트 완성 후 승인 신청** 가능(승인된 사이트만 API 사용) — 출시 전엔 불가. 따라서 **AliExpress를 첫 상품 소스로 앞당김** (원래 Phase 5 예정 → Phase 3 착수).
   - **계정**: 기존 제휴 계정(dugi2020@naver.com, 사이트 "다비교" 보유) 사용. 이번에 만든 새 계정은 사용자 실수로 삭제 → 기존 계정으로 진행.
   - **차단 이슈**: honsalim.com 사이트 등록이 **"ali" 부분문자열 오탐**(hons**ali**m)으로 거부 → AliExpress **whitelist 수동 승인 필요** (사용자 문의 진행 중). 가짜 URL 우회 금지.
-  - **자격 증명**: `ALI_TRACKING_ID` 발급 완료 ✅. **App Key/Secret 미발급**(App 심사 대기 1~2일) — 발급 후 ali.env에 `ALI_APP_KEY`/`ALI_APP_SECRET` 추가.
+  - **자격 증명**: `ALI_TRACKING_ID`·`ALI_APP_KEY`·`ALI_APP_SECRET` 모두 ali.env 저장 완료 ✅ (2026-05-30). 개발자 프로필(Affiliates Individual·Korea) 승인 → Open Platform App Console에서 **Affiliates API 앱 생성** → 키 발급. `Standard API for Publishers(Default)` **Active**. App Status=**Test**(운영 전환 `Apply Online`은 사이트 배포 시).
   - **API 스펙** (Open Platform Affiliate API Guidance): `aliexpress.affiliate.product.query`(키워드·페이지 50/쿼리 5000) · `productdetail.get` · `category.get`. 서명 sha256 HMAC(정렬 key+value, app_secret), app_signature 비필수. 게이트웨이 `api-sg.aliexpress.com/sync`.
-  - **구현**: `src/collector/aliexpress.py` dry-run 골격 (서명이 문서 4.5 예시와 일치 검증, 회귀 +12). 라이브 실호출은 App Key/Secret 발급 후 검증 — timestamp 형식·응답 JSON 경로 최종 확인 필요.
+  - **구현·라이브 검증 완료 [확정 2026-05-30]**: `src/collector/aliexpress.py` (서명 문서 4.5 예시 일치·회귀 +12). **실호출 성공** — `timestamp=밀리초` 확정, 응답 경로(`...product_query_response→resp_result→result→products→product[]`) + 상품 매핑 전 필드 정상(name·price_krw(KRW)·deeplink_url=`s.click.aliexpress` 제휴링크·image·category·tracking=honsalim). **수집기 production-ready**. 코드 수정 불요.
+  - **잔존**: honsalim.com 사이트 등록 whitelist 승인 대기(affiliates@service.alibaba.com 문의). 차기 = 상품 수집 CLI → products 적재 → 첫 글.
 
 ## E. 정책·법무 [확정]
 

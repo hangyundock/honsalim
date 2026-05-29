@@ -45,7 +45,7 @@
 | Anthropic API Key | 영구 [관찰] | 6개월 회전 권장 — **2026-11-28** [추정] |
 | INDEXNOW_KEY | 영구 [확정 — 공개 키] | 회전 불요 |
 | GitHub PAT | 미발급 (Actions는 GITHUB_TOKEN 자동) [확정] | — |
-| AliExpress Portals | **승인 완료 + Tracking ID 발급 + ali.env 작성** [확정 doctor `[OK] secrets/ali.env (loaded)`·세션 #5] | App Key/Secret은 Phase 5 시점 발급 |
+| AliExpress Portals | **App Key/Secret 발급·라이브 검증 완료** [확정 2026-05-30 — collector.aliexpress 실호출 성공, production-ready]. honsalim.com 사이트 whitelist 대기 | 2026-05-30 |
 | 쿠팡 파트너스 | 보류 | Phase 4 (콘텐츠 누적 후) 재가입 |
 
 ## 보안 / 권한
@@ -61,7 +61,7 @@
 
 ### ★ 시급 (다음 세션)
 1. ~~**공개 사이트 5종 시안**~~ ✅ 2026-05-30 — 시안 확정(우드/그림자/미니멀) + Jinja2 템플릿 5종·CSS 구현 (G4). **차기: 정식 빌더 `builder.renderer`·DB 연동·JSON-LD 매크로·Pretendard self-host**
-2. (참고) Phase 5 시점 (2026-11 이후) 알리 App Key/Secret 발급
+2. **저장소 공개 복구됨** (private→public, 2026-05-30) — **main-protect 브랜치 보호 재활성화 필요** (Settings→Rules)
 3. (선택) BitLocker D 드라이브 활성 결정
 4. (Phase 4 진입 시) about.html · Person Schema 적용 (M2-1~M2-7 사전 결정)
 5. Scaled Content Abuse Step 2 (fail 게이트 승격) — 1~2주 운영 데이터 후 별도 세션
@@ -91,8 +91,7 @@
 ### Phase 1 잔존 (작음)
 - Actions status check Branch Protection 추가 (Phase 2 안정 후)
 - BitLocker 활성 (사용자 결정)
-- (완료) 알리 Tracking ID 발급·ali.env 작성·doctor 로드 검증 — 세션 #5
-- (보류) 알리 App Key/Secret — Phase 5 시점 발급
+- (완료) 알리 Tracking ID·App Key/Secret 발급·ali.env 저장·라이브 검증 — 2026-05-30
 
 ### 보류
 - AdSense 신청 (Phase 6, 2026-12)

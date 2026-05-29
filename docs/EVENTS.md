@@ -42,17 +42,18 @@
 **알리 외부 작업 (사용자, 진행 중·미완)**:
 - honsalim.com 사이트 등록이 **"ali" 부분문자열 오탐**(hons**ali**m)으로 거부 → whitelist 문의(대기).
 - 기존 제휴 계정(dugi2020@naver.com) 사용(새 계정 실수 삭제). k-Content Hub(blogspot) 백업 등록.
-- Open Platform Affiliate API 개발자 신청(Affiliates Individual·Korea) → **Under Review**(1~2 영업일). App Key/Secret 대기.
+- Open Platform Affiliate API 개발자 신청(Affiliates Individual·Korea) → **승인** → App Console에서 **Affiliates API 앱 생성** → App Key/Secret 발급·ali.env 저장 → **라이브 검증 성공** ✅ (밀리초 timestamp·응답 파싱·상품 매핑 전 필드 정상, deeplink=`s.click.aliexpress` 제휴링크). **수집기 production-ready**.
+- **저장소 visibility 정정**: 네이버 작업 때 private로 바꿨던 것 발견 → **public 복구**(H1 일치) → CodeQL 그린. (공개 전환으로 push ruleset 꺼짐 → main-protect 재활성화 필요)
 
 **잔존 미해결 (다음 세션)**:
-- 알리 키 발급 후: 수집기 라이브 검증(timestamp 형식·응답 JSON 경로) + 상품 적재 + 첫 글 enrich(API 비용)·검증·승인·발행
+- 상품 수집 CLI → products 적재 → 첫 글 enrich(API 비용)·검증·승인·발행
 - 빌더 잔여: 상세글 렌더·Pretendard self-host·critical CSS·feed.xml·robots.txt
-- honsalim.com whitelist 승인
+- honsalim.com 사이트 whitelist 승인 / main-protect 브랜치 보호 재활성화 / codeql-action 버전업
 
 **다음 세션 할 일**:
-1. 알리 승인 메일 확인 → App Key/Secret `ali.env` 저장
-2. `collector.aliexpress` 라이브 검증 → products 적재
-3. (대기 시) 빌더 잔여 콘텐츠 무관 항목(robots.txt·feed.xml 등)
+1. 상품 수집 CLI(`collect-products`) → products 테이블 적재
+2. 상품↔시나리오 연결 → 첫 글 enrich·검증·승인·발행
+3. (자투리) main-protect 재활성화 · codeql-action 버전업 · 빌더 잔여
 
 ---
 

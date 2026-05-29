@@ -12,10 +12,11 @@
 
 ## 알리 통합 (D9 — 쿠팡 게이팅으로 앞당김, 2026-05-30)
 
-- [ ] **honsalim.com 사이트 등록 whitelist** — "ali" 부분문자열 오탐 거부 → AliExpress 문의·수동 승인 대기 (사용자)
-- [ ] **AliExpress App Key/Secret 발급** — Open Platform App Console → Affiliate API 신청(심사 1~2일) → ali.env에 `ALI_APP_KEY`/`ALI_APP_SECRET` 추가 (사용자)
-- [ ] **`collector.aliexpress` 라이브 검증** — 키 발급 후 실호출 → timestamp 형식·응답 JSON 경로 확인 → products 적재 (dry-run 골격·서명 ✅ 회귀 +12)
-- [ ] **상품 적재 → 첫 글 enrich·발행** — enrich --no-dry-run(API 비용·1클릭 승인) → 4게이트 통과 → 발행
+- [x] ~~**App Key/Secret 발급 + 라이브 검증**~~ ✅ 2026-05-30 — 개발자 승인→앱 생성→키 ali.env 저장→실호출 성공(밀리초·매핑 확정). 수집기 production-ready (D9)
+- [ ] **상품 수집 CLI** (`collect-products --keywords ...`) → product.query 결과를 **products 테이블에 적재** (next, 핵심)
+- [ ] **상품↔시나리오 연결 → 첫 글 enrich·발행** — enrich --no-dry-run(API 비용·1클릭 승인) → 4게이트 → 발행
+- [ ] **honsalim.com 사이트 whitelist** — "ali" 오탐 → affiliates@service.alibaba.com 문의·승인 대기 (사용자)
+- [ ] **main-protect 브랜치 보호 재활성화** (공개 전환으로 꺼짐, Settings→Rules) + codeql-action 버전업
 
 ## 세션 #6 잔존 (시점 의존)
 
