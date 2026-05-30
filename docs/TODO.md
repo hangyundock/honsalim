@@ -3,20 +3,20 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 시급 (다음 세션)
+## ★ 시급 (다음 세션) — #12 갱신
 
-> 공개 사이트 5종 시안·정식 빌더 renderer 완료 (2026-05-30, DECISIONS G4 / STATE) — 상세는 그쪽 참조.
+> #12: collect-products·C-1 연결·enrich 풀구축·4게이트 통과 첫 글 완료(EVENTS #12 / STATE). 다음은 **게시 경로**.
 
-- [ ] **빌더 잔여**: 상세글(article) 렌더(게시 콘텐츠 + body_html↔템플릿 매핑) · Pretendard self-host · critical CSS · feed.xml · robots.txt (FRONTEND §7·§9). [SEO 메타·JSON-LD ✅ 2026-05-30: OG·Breadcrumb·WebSite·Org]
-- [ ] Scaled Content Abuse Step 2 (fail 게이트 승격) — 1~2주 운영 데이터 후 별도 세션
+- [ ] **게시 경로 배선 (최우선)**: promote CLI(article_writer.promote_to_article 래핑) + **상세글 렌더**(article 상세 템플릿·renderer: body_md→HTML·slug·schema 확정값) + 배포. → 검증된 draft 6 게시.
+- [ ] **워크트리 브랜치→main 병합·push** (claude/goofy-hopper-591e17 10커밋, ff 가능). /honsalim-end push origin main으론 미반영 주의.
+- [ ] **시나리오 3종 튜닝**: gaeul-30·isacheol-30·homeoffice-200 (검색어·가격밴드 라이브 검증).
+- [ ] 스타일 disclosure_banner(Phase 3~4, body_md disclosure 중복 회피) · Pretendard self-host · critical CSS · feed.xml · robots.txt.
+- [ ] **main-protect 재활성화** + codeql-action 버전업. Scaled Content Abuse Step 2.
 
-## 알리 통합 (D9 — 쿠팡 게이팅으로 앞당김, 2026-05-30)
+## 알리 통합 (D9) — #12 진척
 
-- [x] ~~**App Key/Secret 발급 + 라이브 검증**~~ ✅ 2026-05-30 — 개발자 승인→앱 생성→키 ali.env 저장→실호출 성공(밀리초·매핑 확정). 수집기 production-ready (D9)
-- [ ] **상품 수집 CLI** (`collect-products --keywords ...`) → product.query 결과를 **products 테이블에 적재** (next, 핵심)
-- [ ] **상품↔시나리오 연결 → 첫 글 enrich·발행** — enrich --no-dry-run(API 비용·1클릭 승인) → 4게이트 → 발행
+- [x] ~~App Key/Secret 발급·라이브 검증~~ ✅ (#11) / ~~**상품 수집 CLI**~~ ✅ #12 (collect-products: 가격밴드·검색어 튜닝·products+draft 적재) / ~~**상품↔시나리오 연결·첫 글 enrich·검증**~~ ✅ #12 (C-1·enrich 풀·4게이트 통과). **발행만 잔여**(위 게시 경로).
 - [ ] **honsalim.com 사이트 whitelist** — "ali" 오탐 → affiliates@service.alibaba.com 문의·승인 대기 (사용자)
-- [ ] **main-protect 브랜치 보호 재활성화** (공개 전환으로 꺼짐, Settings→Rules) + codeql-action 버전업
 
 ## 세션 #6 잔존 (시점 의존)
 

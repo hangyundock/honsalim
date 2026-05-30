@@ -7,18 +7,18 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1 ~95% + Phase 2 핵심 모듈 19개 + 회귀 352 PASS + CLI 11/11 완성 (dashboard 추가) + 결정 K1~K5 + L1~L8 + M1~M7 + M2-1~M2-7 + G3·N1 (자동 push 정책) + SUMMARY 정독 완료·Google API 키 발급 완료 + G4 공개 사이트 5종 Jinja2 템플릿 + builder.renderer (`build --full` DB→정적 5종+sitemap+SEO 메타·JSON-LD(OG·Breadcrumb·WebSite·Org), 회귀 365)** | 2026-05-30 |
+| 진행 단계 | **Phase 1~95% + Phase 2(모듈 19개·CLI·G4 사이트5종·renderer) + #12 콘텐츠 생성 파이프라인 end-to-end 완성·라이브 검증: collect-products(가격밴드·검색어 튜닝·coupang_deferred) → C-1 상품↔시나리오 연결 → enrich 풀구축(상품주입·META/BODY분리·disclosure·schema·featured) → validate 4게이트 → 첫 글 통과(draft 6 validated). disclosure 제휴처 인지형(공정위). 회귀 436 PASS. ★게시 경로(promote·상세글 렌더) 미배선** | 2026-05-30 #12 |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
 | Phase 2 핵심 모듈 18개 (#3~#5) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} · deployer/{git_push,wrangler,verify} · tracker/{d1_aggregator,**report**} · **workers/go_gateway.js** | #5 |
-| Phase 2 회귀 테스트 | **378 / 378 PASS** [확정 pytest 9.0.3, 4.61초] — 2026-05-30 +26 (renderer 9 + jsonld 4 + cli-enrich 1 + aliexpress 12). 분배: validator 42 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 49 + manifest 22 + db 12 + cli 47 + article_writer 25 + integration_phase2 18 + deployer 14 + tracker 25 + check_size_caps 9 + dashboard 10 + renderer 9 + **aliexpress 12** | 2026-05-30 |
-| CLI 명령 (BACKEND §9) | **11/11 완성** — doctor · db migrate/seed · collect · enrich · validate · approve · unapprove · deploy · build · **dashboard** (drafts 단일 HTML, --open 옵션). DECISIONS G3 [확정 #9] (Claude Design 미사용·stub HTML) | #9 |
+| Phase 2 회귀 테스트 | **436 / 436 PASS** [확정 pytest, #12] — #12 +58 (products_store·keyword_map·collect-products·C-1·split_article_response·truncation·apply_disclosure·affiliate-aware disclosure 등). 이전: 378 +26 (renderer 9 + jsonld 4 + cli-enrich 1 + aliexpress 12). 분배: validator 42 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 49 + manifest 22 + db 12 + cli 47 + article_writer 25 + integration_phase2 18 + deployer 14 + tracker 25 + check_size_caps 9 + dashboard 10 + renderer 9 + **aliexpress 12** | 2026-05-30 |
+| CLI 명령 (BACKEND §9) | **12개** — doctor · db · collect · **collect-products(#12 신규: --keywords/--scenario, 가격밴드, products+draft 적재)** · enrich(#12 풀구축: 상품주입·분리·disclosure·schema·featured) · validate · approve · unapprove · deploy · build · dashboard. ★promote CLI 미배선(article_writer 함수만) | #12 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + 4 게이트 통합(validate_and_save) + META-JSON + Article JSON-LD + 1인칭/사진 게이트. 영구화 세션 #4 시점 5개 사항(tracker.d1_aggregator·deployer·builder.manifest·enricher.retry·state_machine 매트릭스 보강) → DECISIONS J + EVENTS #4·#5 누적 | #4~#5 |
 | doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 **41개** (+4 dashboard) · §11 state_machine 매트릭스 · §12 tests 로드 · §13 Workers JS (go_gateway.js) · §14 docs/ size cap | #9 |
 | DB 초기화 | `data/honsalim.db` v1 + 13 테이블 + personas 3 + scenarios 10 (seed idempotent) | #3 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (PLAN·ARCH·DB·SCENARIOS·DESIGN·FRONTEND·BACKEND·POLICY·OPS·BACKUP·MAINTENANCE·SCHEDULE). 일관성 모순 0건 | #2 |
 | 사전 작성 산출물 (#2) | SQL 2편 + 설정 5건 + prompt_templates 6종 + 인프라 7건 (pyproject·wrangler·workflows·README·CHANGELOG 등). 세부는 EVENTS_202605.md | #2 |
-| 메모리 시스템 | feedback 4건 ([[no-speculation]] · [[same-session-continuity]] · [[no-excessive-approval]] #4 · [[no-end-of-step-prompting]] #6) + ~~project naver~~ (#8 D:\naver_blog\로 이전, redirect stub만 남음) + reference market_research + MEMORY.md | #8 |
+| 메모리 시스템 | feedback 7건 (#9 [[no-unfounded-priority]] · **#12 [[incremental-critical-review]](배치금지·1건씩 점검·근본해결) · [[autonomous-safe-system]](무인·안전·자율)** 추가) + reference market_research + MEMORY.md | #12 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
 | 사이트 게시글 / 트래픽 / 수익 | 0편 (Phase 4 출시 전) / N/A / N/A | #2 |
 
@@ -59,12 +59,13 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 시급 (다음 세션)
-1. ~~**공개 사이트 5종 시안**~~ ✅ 2026-05-30 — 시안 확정(우드/그림자/미니멀) + Jinja2 템플릿 5종·CSS 구현 (G4). **차기: 정식 빌더 `builder.renderer`·DB 연동·JSON-LD 매크로·Pretendard self-host**
-2. **저장소 공개 복구됨** (private→public, 2026-05-30) — **main-protect 브랜치 보호 재활성화 필요** (Settings→Rules)
-3. (선택) BitLocker D 드라이브 활성 결정
-4. (Phase 4 진입 시) about.html · Person Schema 적용 (M2-1~M2-7 사전 결정)
-5. Scaled Content Abuse Step 2 (fail 게이트 승격) — 1~2주 운영 데이터 후 별도 세션
+### ★ 시급 (다음 세션) — #12 갱신
+1. **게시 경로 배선 (최우선)**: approve(CLI 有) → **promote CLI 미배선**(article_writer.promote_to_article 함수만) → **상세글 렌더 미구현**(article 상세 템플릿·renderer) → 배포. markdown→HTML·slug 생성·article 필드 조립(body_html·content_hash·disclosure_first)·schema_jsonld 확정값(이미지·발행일) 필요. → 검증된 draft 6 게시 가능 상태.
+2. **워크트리 브랜치 main 병합·push** — 세션 #12 10커밋이 `claude/goofy-hopper-591e17`에 있음, main #11 미이동(ff 가능). /honsalim-end의 push origin main으론 안 올라감(주의).
+3. **시나리오 3종 미튜닝**: gaeul-30·isacheol-30·homeoffice-200 (collect-products 검색어·밴드).
+4. 스타일 disclosure_banner(POLICY §2-2 배치, Phase 3~4 렌더 시 body_md disclosure와 중복 회피 조율).
+5. **main-protect 브랜치 보호 재활성화** (public 전환으로 꺼짐) · honsalim.com 알리 whitelist(사용자·대기).
+6. (Phase 4) about.html·Person Schema · Scaled Content Abuse Step 2.
 
 ### 해소 (세션 #10)
 - ~~본 워크트리들 폐기~~ ✅ — 7개 워크트리 중 6개 + 6개 브랜치(`claude/{busy-hermann,condescending-perlman,dazzling-roentgen,elastic-blackwell,peaceful-gagarin,sharp-volhard}`) 폐기 [확정 git worktree remove + branch -d]. 모두 main 조상 commit·uncommitted 변경 0 확인 후 안전 폐기. 잔존: `gallant-swartz-56b6c0`(본 세션 진행 워크트리) + `peaceful-gagarin-b7fda4` 빈 폴더 1개(Windows 잠금·TIMA-GUARD가 Remove-Item 차단, 다음 세션 main 시작 후 정리)
