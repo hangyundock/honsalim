@@ -82,8 +82,16 @@ def compute_content_hash(body_md: str) -> str:
 def extract_disclosure_first(body_md: str) -> str | None:
     """본문 첫머리에서 disclosure 문구 추출 (POLICY §2-2 표준 문구).
 
-    첫 단락(\\n\\n 전) 또는 처음 300자 안에서 "쿠팡 파트너스" + "수수료"
-    키워드 둘 다 포함된 텍스트를 추출해 반환. 찾지 못하면 None.
+    첫 단락(\\n\\n 전) 또는 처음 300자 안에서 표준 disclosure를 추출해 반환.
+    찾지 못하면 None.
+
+    판정 기준 (제휴처 무관 — 공정위 정확성):
+    1) 표준 첫머리 마커 ``일정 수수료를 제공받습니다`` 존재 (쿠팡·알리·both 모든
+       변형 공통, apply_disclosure가 보장) — **또는**
+    2) (하위호환) "쿠팡 파트너스" + "수수료" 키워드 둘 다 존재.
+
+    이전엔 (2)만 검사해 AliExpress 첫머리(쿠팡 미포함)가 None으로 빠졌고,
+    promote 시 disclosure_first NOT NULL 위반을 유발했다 — 마커 기준으로 근본 수정.
 
     반환된 문자열은 articles.disclosure_first 컬럼에 그대로 저장 가능.
     validator.disclosure 게이트는 별도로 본문 첫 200자 안의 키워드 존재를
@@ -98,7 +106,7 @@ def extract_disclosure_first(body_md: str) -> str | None:
     first_para = first_para.strip()
     if not first_para:
         return None
-    if all(keyword in first_para for keyword in DISCLOSURE_FIRST_KEYWORDS):
+    if _FIRST_MARK in first_para or all(k in first_para for k in DISCLOSURE_FIRST_KEYWORDS):
         return first_para
     return None
 
@@ -370,3 +378,66 @@ def promote_to_article(
     conn.commit()
 
     return article_id
+
+
+def unique_article_slug(conn: sqlite3.Connection, base_slug: str) -> str:
+    """articles.slug 충돌 시 ``-2``, ``-3`` … 접미사로 유일 slug 반환.
+
+    같은 시나리오로 두 번째 글을 게시할 때 slug 충돌(UNIQUE)을 피한다.
+    """
+    slug = base_slug
+    n = 2
+    while conn.execute("SELECT 1 FROM articles WHERE slug = ?", (slug,)).fetchone():
+        slug = f"{base_slug}-{n}"
+        n += 1
+    return slug
+
+
+def link_article_products(
+    conn: sqlite3.Connection,
+    article_id: int,
+    featured: Iterable[dict[str, Any]],
+    *,
+    replace: bool = True,
+) -> tuple[int, int]:
+    """featured 상품(enriched_payload['products'])을 article_products에 연결 (DB §5).
+
+    각 featured 항목의 source_product_id(+source)로 products.id를 찾아
+    article_products(article_id, product_id, display_order, recommendation_note)
+    INSERT. display_order는 입력 순서(0-base). products에 없는 항목은 건너뛴다
+    (link 0개여도 게시는 막지 않되 호출자가 경고).
+
+    replace=True: 기존 연결을 먼저 삭제 후 재삽입 (재게시 멱등).
+    반환: (linked, skipped) 카운트.
+    """
+    if replace:
+        conn.execute("DELETE FROM article_products WHERE article_id = ?", (article_id,))
+    linked = 0
+    skipped = 0
+    for order, f in enumerate(featured):
+        spid = f.get("source_product_id")
+        if not spid:
+            skipped += 1
+            continue
+        src = f.get("source")
+        if src:
+            prow = conn.execute(
+                "SELECT id FROM products WHERE source_product_id = ? AND source = ?",
+                (str(spid), str(src)),
+            ).fetchone()
+        else:
+            prow = conn.execute(
+                "SELECT id FROM products WHERE source_product_id = ?", (str(spid),)
+            ).fetchone()
+        if prow is None:
+            skipped += 1
+            continue
+        conn.execute(
+            "INSERT INTO article_products "
+            "(article_id, product_id, display_order, recommendation_note) "
+            "VALUES (?, ?, ?, ?)",
+            (article_id, int(prow[0]), order, f.get("recommendation_note")),
+        )
+        linked += 1
+    conn.commit()
+    return linked, skipped

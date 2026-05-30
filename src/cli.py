@@ -218,6 +218,8 @@ def _check_phase2_modules() -> bool:
         ("writer.article_writer", "save_enriched"),
         ("writer.article_writer", "validate_and_save"),
         ("writer.article_writer", "promote_to_article"),
+        ("writer.article_writer", "link_article_products"),
+        ("writer.article_writer", "unique_article_slug"),
         ("writer.article_writer", "compute_content_hash"),
         ("writer.article_writer", "extract_disclosure_first"),
         ("writer.state_machine", "transition"),
@@ -249,6 +251,8 @@ def _check_phase2_modules() -> bool:
         ("tracker", "top_articles_by_clicks"),
         ("tracker", "weekly"),
         ("tracker", "monthly"),
+        ("tracker", "sync_slug_map"),
+        ("tracker", "collect_slug_map_entries"),
         ("dashboard.render", "render_dashboard"),
         ("dashboard.render", "render_html"),
         ("dashboard.render", "fetch_drafts_by_status"),
@@ -718,6 +722,103 @@ def cmd_approve(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def cmd_promote(args: argparse.Namespace) -> int:
+    """approved draft → articles + article_products → published (게시 경로 배선).
+
+    검증·승인된 enriched_payload(본문·메타)로 article_fields를 조립한다:
+    - body_html : markdown → HTML 변환 (검증된 body_md 그대로 — content_hash 무결)
+    - slug      : scenario.slug (충돌 시 -2 …)
+    - content_hash · disclosure_first · truth/approved 타임스탬프
+    그 후 promote_to_article + link_article_products(featured → /go/ 제휴 링크 소스).
+    """
+    from datetime import datetime, timezone
+
+    import markdown as md_lib  # BACKEND §10-1 1차 의존성
+
+    from writer import article_writer
+
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        row = conn.execute(
+            "SELECT scenario_id, status, enriched_payload FROM drafts WHERE id = ?",
+            (args.draft,),
+        ).fetchone()
+        if row is None:
+            print(f"{FAIL} draft {args.draft} 없음")
+            return 2
+        scenario_id, status, ep_json = row[0], row[1], row[2]
+        if status != "approved":
+            print(f"{FAIL} draft {args.draft} 상태={status!r} — approve(승인) 후에만 게시 가능")
+            return 2
+        if not ep_json:
+            print(f"{FAIL} draft {args.draft} enriched_payload 비어있음")
+            return 2
+
+        ep = json.loads(ep_json)
+        body_md = ep.get("body_md")
+        if not body_md:
+            print(f"{FAIL} draft {args.draft} body_md 없음 — 라이브 enrich 후 게시 가능")
+            return 2
+        missing_meta = [
+            k for k in ("title", "summary", "meta_description", "schema_jsonld") if not ep.get(k)
+        ]
+        if missing_meta:
+            print(f"{FAIL} enriched_payload 메타 누락: {missing_meta}")
+            return 2
+
+        srow = conn.execute("SELECT slug FROM scenarios WHERE id = ?", (scenario_id,)).fetchone()
+        if srow is None:
+            print(f"{FAIL} scenario id={scenario_id} 없음")
+            return 2
+        slug = article_writer.unique_article_slug(conn, srow[0])
+
+        disclosure_first = article_writer.extract_disclosure_first(body_md)
+        if not disclosure_first:
+            print(f"{FAIL} 첫머리 disclosure 추출 실패 — POLICY §2-2 표준 문구 누락 (게시 중단)")
+            return 2
+
+        # 검증된 body_md를 변형 없이 HTML 변환 (본문 무결성 — validated 본문 = published 본문)
+        body_html = md_lib.markdown(body_md, extensions=["extra", "sane_lists"])
+
+        article_fields: dict[str, Any] = {
+            "slug": slug,
+            "scenario_id": scenario_id,
+            "title": ep["title"],
+            "summary": ep["summary"],
+            "body_md": body_md,
+            "body_html": body_html,
+            "meta_description": ep["meta_description"],
+            "meta_keywords": ep.get("meta_keywords"),
+            "schema_jsonld": ep["schema_jsonld"],
+            "disclosure_first": disclosure_first,
+            "content_hash": article_writer.compute_content_hash(body_md),
+            "truth_check_passed_at": now,
+            "user_approved_at": now,
+            "user_approved_note": args.note,
+        }
+        article_id = article_writer.promote_to_article(conn, args.draft, article_fields)
+
+        featured = ep.get("products") or []
+        linked, skipped = article_writer.link_article_products(conn, article_id, featured)
+
+        print(f"{OK} draft {args.draft} → published (article {article_id}, slug={slug!r})")
+        msg = f"     제휴 상품 연결 {linked}개"
+        if skipped:
+            msg += f" · 매칭 실패 {skipped}개 (products 미존재)"
+        print(msg)
+        if featured and linked == 0:
+            print(
+                f"{WARN} 연결된 제휴 상품 0개 — /go/ 링크 없는 글. "
+                "featured 상품이 products 테이블에 없습니다 (collect-products 먼저)"
+            )
+        print(f"     URL: /articles/{slug}/  (build 후 정적 렌더)")
+        return 0
+    finally:
+        conn.close()
+
+
 def cmd_collect(args: argparse.Namespace) -> int:
     """scenario slug → drafts INSERT (status='collected'). BACKEND §9 [확정]."""
     from writer import article_writer
@@ -937,6 +1038,47 @@ def cmd_deploy(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_sync_slugmap(args: argparse.Namespace) -> int:
+    """published 상품 → D1 slug_map UPSERT (DB §11-2). 기본 dry_run.
+
+    /go/<slug> 게이트웨이(go_gateway.js)가 조회하는 D1 라우팅 테이블 갱신.
+    게시된 글에 연결된 상품의 deeplink_slug → deeplink_url만 노출(미게시 비노출).
+    dry_run=True 기본 — 라이브는 wrangler d1 execute(외부 D1 쓰기·명시 승인, §2-라).
+    """
+    from tracker import slug_map as sm
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        result = sm.sync_slug_map(
+            conn,
+            database_name=args.database,
+            cwd=str(PROJECT_ROOT),
+            dry_run=args.dry_run,
+        )
+    finally:
+        conn.close()
+
+    mode = "dry_run" if result.dry_run else "live"
+    print(f"{OK} sync-slugmap ({mode}) — slug {len(result.entries)}개")
+    for e in result.entries[:20]:
+        print(f"     /go/{e['slug']} → {e['source']} (product {e['product_id_local']})")
+    if len(result.entries) > 20:
+        print(f"     … 외 {len(result.entries) - 20}개")
+    if not result.entries:
+        print("     [NOTE] 게시 글 연결 상품 0개 — 동기화 대상 없음 (promote 먼저)")
+        return 0
+    if result.dry_run:
+        print("     [DRY] 실제 D1 쓰기 없음 — 라이브는 --no-dry-run (wrangler·명시 승인)")
+        return 0
+    if result.error:
+        print(f"{FAIL} D1 실행 실패: {result.error}")
+        if result.stderr:
+            print(f"     stderr: {result.stderr.strip()[:300]}")
+        return 3
+    print(f"{OK} D1 slug_map UPSERT 완료 ({len(result.entries)}개)")
+    return 0
+
+
 def cmd_dashboard(args: argparse.Namespace) -> int:
     """drafts 단일 HTML 미리보기 생성 (BACKEND §2-6 + DECISIONS G3 [확정 #9]).
 
@@ -1046,6 +1188,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_approve.add_argument("--note", type=str, default=None, help="승인 메모")
     p_approve.set_defaults(func=cmd_approve)
 
+    # BACKEND §9 [확정] — promote: approved draft → articles + article_products → published
+    p_promote = sub.add_parser(
+        "promote",
+        help="approved draft 게시 (articles + article_products INSERT, status=published)",
+    )
+    p_promote.add_argument("--draft", type=int, required=True, help="draft id")
+    p_promote.add_argument(
+        "--note", type=str, default=None, help="게시 메모 (articles.user_approved_note)"
+    )
+    p_promote.set_defaults(func=cmd_promote)
+
     p_collect = sub.add_parser("collect", help="scenario slug → drafts 생성 (status=collected)")
     p_collect.add_argument("scenario_slug", type=str, help="scenarios.slug")
     p_collect.set_defaults(func=cmd_collect)
@@ -1113,11 +1266,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_deploy.add_argument("--remote", type=str, default="origin", help="git push remote")
     p_deploy.add_argument("--branch", type=str, default="main", help="git push branch")
-    p_deploy.add_argument("--build-dir", type=str, default="build", help="wrangler 배포 디렉토리")
+    p_deploy.add_argument(
+        "--build-dir",
+        type=str,
+        default="build/site",
+        help="wrangler 배포 디렉토리 (renderer 산출물 = build/site)",
+    )
     p_deploy.add_argument(
         "--project", type=str, default="honsalim", help="Cloudflare Pages 프로젝트 이름"
     )
     p_deploy.set_defaults(func=cmd_deploy, dry_run=True)
+
+    # DB §11-2 [확정] — sync-slugmap: published 상품 → D1 slug_map UPSERT (/go/ 라우팅)
+    p_sync = sub.add_parser(
+        "sync-slugmap",
+        help="published 상품 → D1 slug_map UPSERT (/go/ 게이트웨이 라우팅, 기본 dry_run)",
+    )
+    p_sync.add_argument(
+        "--database", type=str, default="honsalim-clicks", help="D1 database 이름/ID"
+    )
+    p_sync.add_argument(
+        "--no-dry-run",
+        dest="dry_run",
+        action="store_false",
+        help="실제 wrangler d1 execute (외부 D1 쓰기 — 명시 승인 후)",
+    )
+    p_sync.set_defaults(func=cmd_sync_slugmap, dry_run=True)
 
     # BACKEND §9 [확정] — build: manifest 로드 (Phase 2 stub, renderer 미작성)
     p_build = sub.add_parser(

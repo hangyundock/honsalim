@@ -31,6 +31,20 @@ DEFAULT_OUT = PROJECT_ROOT / "build" / "site"
 SITE_ORIGIN = "https://honsalim.com"
 SITE_DESC = "1인 가구·자취·홈오피스·일상살림 추천 가이드. 혼자 살림을 따뜻하게 시작하세요."
 
+# robots.txt — /go/ 게이트웨이(제휴 redirect)는 색인 제외, sitemap 안내
+ROBOTS_TXT = f"User-agent: *\nAllow: /\nDisallow: /go/\n\nSitemap: {SITE_ORIGIN}/sitemap.xml\n"
+
+# Cloudflare Pages _headers — 정적 자산 장기 캐시 + 기본 보안 헤더 (FRONTEND §9 / POLICY §6)
+HEADERS_FILE = (
+    "/static/*\n"
+    "  Cache-Control: public, max-age=31536000, immutable\n"
+    "\n"
+    "/*\n"
+    "  X-Content-Type-Options: nosniff\n"
+    "  Referrer-Policy: strict-origin-when-cross-origin\n"
+    "  X-Frame-Options: DENY\n"
+)
+
 WOOD = ["var(--wood-1)", "var(--wood-2)", "var(--wood-3)", "var(--wood-4)"]
 PERSONA_ICON = {"cheot-jachi": "key", "homeoffice": "laptop", "minimal-life": "plant"}
 PERSONA_IMG = {
@@ -117,6 +131,11 @@ def _budget_tier(mx: int | None) -> str:
 
 def _scenario_card(row: sqlite3.Row, idx: int) -> dict:
     slug = row["slug"]
+    # 게시된 글이 있는 시나리오만 /articles/<slug>/로 링크 — 없으면 url=None(비클릭 '준비 중').
+    # 글 없는 카드가 404로 가는 것을 방지 (콘텐츠 단계적 발행 중 깨진 링크 회피).
+    article_slug = row["article_slug"] if "article_slug" in row.keys() else None
+    has_article = bool(article_slug)
+    product_count = row["product_count"] if "product_count" in row.keys() else 0
     return {
         "id": slug,
         "title": row["title_ko"],
@@ -128,16 +147,23 @@ def _scenario_card(row: sqlite3.Row, idx: int) -> dict:
         "season_icon": "",  # season_peak는 월 범위 텍스트 — 아이콘 오매핑 회피
         "budget": _budget_display(row["budget_min_krw"], row["budget_max_krw"]),
         "budget_tier": _budget_tier(row["budget_max_krw"]),
-        "count": 0,  # 게시 전 — 상품 수 미정
+        "count": product_count if has_article else 0,
         "img": WOOD[idx % len(WOOD)],
         "cap": row["season_peak"] or "",
-        "url": f"/articles/{slug}/",
+        "url": f"/articles/{article_slug}/" if has_article else None,
+        "available": has_article,
     }
 
 
 def _load_scenarios(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute("""
-        SELECT s.*, p.slug AS persona_slug, p.title_ko AS persona_title
+        SELECT s.*, p.slug AS persona_slug, p.title_ko AS persona_title,
+               (SELECT a.slug FROM articles a
+                WHERE a.scenario_id = s.id AND a.status = 'published'
+                ORDER BY a.published_at DESC LIMIT 1) AS article_slug,
+               (SELECT COUNT(*) FROM article_products ap
+                JOIN articles a2 ON a2.id = ap.article_id
+                WHERE a2.scenario_id = s.id AND a2.status = 'published') AS product_count
         FROM scenarios s JOIN personas p ON p.id = s.persona_id
         WHERE s.active = 1
         ORDER BY s.priority DESC, s.id
@@ -180,6 +206,78 @@ def _load_personas(conn: sqlite3.Connection) -> list[dict]:
     return out
 
 
+ARTICLE_DETAIL_SQL = """
+    SELECT a.id, a.slug, a.title, a.summary, a.body_html, a.meta_description,
+           a.schema_jsonld, a.published_at,
+           s.season_peak, s.budget_min_krw, s.budget_max_krw,
+           p.slug AS persona_slug, p.title_ko AS persona_title
+    FROM articles a
+    JOIN scenarios s ON s.id = a.scenario_id
+    JOIN personas p ON p.id = s.persona_id
+    WHERE a.status = 'published'
+    ORDER BY a.published_at DESC
+"""
+
+ARTICLE_PRODUCTS_SQL = """
+    SELECT pr.name, pr.price_krw, pr.deeplink_slug, pr.category_path
+    FROM article_products ap
+    JOIN products pr ON pr.id = ap.product_id
+    WHERE ap.article_id = ?
+    ORDER BY ap.display_order, ap.product_id
+"""
+
+
+def _price_krw(value: int | None) -> str:
+    return f"{value:,}원" if value else ""
+
+
+def _load_article_pages(conn: sqlite3.Connection) -> list[dict]:
+    """published articles → 상세글 렌더 컨텍스트 (산문 본문 + /go/ 제휴 상품 카드).
+
+    article.html 계약에 맞춘 dict: article(메타·body_html·페르소나/시즌/예산 칩) +
+    products(이름·가격·/go/ 링크). 이미지는 우드톤 placeholder(§9 외부 이미지
+    저작권 회색지대 회피 — 실제 대표 이미지는 Phase 3 AI 생성).
+    """
+    rows = conn.execute(ARTICLE_DETAIL_SQL).fetchall()
+    pages: list[dict] = []
+    for row in rows:
+        prods = conn.execute(ARTICLE_PRODUCTS_SQL, (row["id"],)).fetchall()
+        products = [
+            {
+                "name": pr["name"],
+                "price": _price_krw(pr["price_krw"]),
+                "url": f"/go/{pr['deeplink_slug']}",
+                "img": WOOD[i % len(WOOD)],
+                "cat": pr["category_path"] or "",
+                "tag": "",  # 필수/추천/선택 등급 데이터 없음(v1) — 본문이 설명 담당
+                "why": "",  # recommendation_note 미사용(v1)
+            }
+            for i, pr in enumerate(prods)
+        ]
+        pages.append(
+            {
+                "slug": row["slug"],
+                "title": row["title"],
+                "meta_description": row["meta_description"],
+                "schema_raw": row["schema_jsonld"],
+                "article": {
+                    "slug": row["slug"],
+                    "title": row["title"],
+                    "summary": row["summary"],
+                    "desc": row["meta_description"],
+                    "body_html": row["body_html"],
+                    "persona": row["persona_slug"],
+                    "persona_name": row["persona_title"],
+                    "persona_icon": PERSONA_ICON.get(row["persona_slug"], ""),
+                    "season": row["season_peak"] or "",
+                    "budget": _budget_display(row["budget_min_krw"], row["budget_max_krw"]),
+                },
+                "products": products,
+            }
+        )
+    return pages
+
+
 def _sitemap(urls: list[str]) -> str:
     items = "\n".join(f"  <url><loc>{SITE_ORIGIN}{u}</loc></url>" for u in urls)
     return (
@@ -196,9 +294,7 @@ def render_site(out_dir: Path = DEFAULT_OUT, db_path: Path = db.DB_PATH) -> dict
     try:
         scenarios = _load_scenarios(conn)
         personas = _load_personas(conn)
-        articles = conn.execute(
-            "SELECT slug FROM articles WHERE status = 'published' ORDER BY published_at DESC"
-        ).fetchall()
+        article_pages = _load_article_pages(conn)
     finally:
         conn.close()
 
@@ -217,7 +313,8 @@ def render_site(out_dir: Path = DEFAULT_OUT, db_path: Path = db.DB_PATH) -> dict
     def w(rel: str, html: str) -> None:
         page = out_dir / rel
         page.parent.mkdir(parents=True, exist_ok=True)
-        page.write_text(html, encoding="utf-8")
+        # newline="\n" — Windows에서도 LF로 통일 (배포 산출물 CRLF churn 방지)
+        page.write_text(html, encoding="utf-8", newline="\n")
         written.append(rel)
 
     # 홈 (상위 우선순위 6개)
@@ -320,8 +417,37 @@ def render_site(out_dir: Path = DEFAULT_OUT, db_path: Path = db.DB_PATH) -> dict
     # 404
     w("404.html", env.get_template("404.html").render(active_nav="", **common))
 
-    # 상세글: published articles만. 현재 0편 → 미렌더 (body_html↔템플릿 매핑은 콘텐츠 단계).
-    article_slugs = [a["slug"] for a in articles]
+    # 상세글: published articles → article.html (산문 body_html + /go/ 제휴 상품 카드)
+    art_tmpl = env.get_template("article.html")
+    for pg in article_pages:
+        slug = pg["slug"]
+        schema = jsonld.as_script_tags(
+            [
+                jsonld.build_breadcrumb_jsonld(
+                    [
+                        {"name": "홈", "url": "/"},
+                        {"name": "시나리오", "url": "/scenarios/"},
+                        {"name": pg["title"]},
+                    ],
+                    SITE_ORIGIN,
+                ),
+                pg["schema_raw"],
+            ]
+        )
+        w(
+            f"articles/{slug}/index.html",
+            art_tmpl.render(
+                active_nav="",
+                canonical_url=f"{SITE_ORIGIN}/articles/{slug}/",
+                meta_title=f"{pg['title']} | 혼살림",
+                meta_description=pg["meta_description"],
+                schema_jsonld=schema,
+                article=pg["article"],
+                products=pg["products"],
+                **common,
+            ),
+        )
+    article_slugs = [pg["slug"] for pg in article_pages]
 
     # sitemap.xml
     urls = (
@@ -330,6 +456,10 @@ def render_site(out_dir: Path = DEFAULT_OUT, db_path: Path = db.DB_PATH) -> dict
         + [f"/articles/{slug}/" for slug in article_slugs]
     )
     w("sitemap.xml", _sitemap(urls))
+
+    # robots.txt + _headers (배포 산출물 — 색인 규칙·캐시·보안 헤더)
+    w("robots.txt", ROBOTS_TXT)
+    w("_headers", HEADERS_FILE)
 
     # static 복사
     shutil.copytree(STATIC_DIR, out_dir / "static", dirs_exist_ok=True)

@@ -211,6 +211,25 @@ class TestPhase2Commands:
         with raises(SystemExit):
             parser.parse_args(["unapprove"])
 
+    # promote
+    def test_promote_subcommand_recognized(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["promote", "--draft", "6"])
+        assert args.command == "promote"
+        assert args.draft == 6
+        assert args.note is None
+        assert args.func == cli.cmd_promote
+
+    def test_promote_note_flag(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["promote", "--draft", "6", "--note", "게시 승인"])
+        assert args.note == "게시 승인"
+
+    def test_promote_requires_draft_id(self) -> None:
+        parser = cli.build_parser()
+        with raises(SystemExit):
+            parser.parse_args(["promote"])
+
 
 class TestStateMachineMatrixUnapprove:
     """세션 #4 — BACKEND §9 unapprove 정합: approved → validated 허용."""
@@ -274,7 +293,7 @@ class TestDeployParser:
         args = parser.parse_args(["deploy"])
         assert args.remote == "origin"
         assert args.branch == "main"
-        assert args.build_dir == "build"
+        assert args.build_dir == "build/site"  # renderer 산출물 경로
         assert args.project == "honsalim"
 
     def test_deploy_dry_run_executes_without_external_call(self) -> None:
@@ -353,6 +372,102 @@ class TestEnrichCommandExecution:
         finally:
             conn.close()
         assert status == "enriched"
+
+
+class TestPromoteCommandExecution:
+    """promote 명령 실제 실행 — approved draft → articles + article_products → published."""
+
+    def _insert_product(self, conn: Any, spid: str) -> None:
+        conn.execute(
+            "INSERT INTO products (source, source_product_id, name, currency, price_krw, "
+            "deeplink_url, deeplink_slug, affiliate_tag, created_at, updated_at, last_seen_at) "
+            "VALUES ('aliexpress', ?, '상품', 'KRW', 12000, ?, ?, 'honsalim', "
+            "datetime('now'), datetime('now'), datetime('now'))",
+            (spid, f"https://s.click.aliexpress.com/{spid}", f"ali-{spid}"),
+        )
+        conn.commit()
+
+    def test_approved_draft_promotes_with_products(self, tmp_path: Any, monkeypatch: Any) -> None:
+        from builder.jsonld import build_article_jsonld
+        from common import db
+        from writer import article_writer
+        from writer.state_machine import transition
+
+        tmp_db = tmp_path / "cli_promote.db"
+        monkeypatch.setattr(db, "DB_PATH", tmp_db)
+        db.migrate(db_path=tmp_db)
+        db.seed(db_path=tmp_db)
+
+        body = (
+            "이 글에는 AliExpress 어필리에이트 활동의 일환으로 일정 수수료를 제공받습니다. "
+            "(구매자에게 추가 비용은 발생하지 않습니다.)\n\n# 제목\n본문 12,000원.\n\n"
+            "혼살림은 쿠팡 파트너스 및 AliExpress Portals 어필리에이트 활동의 일환으로 "
+            "일정 수수료를 받습니다. 어필리에이트 정책을 준수합니다."
+        )
+        conn = db.connect(tmp_db)
+        try:
+            srow = conn.execute("SELECT id, slug FROM scenarios ORDER BY id LIMIT 1").fetchone()
+            scenario_id, scenario_slug = srow[0], srow[1]
+            self._insert_product(conn, "sp1")
+            schema = build_article_jsonld(
+                meta={"title": "제목", "meta_description": "메타 설명입니다"},
+                scenario={"slug": scenario_slug},
+                site_base_url="https://honsalim.com",
+                image_url="https://honsalim.com/static/img/og-default.png",
+                published_at="2026-05-30",
+            )
+            did = article_writer.create_draft(conn, scenario_id=scenario_id)
+            transition(conn, did, "enriched")
+            article_writer.save_enriched(
+                conn,
+                did,
+                {
+                    "body_md": body,
+                    "title": "제목",
+                    "summary": "요약",
+                    "meta_description": "메타 설명입니다",
+                    "schema_jsonld": schema,
+                    "products": [{"source": "aliexpress", "source_product_id": "sp1"}],
+                },
+            )
+            transition(conn, did, "validated")
+            transition(conn, did, "approved")
+        finally:
+            conn.close()
+
+        assert cli.cmd_promote(argparse.Namespace(draft=did, note=None)) == 0
+
+        conn = db.connect(tmp_db)
+        try:
+            art = conn.execute(
+                "SELECT id, status FROM articles WHERE scenario_id = ?", (scenario_id,)
+            ).fetchone()
+            assert art is not None
+            assert art[1] == "published"
+            cnt = conn.execute(
+                "SELECT COUNT(*) FROM article_products WHERE article_id = ?", (art[0],)
+            ).fetchone()[0]
+            assert cnt == 1
+            dstatus = conn.execute("SELECT status FROM drafts WHERE id = ?", (did,)).fetchone()[0]
+            assert dstatus == "published"
+        finally:
+            conn.close()
+
+    def test_promote_rejects_non_approved(self, tmp_path: Any, monkeypatch: Any) -> None:
+        from common import db
+        from writer import article_writer
+
+        tmp_db = tmp_path / "cli_promote2.db"
+        monkeypatch.setattr(db, "DB_PATH", tmp_db)
+        db.migrate(db_path=tmp_db)
+        db.seed(db_path=tmp_db)
+        conn = db.connect(tmp_db)
+        try:
+            did = article_writer.create_draft(conn, scenario_id=1)  # collected 상태
+        finally:
+            conn.close()
+        # 승인 안 된 draft 게시 시도 → 데이터 에러(rc=2), articles 미생성
+        assert cli.cmd_promote(argparse.Namespace(draft=did, note=None)) == 2
 
 
 if __name__ == "__main__":

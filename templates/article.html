@@ -1,10 +1,7 @@
 {% extends "base.html" %}
-{% from "_macros/components.html" import icon, image_block, chip, persona_chip, scenario_card, breadcrumb, disclosure, product_card, budget_table, faq_section %}
+{% from "_macros/components.html" import icon, chip, persona_chip, breadcrumb, product_card %}
 
 {% block title %}{{ article.title }} | 혼살림{% endblock %}
-{% block meta %}
-<meta name="description" content="{{ article.desc }}">
-{% endblock %}
 
 {% block main %}
 <div class="article">
@@ -15,50 +12,26 @@
         {'label': article.title}
     ]) }}
 
-    {{ disclosure() }}
-
-    <div class="chip-row" style="margin:22px 0 14px">
+    <div class="chip-row" style="margin:22px 0 6px">
       {{ persona_chip(article.persona, article.persona_name, solid=True, icon_name=article.persona_icon | default('')) }}
-      {{ chip(article.season) }}
-      <span class="chip ghost">{{ icon('won', 13) }} {{ article.budget }}</span>
+      {% if article.season %}{{ chip(article.season, 'ghost') }}{% endif %}
+      {% if article.budget %}<span class="chip ghost">{{ icon('won', 13) }} {{ article.budget }}</span>{% endif %}
     </div>
 
-    <h1 class="art-title">{{ article.title }}</h1>
-    <p class="art-summary">
-      {{ article.desc }} 아래 추천은 <b>필수 → 추천 → 선택</b> 순서로 정리했습니다.
-      예산이 빠듯하면 필수 항목만 먼저 갖추고, 나머지는 천천히 채워도 됩니다.
-    </p>
+    {# 본문 — 검증된 body_md → HTML. 첫머리 대가성 고지·제목(H1)·섹션·푸터 고지를
+       모두 포함한 완결 산문 (content_hash 무결: validated 본문 = published 본문). #}
+    <article class="art-body">{{ article.body_html | safe }}</article>
 
-    <div class="art-hero-img">
-      {{ image_block(article.img, article.cap, article.season_icon) }}
-    </div>
-
-    {# 추천 상품 #}
+    {# 추천 상품 — 본문은 상품을 '설명', 이 카드가 클릭 가능한 /go/ 제휴 링크를 제공.
+       (POLICY §6 rel="sponsored nofollow" — product_card 매크로에 내장) #}
+    {% if products %}
     <div class="art-sec">
       <div class="art-sec-head">
-        <h2>추천 구성 <span class="muted" style="font-weight:600;font-size:16px">{{ products | length }}개</span></h2>
-        <p class="muted">각 항목의 "추천 보기"는 제휴 링크로 연결됩니다.</p>
+        <h2>추천 상품 <span class="sub" style="font-weight:600;font-size:16px">{{ products | length }}개</span></h2>
+        <p class="sub">아래 “추천 보기”는 제휴(어필리에이트) 링크로 연결됩니다. 가격·재고는 변동될 수 있습니다.</p>
       </div>
       <div class="grid-3 art-products">
         {% for p in products %}{{ product_card(p) }}{% endfor %}
-      </div>
-    </div>
-
-    {# 예산 분배표 #}
-    <div class="art-sec">{{ budget_table(budget) }}</div>
-
-    {# FAQ #}
-    <div class="art-sec">
-      <h2 style="margin-bottom:18px">자주 묻는 질문</h2>
-      {{ faq_section(faqs) }}
-    </div>
-
-    {# 관련 시나리오 #}
-    {% if related %}
-    <div class="art-sec">
-      <h2 style="margin-bottom:24px">관련 시나리오</h2>
-      <div class="grid-3">
-        {% for r in related %}{{ scenario_card(r) }}{% endfor %}
       </div>
     </div>
     {% endif %}

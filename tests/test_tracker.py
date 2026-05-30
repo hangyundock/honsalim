@@ -62,6 +62,15 @@ class TestAggregate:
         assert "INSERT INTO clicks_daily" in sql
         assert "ON CONFLICT" in sql
 
+    def test_sql_reads_correct_clicks_column(self) -> None:
+        """집계는 clicks.ts 컬럼 기준 — go_gateway.js writer·D1 schema 정합.
+
+        회귀 가드: 이전엔 존재하지 않는 'timestamp' 컬럼을 읽어 라이브 집계가 실패했다.
+        """
+        sql = " ".join(aggregate("2026-05-28").command)
+        assert "substr(ts," in sql
+        assert "timestamp" not in sql
+
     def test_invalid_date_format_raises(self) -> None:
         with raises(ValueError):
             aggregate("2026/05/28")

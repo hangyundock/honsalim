@@ -3,12 +3,12 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 시급 (다음 세션) — #12 갱신
+## ★ 시급 (다음 세션) — #13 갱신
 
-> #12: collect-products·C-1 연결·enrich 풀구축·4게이트 통과 첫 글 완료(EVENTS #12 / STATE). 다음은 **게시 경로**.
+> #12: collect-products·C-1 연결·enrich 풀구축·4게이트 통과 첫 글 완료. #13: 워크트리 병합 stale 정정·문서 cap 정리. 다음은 **게시 경로**.
 
 - [ ] **게시 경로 배선 (최우선)**: promote CLI(article_writer.promote_to_article 래핑) + **상세글 렌더**(article 상세 템플릿·renderer: body_md→HTML·slug·schema 확정값) + 배포. → 검증된 draft 6 게시.
-- [ ] **워크트리 브랜치→main 병합·push** (claude/goofy-hopper-591e17 10커밋, ff 가능). /honsalim-end push origin main으론 미반영 주의.
+- [x] ~~워크트리 브랜치→main 병합·push~~ ✅ #13 확인 — 이미 완료(main=origin/main=7b572ad, 0/0 동기). 표기 stale 정정.
 - [ ] **시나리오 3종 튜닝**: gaeul-30·isacheol-30·homeoffice-200 (검색어·가격밴드 라이브 검증).
 - [ ] 스타일 disclosure_banner(Phase 3~4, body_md disclosure 중복 회피) · Pretendard self-host · critical CSS · feed.xml · robots.txt.
 - [ ] **main-protect 재활성화** + codeql-action 버전업. Scaled Content Abuse Step 2.

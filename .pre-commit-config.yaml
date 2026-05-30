@@ -34,8 +34,11 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
+      # 생성 산출물(build/site = 렌더된 공개 HTML)은 포맷터 대상 제외 — 원본은 templates/
       - id: trailing-whitespace
+        exclude: ^build/site/
       - id: end-of-file-fixer
+        exclude: ^build/site/
       - id: check-yaml
       - id: check-json
       - id: check-added-large-files

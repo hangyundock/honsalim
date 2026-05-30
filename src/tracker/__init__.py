@@ -21,14 +21,18 @@ from .report import (
     top_articles_by_clicks,
     weekly,
 )
+from .slug_map import build_upsert_sql, collect_slug_map_entries, sync_slug_map
 
 __all__ = (
     "aggregate",
     "aggregate_monthly",
     "aggregate_weekly",
+    "build_upsert_sql",
+    "collect_slug_map_entries",
     "export_to_sqlite",
     "monthly",
     "render_html_stub",
+    "sync_slug_map",
     "top_articles_by_clicks",
     "weekly",
 )

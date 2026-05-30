@@ -45,7 +45,7 @@
 | Anthropic API Key | 영구 [관찰] | 6개월 회전 권장 — **2026-11-28** [추정] |
 | INDEXNOW_KEY | 영구 [확정 — 공개 키] | 회전 불요 |
 | GitHub PAT | 미발급 (Actions는 GITHUB_TOKEN 자동) [확정] | — |
-| AliExpress Portals | **App Key/Secret 발급·라이브 검증 완료** [확정 2026-05-30 — collector.aliexpress 실호출 성공, production-ready]. honsalim.com 사이트 whitelist 대기 | 2026-05-30 |
+| AliExpress Portals | **App Key/Secret 발급·라이브 검증 완료** [확정 2026-05-30 — collector.aliexpress 실호출 성공, production-ready]. honsalim.com 사이트 whitelist — **문의 이메일 발송 완료(2026-05-30 새벽, affiliates@service.alibaba.com — 'ali' 오탐 해소 요청), 답변 대기** [확정 사용자] | 2026-05-30 |
 | 쿠팡 파트너스 | 보류 | Phase 4 (콘텐츠 누적 후) 재가입 |
 
 ## 보안 / 권한
@@ -59,26 +59,21 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 시급 (다음 세션) — #12 갱신
+### ★ 시급 (다음 세션) — #13 갱신
 1. **게시 경로 배선 (최우선)**: approve(CLI 有) → **promote CLI 미배선**(article_writer.promote_to_article 함수만) → **상세글 렌더 미구현**(article 상세 템플릿·renderer) → 배포. markdown→HTML·slug 생성·article 필드 조립(body_html·content_hash·disclosure_first)·schema_jsonld 확정값(이미지·발행일) 필요. → 검증된 draft 6 게시 가능 상태.
-2. **워크트리 브랜치 main 병합·push** — 세션 #12 10커밋이 `claude/goofy-hopper-591e17`에 있음, main #11 미이동(ff 가능). /honsalim-end의 push origin main으론 안 올라감(주의).
-3. **시나리오 3종 미튜닝**: gaeul-30·isacheol-30·homeoffice-200 (collect-products 검색어·밴드).
-4. 스타일 disclosure_banner(POLICY §2-2 배치, Phase 3~4 렌더 시 body_md disclosure와 중복 회피 조율).
-5. **main-protect 브랜치 보호 재활성화** (public 전환으로 꺼짐) · honsalim.com 알리 whitelist(사용자·대기).
-6. (Phase 4) about.html·Person Schema · Scaled Content Abuse Step 2.
+2. **시나리오 3종 미튜닝**: gaeul-30·isacheol-30·homeoffice-200 (collect-products 검색어·밴드).
+3. 스타일 disclosure_banner(POLICY §2-2 배치, Phase 3~4 렌더 시 body_md disclosure와 중복 회피 조율).
+4. **main-protect 브랜치 보호 재활성화** (public 전환으로 꺼짐, 사용자 GitHub GUI) · honsalim.com 알리 whitelist(사용자·대기).
+5. (Phase 4) about.html·Person Schema · Scaled Content Abuse Step 2.
 
-### 해소 (세션 #10)
-- ~~본 워크트리들 폐기~~ ✅ — 7개 워크트리 중 6개 + 6개 브랜치(`claude/{busy-hermann,condescending-perlman,dazzling-roentgen,elastic-blackwell,peaceful-gagarin,sharp-volhard}`) 폐기 [확정 git worktree remove + branch -d]. 모두 main 조상 commit·uncommitted 변경 0 확인 후 안전 폐기. 잔존: `gallant-swartz-56b6c0`(본 세션 진행 워크트리) + `peaceful-gagarin-b7fda4` 빈 폴더 1개(Windows 잠금·TIMA-GUARD가 Remove-Item 차단, 다음 세션 main 시작 후 정리)
+### 해소 (세션 #13)
+- ~~워크트리 브랜치 main 병합·push~~ ✅ — #12 commits 이미 main 병합·origin push 완료 [확정 main=origin/main=**7b572ad**, 0/0 동기]. STATE/EVENTS/TODO "병합 필요" 표기 stale 정정.
+- 잔존 워크트리 5개(`admiring-sinoussi·gallant-swartz·goofy-hopper·sleepy-dewdney·stupefied-lichterman`) 모두 main 조상·uncommitted 0 확인. **폐기는 수동 거부로 보류**(무해 잔여물, 사용자 승인 시 처리).
 
 ### 해소 (세션 #9)
 - ~~SUMMARY 정독~~ ✅ + ~~Google API 키 발급~~ ✅ (`D:\secrets\honsalim.env`)
-- ~~dashboard 시안 진입~~ → DECISIONS G3 [확정 #9] (Claude Design 미사용·stub HTML)
-- ~~dashboard 모듈 구현~~ ✅ CLI 11/11 완성·회귀 +10 (BACKEND §2-6 명세)
-- ~~settings.json N1 정책 적용~~ ✅ force·rebase·reset 등 destructive op 자동 차단
-
-### 해소 (세션 #7)
-- ~~세션 #6 6 commits push origin main 승인~~ → 세션 #6 종료 시점 이미 push 완료 (EVENTS #6 "누적 17건 [확정 origin/main 모두 동기]"). 본 STATE 시급 #1 stale 정정.
-- ~~pip-audit transitive 13건 분석~~ → **pip-audit 0건 [확정 세션 #7 재검증]**. 세션 #6 `pip install -U` 16건 적용 결과 유지 중. 시스템 Python 공유 (TIMA·AutoBlog) — 단순 outdated 무차별 -U는 환경 변경 금지(CLAUDE.md §12). 보안 작업 완료.
+- ~~dashboard 모듈 구현~~ ✅ CLI 11/11 완성·회귀 +10 (BACKEND §2-6) · ~~settings.json N1~~ ✅ destructive op 자동 차단
+- (#7 해소분 pip-audit 0건·#6 push 완료는 EVENTS archive 참조)
 
 ### Phase 2 진척 가능 (검토 영향 작음)
 - (현재 안전 진척 후보 모두 소진 — 다음은 사용자 검토 4건 의존)

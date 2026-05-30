@@ -1,0 +1,90 @@
+/* ===== 혼살림 — 디자인 토큰 =====
+   출처: Claude Design 핸드오프 (docs/design_drafts/honsalim).
+   확정 조합: 톤=우드 / 카드=그림자 / 밀도=미니멀 (DECISIONS G3 기반, 세션 #11).
+   변형 토글(data-tone/card/density)은 제거하고 확정값만 baked-in. */
+:root {
+  /* 우드톤 + 잉크 팔레트 (DESIGN §3-1 일치) */
+  --bg: #FAF6F1;          /* 따뜻한 화이트 배경 */
+  --card-bg: #F1E9DC;     /* 카드 배경 */
+  --surface: #FFFFFF;     /* 카드 표면 */
+  --accent: #A87F4D;      /* 강조/링크/버튼 */
+  --accent-ink: #936C3E;  /* hover */
+  --brand: #7A5530;       /* 진한 강조·브랜드 */
+  --border: #D4B896;      /* 보더·태그 */
+  --text: #1C1A17;        /* 본문 */
+  --sub: #3D3A35;         /* 서브 */
+  --meta: #6B6660;        /* 메타·캡션 */
+  --divider: #E8E5E0;     /* 구분선 */
+
+  /* 우드 단색 블록 톤 (placeholder 이미지) */
+  --wood-1: #C9A876;
+  --wood-2: #B8946A;
+  --wood-3: #D8C3A0;
+  --wood-4: #A87F4D;
+
+  --maxw: 1140px;
+  --radius: 14px;
+  --radius-sm: 9px;
+
+  /* 타입 스케일 — 미니멀 밀도 확정 */
+  --fs-hero: 50px;
+  --fs-h1: 36px;
+  --fs-h2: 26px;
+  --fs-h3: 19px;
+  --fs-body: 16.5px;
+  --fs-meta: 13px;
+  --lh-body: 1.78;
+
+  /* 간격 — 미니멀 밀도 확정 */
+  --gap: 32px;
+  --pad-card: 26px;
+  --section-y: 104px;
+
+  --shadow-card: 0 1px 2px rgba(28,26,23,.04), 0 8px 28px rgba(122,85,48,.07);
+  --shadow-soft: 0 1px 3px rgba(28,26,23,.05);
+
+  --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+          'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+
+  /* 톤 — 우드(따뜻한 강조) 확정 */
+  --hero-bg: linear-gradient(168deg, #F4ECDF 0%, #EADBC4 100%);
+  --hero-accent: var(--brand);
+  --label-color: var(--accent);
+  --section-tint: #F6EEE2;
+  --block-sat: 1;
+}
+
+/* ===== 리셋 / 베이스 ===== */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  word-break: keep-all;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-ink); }
+img { max-width: 100%; display: block; }
+button { font-family: inherit; cursor: pointer; }
+::selection { background: #E7D6BC; }
+
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+.section { padding: var(--section-y) 0; }
+.eyebrow {
+  font-size: var(--fs-meta); font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--label-color);
+}
+h1, h2, h3, h4, p { margin: 0; text-wrap: pretty; }
+.muted { color: var(--meta); }
+.sub { color: var(--sub); }
+
+/* 미니멀 밀도: 정보밀도 전용 메타는 숨김 */
+.dense-only { display: none; }
+
+/* 스크롤바 — 우드톤 */
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-thumb { background: #D9C7AC; border-radius: 8px; border: 3px solid var(--bg); }
+::-webkit-scrollbar-track { background: var(--bg); }

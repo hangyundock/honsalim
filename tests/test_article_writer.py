@@ -328,6 +328,19 @@ class TestExtractDisclosureFirst:
         assert "쿠팡 파트너스" in out
         assert "수수료" in out
 
+    def test_extracts_aliexpress_disclosure(self) -> None:
+        """제휴처 인지형 첫머리 — AliExpress 변형(쿠팡 미포함)도 표준 마커로 추출.
+
+        근본 수정 회귀 가드: 이전엔 '쿠팡 파트너스' 키워드 강제로 None 반환 →
+        promote 시 disclosure_first NOT NULL 위반. 표준 마커 기준으로 정정.
+        """
+        body = article_writer.apply_disclosure("# 알리 추천\n본문입니다.", sources={"aliexpress"})
+        out = article_writer.extract_disclosure_first(body)
+        assert out is not None
+        assert "AliExpress" in out
+        assert "수수료" in out
+        assert "쿠팡 파트너스" not in out
+
     def test_returns_none_when_both_keywords_missing(self) -> None:
         body = "안녕하세요. 일반 가이드입니다.\n\n본문 본문."
         assert article_writer.extract_disclosure_first(body) is None
@@ -456,6 +469,115 @@ class TestRecordScenarioCandidates:
         did = article_writer.record_scenario_candidates(conn, 1, self._candidates())
         assert did != old
         assert conn.execute("SELECT COUNT(*) FROM drafts WHERE scenario_id = 1").fetchone()[0] == 2
+
+
+def _insert_product(
+    conn: sqlite3.Connection,
+    spid: str,
+    *,
+    source: str = "aliexpress",
+    price: int = 10000,
+) -> int:
+    """products 테이블에 최소 필드 상품 1건 삽입 → id 반환 (link 테스트용)."""
+    conn.execute(
+        "INSERT INTO products (source, source_product_id, name, currency, price_krw, "
+        "deeplink_url, deeplink_slug, affiliate_tag, created_at, updated_at, last_seen_at) "
+        "VALUES (?, ?, ?, 'KRW', ?, ?, ?, 'honsalim', "
+        "datetime('now'), datetime('now'), datetime('now'))",
+        (
+            source,
+            str(spid),
+            f"상품 {spid}",
+            price,
+            f"https://s.click.aliexpress.com/{spid}",
+            f"ali-{spid}",
+        ),
+    )
+    conn.commit()
+    return int(
+        conn.execute(
+            "SELECT id FROM products WHERE source_product_id = ?", (str(spid),)
+        ).fetchone()[0]
+    )
+
+
+def _published_article(conn: sqlite3.Connection, slug: str = "a1") -> int:
+    did = _approved_draft_with_enrichment(conn)
+    fields = {**_valid_article_fields(), "slug": slug}
+    return article_writer.promote_to_article(conn, did, fields)
+
+
+class TestUniqueArticleSlug:
+    def test_returns_base_when_free(self) -> None:
+        conn = _seeded_db()
+        assert article_writer.unique_article_slug(conn, "homeoffice-50") == "homeoffice-50"
+
+    def test_appends_suffix_on_collision(self) -> None:
+        conn = _seeded_db()
+        _published_article(conn, slug="homeoffice-50")
+        assert article_writer.unique_article_slug(conn, "homeoffice-50") == "homeoffice-50-2"
+
+
+class TestLinkArticleProducts:
+    """featured(enriched_payload['products']) → article_products 연결 (DB §5)."""
+
+    def test_links_featured_to_products_in_order(self) -> None:
+        conn = _seeded_db()
+        _insert_product(conn, "111")
+        _insert_product(conn, "222")
+        aid = _published_article(conn)
+        featured = [
+            {"source": "aliexpress", "source_product_id": "111"},
+            {"source": "aliexpress", "source_product_id": "222"},
+        ]
+        linked, skipped = article_writer.link_article_products(conn, aid, featured)
+        assert (linked, skipped) == (2, 0)
+        rows = conn.execute(
+            "SELECT display_order FROM article_products WHERE article_id = ? "
+            "ORDER BY display_order",
+            (aid,),
+        ).fetchall()
+        assert [r[0] for r in rows] == [0, 1]
+
+    def test_skips_products_not_in_table(self) -> None:
+        conn = _seeded_db()
+        _insert_product(conn, "111")
+        aid = _published_article(conn)
+        featured = [
+            {"source": "aliexpress", "source_product_id": "111"},
+            {"source": "aliexpress", "source_product_id": "999"},  # products에 없음
+        ]
+        linked, skipped = article_writer.link_article_products(conn, aid, featured)
+        assert (linked, skipped) == (1, 1)
+
+    def test_skips_entry_without_source_product_id(self) -> None:
+        conn = _seeded_db()
+        aid = _published_article(conn)
+        linked, skipped = article_writer.link_article_products(
+            conn, aid, [{"source": "aliexpress"}]
+        )
+        assert (linked, skipped) == (0, 1)
+
+    def test_replace_true_is_idempotent(self) -> None:
+        conn = _seeded_db()
+        _insert_product(conn, "111")
+        aid = _published_article(conn)
+        featured = [{"source": "aliexpress", "source_product_id": "111"}]
+        article_writer.link_article_products(conn, aid, featured)
+        article_writer.link_article_products(conn, aid, featured)  # 재게시
+        cnt = conn.execute(
+            "SELECT COUNT(*) FROM article_products WHERE article_id = ?", (aid,)
+        ).fetchone()[0]
+        assert cnt == 1  # PK 충돌·중복 없이 1건 유지
+
+    def test_matches_by_source_when_provided(self) -> None:
+        """같은 source_product_id라도 source 불일치면 매칭 안 됨."""
+        conn = _seeded_db()
+        _insert_product(conn, "111", source="aliexpress")
+        aid = _published_article(conn)
+        featured = [{"source": "coupang", "source_product_id": "111"}]
+        linked, skipped = article_writer.link_article_products(conn, aid, featured)
+        assert (linked, skipped) == (0, 1)
 
 
 if __name__ == "__main__":

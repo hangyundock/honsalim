@@ -65,9 +65,11 @@
 {%- endmacro %}
 
 {# ---- 시나리오 카드 ---- #}
+{# 게시 글이 있는 카드만 href로 링크. 없으면 href 생략(비클릭) + '준비 중' 표시 —
+   콘텐츠 단계 발행 중 글 없는 카드가 404로 가는 것 방지. data-* 필터 속성은 유지. #}
 {% macro scenario_card(s) -%}
   {%- set SI = {'봄':'spring','여름':'summer','가을':'fall','겨울':'winter'} -%}
-<a class="s-card" href="{{ s.url }}" data-persona="{{ s.persona }}" data-season="{{ s.season }}" data-budget="{{ s.budget_tier | default('') }}">
+<a class="s-card{% if not s.url %} s-card-soon{% endif %}"{% if s.url %} href="{{ s.url }}"{% endif %} data-persona="{{ s.persona }}" data-season="{{ s.season }}" data-budget="{{ s.budget_tier | default('') }}"{% if not s.url %} aria-disabled="true"{% endif %}>
   {{ image_block(s.img, s.cap, SI.get(s.season, '')) }}
   <div class="body">
     <div class="chip-row">
@@ -78,7 +80,9 @@
     <p class="desc">{{ s.desc }}</p>
     <div class="meta-row">
       <span class="price">{{ s.budget }}</span>
-      {% if s.count %}<span class="dot"></span><span>추천 {{ s.count }}개</span>{% endif %}
+      {% if s.url %}
+        {% if s.count %}<span class="dot"></span><span>추천 {{ s.count }}개</span>{% endif %}
+      {% else %}<span class="dot"></span><span class="soon-badge">준비 중</span>{% endif %}
     </div>
   </div>
 </a>

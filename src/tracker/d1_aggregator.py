@@ -79,11 +79,13 @@ def aggregate(
     if not database_id:
         raise ValueError("database_id 빈 값")
 
-    # D1 §11 — clicks_daily UPSERT 패턴
+    # D1 §11 — clicks_daily UPSERT 패턴.
+    # 컬럼명은 clicks.ts (go_gateway.js writer·sql/d1/schema.sql 정합). 이전 'timestamp'는
+    # 존재하지 않는 컬럼 — 라이브 집계 실패 유발하던 버그(근본 수정, 2026-05-30).
     sql = (
         "INSERT INTO clicks_daily (date, slug, clicks) "
         "SELECT ?1 AS date, slug, COUNT(*) AS clicks "
-        "FROM clicks WHERE substr(timestamp, 1, 10) = ?1 GROUP BY slug "
+        "FROM clicks WHERE substr(ts, 1, 10) = ?1 GROUP BY slug "
         "ON CONFLICT(date, slug) DO UPDATE SET clicks = excluded.clicks"
     )
     cmd = [
