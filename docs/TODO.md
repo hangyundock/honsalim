@@ -3,20 +3,23 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 시급 (다음 세션) — #13 갱신
+## ★ 시급 (다음 세션) — #14 갱신
 
-> #12: collect-products·C-1 연결·enrich 풀구축·4게이트 통과 첫 글 완료. #13: 워크트리 병합 stale 정정·문서 cap 정리. 다음은 **게시 경로**.
+> #13: 게시 경로 완성·**첫 글 honsalim.com 라이브 게시**·무인 배포(방법 A)·알리 whitelist 2채널 제출. 회귀 470. 다음은 **/go/ 링크 작동(수익화)**.
 
-- [ ] **게시 경로 배선 (최우선)**: promote CLI(article_writer.promote_to_article 래핑) + **상세글 렌더**(article 상세 템플릿·renderer: body_md→HTML·slug·schema 확정값) + 배포. → 검증된 draft 6 게시.
-- [x] ~~워크트리 브랜치→main 병합·push~~ ✅ #13 확인 — 이미 완료(main=origin/main=7b572ad, 0/0 동기). 표기 stale 정정.
-- [ ] **시나리오 3종 튜닝**: gaeul-30·isacheol-30·homeoffice-200 (검색어·가격밴드 라이브 검증).
-- [ ] 스타일 disclosure_banner(Phase 3~4, body_md disclosure 중복 회피) · Pretendard self-host · critical CSS · feed.xml · robots.txt.
-- [ ] **main-protect 재활성화** + codeql-action 버전업. Scaled Content Abuse Step 2.
+- [x] ~~게시 경로 배선~~ ✅ #13 (promote CLI·renderer 상세글·article.html 실데이터화 → 첫 글 라이브)
+- [x] ~~codeql v4·robots/_headers·404방지·문서 cap/stale~~ ✅ #13
+- [ ] **★/go/ 제휴 링크 작동 (최우선·수익 직결)**: ①**D1 slug_map 라이브 쓰기** — `sync-slugmap --no-dry-run`(코드 준비됨, deny-list라 사람/CI 트리거) + D1 스키마 적용(`sql/d1/schema.sql`) ②**go_gateway Worker 배포**(`wrangler deploy`, deny-list). 현재 "추천 보기"→홈으로 감.
+- [ ] **상품 이미지** — AliExpress CDN `image_url_external`(정책확인 후 product_card, 빠른 보강) / 대표이미지 AI(Phase 3 Imagen). 현재 우드톤 placeholder(의도).
+- [ ] **시나리오 추가 글**(현재 1편, 9개 "준비 중") + 3종 튜닝(gaeul·isacheol·homeoffice-200).
+- [ ] **알리 whitelist 답변 확인**(무응답 3~4영업일 시 follow-up) · **main-protect 재활성화**(사용자 GUI) · **로컬 main pull**(origin e763e0f).
+- [ ] 배포 워크플로 `paths: build/site/**` 필터(문서-only push 불필요 재배포 회피) · 잔존 워크트리 5개 정리(수동거부 보류).
 
-## 알리 통합 (D9) — #12 진척
+## 알리 통합 (D9)
 
-- [x] ~~App Key/Secret 발급·라이브 검증~~ ✅ (#11) / ~~**상품 수집 CLI**~~ ✅ #12 (collect-products: 가격밴드·검색어 튜닝·products+draft 적재) / ~~**상품↔시나리오 연결·첫 글 enrich·검증**~~ ✅ #12 (C-1·enrich 풀·4게이트 통과). **발행만 잔여**(위 게시 경로).
-- [ ] **honsalim.com 사이트 whitelist** — "ali" 오탐 → affiliates@service.alibaba.com 문의·승인 대기 (사용자)
+- [x] ~~App Key/Secret·라이브검증(#11)·collect-products·C-1·enrich·4게이트(#12)·promote·상세글 렌더·라이브 게시(#13)~~ ✅
+- [x] ~~honsalim.com whitelist 제출~~ ✅ #13 — **이메일 + 포털 XFeedback(스크린샷 증거, "To do") 제출, 답변 대기**. 사이트등록폼은 'ali' 자동검증으로 Submit 불가 → 사람 화이트리스트만 길.
+- [ ] 알리 답변 후속 (승인 시 /go/ 동작 + 수익 추적 활성)
 
 ## 세션 #6 잔존 (시점 의존)
 

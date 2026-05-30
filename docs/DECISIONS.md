@@ -180,6 +180,13 @@
   **그 외 시점 push**: 명시 승인 후만 (변동 없음).
   적용 파일: `CLAUDE.md` §2(라)·§11 / `.claude/commands/honsalim-end.md` §7+규칙 / `.claude/settings.json` deny+allow.
 
+- **N2. 무인 배포 = 방법 A (build/site 커밋 → GitHub Actions 배포) [확정 세션 #13, 사용자 결정]**:
+  배포 경로를 "로컬 wrangler(B)"가 아니라 "**빌드 산출물(build/site 공개 HTML)을 저장소에 커밋 → main push → GitHub Actions가 Cloudflare Pages에 업로드**"로 확정.
+  사유: ①배포 실행 명령(`wrangler ... deploy`·`python -m honsalim deploy`)은 `.claude/settings.json` deny로 **Claude 차단**(§2-라/§2-마 안전장치) → 배포는 사람/CI만 실행 가능 ②§11 "build/ 커밋 금지"는 글 DB(data/)·비공개 데이터 보호가 목적이고, **build/site는 어차피 공개될 HTML이라 노출 위험 없음** → "공개 산출물은 배포용 커밋 허용"으로 §11 보강 ③CI는 글 DB를 못 보므로(로컬 전용) **재빌드 없이 커밋된 build/site를 업로드만**.
+  적용: `.gitignore`(`build/*` + `!build/site/`) / `.github/workflows/build.yml` 재작성(test 게이트→build/site 검증→`pages deploy build/site --branch=main`) / renderer robots.txt·_headers·LF 출력 / pre-commit trailing·eof 훅 build/site 제외.
+  **첫 적용 [확정 #13]**: e763e0f push → Actions deploy success → honsalim.com 첫 글 라이브. CF_API_TOKEN Pages 권한 확인됨.
+  **인간 게이트 유지**(§2-마): 콘텐츠는 promote(published) 전 사용자 승인 후에만 render·commit·push.
+
 ## 폐기된 결정 (역사 참조용)
 
 | 폐기일 | 결정 | 폐기 사유 |

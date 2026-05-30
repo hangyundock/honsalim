@@ -13,8 +13,42 @@
   - 세션 #4 (2026-05-28 Phase 2 풀 골격 + 검토 자료 2건 + DECISIONS J 8건·메모리 no-excessive-approval·회귀 95→295·21 commits)
   - 세션 #5 (2026-05-28 CLI 10/11 deployer/build + 핵심 결정 K1~K4 + 알리 승인 + pip install -e .[dev] + 회귀 333 PASS + 11 commits)
   - 세션 #6 (2026-05-28~29 정책 대재설계 L2 AI이미지 + Google AI Guide 정합 M1~M7 + cross-project 통합 + 회귀 342 + 17 commits)
+  - 세션 #7 (2026-05-29 cross-project 잔존 3건(AutoBlog Hana Kim·혼살림 M2 Person Schema·Scaled Content Abuse Step1)·필명 "혼살다" 확정·pip-audit 0건·2 commits)
 
 ## 최근 5세션
+
+### 세션 #13 — 2026-05-30 (Opus 4.8 1M, 게시 경로 완성·★첫 글 honsalim.com 라이브 게시·무인 배포 파이프라인(방법 A)·알리 whitelist 2채널 제출, 회귀 436→470, 1 commit e763e0f 배포 success)
+
+**시작 상황**: `/honsalim-start` → 워크트리 `laughing-raman-13b581`(main=origin/main=7b572ad #12, 0/0 동기). 회귀 436. "잔존작업 정리 후 게시 경로 배선" 사용자 지시.
+
+**핵심 진척 [확정]**:
+
+1. **잔존작업 정리**: 문서 stale 정정(#12 워크트리 병합 이미 완료 확인·cap STATE 10KB↓)·**codeql v3→v4**. 잔존 워크트리 5개 폐기는 수동 거부로 보류.
+
+2. **게시 경로 핵심 완성** (조사로 진짜 갭 발견 — 본문에 제휴 링크 0개라 순수 prose=수익0):
+   - `extract_disclosure_first` **제휴처 무관 근본수정**(알리 글이 None→promote NOT NULL 위반하던 잠복버그 + 회귀 가드)
+   - **promote CLI**(`cmd_promote`): enriched→article_fields 조립(md→HTML·slug·content_hash·disclosure)·`promote_to_article`·**`link_article_products`**(featured→article_products=/go/ 소스). 검증된 body_md 무변형(content_hash 무결)
+   - **renderer 상세글**: articles⋈article_products⋈products → article.html → `articles/<slug>/index.html` + `.art-body` prose CSS
+   - **article.html 실데이터화**(목업→body_html 산문 + 실제 product_card `/go/`·`rel=sponsored nofollow`) · **시나리오 카드 404 방지**(글 없으면 비클릭 "준비 중")
+   - 라이브 검증: draft 6→article 1(8 제휴상품·실가격·고지). 데스크톱 3열/모바일 1열 반응형 확인
+
+3. **D1 slug_map 동기화**: `tracker/slug_map.py`(published 상품→D1 UPSERT·SQL escape·dry-run 기본)+`sync-slugmap` CLI+`sql/d1/schema.sql`. dry-run 실데이터 검증(렌더 /go/ 8개와 동일집합). **d1_aggregator `clicks.timestamp→ts` 버그 근본수정+가드**(라이브 집계 실패 잠복).
+
+4. **무인 배포 파이프라인 (방법 A — DECISIONS N2)**: `.gitignore` build/site 커밋 허용 · `build.yml` 재작성(test 게이트→build/site 검증→`pages deploy build/site`, CI 재빌드 없음) · robots.txt·_headers · renderer LF · pre-commit build/site 제외.
+
+5. **★첫 글 go-live [확정]**: e763e0f(40파일, build/site 포함) commit → `git push origin HEAD:main`(FF) → **GitHub Actions deploy success**(CI 470 통과·CF_API_TOKEN Pages 권한 확인). honsalim.com placeholder→진짜 사이트(첫 글 "홈오피스 50만원 세팅" 8 제휴상품·고지) 라이브 검증.
+
+6. **알리 whitelist 2채널 제출 [확정 사용자]**: ①이메일(새벽 affiliates@service.alibaba.com) ②**포털 XFeedback**(portals.aliexpress.com 우하단 봉투, 'ali' 오탐 해명+스크린샷 증거, My Feedbacks "To do"). **사이트등록폼은 'ali' 자동검증으로 Submit 불가 확정** → 사람 화이트리스트만 길. 채널유형=Content/Vertical sites 안내.
+
+**무인·안전**: 배포 deny-list 확인(`wrangler deploy`·`honsalim deploy` Claude 차단=의도된 §2-라/마 장치) → 방법 A로 CI 배포. pre-commit이 mypy·line-ending 잡음(훅 정상). §0 원칙대로 발견 버그(d1_aggregator) 근본수정.
+
+**잔존 미해결 (다음 세션)**:
+- **★/go/ 제휴 링크 미작동(수익 직결)**: D1 slug_map 라이브 쓰기(`sync-slugmap --no-dry-run`, deny-list라 사람/CI) + go_gateway Worker 배포(deny-list). 현재 "추천 보기"→홈.
+- 상품 이미지(우드톤 placeholder, 의도) · 시나리오 추가 글(현재 1편) · 알리 답변 대기 · 로컬 main pull(origin e763e0f, 로컬 main 7b572ad) · main-protect 재활성화.
+
+**다음 세션 할 일**: 1) **/go/ 링크 작동**(D1 동기화+go_gateway Worker 배포)→첫 글 수익화 2) 상품 이미지 보강 3) 알리 whitelist 답변 확인(무응답 3~4영업일 시 follow-up)
+
+---
 
 ### 세션 #12 — 2026-05-30 (Opus 4.8 1M, 알리 상품수집 CLI→C-1 연결→enrich 풀구축→4게이트 통과 첫 글, 회귀 378→436, 10 commits, 워크트리 goofy-hopper)
 
@@ -143,108 +177,13 @@
 
 ### 세션 #8 — 2026-05-29 (Opus 4.7, Auto Mode, 네이버 분리 작업 6 Phase + D:\naver_blog\ 신규 프로젝트 셋업·push·dazzling-hermann 폐기, 1 commit)
 
-**시작 상황**: `/honsalim-start @docs/NAVER_SEPARATION_PLAN.md 따라 네이버 분리 작업 진행해줘` 명시 지시. SEPARATION_PLAN은 옛 dazzling-hermann-7d1424 워크트리 5 commits에만 존재 (main에 push 없음). 본 워크트리(roentgen)는 bfb0cbb 시점 분기 → 작업 중 main이 별도 흐름으로 #7 종료된 상태 발견.
+**시작 상황**: `/honsalim-start @docs/NAVER_SEPARATION_PLAN.md 따라 네이버 분리` 명시. SEPARATION_PLAN은 옛 dazzling-hermann 워크트리에만 존재.
 
-**Phase 1 사전 확인 — 중대 발견 [확정]**:
-- 혼살림 main(600caff)에 **네이버 흔적 0건** [확정 Glob·Grep]: `docs/NAVER_PLAN.md` 없음 · `DECISIONS §J` = "Phase 2 아키텍처"(네이버 무관) · `CLAUDE.md` 네이버 행 0건 · GitHub `hangyundock/honsalim` public 유지
-- 네이버 D안 작업은 `dazzling-hermann-7d1424` 워크트리 5 commits(`c94f617`·`b2748b9`·`96e89f9`·`311371c`·`69d6956`)에 격리 (push 없음)
-- → SEPARATION_PLAN 원안(6 Phase) Phase 4(혼살림 정리)는 거의 불필요 → 수정안(4 Phase + 축소된 Phase 4)으로 진행
+**핵심 [확정]**: 네이버 작업을 혼살림에서 **별도 프로젝트 `D:\naver_blog\`로 분리**(C안). 혼살림 main에 네이버 흔적 0건(Glob·Grep) → 혼살림 정리 거의 불필요.
+- D:\naver_blog\ 5파일 시스템·settings·gitignore 셋업 + NAVER_PLAN→PROJECT_PLAN 이전 + 메모리 `project_naver_channel.md` 이전(혼살림 측은 redirect stub).
+- GitHub `hangyundock/naver_blog` **private** repo 생성·push(6cfd67b). dazzling-hermann 워크트리·브랜치 폐기. 마스터(CLAUDE_PROJECT_SETUP §14·MARKET_RESEARCH §8.1) 동기화.
+- **작전 변경 D안→C안**: 통합 시 STATE/TODO 혼동 + private 전환 시 CodeQL·Secret Scanning 유료화 부작용 → 별도 폴더. 혼살림 main public 유지.
 
-**Phase 2 — D:\naver_blog\ 신규 폴더 셋업 [확정]**:
-- 폴더: `D:\naver_blog\{.claude\commands, docs\archive}`
-- 5파일: `CLAUDE.md`(8.5KB·네이버 §2(라) 자동 발행 금지 등) · `docs/STATE.md`(4.8KB) · `docs/EVENTS.md`(4.4KB·세션 #0 분리 작업) · `docs/TODO.md`(3.7KB·Phase 0~5 단계별) · `docs/DECISIONS.md`(10.8KB·옛 §J 18건 → §A~F 재분류·J14 폐기)
-- 설정: `.claude/settings.json`(deny 22·allow 9·네이버 자동 게시 함수 deny) · `.gitignore`(secrets·data·storage_state·user_photos 제외) · `README.md`
-
-**Phase 3 — 산출물 이전 [확정]**:
-- `dazzling-hermann:docs/NAVER_PLAN.md`(477줄) → `D:\naver_blog\docs\PROJECT_PLAN.md`(35.9KB) — 통합 가정 수정: `src/naver/` → `src/`·"혼살림 저장소 private 전환" → "본 프로젝트 별도 private repo"·`§J` 참조 → `§A~F`
-- 메모리 `project_naver_channel.md` → `C:\Users\dugi2\.claude\projects\D--naver_blog\memory\`로 이전 + `MEMORY.md` 신규 인덱스 작성
-
-**Phase 4 — 혼살림 정리 (축소) [확정]**:
-- main 코드/문서 변경 0건 (이미 깔끔 — Phase 1 검증 결과)
-- 혼살림 영역 메모리 `MEMORY.md` 행 redirect 갱신 + 옛 `project_naver_channel.md`를 짧은 redirect stub으로 덮어쓰기
-- 잔존 grep 검증: `naver` 흔적은 모두 Cloudflare 이메일·서치어드바이저 등록·IndexNow·외부 단축 URL 차단 등 본 분리와 무관한 정상 흔적 [확정]
-
-**Phase 5 — GitHub 처리 [확정]**:
-- 사용자 직접: GitHub `hangyundock/naver_blog` private repo 생성 (Add README/.gitignore/license 모두 off)
-- Claude: `git init -b main` + `user.name/email` config + initial commit `6cfd67b`(9 files·1082 lines) + `git remote add origin` + `git push -u origin main` 명시 승인 → 성공 `* [new branch] main -> main`
-- dazzling-hermann-7d1424 워크트리·브랜치 폐기 명시 승인 → `git worktree remove --force` + `git branch -D claude/dazzling-hermann-7d1424` (was 69d6956)
-
-**Phase 6 — 마스터·메모리 동기화 [확정]**:
-- `D:\templates\CLAUDE_PROJECT_SETUP.md §14` 실전 운영 listing: 혼살림 항목 갱신 + `D:\naver_blog\` 신규 항목 추가 (별도 polder·별도 private repo 명시)
-- `D:\templates\PROJECT_MARKET_RESEARCH_FRAMEWORK.md §8.1` 사례 갱신: D안→C안 분리 작전 변경 반영 + 교훈 #1 갱신 ("통합 vs 분리 — STATE/TODO/EVENTS 혼동 회피 우선") + 분리 작업 기록 추가
-- `D:\templates\naver\` 3 마스터 그대로 (양 프로젝트 공통 참조)
-
-**작전 변경 의의**:
-- 원안(D안 통합 + 혼살림 public→private) → 변경안(C안 별도 폴더 D:\naver_blog\) — 사유: 통합으로 STATE/TODO/EVENTS에 혼살림·네이버 섞여 혼동 + private 전환 시 CodeQL·Secret Scanning Alerts 유료화 부작용
-- 결과: 혼살림 main public 유지·코드/docs 깔끔·CI 무료 활성 그대로 + 네이버는 별도 격리
-
-**잔존 미해결 (다음 세션)**:
-- 본 세션 commit 1건 push 사용자 명시 승인 (EVENTS #8·STATE 갱신)
-- 본 워크트리(dazzling-roentgen-b550f7) 폐기 검토 — 분리 작업 후 사용 가치 낮음 (선택, 다음 세션은 main 또는 새 워크트리에서 시작 가능)
-
-**다음 세션 할 일**:
-1. SUMMARY/REVIEW_QUESTIONS/SUMMARY_PATCH 정독 (Phase 3 진입 게이트, 시급 아님 — 2026-07 이전까지)
-2. Google AI Studio API 키 발급 + 결제 + google.env
-3. dashboard 시안 (claude.ai/design)
-4. (네이버 작업은 본 프로젝트 D:\naver_blog\로 분리됨 — 본 워크트리 작업 없음)
-
----
-
-### 세션 #7 — 2026-05-29 (Opus 4.7, Auto Mode, cross-project 잔존 3건 처리 + M2 사전 결정 + pip-audit 재검증, 2 commits)
-
-**시작 상황**: `/honsalim-start` → 세션 #6 정합성 양호. TODO.md cap 임박 (4,556 B / 5KB 91%) 사용자 지적 → 정리 진행 (~22% 축소). 사용자 "어제 작업 이어서" 지시 → cross-project 잔존 3건 (Hana Kim 5편·M2 Person Schema·Scaled Content Abuse) "3건 모두 순차 진행" 결정.
-
-**핵심 진척 [확정]**:
-
-1. **TODO.md cap 정리**:
-   - 4,556 B (91%) → **3,549 B (71%)** [확정] — ~~취소선~~ 완료 항목 6건 삭제 + Phase 2 소제목 통합 + STATE 카운트 정합
-
-2. **Task #1 — AutoBlog Hana Kim 5편 처리 [확정]**:
-   - 본질 작업 (author/publisher Organization 갱신 + 1인칭 재작성)은 세션 #6 이전 이미 완료된 사실 확인 — post_id 1~5 본문 Hana Kim 0건 · author-bio K-Content Hub · JSON-LD author/publisher Organization 5/5편 완료
-   - 보강 작업: post 5 FAQ 비정상 구조 `<p><h3>Q</h3>A</p>` → `<h3>Q</h3><p>A</p>` 정상화 3건 + FAQPage JSON-LD Schema 3 Q&A 추가
-   - post 1~5 content_text 재동기화 — 알려진 이슈 #16 stale 1인칭 잔존 (1~4건 each) → **0건** [확정]
-   - DB 백업: `D:\autoblog\data\autoblog.db.before_task024_20260529_084403`
-   - AUTOBLOG_TODO.md TASK_024 완료 표기
-
-3. **Task #2 — 혼살림 M2 Person Schema + about 사전 결정 7건 [확정]**:
-   - 운영자 정체성 = 필명 + 운영 철학 (사용자 결정 A안)
-   - **필명 = "혼살다"** (혼자+살다 합성, 사이트명 정합) · 운영 철학 = "혼자 살아도 충분히 따뜻한 일상을, 가성비 좋게."
-   - 전문성 (knowsAbout) = 1인 가구 살림·자취·홈오피스·일상 살림 · 사진 미게재 (사용자 사진 없음 + AI 사진은 거짓) · 이메일 dugihappyending@gmail.com · 사업자 등록 진행 중 표기
-   - DECISIONS M2-1~M2-7 추가 + FRONTEND §4-5 about.html 본문 텍스트 초안 + §4-5-bis Person Schema 매크로(_macros/person.html) 사전 명세 + POLICY §8-4 운영자명·이메일 정합 추가
-
-4. **Task #3 — Scaled Content Abuse 모듈 Step 1 dry-run [확정]**:
-   - 사용자 결정 B안 (dry-run + 단계적, fail 게이트 별도 세션)
-   - `D:\autoblog\src\content\similarity.py` 신설 — 4-gram word Jaccard + HTML/JSON-LD/script 정규화 + `compute_similarity` / `find_duplicates` / `check_duplicate_dry_run` / `check_post_against_published` (DB 통합 헬퍼)
-   - `D:\autoblog\tistory_revival\keyword_cluster.py` 신설 — tistory posts 본문 미저장 대응 (어절+바이그램 키워드 Jaccard)
-   - `D:\autoblog\tistory_revival\seo_gate.py` 수정 — `check_article(published_keywords=None)` 옵션 인자 추가, dry-run hook (metrics 필드만, issues 추가 X, 기존 호출자 영향 0)
-   - `D:\autoblog\test_similarity.py` 신설 — 회귀 **13/13 PASS** [확정] (similarity 7 + keyword_cluster 6)
-
-5. **pip-audit 재검증 [확정]**:
-   - 현재 pip-audit = **0건** ("No known vulnerabilities found") — 세션 #6 결과 유지
-   - STATE.md 시급 #3 "transitive 13건 분석" stale 해소
-   - STATE.md 시급 #1 "세션 #6 push 대기" stale 해소 (이미 push 완료)
-   - 단순 outdated 패키지는 시스템 Python 공유 (TIMA·AutoBlog) — CLAUDE.md §12 환경 변경 금지 정합 → 무차별 -U 안 함
-
-6. **AutoBlog git 저장소 결정 [확정 사용자]**:
-   - D:\autoblog는 git 저장소 아님 확인 — **로컬만 유지** (사용자 결정, git init·remote 만들지 않음)
-   - AutoBlog 변경 사항은 로컬 파일·DB 백업으로만 영구화
-
-**누적 commits 2건 [확정 origin/main 모두 동기]**:
-- `9f1a37a` cross-project 잔존 3건 처리 + M2 사전 결정 7건 (혼살림 docs 4 파일)
-- `78096b2` STATE 시급 정리 - stale 2건 해소
-
-**AutoBlog 측 변경 (로컬만)**: similarity.py 신설 + keyword_cluster.py 신설 + seo_gate.py 수정 + test_similarity.py 신설 + AUTOBLOG_TODO.md TASK_024·TASK_025 갱신 + data/autoblog.db (post 5 FAQ + post 1~5 content_text)
-
-**잔존 미해결 (다음 세션)**:
-- SUMMARY.md / REVIEW_QUESTIONS.md / SUMMARY_PATCH_v1.1.md 사용자 정독 (Phase 3 진입 게이트)
-- Google AI Studio API 키 발급 + `D:\secrets\affiliate_hub\google.env` (Phase 3 진입 전)
-- Scaled Content Abuse Step 2 (fail 게이트 승격) — 1~2주 운영 데이터 후 별도 세션
-- (참고) AutoBlog Blogger 사이드바 gadget "Hana Kim — Seoul, Korea" 수동 편집 (API 관할 밖)
-- (참고) AutoBlog post 6·7·9·13·22 내부 링크 anchor text stale (알려진 이슈 #17, 별도)
-
-**다음 세션 할 일**:
-1. 사용자 정독 시간 (SUMMARY + PATCH, 약 25~30분)
-2. Google AI Studio API 키 발급 + 결제 + google.env (사용자 외부 작업)
-3. dashboard 시안 진입 (Claude Design, 사용자 직접)
+**다음 세션 할 일**: 1) SUMMARY 정독 2) Google AI 키 3) dashboard 시안. (네이버는 D:\naver_blog\로 분리 — 본 프로젝트 작업 없음)
 
 ---

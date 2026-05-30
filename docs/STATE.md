@@ -7,20 +7,20 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1~95% + Phase 2(모듈 19개·CLI·G4 사이트5종·renderer) + #12 콘텐츠 생성 파이프라인 end-to-end 완성·라이브 검증: collect-products(가격밴드·검색어 튜닝·coupang_deferred) → C-1 상품↔시나리오 연결 → enrich 풀구축(상품주입·META/BODY분리·disclosure·schema·featured) → validate 4게이트 → 첫 글 통과(draft 6 validated). disclosure 제휴처 인지형(공정위). 회귀 436 PASS. ★게시 경로(promote·상세글 렌더) 미배선** | 2026-05-30 #12 |
+| 진행 단계 | **Phase 1~95% + Phase 2 + #13 게시 경로 완성·★첫 글 honsalim.com 라이브 게시**: promote CLI(article_products 연결)→renderer 상세글(article.html 실데이터화)→배포. D1 slug_map 동기화 모듈+sync-slugmap CLI. **무인 배포(방법 A): build/site 커밋 → main push → GitHub Actions 자동 배포** [확정 e763e0f 배포 success]. honsalim.com placeholder→진짜 사이트(첫 글 "홈오피스 50만원 세팅" 8 제휴상품). 회귀 470 PASS. **★잔여: /go/ 제휴 링크 미작동(D1 slug_map 쓰기+go_gateway Worker 배포 필요)** | 2026-05-30 #13 |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
 | Phase 2 핵심 모듈 18개 (#3~#5) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} · deployer/{git_push,wrangler,verify} · tracker/{d1_aggregator,**report**} · **workers/go_gateway.js** | #5 |
-| Phase 2 회귀 테스트 | **436 / 436 PASS** [확정 pytest, #12] — #12 +58 (products_store·keyword_map·collect-products·C-1·split_article_response·truncation·apply_disclosure·affiliate-aware disclosure 등). 이전: 378 +26 (renderer 9 + jsonld 4 + cli-enrich 1 + aliexpress 12). 분배: validator 42 + state_machine 14 + scenario_loader 11 + enricher 13 + retry 15 + meta_extractor 31 + jsonld 49 + manifest 22 + db 12 + cli 47 + article_writer 25 + integration_phase2 18 + deployer 14 + tracker 25 + check_size_caps 9 + dashboard 10 + renderer 9 + **aliexpress 12** | 2026-05-30 |
-| CLI 명령 (BACKEND §9) | **12개** — doctor · db · collect · **collect-products(#12 신규: --keywords/--scenario, 가격밴드, products+draft 적재)** · enrich(#12 풀구축: 상품주입·분리·disclosure·schema·featured) · validate · approve · unapprove · deploy · build · dashboard. ★promote CLI 미배선(article_writer 함수만) | #12 |
+| Phase 2 회귀 테스트 | **470 / 470 PASS** [확정 pytest, #13] — #13 +34 (article_writer link/slug 7 + cli promote/sync 5 + renderer 상세글·404·robots 8 + slug_map 11 + tracker ts가드 1 + disclosure ali 1 등). #12 436. CI(GitHub Actions)에서도 470 통과 후 배포 | 2026-05-30 |
+| CLI 명령 (BACKEND §9) | **14개** — doctor · db · collect · collect-products · enrich · validate · approve · **promote(#13 신규: article_fields 조립·md→HTML·article_products 연결)** · unapprove · deploy · **sync-slugmap(#13 신규: published 상품→D1 slug_map UPSERT, dry-run 기본)** · build · dashboard | #13 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + 4 게이트 통합(validate_and_save) + META-JSON + Article JSON-LD + 1인칭/사진 게이트. 영구화 세션 #4 시점 5개 사항(tracker.d1_aggregator·deployer·builder.manifest·enricher.retry·state_machine 매트릭스 보강) → DECISIONS J + EVENTS #4·#5 누적 | #4~#5 |
-| doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 **41개** (+4 dashboard) · §11 state_machine 매트릭스 · §12 tests 로드 · §13 Workers JS (go_gateway.js) · §14 docs/ size cap | #9 |
+| doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 **49개** (#13 +link_article_products·unique_article_slug·sync_slug_map·collect_slug_map_entries) · §11 state_machine 매트릭스 · §12 tests 로드 · §13 Workers JS · §14 size cap | #13 |
 | DB 초기화 | `data/honsalim.db` v1 + 13 테이블 + personas 3 + scenarios 10 (seed idempotent) | #3 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (PLAN·ARCH·DB·SCENARIOS·DESIGN·FRONTEND·BACKEND·POLICY·OPS·BACKUP·MAINTENANCE·SCHEDULE). 일관성 모순 0건 | #2 |
 | 사전 작성 산출물 (#2) | SQL 2편 + 설정 5건 + prompt_templates 6종 + 인프라 7건 (pyproject·wrangler·workflows·README·CHANGELOG 등). 세부는 EVENTS_202605.md | #2 |
 | 메모리 시스템 | feedback 7건 (#9 [[no-unfounded-priority]] · **#12 [[incremental-critical-review]](배치금지·1건씩 점검·근본해결) · [[autonomous-safe-system]](무인·안전·자율)** 추가) + reference market_research + MEMORY.md | #12 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
-| 사이트 게시글 / 트래픽 / 수익 | 0편 (Phase 4 출시 전) / N/A / N/A | #2 |
+| 사이트 게시글 / 트래픽 / 수익 | **1편 라이브 게시** (honsalim.com/articles/homeoffice-chair-desk-50/, #13 배포) / N/A / N/A (수익은 /go/ 링크 작동+알리 whitelist 후) | #13 |
 
 ## 인프라
 
@@ -29,7 +29,7 @@
 | 프로젝트 폴더 | `D:\affiliate_hub\` (docs·archive·.claude/commands 하위) |
 | 사이트 / 도메인 | 혼살림 / **honsalim.com** (만료 2027-05-28·Auto Renew·SSL Active) |
 | 호스팅 | **Cloudflare Pages `honsalim`** + Custom domain (Dugi2020@naver.com) |
-| GitHub | **`hangyundock/honsalim` Public** — 세션 #6 종료 시점 origin/main 동기 (17 commits 모두 push). build-and-deploy ✅ + CodeQL ✅ + Graph ✅ + lint ✅ + security ✅ (월간 pip-audit) |
+| GitHub | **`hangyundock/honsalim` Public** — origin/main = **e763e0f (#13)**, 배포됨. **build-and-deploy 워크플로 #13 재작성: main push → 커밋된 build/site를 Cloudflare Pages 배포 (CI 재빌드 없음, 글 DB는 로컬). 배포 success 확인** + CodeQL · lint · security(월간 pip-audit) ✅. ※로컬 main worktree(D:\affiliate_hub)는 7b572ad로 뒤처짐 — 다음 세션 pull 권장 |
 | GitHub Secrets / Branch Protection | CF_API_TOKEN · CF_ACCOUNT_ID · INDEXNOW_KEY 등록 / ruleset `main-protect` Active |
 | R2 / D1 | `honsalim-images` (APAC) / `honsalim-clicks` ID `9bae858e-456f-40e7-8084-c3b90e4ec3ca` |
 | Python | 3.10 32-bit (TIMA·AutoBlog 시스템 공유) |
@@ -45,7 +45,7 @@
 | Anthropic API Key | 영구 [관찰] | 6개월 회전 권장 — **2026-11-28** [추정] |
 | INDEXNOW_KEY | 영구 [확정 — 공개 키] | 회전 불요 |
 | GitHub PAT | 미발급 (Actions는 GITHUB_TOKEN 자동) [확정] | — |
-| AliExpress Portals | **App Key/Secret 발급·라이브 검증 완료** [확정 2026-05-30 — collector.aliexpress 실호출 성공, production-ready]. honsalim.com 사이트 whitelist — **문의 이메일 발송 완료(2026-05-30 새벽, affiliates@service.alibaba.com — 'ali' 오탐 해소 요청), 답변 대기** [확정 사용자] | 2026-05-30 |
+| AliExpress Portals | **App Key/Secret·라이브 검증 완료** [확정]. honsalim.com whitelist('ali' 오탐) — **2채널 제출 완료, 답변 대기** [확정 #13]: ①이메일(새벽 affiliates@service.alibaba.com) ②**포털 XFeedback(스크린샷 증거 포함, My Feedbacks 상태 "To do")**. 사이트 라이브 상태로 제출. 사이트등록폼은 'ali' 자동검증으로 Submit 불가 → 사람 화이트리스트만 길. 무응답 3~4영업일 시 follow-up | 2026-05-30 |
 | 쿠팡 파트너스 | 보류 | Phase 4 (콘텐츠 누적 후) 재가입 |
 
 ## 보안 / 권한
@@ -60,29 +60,21 @@
 ## 알려진 잔존 미해결
 
 ### ★ 시급 (다음 세션) — #13 갱신
-1. **게시 경로 배선 (최우선)**: approve(CLI 有) → **promote CLI 미배선**(article_writer.promote_to_article 함수만) → **상세글 렌더 미구현**(article 상세 템플릿·renderer) → 배포. markdown→HTML·slug 생성·article 필드 조립(body_html·content_hash·disclosure_first)·schema_jsonld 확정값(이미지·발행일) 필요. → 검증된 draft 6 게시 가능 상태.
-2. **시나리오 3종 미튜닝**: gaeul-30·isacheol-30·homeoffice-200 (collect-products 검색어·밴드).
-3. 스타일 disclosure_banner(POLICY §2-2 배치, Phase 3~4 렌더 시 body_md disclosure와 중복 회피 조율).
-4. **main-protect 브랜치 보호 재활성화** (public 전환으로 꺼짐, 사용자 GitHub GUI) · honsalim.com 알리 whitelist(사용자·대기).
-5. (Phase 4) about.html·Person Schema · Scaled Content Abuse Step 2.
+1. **★/go/ 제휴 링크 작동 완성 (최우선·수익 직결)**: 현재 첫 글 "추천 보기" 클릭 시 홈으로 감(D1 slug_map 비어있음). 필요: ①**D1 slug_map 라이브 쓰기** — `sync-slugmap --no-dry-run`(코드 준비됨, deny-list라 사람/CI 트리거) + D1 스키마 적용(`sql/d1/schema.sql`) ②**go_gateway Worker 배포**(`wrangler deploy`, deny-list). → 첫 글 수익화 활성.
+2. **상품 이미지** — 빠른 길: AliExpress CDN `image_url_external`(정책확인 후 product_card). 대표 이미지는 AI생성(Phase 3 Imagen). 현재 우드톤 placeholder(의도).
+3. **시나리오 추가 글** — 현재 1편(나머지 9개 "준비 중" 비클릭). 시나리오 3종 튜닝(gaeul·isacheol·homeoffice-200).
+4. **알리 whitelist 답변 확인**(3~4영업일 무응답 시 follow-up) · **main-protect 재활성화**(사용자 GUI) · **로컬 main pull**(origin e763e0f).
+5. 배포 워크플로 `paths: build/site/**` 필터(문서-only push 시 불필요 재배포 회피) · 잔존 워크트리 5개 정리(수동거부 보류) · (Phase 4)about.html·Person Schema.
 
 ### 해소 (세션 #13)
-- ~~워크트리 브랜치 main 병합·push~~ ✅ — #12 commits 이미 main 병합·origin push 완료 [확정 main=origin/main=**7b572ad**, 0/0 동기]. STATE/EVENTS/TODO "병합 필요" 표기 stale 정정.
-- 잔존 워크트리 5개(`admiring-sinoussi·gallant-swartz·goofy-hopper·sleepy-dewdney·stupefied-lichterman`) 모두 main 조상·uncommitted 0 확인. **폐기는 수동 거부로 보류**(무해 잔여물, 사용자 승인 시 처리).
+- ~~게시 경로 배선~~ ✅ promote CLI(article_products 연결)·renderer 상세글·article.html 실데이터화 → **첫 글 honsalim.com 라이브 게시**
+- ~~무인 배포 파이프라인~~ ✅ 방법 A(build/site 커밋·Actions 배포, 배포 success 확인) · ~~codeql v3→v4~~ ✅ · ~~문서 cap/stale 정정~~ ✅
+- **근본 수정**: d1_aggregator `clicks.timestamp→ts`(라이브 집계 실패 버그) · extract_disclosure_first 제휴처 무관(알리 글 None→promote NOT NULL 위반 잠복버그) · renderer LF(CRLF churn)
+- 잔존 워크트리 5개·#12 병합건은 위 #13 시급 4·5 참조
 
-### 해소 (세션 #9)
-- ~~SUMMARY 정독~~ ✅ + ~~Google API 키 발급~~ ✅ (`D:\secrets\honsalim.env`)
-- ~~dashboard 모듈 구현~~ ✅ CLI 11/11 완성·회귀 +10 (BACKEND §2-6) · ~~settings.json N1~~ ✅ destructive op 자동 차단
-- (#7 해소분 pip-audit 0건·#6 push 완료는 EVENTS archive 참조)
-
-### Phase 2 진척 가능 (검토 영향 작음)
-- (현재 안전 진척 후보 모두 소진 — 다음은 사용자 검토 4건 의존)
-
-### Phase 2 진척 가능 (검토 의존 큼 — 사용자 결정 후)
-- `src/builder/manifest.py` 증분 빌드 (ARCH §7·DB §10)
-- `src/dashboard/{render,approve}.py` (디자인 시안 Phase 3 의존)
-- `src/deployer/{git_push,wrangler}.py` · `src/tracker/d1_aggregator.py` · `src/workers/go_gateway.js`
-- `src/collector/coupang.py` (Phase 4)
+### Phase 2 진척 가능 (검토 의존 큼)
+- `src/builder/manifest.py` 증분 빌드 (ARCH §7·DB §10) · `src/collector/coupang.py` (Phase 4)
+- (이전 해소분 #7·#9·#10·#12는 EVENTS archive 참조)
 
 ### Phase 1 잔존 (작음)
 - Actions status check Branch Protection 추가 (Phase 2 안정 후)
