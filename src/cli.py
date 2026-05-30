@@ -55,6 +55,9 @@ OK = "[OK]"
 WARN = "[WARN]"
 FAIL = "[FAIL]"
 
+# 사이트 origin (builder.renderer.SITE_ORIGIN과 일치 — JSON-LD URL 생성용)
+SITE_ORIGIN = "https://honsalim.com"
+
 
 def _print_section(title: str) -> None:
     print(f"\n=== {title} ===")
@@ -581,6 +584,24 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                 "usage": result.usage,
                 "model": client.model,
             }
+            # schema 게이트용 Article JSON-LD. image_url·published_at은 임시값
+            # (실제 대표 이미지는 Phase 3 AI 생성, 실제 발행일은 promote 시 확정).
+            from datetime import date
+
+            from builder import build_article_jsonld
+
+            try:
+                enriched_payload["schema_jsonld"] = build_article_jsonld(
+                    meta=meta,
+                    scenario={"slug": scenario_dict["slug"]},
+                    site_base_url=SITE_ORIGIN,
+                    image_url=f"{SITE_ORIGIN}/static/img/og-default.png",
+                    published_at=date.today().isoformat(),
+                )
+            except ValueError as e:
+                print(
+                    f"{WARN} schema_jsonld 생성 실패(메타 필드 부족): {e} — validate schema 게이트 막힘"
+                )
         else:
             enriched_payload = {
                 "dry_run": True,
