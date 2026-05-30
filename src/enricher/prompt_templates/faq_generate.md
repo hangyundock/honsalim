@@ -3,10 +3,10 @@
 > 출처: SCENARIOS §5-1 + FRONTEND §4-2 [확정]
 > 사용: 본문 생성 시 자동 포함되거나, FAQ 누락 시 별도 호출.
 
-다음 시나리오에 대한 FAQ 3~5개를 작성하세요.
+다음 세팅에 대한 FAQ 3~5개를 작성하세요.
 
-시나리오: {{scenario.title_ko}}
-페르소나: {{persona.title_ko}}
+세팅: {{scenario.title_ko}}
+라이프스타일: {{persona.title_ko}}
 예산: {{scenario.budget_min_krw}}~{{scenario.budget_max_krw}}원
 
 ## 좋은 FAQ 기준

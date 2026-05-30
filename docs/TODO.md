@@ -3,17 +3,15 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 시급 (다음 세션) — #14 갱신
+## ★ 시급 (다음 세션 #15) — #14 갱신
 
-> #13: 게시 경로 완성·**첫 글 honsalim.com 라이브 게시**·무인 배포(방법 A)·알리 whitelist 2채널 제출. 회귀 470. 다음은 **/go/ 링크 작동(수익화)**.
+> #14: ① 용어 일상화(시나리오→**내맘대로 세팅**·페르소나→**라이프스타일**) 교체+재발방지 가드, 회귀 472. ② **★사이트 大전환 기획 확정 — "카테고리 우선 제품 비교·정보 사이트(노써치형)"**. 표준 `docs/CATEGORY_PAGE.md` · 프로토타입 `scripts/category_page_prototype.py`. **본구현(자동화)은 다음 세션.**
 
-- [x] ~~게시 경로 배선~~ ✅ #13 (promote CLI·renderer 상세글·article.html 실데이터화 → 첫 글 라이브)
-- [x] ~~codeql v4·robots/_headers·404방지·문서 cap/stale~~ ✅ #13
-- [ ] **★/go/ 제휴 링크 작동 (최우선·수익 직결)**: ①**D1 slug_map 라이브 쓰기** — `sync-slugmap --no-dry-run`(코드 준비됨, deny-list라 사람/CI 트리거) + D1 스키마 적용(`sql/d1/schema.sql`) ②**go_gateway Worker 배포**(`wrangler deploy`, deny-list). 현재 "추천 보기"→홈으로 감.
-- [ ] **상품 이미지** — AliExpress CDN `image_url_external`(정책확인 후 product_card, 빠른 보강) / 대표이미지 AI(Phase 3 Imagen). 현재 우드톤 placeholder(의도).
-- [ ] **시나리오 추가 글**(현재 1편, 9개 "준비 중") + 3종 튜닝(gaeul·isacheol·homeoffice-200).
-- [ ] **알리 whitelist 답변 확인**(무응답 3~4영업일 시 follow-up) · **main-protect 재활성화**(사용자 GUI) · **로컬 main pull**(origin e763e0f).
-- [ ] 배포 워크플로 `paths: build/site/**` 필터(문서-only push 불필요 재배포 회피) · 잔존 워크트리 5개 정리(수동거부 보류).
+- [x] ~~용어 일상화 교체+가드(472 PASS)·재설계 기획 확정·노써치 분석·카테고리 프로토타입~~ ✅ #14
+- [ ] **★페이지 재설계 본구현 (최우선)** (DECISIONS O / `CATEGORY_PAGE.md` §6): ① **콘텐츠 파이프라인**(혼살다 명의 8요소 자동작성 + 진실성 게이트, enrich 개편) ② **카테고리별 2티어 수집**(실속/고급 가격밴드 — `search_keywords.yml` 정형화) ③ 수집기 `target_original_price`·`discount` 필드 + DB 컬럼 + **가격 빌드시 재조회**(드리프트 가드) ④ **렌더러 category 템플릿 이식**(프로토타입 참조) ⑤ **"더 많은 제품 보기"(전체 제품)** 필터·정렬 페이지.
+- [ ] 용어 교체 build/site **배포 반영 확인**(honsalim.com에 시나리오→세팅).
+- [ ] **★/go/ 제휴 링크 작동**(D1 slug_map 쓰기 + go_gateway Worker 배포, deny-list라 사람/CI) — 수익 직결.
+- [ ] (확인) 알리 이미지 허용(affiliates@ 채널) · **네이버 폰트 확정**(Chrome 연결 시) · 알리 whitelist 답변 · main-protect 재활성화.
 
 ## 알리 통합 (D9)
 

@@ -10,8 +10,8 @@
 {{body_md}}
 ```
 
-페르소나 슬러그: {{persona.slug}}
-시나리오 슬러그: {{scenario.slug}}
+라이프스타일 슬러그: {{persona.slug}}
+세팅 슬러그: {{scenario.slug}}
 
 ## 출력 형식 (엄격)
 

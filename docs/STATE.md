@@ -7,11 +7,11 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **Phase 1~95% + Phase 2 + #13 게시 경로 완성·★첫 글 honsalim.com 라이브 게시**: promote CLI(article_products 연결)→renderer 상세글(article.html 실데이터화)→배포. D1 slug_map 동기화 모듈+sync-slugmap CLI. **무인 배포(방법 A): build/site 커밋 → main push → GitHub Actions 자동 배포** [확정 e763e0f 배포 success]. honsalim.com placeholder→진짜 사이트(첫 글 "홈오피스 50만원 세팅" 8 제휴상품). 회귀 470 PASS. **★잔여: /go/ 제휴 링크 미작동(D1 slug_map 쓰기+go_gateway Worker 배포 필요)** | 2026-05-30 #13 |
+| 진행 단계 | **#14: ① 용어 일상화**(시나리오→**내맘대로 세팅**·페르소나→**라이프스타일**) 화면·글본문·프롬프트·renderer 교체 + 재발방지 가드, **회귀 472 PASS**, build/site 재빌드(배포 대기). **② ★페이지/콘텐츠 大전환 기획 확정** — "**카테고리 우선 제품 비교·정보 사이트(노써치형)**". 표준 `docs/CATEGORY_PAGE.md`+프로토타입 `scripts/category_page_prototype.py`(사무용 의자·흰 바탕·NanumSquare Neo·2분류·실데이터). #13: 첫 글 라이브·무인배포(방법A). **★본구현 미완(자동화)**: 파이프라인·2티어 수집·가격 재조회·렌더러 이식 (DECISIONS O) | 2026-05-31 #14 |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
 | Phase 2 핵심 모듈 18개 (#3~#5) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} · deployer/{git_push,wrangler,verify} · tracker/{d1_aggregator,**report**} · **workers/go_gateway.js** | #5 |
-| Phase 2 회귀 테스트 | **470 / 470 PASS** [확정 pytest, #13] — #13 +34 (article_writer link/slug 7 + cli promote/sync 5 + renderer 상세글·404·robots 8 + slug_map 11 + tracker ts가드 1 + disclosure ali 1 등). #12 436. CI(GitHub Actions)에서도 470 통과 후 배포 | 2026-05-30 |
+| Phase 2 회귀 테스트 | **472 / 472 PASS** [확정 pytest, #14] — #14 +2(용어 재발방지 가드 `test_renderer`), #13 +34 (article_writer link/slug 7 + cli promote/sync 5 + renderer 상세글·404·robots 8 + slug_map 11 + tracker ts가드 1 + disclosure ali 1 등). #12 436. CI(GitHub Actions)에서도 470 통과 후 배포 | 2026-05-30 |
 | CLI 명령 (BACKEND §9) | **14개** — doctor · db · collect · collect-products · enrich · validate · approve · **promote(#13 신규: article_fields 조립·md→HTML·article_products 연결)** · unapprove · deploy · **sync-slugmap(#13 신규: published 상품→D1 slug_map UPSERT, dry-run 기본)** · build · dashboard | #13 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + 4 게이트 통합(validate_and_save) + META-JSON + Article JSON-LD + 1인칭/사진 게이트. 영구화 세션 #4 시점 5개 사항(tracker.d1_aggregator·deployer·builder.manifest·enricher.retry·state_machine 매트릭스 보강) → DECISIONS J + EVENTS #4·#5 누적 | #4~#5 |
 | doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 **49개** (#13 +link_article_products·unique_article_slug·sync_slug_map·collect_slug_map_entries) · §11 state_machine 매트릭스 · §12 tests 로드 · §13 Workers JS · §14 size cap | #13 |
@@ -59,12 +59,11 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 시급 (다음 세션) — #13 갱신
-1. **★/go/ 제휴 링크 작동 완성 (최우선·수익 직결)**: 현재 첫 글 "추천 보기" 클릭 시 홈으로 감(D1 slug_map 비어있음). 필요: ①**D1 slug_map 라이브 쓰기** — `sync-slugmap --no-dry-run`(코드 준비됨, deny-list라 사람/CI 트리거) + D1 스키마 적용(`sql/d1/schema.sql`) ②**go_gateway Worker 배포**(`wrangler deploy`, deny-list). → 첫 글 수익화 활성.
-2. **상품 이미지** — 빠른 길: AliExpress CDN `image_url_external`(정책확인 후 product_card). 대표 이미지는 AI생성(Phase 3 Imagen). 현재 우드톤 placeholder(의도).
-3. **시나리오 추가 글** — 현재 1편(나머지 9개 "준비 중" 비클릭). 시나리오 3종 튜닝(gaeul·isacheol·homeoffice-200).
-4. **알리 whitelist 답변 확인**(3~4영업일 무응답 시 follow-up) · **main-protect 재활성화**(사용자 GUI) · **로컬 main pull**(origin e763e0f).
-5. 배포 워크플로 `paths: build/site/**` 필터(문서-only push 시 불필요 재배포 회피) · 잔존 워크트리 5개 정리(수동거부 보류) · (Phase 4)about.html·Person Schema.
+### ★ 시급 (다음 세션 #15) — #14 갱신 (상세: DECISIONS O · `docs/CATEGORY_PAGE.md` §6)
+0. **용어 일상화 배포 반영 확인**: #14 커밋 build/site(시나리오→세팅)가 Actions 배포로 honsalim.com에 실제 반영됐는지.
+1. **★페이지 재설계 본구현 (최우선, 자동화)**: ① 콘텐츠 파이프라인(혼살다 명의 8요소 자동작성+진실성 게이트, enrich 개편) ② 카테고리별 **2티어 수집**(실속/고급 가격밴드 — `search_keywords.yml` 정형화) ③ 수집기 `target_original_price`·`discount` 필드+DB 컬럼 + **가격 빌드시 재조회**(드리프트 가드) ④ **렌더러에 category 템플릿 이식**(프로토타입 = `scripts/category_page_prototype.py`) ⑤ **"더 많은 제품 보기"(전체 제품)** 필터·정렬 리스트 페이지.
+2. **★/go/ 제휴 링크 작동** — D1 slug_map 쓰기 + go_gateway Worker 배포(deny-list라 사람/CI). 수익 직결, 보류.
+3. (확인) 알리 이미지 허용(affiliates@ 채널) · **네이버 폰트 NanumSquare Neo 확정**(Chrome 연결 시 직접 inspect) · 알리 whitelist 답변 · main-protect 재활성화.
 
 ### 해소 (세션 #13)
 - ~~게시 경로 배선~~ ✅ promote CLI(article_products 연결)·renderer 상세글·article.html 실데이터화 → **첫 글 honsalim.com 라이브 게시**

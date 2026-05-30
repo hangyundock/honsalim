@@ -14,8 +14,30 @@
   - 세션 #5 (2026-05-28 CLI 10/11 deployer/build + 핵심 결정 K1~K4 + 알리 승인 + pip install -e .[dev] + 회귀 333 PASS + 11 commits)
   - 세션 #6 (2026-05-28~29 정책 대재설계 L2 AI이미지 + Google AI Guide 정합 M1~M7 + cross-project 통합 + 회귀 342 + 17 commits)
   - 세션 #7 (2026-05-29 cross-project 잔존 3건(AutoBlog Hana Kim·혼살림 M2 Person Schema·Scaled Content Abuse Step1)·필명 "혼살다" 확정·pip-audit 0건·2 commits)
+  - 세션 #8 (2026-05-29 네이버 작업 D:\naver_blog\ 별도 프로젝트 분리(C안)·private repo·dazzling-hermann 폐기·1 commit)
 
 ## 최근 5세션
+
+### 세션 #14 — 2026-05-31 (Opus 4.8 1M, ★용어 일상화 + 사이트 大전환 기획(카테고리 비교·정보 사이트, 노써치형) + 카테고리 페이지 프로토타입, 회귀 470→472)
+
+**시작 상황**: `/honsalim-start` → 워크트리 hopeful-kirch-af444e(HEAD=origin/main=9a722a7 #13). 회귀 470. 사용자가 라이브 첫 글을 보며 연속 개선 요청.
+
+**핵심 진척 [확정]**:
+1. **용어 일상화 (AI 자카 제거→신뢰)** [확정 사용자]: 시나리오→**내맘대로 세팅**(합성어 자리 "세팅")·페르소나→**라이프스타일**. 화면(템플릿 6)·renderer 문자열(meta·JSON-LD)·enrich 프롬프트 7·라이브 첫 글 본문 H2(DB body_md/html/hash 정합 정정) 교체. URL/코드/DB 내부명 유지(방문자 무관·위험). **재발방지 가드 테스트**(렌더 결과에 두 단어 0건). 회귀 470→**472 PASS**. build/site 재빌드(0건 확인, 배포 대기). ※**"AI가 작성" 비노출**(저자=운영자 "혼살다") 원칙 확정.
+2. **사이트 大전환 기획 확정** [확정 사용자]: 노써치(nosearch.com) 정밀분석(메인·구매가이드·intro·에어컨 픽) → **"카테고리 우선 제품 비교·정보 사이트"**로 전환. 표준 `docs/CATEGORY_PAGE.md`(12컴포넌트)+콘텐츠 8요소+정직 큐레이터 포지셔닝(테스트 없음→스펙·기준 종합). **DECISIONS O 신규(O1~O9)**.
+3. **카테고리 페이지 프로토타입** `scripts/category_page_prototype.py`(사무용 의자): 흰 바탕·NanumSquare Neo·💰실속(라이브 수집)/⭐고급 2분류 비교카드·한눈비교표·신뢰박스·8요소 가이드·정직 문구·독창 헤더.
+4. **알리 API 라이브 검증** [확정]: collect-products로 사무용 의자 ~60개 수집(**구체검색어+가격밴드=진짜 제품**, 일반어+저밴드=액세서리만). **productdetail.get=product.query 동일 필드** — 가격/정가/할인율·이미지갤러리·카테고리 제공, **평점·구조화스펙·후기 미제공**(가짜 평점 금지). **가격 드리프트 실측**(게이밍 105,200→239,264 2배 → 빌드시 재조회·기준시각·재선정 규칙).
+5. 신뢰 신호 = **정가→판매가+할인율**(가짜 평점 폐기) · "후기" 과장 문구 제거 · 공정위 고지 위치(2024.12 개정) 확인 · 알리 이미지 핫링크 정책.
+
+**무인·안전/진실성(§0)**: 가짜 "긍정평가"·"후기" 주장 발견 즉시 제거. 가격 stale 발견→재조회 규칙화(O7). 경쟁사(노써치) 카피 우려 점검→구조만 참고·표현 원본화. 라이브 수집/배포는 사용자 승인 후.
+
+**잔존 미해결 (다음 세션)**:
+- **★본구현(자동화) 미완**: 콘텐츠 파이프라인(8요소·혼살다·진실성게이트)·카테고리별 2티어 수집·정가/할인 필드+가격재조회·렌더러 category 이식·"더보기"(전체제품) 페이지. (현재 목업 — `docs/design_drafts`·`tmp_*`·`data/`·`launch.json` gitignore라 새 워크트리엔 안 넘어옴 → 커밋된 `docs/CATEGORY_PAGE.md`+`scripts/category_page_prototype.py` 참조, 수집 재실행)
+- 용어 교체 배포 반영 확인 · /go/ 링크 미작동 · 알리 이미지 허용 확인 · 네이버 폰트 확정(Chrome) · 알리 whitelist 답변.
+
+**다음 세션 할 일**: 1) **페이지 재설계 본구현**(파이프라인→2티어 수집→가격재조회→렌더러→더보기) 2) 용어 배포 반영 확인 3) /go/ 링크 작동.
+
+---
 
 ### 세션 #13 — 2026-05-30 (Opus 4.8 1M, 게시 경로 완성·★첫 글 honsalim.com 라이브 게시·무인 배포 파이프라인(방법 A)·알리 whitelist 2채널 제출, 회귀 436→470, 1 commit e763e0f 배포 success)
 
@@ -172,18 +194,3 @@
 **다음 세션 할 일**:
 1. 사용자 외부 작업 (claude.ai/design 5종 시안 생성·1개 선정)
 2. 시안 선정 후 Claude Code → DESIGN.md 토큰 갱신 + Jinja2 템플릿 작성 진입
-
----
-
-### 세션 #8 — 2026-05-29 (Opus 4.7, Auto Mode, 네이버 분리 작업 6 Phase + D:\naver_blog\ 신규 프로젝트 셋업·push·dazzling-hermann 폐기, 1 commit)
-
-**시작 상황**: `/honsalim-start @docs/NAVER_SEPARATION_PLAN.md 따라 네이버 분리` 명시. SEPARATION_PLAN은 옛 dazzling-hermann 워크트리에만 존재.
-
-**핵심 [확정]**: 네이버 작업을 혼살림에서 **별도 프로젝트 `D:\naver_blog\`로 분리**(C안). 혼살림 main에 네이버 흔적 0건(Glob·Grep) → 혼살림 정리 거의 불필요.
-- D:\naver_blog\ 5파일 시스템·settings·gitignore 셋업 + NAVER_PLAN→PROJECT_PLAN 이전 + 메모리 `project_naver_channel.md` 이전(혼살림 측은 redirect stub).
-- GitHub `hangyundock/naver_blog` **private** repo 생성·push(6cfd67b). dazzling-hermann 워크트리·브랜치 폐기. 마스터(CLAUDE_PROJECT_SETUP §14·MARKET_RESEARCH §8.1) 동기화.
-- **작전 변경 D안→C안**: 통합 시 STATE/TODO 혼동 + private 전환 시 CodeQL·Secret Scanning 유료화 부작용 → 별도 폴더. 혼살림 main public 유지.
-
-**다음 세션 할 일**: 1) SUMMARY 정독 2) Google AI 키 3) dashboard 시안. (네이버는 D:\naver_blog\로 분리 — 본 프로젝트 작업 없음)
-
----

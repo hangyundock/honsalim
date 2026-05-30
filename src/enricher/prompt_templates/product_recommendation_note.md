@@ -8,16 +8,16 @@
 상품: {{product.name}}
 가격: {{product.price_krw}}원
 카테고리: {{product.category_path}}
-시나리오 페르소나: {{persona.title_ko}}
+라이프스타일: {{persona.title_ko}}
 예산 fit: {{product.fit_reason}}
 직접 사진 있음: {{has_user_photo}}  # true|false
 
 ## 작성 기준
 
 - 분량: 200~300자 한국어
-- 페르소나 톤 (SCENARIOS §3)
+- 라이프스타일 톤 (SCENARIOS §3)
 - 가격 대비 가치 명시
-- 사용 시나리오 ("원룸 8평에서 …", "재택근무 8시간에 …")
+- 사용 상황 ("원룸 8평에서 …", "재택근무 8시간에 …")
 - 1인칭 표현: **{{has_user_photo}}가 true인 경우에만 허용**
   - 예: "써본 결과 …", "내 원룸에서는 …", "지난 겨울 사용해보니 …"
   - false인 경우 객관 설명만 ("이 모델은 …", "사양은 …")

@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% from "_macros/components.html" import icon, scenario_card, breadcrumb %}
 
-{% block title %}모든 시나리오 | 혼살림{% endblock %}
+{% block title %}내맘대로 세팅 | 혼살림{% endblock %}
 
 {% block main %}
 <section class="hub-head">
   <div class="wrap">
-    {{ breadcrumb([{'label': '홈', 'url': '/'}, {'label': '시나리오'}]) }}
-    <h1 style="margin-top:14px">모든 시나리오</h1>
-    <p class="hub-lead">페르소나·예산·시즌으로 좁혀 내 상황에 맞는 추천을 찾아보세요.</p>
+    {{ breadcrumb([{'label': '홈', 'url': '/'}, {'label': '내맘대로 세팅'}]) }}
+    <h1 style="margin-top:14px">내맘대로 세팅</h1>
+    <p class="hub-lead">라이프스타일·예산·시즌으로 좁혀 내 상황에 맞는 추천을 찾아보세요.</p>
   </div>
 </section>
 
@@ -21,7 +21,7 @@
           <button class="clear" type="button" data-clear>초기화</button>
         </div>
         <div class="fg">
-          <div class="fg-title">페르소나</div>
+          <div class="fg-title">라이프스타일</div>
           <div class="fg-opts">
             {% for p in personas %}
             <label class="chk" data-filter data-group="persona" data-value="{{ p.id }}">
@@ -55,12 +55,12 @@
 
     <div class="hub-main">
       <div class="hub-result-bar">
-        <span><b data-result-count>{{ scenarios | length }}</b>개 시나리오</span>
+        <span><b data-result-count>{{ scenarios | length }}</b>개 세팅</span>
       </div>
       <div class="grid-3 hub-cards">
         {% for s in scenarios %}{{ scenario_card(s) }}{% endfor %}
       </div>
-      <div class="empty" data-empty style="display:none">조건에 맞는 시나리오가 없습니다. 필터를 줄여보세요.</div>
+      <div class="empty" data-empty style="display:none">조건에 맞는 세팅이 없습니다. 필터를 줄여보세요.</div>
     </div>
   </div>
 </section>

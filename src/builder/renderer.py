@@ -347,12 +347,12 @@ def render_site(out_dir: Path = DEFAULT_OUT, db_path: Path = db.DB_PATH) -> dict
         env.get_template("scenario_list.html").render(
             active_nav="hub",
             canonical_url=f"{SITE_ORIGIN}/scenarios/",
-            meta_title="모든 시나리오 | 혼살림",
-            meta_description="페르소나·예산·시즌으로 좁혀 내 상황에 맞는 1인 가구 살림 추천을 찾아보세요.",
+            meta_title="내맘대로 세팅 | 혼살림",
+            meta_description="라이프스타일·예산·시즌으로 좁혀 내 상황에 맞는 1인 가구 살림 추천을 찾아보세요.",
             schema_jsonld=jsonld.as_script_tags(
                 [
                     jsonld.build_breadcrumb_jsonld(
-                        [{"name": "홈", "url": "/"}, {"name": "시나리오"}], SITE_ORIGIN
+                        [{"name": "홈", "url": "/"}, {"name": "내맘대로 세팅"}], SITE_ORIGIN
                     ),
                     org_ld,
                 ]
@@ -371,14 +371,14 @@ def render_site(out_dir: Path = DEFAULT_OUT, db_path: Path = db.DB_PATH) -> dict
         html = persona_tmpl.render(
             active_nav="persona",
             canonical_url=f"{SITE_ORIGIN}/personas/{p['id']}/",
-            meta_title=f"{p['name']} | 혼살림 페르소나",
+            meta_title=f"{p['name']} | 혼살림 라이프스타일",
             meta_description=p["line"],
             schema_jsonld=jsonld.as_script_tags(
                 [
                     jsonld.build_breadcrumb_jsonld(
                         [
                             {"name": "홈", "url": "/"},
-                            {"name": "페르소나", "url": "/personas/"},
+                            {"name": "라이프스타일", "url": "/personas/"},
                             {"name": p["name"]},
                         ],
                         SITE_ORIGIN,
@@ -426,7 +426,7 @@ def render_site(out_dir: Path = DEFAULT_OUT, db_path: Path = db.DB_PATH) -> dict
                 jsonld.build_breadcrumb_jsonld(
                     [
                         {"name": "홈", "url": "/"},
-                        {"name": "시나리오", "url": "/scenarios/"},
+                        {"name": "내맘대로 세팅", "url": "/scenarios/"},
                         {"name": pg["title"]},
                     ],
                     SITE_ORIGIN,

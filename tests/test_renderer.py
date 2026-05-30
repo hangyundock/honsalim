@@ -242,3 +242,31 @@ class TestRenderArticleDetail:
         assert f'href="/articles/{slug}/"' in hub  # 글 있는 카드는 링크됨
         assert hub.count("s-card-soon") == 9  # 나머지 9개는 비클릭
         assert hub.count("준비 중") == 9
+
+
+# 브랜드 용어 가드 — 'AI 자카'(시나리오/페르소나)를 일상어로 교체 후 재발 방지 (세션 #14).
+# 비개발자 일상어가 아닌 위 두 단어가 화면/검색 노출 텍스트에 다시 등장하면 빌드를
+# 실패시켜 무인 회귀를 차단한다 (→ '내맘대로 세팅'·'라이프스타일').
+_BANNED_DISPLAY_TERMS = ("시나리오", "페르소나")
+
+
+def _assert_no_banned_terms(out: Path) -> None:
+    """out 아래 모든 .html(메뉴·푸터·breadcrumb·meta·JSON-LD·본문 포함)에
+    금지 용어가 없어야 한다. *.xml(영문 slug)·*.css/*.js(코드 주석)는 대상 외."""
+    offenders: list[str] = []
+    for html_path in sorted(out.rglob("*.html")):
+        text = html_path.read_text(encoding="utf-8")
+        for term in _BANNED_DISPLAY_TERMS:
+            if term in text:
+                offenders.append(f"{html_path.relative_to(out).as_posix()} → '{term}'")
+    assert not offenders, "AI 자카 용어 노출 (일상어로 교체 필요):\n" + "\n".join(offenders)
+
+
+class TestNoAiJargonTerms:
+    """렌더된 어떤 페이지에도 '시나리오'·'페르소나'가 노출되면 안 된다 (세션 #14 용어 교체)."""
+
+    def test_chrome_pages_have_no_banned_terms(self, built: dict) -> None:
+        _assert_no_banned_terms(built["out"])
+
+    def test_article_page_has_no_banned_terms(self, built_with_article: dict) -> None:
+        _assert_no_banned_terms(built_with_article["out"])

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros/components.html" import icon, image_block, scenario_card, breadcrumb, section_head %}
 
-{% block title %}{{ persona.name }} | 혼살림 페르소나{% endblock %}
+{% block title %}{{ persona.name }} | 혼살림 라이프스타일{% endblock %}
 
 {% block main %}
 {# 페르소나 전환 탭 #}
@@ -17,8 +17,8 @@
 <section class="persona-hero">
   <div class="wrap persona-hero-in">
     <div class="ph-copy">
-      {{ breadcrumb([{'label': '홈', 'url': '/'}, {'label': '페르소나', 'url': '/personas/'}, {'label': persona.name}]) }}
-      <div class="eyebrow" style="margin-top:14px">페르소나</div>
+      {{ breadcrumb([{'label': '홈', 'url': '/'}, {'label': '라이프스타일', 'url': '/personas/'}, {'label': persona.name}]) }}
+      <div class="eyebrow" style="margin-top:14px">라이프스타일</div>
       <h1>{{ persona.name }}</h1>
       <p class="ph-line">{{ persona.line }}</p>
       <p class="ph-desc">{{ persona.desc }}</p>
@@ -68,9 +68,9 @@
     {# 우측 시나리오 카드 #}
     <div class="persona-scenarios">
       {{ section_head(
-          title=persona.name ~ ' 시나리오',
+          title=persona.name ~ ' 세팅',
           lead=(scenarios | length) | string ~ '개의 가이드가 준비돼 있어요.',
-          action_label='전체 시나리오', action_url='/scenarios/', action_class='btn btn-text'
+          action_label='전체 세팅', action_url='/scenarios/', action_class='btn btn-text'
       ) }}
       <div class="grid-2">
         {% for s in scenarios %}{{ scenario_card(s) }}{% endfor %}
