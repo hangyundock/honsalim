@@ -548,10 +548,20 @@ def cmd_enrich(args: argparse.Namespace) -> int:
         # 라이브: 응답을 META-JSON + BODY-MARKDOWN으로 분리해 본문을 영구 저장.
         # 분리 실패 시 본문 미저장·상태 전이 없음(돈만 쓰고 stub 저장 방지).
         if not args.dry_run:
-            from enricher.claude_client import ArticleResponseError, split_article_response
+            from enricher.claude_client import (
+                ArticleResponseError,
+                is_truncated,
+                split_article_response,
+            )
 
             if not result.response_text:
                 print(f"{FAIL} 라이브 응답 본문 비어있음 — 저장 안 함")
+                return 3
+            if is_truncated(result):
+                print(
+                    f"{FAIL} 응답이 max_tokens({client.max_tokens})에서 잘림 — "
+                    "본문 미완성. max_tokens 상향 또는 본문 축소 필요 (저장 안 함)"
+                )
                 return 3
             try:
                 meta, body_md = split_article_response(result.response_text)

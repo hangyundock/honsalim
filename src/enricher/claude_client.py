@@ -26,9 +26,11 @@ from typing import Any
 
 from . import prompt_loader
 
-# BACKEND §3-1 [확정]
+# BACKEND §3-1 [확정] — max_tokens는 라이브 검증으로 상향 [확정 2026-05-30]:
+# 4096은 한국어 8섹션 본문 + META-JSON + FAQ 5개에 부족(응답 truncate → BODY-END 누락 → 분리 실패).
+# 8192로 상향(헤드룸 확보). BACKEND §3-1 문서도 갱신 필요.
 DEFAULT_MODEL = "claude-haiku-4-5-20251001"
-DEFAULT_MAX_TOKENS = 4096
+DEFAULT_MAX_TOKENS = 8192
 DEFAULT_TEMPERATURE = 0.4
 
 # system_base.md §2 출력 형식 구분자 [확정]
@@ -98,6 +100,12 @@ class GenerateResult:
     response_text: str | None = None
     usage: dict[str, int] = field(default_factory=dict)
     dry_run: bool = True
+    stop_reason: str | None = None  # 'end_turn' 정상 · 'max_tokens' 잘림(무인 진단)
+
+
+def is_truncated(result: GenerateResult) -> bool:
+    """응답이 max_tokens에서 잘렸는지 — 잘리면 본문 끝 구분자 누락으로 분리 실패."""
+    return result.stop_reason == "max_tokens"
 
 
 def build_system_blocks() -> list[dict[str, Any]]:
@@ -212,4 +220,5 @@ class ClaudeClient:
                 "output_tokens": getattr(response.usage, "output_tokens", 0),
             },
             dry_run=False,
+            stop_reason=getattr(response, "stop_reason", None),
         )

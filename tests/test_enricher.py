@@ -35,6 +35,7 @@ from enricher import (
     GenerateRequest,
     build_system_blocks,
     build_user_prompt,
+    is_truncated,
     list_templates,
     load,
     split_article_response,
@@ -86,9 +87,10 @@ class TestPromptLoader:
 
 class TestClaudeClient:
     def test_defaults_match_backend_spec(self) -> None:
-        """BACKEND §3-1 매개변수 일치."""
+        """BACKEND §3-1 매개변수. max_tokens는 라이브 검증으로 8192 상향 [확정 2026-05-30]
+        (4096은 한국어 8섹션+META+FAQ에 부족 → 응답 truncate)."""
         assert DEFAULT_MODEL == "claude-haiku-4-5-20251001"
-        assert DEFAULT_MAX_TOKENS == 4096
+        assert DEFAULT_MAX_TOKENS == 8192
         assert DEFAULT_TEMPERATURE == 0.4
 
     def test_cached_system_templates_pair(self) -> None:
@@ -178,6 +180,32 @@ class TestSplitArticleResponse:
         )
         with raises(ArticleResponseError):
             split_article_response(text)
+
+    def test_split_works_inside_code_fence(self) -> None:
+        """라이브 모델이 출력을 ``` 코드펜스·서두로 감싸도 구분자 기반 분리 동작 [확정 라이브]."""
+        text = (
+            "# 본문 생성 결과\n```\n"
+            "---META-JSON-START---\n" + '{"title": "T"}\n' + "---META-JSON-END---\n"
+            "---BODY-MARKDOWN-START---\n## 1. 섹션\n본문\n---BODY-MARKDOWN-END---\n```"
+        )
+        meta, body = split_article_response(text)
+        assert meta["title"] == "T" and body.startswith("## 1. 섹션")
+
+
+class TestTruncationDetection:
+    """max_tokens 잘림 감지 — 무인 운영 진단 (라이브에서 4096 truncate 확인)."""
+
+    def _result(self, stop_reason: str | None) -> Any:
+        from enricher import GenerateResult
+
+        return GenerateResult(system_blocks=[], user_prompt="x", stop_reason=stop_reason)
+
+    def test_max_tokens_is_truncated(self) -> None:
+        assert is_truncated(self._result("max_tokens")) is True
+
+    def test_end_turn_not_truncated(self) -> None:
+        assert is_truncated(self._result("end_turn")) is False
+        assert is_truncated(self._result(None)) is False
 
 
 if __name__ == "__main__":

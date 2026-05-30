@@ -16,6 +16,7 @@ from .claude_client import (
     GenerateResult,
     build_system_blocks,
     build_user_prompt,
+    is_truncated,
     split_article_response,
 )
 from .meta_extractor import (
@@ -73,6 +74,7 @@ __all__ = (
     "build_system_blocks",
     "build_user_prompt",
     "extract",
+    "is_truncated",
     "list_templates",
     "load",
     "normalize_meta",
