@@ -383,6 +383,14 @@ class TestApplyDisclosure:
         # 첫머리 문구가 두 번 들어가지 않음
         assert twice.count("일정 수수료를 제공받습니다") == 1
 
+    def test_nonstandard_model_disclosure_gets_standard(self) -> None:
+        """모델이 임의로 쓴 비표준 disclosure(키워드는 있음)여도 표준 문구를 삽입 (POLICY §2-4)."""
+        # 키워드(쿠팡 파트너스·수수료)는 있지만 표준 문구는 아님 — 라이브에서 실제 발생한 케이스
+        model_written = "[광고 공시] 본 페이지는 쿠팡 파트너스 활동으로 일정 수수료를 받습니다.\n\n# 제목\n본문."
+        out = article_writer.apply_disclosure(model_written)
+        assert article_writer.FIRST_DISCLOSURE.split(".")[0] in out  # 표준 첫머리 삽입됨
+        assert "일정 수수료를 제공받습니다" in out[:300]
+
 
 class TestRecordScenarioCandidates:
     """collect-products → 시나리오 collected draft.raw_payload 후보 기록 (DB §5)."""

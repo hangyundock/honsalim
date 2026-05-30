@@ -91,18 +91,24 @@ def extract_disclosure_first(body_md: str) -> str | None:
     return None
 
 
-def apply_disclosure(body_md: str) -> str:
-    """POLICY §2-2 첫머리 + §2-3 푸터 disclosure를 본문에 자동 삽입 (system_base §2 '자동 삽입').
+# 표준 문구 식별용 distinctive 구절 (POLICY §2-4 "표준 문구" 일치 여부 판정 — 키워드가 아니라
+# 표준 문구 자체의 존재로 멱등 판정해야 모델이 임의로 쓴 비표준 disclosure를 표준으로 교체 보강).
+_FIRST_MARK = "일정 수수료를 제공받습니다"
+_FOOTER_MARK = "어필리에이트 정책을 준수합니다"
 
-    모델은 disclosure를 쓰지 않도록 지시받으므로(프롬프트) 생성 후 시스템이 삽입한다.
-    멱등: 첫머리 200자·푸터 800자에 이미 키워드가 있으면 중복 추가하지 않는다.
-    삽입 결과는 validator.check_disclosure(첫머리 쿠팡 파트너스+수수료 / 푸터 +AliExpress+본인)를 통과한다.
+
+def apply_disclosure(body_md: str) -> str:
+    """POLICY §2-2 첫머리 + §2-3 푸터 **표준** disclosure를 본문에 자동 삽입 (system_base §2 '자동 삽입').
+
+    모델은 disclosure를 쓰지 않도록 지시받으므로(프롬프트) 생성 후 시스템이 표준 문구를 삽입한다.
+    멱등 판정은 **표준 문구 존재**(키워드 아님) 기준 — 모델이 임의로 쓴 비표준 disclosure가 있어도
+    표준 문구가 없으면 삽입한다(POLICY §2-4 표준 문구 보장). 결과는 validator.check_disclosure 통과.
     """
     body = body_md or ""
-    head = body[:200]
-    tail = body[-800:]
-    need_first = not all(k in head for k in DISCLOSURE_FIRST_KEYWORDS)
-    need_footer = not all(k in tail for k in DISCLOSURE_FOOTER_KEYWORDS)
+    head = body[:300]  # 표준 첫머리는 본문 맨 앞이나 모델 서두 직후일 수 있어 약간 여유
+    tail = body[-1000:]
+    need_first = _FIRST_MARK not in head
+    need_footer = _FOOTER_MARK not in tail
 
     parts: list[str] = []
     if need_first:
