@@ -1,0 +1,130 @@
+# search_keywords.yml — 시나리오 slug → AliExpress 영어 검색어 목록
+#
+# 출처: SCENARIOS.md §8-2 시나리오 10종 + 라이브 발견 [확정 2026-05-30].
+#
+# ── 왜 영어인가 ──
+# AliExpress affiliate product.query 는 영어 검색어 기반이다.
+# 한글 검색어("원룸 조명")는 resp_code 405 "The result is empty" 로 빈 결과를 반환한다.
+# 단, target_language=ko 가 적용되어 **결과 상품명은 한글로 반환**되므로 사이트에 그대로 쓸 수 있다.
+# → 검색어만 영어로 작성하면 된다.
+#
+# ── ★ 사용자 검토 필요 [추정] ──
+# 아래 검색어 목록이 각 시나리오에서 실제로 수집되는 상품 카테고리를 결정한다.
+# 시나리오는 모두 "30만원 필수템 6~8개" 같은 번들형이라, 카테고리별로 검색어를 나열한다.
+# 검토 시 원칙:
+#   - 1인 가구·자취·홈오피스 맥락의 일반 상품 영어명 (브랜드명 금지 — 매칭률·정책 위험)
+#   - 너무 좁히지 말 것 (예: "LED desk lamp clamp" 보다 "desk lamp" 가 매칭 안정적)
+#   - 예산대(budget_min/max)·계절(season_peak)은 수집 후 enrich/검증 단계에서 반영
+
+# 쿠팡 전담 시나리오 — 전 품목이 가전/대형이라 AliExpress 부적합 (라이브 검증 [확정 2026-05-30]).
+# Phase 4 쿠팡 가입 후 collector.coupang가 담당. AliExpress 수집 대상 아님.
+coupang_deferred:
+  - cheot-jachi-gajeon-100      # 1인 가전 100만원 풀세트 (냉장고·세탁기·전자레인지 등 전부 가전)
+  - jeongchak-gajeon-up-50      # 소형 가전 업그레이드 (에어프라이어·로봇청소기·커피머신 등)
+
+scenarios:
+  # 원룸 첫 자취 30만원 필수템 패키지 (cheot-jachi, 2-3월, 6~8개, 예산 25~35만)
+  # 라이브 검증: 소형 잡화는 AliExpress 양호. ★가구/대형 생활용품은 쿠팡(메인) 권장 —
+  #   bedside table·trash can·laundry basket은 AliExpress에서 가구 아닌 램프/봉투/캐릭터만 (소싱 한계).
+  #   Phase 4 쿠팡 가입 후 해당 카테고리는 collector.coupang로 이관 검토.
+  wonroom-cheot-jachi-30:
+    - {q: led desk lamp,               min: 5000,  max: 60000}
+    - {q: folding clothes drying rack, min: 10000, max: 80000}
+    - {q: plastic storage box,         min: 3000,  max: 40000}
+    - {q: standing floor mirror,       min: 20000, max: 120000}
+    - {q: power strip surge protector, min: 5000,  max: 40000}
+    # ↓ AliExpress 소싱 약함 (쿠팡 이관 후보) — 임시 보류
+    # - {q: nightstand,      min: 20000, max: 120000}   # 가구 → 램프만 나옴
+    # - {q: trash can pedal, min: 5000,  max: 40000}    # 봉투/컴포스터만
+    # - {q: laundry basket,  min: 5000,  max: 40000}    # 캐릭터 바구니만
+
+  # 첫 자취 살림 50만원 완성판 (cheot-jachi, 2-3월, 8~10개) — ★쿠팡 우세형
+  # 라이브 검증 [확정 2026-05-30]: 가전(microwave·kettle·rice cooker→차량용/부품/액세서리만,
+  #   220V·KC 정품 없음)·가구(folding table→램프, storage shelf→레코드랙)·침구(bedding set→애니)·
+  #   커튼(→차량용)은 AliExpress 부적합 → Phase 4 쿠팡 이관. AliExpress는 소형 소모품만.
+  cheot-jachi-50-complete:
+    - {q: home slippers,               min: 3000,  max: 30000}
+    - {q: plastic storage box,         min: 3000,  max: 40000}
+    - {q: folding clothes drying rack, min: 10000, max: 80000}
+    # ↓ 쿠팡 이관 (가전·가구·침구·대형): folding table, floor mattress, microwave oven,
+    #   electric kettle, rice cooker, storage shelf, clothes rack, blackout curtain, bedding set
+
+  # cheot-jachi-gajeon-100 (1인 가전 100만원 풀세트)는 coupang_deferred — 위 참조.
+
+  # 가을 신학기 자취 보완 살림 30만원 (cheot-jachi, 8-9월, 6~8개) — 정리·수납 중심(AliExpress 적합)
+  # 가전(humidifier·heater)·침구(blanket)는 쿠팡 이관. storage/organizer/shelf/rack은 라이브 검증 후 확정.
+  gaeul-cheot-jachi-30:
+    - storage organizer
+    - desk organizer
+    - bathroom shelf
+    - kitchen rack
+
+  # 홈오피스 책상·의자 50만원 세팅 (homeoffice, 11-1월, 6~8개)
+  # 가격 밴드(KRW)는 라이브 검증으로 카테고리별 적정대 — 30k~150k 밴드만으로
+  # "office chair"가 실제 의자로 정제됨 [확정 2026-05-30]. 품목별로 밴드 조정.
+  # 검색어는 라이브 검증으로 정제 — 일반어가 엉뚱한 카테고리를 흡수할 때 구체화 [확정 2026-05-30]:
+  #   foot rest→under desk foot rest(오토바이 발판 제거) · monitor stand→monitor riser stand
+  #   monitor arm→monitor desk mount bracket(심박밴드 제거) · desk mat→large mouse pad
+  #   desk lamp→led desk lamp(의료힌지 제거) · cable organizer→cable management box(폰박스·캐릭터 제거)
+  #   computer desk→small computer desk(의자 아닌 실제 접이식/소형 책상, 1인가구 적합)
+  homeoffice-chair-desk-50:
+    - {q: office chair,                min: 40000, max: 250000}
+    - {q: small computer desk,         min: 30000, max: 300000}
+    - {q: monitor riser stand,         min: 5000,  max: 60000}
+    - {q: led desk lamp,               min: 5000,  max: 60000}
+    - {q: under desk foot rest,        min: 5000,  max: 60000}
+    - {q: large mouse pad,             min: 3000,  max: 40000}
+    - {q: cable management box,        min: 1000,  max: 30000}
+    - {q: monitor desk mount bracket,  min: 20000, max: 200000}
+
+  # 홈오피스 100만원 효율 셋업 (homeoffice, 11-1월, 8~10개)
+  # 라이브 검증 [확정 2026-05-30]: 전자 본체(monitor→브래킷·서버케이스, keyboard→키캡,
+  #   webcam→유아카메라)는 정품 안 나옴 → 쿠팡. AliExpress는 주변 액세서리만.
+  homeoffice-100-setup:
+    - {q: office chair,               min: 40000, max: 250000}
+    - {q: led desk lamp,              min: 5000,  max: 60000}
+    - {q: monitor desk mount bracket, min: 20000, max: 200000}
+    - {q: wireless mouse,             min: 5000,  max: 50000}
+    - {q: usb hub,                    min: 5000,  max: 40000}
+    - {q: desk shelf,                 min: 5000,  max: 50000}
+    - {q: laptop stand,               min: 10000, max: 60000}
+    # ↓ 쿠팡 이관 (전자 본체): computer monitor, mechanical keyboard, webcam
+
+  # 홈오피스 200만원 프리미엄 풀셋업 (homeoffice, 11-1월, 10~12개)
+  homeoffice-200-premium:
+    - ultrawide monitor
+    - ergonomic office chair
+    - standing desk
+    - mechanical keyboard
+    - wireless mouse
+    - monitor light bar
+    - desk speaker
+    - headphone stand
+    - cable management box
+    - usb c hub
+    - webcam 4k
+    - under desk drawer
+
+  # 1인 가구 새해 미니멀 살림 20만원 (minimal-life, 1월, 6~8개) — 정리·수납 중심(AliExpress 적합)
+  # 라이브 검증 [확정 2026-05-30]: 일반어(drawer/hanging/foldable basket organizer)는 약통·공구걸이·
+  #   정원봉투로 빗나가 구체어로 교체. clothes vacuum compression bag·desk drawer organizer 깨끗.
+  saehae-minimal-20:
+    - {q: plastic storage box,            min: 3000, max: 40000}
+    - {q: clothes vacuum compression bag, min: 3000, max: 30000}
+    - {q: desk drawer organizer,          min: 3000, max: 30000}
+    - {q: cable management box,           min: 1000, max: 30000}
+    - {q: shoe rack,                      min: 5000, max: 50000}
+    - {q: hanging closet organizer,       min: 3000, max: 30000}
+
+  # jeongchak-gajeon-up-50 (소형 가전 업그레이드)는 coupang_deferred — 위 참조.
+
+  # 원룸 이사철 정리·수납 시스템 30만원 (minimal-life, 3-4월·9-10월, 6~8개)
+  isacheol-jeongni-30:
+    - moving storage box
+    - vacuum storage bag
+    - packing tape
+    - storage shelf
+    - clothes rack
+    - drawer organizer
+    - bubble wrap
+    - storage label sticker

@@ -223,6 +223,10 @@ def _check_phase2_modules() -> bool:
         ("enricher.retry", "RetryConfig"),
         ("collector.scenario_loader", "list_active_scenarios"),
         ("collector.scenario_loader", "next_scenarios_for_collection"),
+        ("collector.products_store", "upsert_products"),
+        ("collector.keyword_map", "keywords_for_scenario"),
+        ("collector.aliexpress", "query_products"),
+        ("collector.aliexpress", "map_product"),
         ("builder", "build_article_jsonld"),
         ("builder", "build_itemlist_jsonld"),
         ("builder", "build_product_jsonld"),
@@ -639,6 +643,103 @@ def cmd_collect(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def cmd_collect_products(args: argparse.Namespace) -> int:
+    """AliExpress product.query → products 테이블 적재 (DECISIONS D9).
+
+    검색어 소스 (둘 중 하나 필수):
+    - ``--keywords <검색어>``  : 단일 영어 검색어
+    - ``--scenario <slug>``   : 시나리오 매핑(search_keywords.yml)의 영어 검색어 목록 전체
+
+    기본 dry_run: 검색어·요청만 빌드 — 실제 호출·DB 쓰기 없음.
+    --no-dry-run: ali.env 로드 → 검색어별 실제 호출(쿼터 소모) → products upsert.
+    외부 API 쿼터를 소모하므로 라이브는 사용자 명시 승인 후 (CLAUDE.md §2-라).
+    """
+    import time
+
+    from collector import aliexpress as ali
+    from collector import keyword_map, products_store
+    from collector.keyword_map import SearchTerm
+
+    # 1) 검색어(SearchTerm) 목록 결정 — --scenario 우선, 없으면 --keywords
+    if args.scenario:
+        terms = keyword_map.terms_for_scenario(args.scenario)
+        if not terms:
+            print(
+                f"{FAIL} 시나리오 {args.scenario!r}에 매핑된 검색어 없음 "
+                f"(search_keywords.yml 확인). 매핑된 slug: {keyword_map.all_mapped_slugs()}"
+            )
+            return 2
+        source = f"scenario={args.scenario!r} ({len(terms)} 검색어)"
+    elif args.keywords:
+        terms = [SearchTerm(q=args.keywords, min_price=args.min_price, max_price=args.max_price)]
+        source = f"keywords={args.keywords!r}"
+    else:
+        print(f"{FAIL} --keywords 또는 --scenario 중 하나가 필요합니다")
+        return 2
+
+    def _band(t: SearchTerm) -> str:
+        if t.min_price is None and t.max_price is None:
+            return ""
+        lo = f"{t.min_price:,}" if t.min_price is not None else "0"
+        hi = f"{t.max_price:,}" if t.max_price is not None else "∞"
+        return f"  [{lo}~{hi} KRW]"
+
+    mode = "dry_run" if args.dry_run else "live"
+    print(f"{OK} collect-products {source}, page_size={args.page_size}, {mode}")
+
+    # 2) dry_run: 검색어·밴드만 나열, 호출·DB 없음
+    if args.dry_run:
+        for t in terms:
+            print(f"     - {t.q}{_band(t)}")
+        print("     [DRY] 실제 호출·DB 쓰기 없음 — 라이브 수집은 --no-dry-run (쿼터·1클릭 승인)")
+        return 0
+
+    # 3) live: ali.env 로드 → 검색어별 호출(가격 밴드 적용) → 누적
+    config.load_secrets()  # ali.env → ALI_APP_KEY/SECRET/TRACKING_ID
+    all_products: list[dict] = []
+    for i, t in enumerate(terms):
+        if i:
+            time.sleep(0.2)  # BACKEND §2-1 호출 간 간격 (rate limit 보호)
+        # 라이브 검증 결과 게이트웨이 timestamp는 밀리초 (EVENTS #11 [확정])
+        try:
+            res = ali.query_products(
+                t.q,
+                timestamp=int(time.time() * 1000),
+                dry_run=False,
+                page_no=args.page_no,
+                page_size=args.page_size,
+                min_sale_price=t.min_price,
+                max_sale_price=t.max_price,
+            )
+        except RuntimeError as e:  # 키 미설정
+            print(f"{FAIL} {e}")
+            return 2
+        except Exception as e:  # 네트워크·응답 파싱 등 외부 요인
+            print(f"{FAIL} {t.q!r} 호출 실패: {e}")
+            return 3
+        n = len(res.products)
+        status = f" (API: {res.resp_msg})" if res.resp_msg else ""
+        note = "  [NOTE] 0건 — 영어 검색어 권장" if n == 0 and not args.scenario else ""
+        print(f"     {t.q:<22}{_band(t):<24} → {n}개{status}{note}")
+        all_products.extend(res.products)
+
+    if not all_products:
+        print(f"{WARN} 수신 상품 0개 — 적재할 데이터 없음")
+        return 0
+
+    # 4) 누적 상품 일괄 upsert (같은 product_id 중복은 ON CONFLICT로 갱신 처리)
+    conn = db.connect(db.DB_PATH)
+    try:
+        upsert = products_store.upsert_products(conn, all_products)
+    finally:
+        conn.close()
+    print(
+        f"{OK} products 적재 (수신 {len(all_products)}) — 신규 {upsert.inserted} · "
+        f"갱신 {upsert.updated} · 스킵 {upsert.skipped} (필수 필드 누락)"
+    )
+    return 0
+
+
 def cmd_unapprove(args: argparse.Namespace) -> int:
     """approved draft → validated 회귀. BACKEND §9 [확정]."""
     from writer import state_machine
@@ -820,6 +921,42 @@ def build_parser() -> argparse.ArgumentParser:
     p_collect = sub.add_parser("collect", help="scenario slug → drafts 생성 (status=collected)")
     p_collect.add_argument("scenario_slug", type=str, help="scenarios.slug")
     p_collect.set_defaults(func=cmd_collect)
+
+    # DECISIONS D9 [확정] — collect-products: AliExpress product.query → products 적재
+    p_collect_products = sub.add_parser(
+        "collect-products",
+        help="AliExpress product.query → products 테이블 적재 (기본 dry_run)",
+    )
+    p_cp_src = p_collect_products.add_mutually_exclusive_group(required=True)
+    p_cp_src.add_argument(
+        "--keywords", type=str, default=None, help="단일 영어 검색어 (예: 'desk lamp')"
+    )
+    p_cp_src.add_argument(
+        "--scenario",
+        type=str,
+        default=None,
+        help="시나리오 slug — search_keywords.yml의 영어 검색어 목록 전체 수집",
+    )
+    p_collect_products.add_argument("--page-no", type=int, default=1, help="페이지 번호 (기본 1)")
+    p_collect_products.add_argument(
+        "--page-size", type=int, default=20, help="페이지당 상품 수 (기본 20, 최대 50 — FAQ 4.2)"
+    )
+    p_collect_products.add_argument(
+        "--min-price",
+        type=int,
+        default=None,
+        help="가격 하한 (KRW) — --keywords 단일 검색 시 (--scenario는 YAML 밴드 사용)",
+    )
+    p_collect_products.add_argument(
+        "--max-price", type=int, default=None, help="가격 상한 (KRW) — --keywords 단일 검색 시"
+    )
+    p_collect_products.add_argument(
+        "--no-dry-run",
+        dest="dry_run",
+        action="store_false",
+        help="실제 API 호출 + DB 적재 (쿼터 소모·외부 영향 — 명시 승인 후)",
+    )
+    p_collect_products.set_defaults(func=cmd_collect_products, dry_run=True)
 
     p_unapprove = sub.add_parser("unapprove", help="approved draft → validated 회귀")
     p_unapprove.add_argument("--draft", type=int, required=True, help="draft id")

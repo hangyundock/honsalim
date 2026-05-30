@@ -77,12 +77,19 @@ def build_query_request(
     target_currency: str = "KRW",
     target_language: str = "ko",
     ship_to_country: str = "KR",
+    sort: str = "",
+    min_sale_price: int | None = None,
+    max_sale_price: int | None = None,
     app_secret: str = "",
     sign_method: str = "sha256",
     method: str = PRODUCT_QUERY,
 ) -> dict[str, str]:
     """product.query 요청 파라미터(서명 포함) 빌드. 순수 함수 — 테스트·dry_run 공용.
 
+    sort: 결과 정렬. 빈 문자열이면 파라미터 생략(기본=관련도순). 예: ``LAST_VOLUME_DESC``
+    (판매량 많은 순). 정렬 단독은 관련성에 불충분 — 가격 밴드와 병용 [관찰 2026-05-30].
+    min_sale_price/max_sale_price: 가격 필터(None이면 생략). **단위는 라이브 검증 필요 [추정]**
+    (target_currency 기준 정수인지, cents인지 확인 후 확정).
     app_secret이 비면 sign은 빈 문자열(dry_run에서 키 없이 구조만 확인).
     """
     if page_size > PAGE_SIZE_MAX:
@@ -104,6 +111,13 @@ def build_query_request(
         "target_language": target_language,
         "ship_to_country": ship_to_country,
     }
+    # 선택 파라미터 — 값이 있을 때만 포함 (없으면 서명·기존 동작 불변)
+    if sort:
+        params["sort"] = sort
+    if min_sale_price is not None:
+        params["min_sale_price"] = str(min_sale_price)
+    if max_sale_price is not None:
+        params["max_sale_price"] = str(max_sale_price)
     params["sign"] = sign(params, app_secret, sign_method) if app_secret else ""
     return params
 
@@ -138,19 +152,44 @@ def map_product(item: dict[str, Any], tracking_id: str) -> dict[str, Any]:
     }
 
 
-def _extract_items(raw: Any) -> list[dict[str, Any]]:
-    """응답 JSON에서 상품 리스트 추출 (경로는 라이브 검증 필요).
+def _response_root_key(method: str) -> str:
+    """method → 응답 래퍼 키. 'aliexpress.affiliate.product.query'
+    → 'aliexpress_affiliate_product_query_response' (라이브 응답으로 확인 [확정 2026-05-30])."""
+    return method.replace(".", "_") + "_response"
 
-    예상 경로: aliexpress_affiliate_product_query_response → resp_result → result → products → product[]
-    """
+
+def _resp_result(raw: Any, method: str = PRODUCT_QUERY) -> dict[str, Any]:
+    """응답에서 resp_result dict까지 진입 (없으면 빈 dict)."""
     node: Any = raw
-    for key in (
-        "aliexpress_affiliate_product_query_response",
-        "resp_result",
-        "result",
-        "products",
-        "product",
-    ):
+    for key in (_response_root_key(method), "resp_result"):
+        if isinstance(node, dict) and key in node:
+            node = node[key]
+    return node if isinstance(node, dict) else {}
+
+
+def _extract_status(raw: Any, method: str = PRODUCT_QUERY) -> tuple[str | None, str | None]:
+    """API 응답 상태 (resp_code, resp_msg). 라이브 확인 [확정 2026-05-30]:
+    성공 200 'Call succeeds' · 빈 결과 405 'The result is empty'.
+    시스템 오류는 최상위 error_response(code·msg)로 옴."""
+    if isinstance(raw, dict) and "error_response" in raw:
+        err = raw.get("error_response") or {}
+        code = err.get("code", "error")
+        msg = err.get("msg") or err.get("sub_msg")
+        return (str(code), str(msg) if msg is not None else None)
+    rr = _resp_result(raw, method)
+    code = rr.get("resp_code")
+    msg = rr.get("resp_msg")
+    return (str(code) if code is not None else None, str(msg) if msg is not None else None)
+
+
+def _extract_items(raw: Any, method: str = PRODUCT_QUERY) -> list[dict[str, Any]]:
+    """응답 JSON에서 상품 리스트 추출 (라이브 확인 [확정 2026-05-30]).
+
+    경로: <root>_response → resp_result → result → products → product[]
+    빈 결과(resp_code 405)는 result 키 자체가 없어 [] 반환.
+    """
+    node: Any = _resp_result(raw, method)
+    for key in ("result", "products", "product"):
         if isinstance(node, dict) and key in node:
             node = node[key]
     return node if isinstance(node, list) else []
@@ -162,6 +201,8 @@ class QueryResult:
     request: dict[str, str]
     products: list[dict[str, Any]] = field(default_factory=list)
     raw: Any = None
+    resp_code: str | None = None
+    resp_msg: str | None = None
 
 
 def query_products(
@@ -171,6 +212,9 @@ def query_products(
     dry_run: bool = True,
     page_no: int = 1,
     page_size: int = 20,
+    sort: str = "",
+    min_sale_price: int | None = None,
+    max_sale_price: int | None = None,
     app_key: str | None = None,
     app_secret: str | None = None,
     tracking_id: str | None = None,
@@ -180,6 +224,8 @@ def query_products(
 
     dry_run=True: HTTP 없이 서명된 요청만 반환 (키 없이 가능).
     dry_run=False: App Key/Secret 필요 + 실제 호출. 키 미설정 시 RuntimeError.
+    sort: 결과 정렬값 (빈 문자열=기본 관련도순). 예: ``LAST_VOLUME_DESC`` (판매량순).
+    min_sale_price/max_sale_price: 가격 필터(None이면 생략). 단위는 라이브 검증 필요 [추정].
     자격 증명은 인자 우선, 없으면 os.environ (config.load_secrets()로 ali.env 로드 후).
     """
     app_key = app_key if app_key is not None else os.environ.get(ENV_APP_KEY, "")
@@ -193,6 +239,9 @@ def query_products(
         timestamp=timestamp,
         page_no=page_no,
         page_size=page_size,
+        sort=sort,
+        min_sale_price=min_sale_price,
+        max_sale_price=max_sale_price,
         app_secret=app_secret,
     )
 
@@ -207,4 +256,7 @@ def query_products(
     with urllib.request.urlopen(API_GATEWAY, data=data, timeout=timeout) as resp:  # noqa: S310
         raw = json.loads(resp.read().decode("utf-8"))
     products = [map_product(it, tracking_id) for it in _extract_items(raw)]
-    return QueryResult(dry_run=False, request=req, products=products, raw=raw)
+    code, msg = _extract_status(raw)
+    return QueryResult(
+        dry_run=False, request=req, products=products, raw=raw, resp_code=code, resp_msg=msg
+    )

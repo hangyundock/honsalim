@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, ClassVar
 
 try:
     import pytest
@@ -95,6 +95,37 @@ class TestBuildQueryRequest:
         req = ali.build_query_request("lamp", "k", "t", timestamp=1)
         assert req["sign"] == ""
 
+    def test_sort_omitted_by_default(self) -> None:
+        req = ali.build_query_request("lamp", "k", "t", timestamp=1)
+        assert "sort" not in req  # 빈 값이면 파라미터 생략 → 기존 동작 불변
+
+    def test_sort_included_and_signed_when_set(self) -> None:
+        with_sort = ali.build_query_request(
+            "lamp", "k", "t", timestamp=1, sort="LAST_VOLUME_DESC", app_secret="sec"
+        )
+        without = ali.build_query_request("lamp", "k", "t", timestamp=1, app_secret="sec")
+        assert with_sort["sort"] == "LAST_VOLUME_DESC"
+        assert with_sort["sign"] != without["sign"]  # sort가 서명에 포함됨
+
+    def test_price_params_omitted_by_default(self) -> None:
+        req = ali.build_query_request("lamp", "k", "t", timestamp=1)
+        assert "min_sale_price" not in req and "max_sale_price" not in req
+
+    def test_price_params_included_and_signed_when_set(self) -> None:
+        with_price = ali.build_query_request(
+            "lamp",
+            "k",
+            "t",
+            timestamp=1,
+            min_sale_price=30000,
+            max_sale_price=150000,
+            app_secret="s",
+        )
+        without = ali.build_query_request("lamp", "k", "t", timestamp=1, app_secret="s")
+        assert with_price["min_sale_price"] == "30000"
+        assert with_price["max_sale_price"] == "150000"
+        assert with_price["sign"] != without["sign"]  # 가격 필터가 서명에 포함됨
+
 
 class TestMapProduct:
     def test_maps_to_products_schema(self) -> None:
@@ -120,6 +151,58 @@ class TestMapProduct:
     def test_missing_price_is_none(self) -> None:
         row = ali.map_product({"product_id": "1", "product_title": "x"}, "T")
         assert row["price_krw"] is None
+
+
+class TestResponseParsing:
+    """라이브 응답 구조 [확정 2026-05-30] 기반 — 성공·빈결과·시스템오류 파싱."""
+
+    _SUCCESS: ClassVar[dict] = {
+        "aliexpress_affiliate_product_query_response": {
+            "resp_result": {
+                "result": {
+                    "current_record_count": 2,
+                    "products": {
+                        "product": [
+                            {"product_id": "1", "product_title": "A"},
+                            {"product_id": "2", "product_title": "B"},
+                        ]
+                    },
+                },
+                "resp_code": 200,
+                "resp_msg": "Call succeeds",
+            }
+        }
+    }
+    _EMPTY: ClassVar[dict] = {
+        "aliexpress_affiliate_product_query_response": {
+            "resp_result": {"resp_code": 405, "resp_msg": "The result is empty"}
+        }
+    }
+    _ERROR: ClassVar[dict] = {
+        "error_response": {"code": "15", "msg": "App call limit", "sub_msg": "qps"}
+    }
+
+    def test_extract_items_success(self) -> None:
+        items = ali._extract_items(self._SUCCESS)
+        assert [it["product_id"] for it in items] == ["1", "2"]
+
+    def test_extract_status_success(self) -> None:
+        assert ali._extract_status(self._SUCCESS) == ("200", "Call succeeds")
+
+    def test_empty_result_yields_no_items_with_405(self) -> None:
+        assert ali._extract_items(self._EMPTY) == []
+        assert ali._extract_status(self._EMPTY) == ("405", "The result is empty")
+
+    def test_error_response_surfaced(self) -> None:
+        assert ali._extract_items(self._ERROR) == []
+        code, msg = ali._extract_status(self._ERROR)
+        assert code == "15" and "App call limit" in (msg or "")
+
+    def test_response_root_key_derivation(self) -> None:
+        assert (
+            ali._response_root_key(ali.PRODUCT_QUERY)
+            == "aliexpress_affiliate_product_query_response"
+        )
 
 
 class TestQueryProductsDryRun:
