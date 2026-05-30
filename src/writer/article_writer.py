@@ -27,6 +27,22 @@ from . import state_machine
 
 # POLICY §2-2 [확정] — 첫머리 disclosure 키워드 (두 단어 모두 포함 필수)
 DISCLOSURE_FIRST_KEYWORDS: tuple[str, ...] = ("쿠팡 파트너스", "수수료")
+# POLICY §2-3 [확정] — 푸터 disclosure 키워드 (validator.disclosure FOOTER_REQUIRED 일치)
+DISCLOSURE_FOOTER_KEYWORDS: tuple[str, ...] = ("쿠팡 파트너스", "AliExpress", "본인")
+
+# POLICY §2-2 표준 첫머리 문구 (verbatim — 표준 문구 글자 변경 ≤ 3자 규칙 §2-4 준수)
+FIRST_DISCLOSURE = (
+    "이 글에는 쿠팡 파트너스 활동의 일환으로 일정 수수료를 제공받습니다. "
+    "(구매자에게 추가 비용은 발생하지 않습니다.)"
+)
+# POLICY §2-3 표준 푸터 풀 문구 (verbatim)
+FOOTER_DISCLOSURE = (
+    "혼살림은 쿠팡 파트너스 및 AliExpress Portals 어필리에이트 활동의 일환으로, "
+    "독자가 본 사이트의 추천 링크를 통해 상품을 구매할 경우 일정 수수료를 받습니다. "
+    "수수료는 구매자가 지불하는 가격에 추가되지 않으며, 본 사이트는 수수료 여부와 "
+    "무관하게 추천 기준을 적용합니다. 본인 및 가족 구매 금지·자동 실행 광고 미사용 "
+    "등 어필리에이트 정책을 준수합니다."
+)
 
 # 첫머리 검사 범위 — POLICY §2-4 명시 200자보다 약간 여유 (단락 종료 우선)
 DISCLOSURE_SCAN_HEAD_LEN = 300
@@ -73,6 +89,29 @@ def extract_disclosure_first(body_md: str) -> str | None:
     if all(keyword in first_para for keyword in DISCLOSURE_FIRST_KEYWORDS):
         return first_para
     return None
+
+
+def apply_disclosure(body_md: str) -> str:
+    """POLICY §2-2 첫머리 + §2-3 푸터 disclosure를 본문에 자동 삽입 (system_base §2 '자동 삽입').
+
+    모델은 disclosure를 쓰지 않도록 지시받으므로(프롬프트) 생성 후 시스템이 삽입한다.
+    멱등: 첫머리 200자·푸터 800자에 이미 키워드가 있으면 중복 추가하지 않는다.
+    삽입 결과는 validator.check_disclosure(첫머리 쿠팡 파트너스+수수료 / 푸터 +AliExpress+본인)를 통과한다.
+    """
+    body = body_md or ""
+    head = body[:200]
+    tail = body[-800:]
+    need_first = not all(k in head for k in DISCLOSURE_FIRST_KEYWORDS)
+    need_footer = not all(k in tail for k in DISCLOSURE_FOOTER_KEYWORDS)
+
+    parts: list[str] = []
+    if need_first:
+        parts.append(FIRST_DISCLOSURE)
+    if body:
+        parts.append(body)
+    if need_footer:
+        parts.append(FOOTER_DISCLOSURE)
+    return "\n\n".join(parts)
 
 
 def create_draft(

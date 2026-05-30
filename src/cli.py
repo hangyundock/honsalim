@@ -568,6 +568,8 @@ def cmd_enrich(args: argparse.Namespace) -> int:
             except ArticleResponseError as e:
                 print(f"{FAIL} 응답 형식 오류(META-JSON/BODY 분리 실패): {e}")
                 return 3
+            # POLICY §2-2/§2-3 disclosure 자동 삽입 (모델은 미작성 — 시스템 책임). 멱등.
+            body_md = article_writer.apply_disclosure(body_md)
             enriched_payload: dict[str, Any] = {
                 "body_md": body_md,
                 "title": meta.get("title"),

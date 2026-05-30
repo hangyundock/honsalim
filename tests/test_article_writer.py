@@ -355,6 +355,35 @@ class TestExtractDisclosureFirst:
         assert not out.endswith(" ")
 
 
+class TestApplyDisclosure:
+    """POLICY §2-2/§2-3 disclosure 자동 삽입 — 결과가 validator.disclosure를 통과해야 함."""
+
+    def test_inserted_body_passes_validator(self) -> None:
+        from validator.disclosure import check_disclosure
+
+        body = "## 1. 누구를 위한 가이드\n원룸 자취 첫 살림 추천.\n\n## 2. 추천 상품\n..."
+        out = article_writer.apply_disclosure(body)
+        ok, report = check_disclosure(out)
+        assert ok, report
+        # 원본 본문 보존
+        assert "누구를 위한 가이드" in out
+
+    def test_first_keywords_in_head(self) -> None:
+        out = article_writer.apply_disclosure("본문 시작\n\n본문 끝")
+        assert all(k in out[:200] for k in article_writer.DISCLOSURE_FIRST_KEYWORDS)
+
+    def test_footer_keywords_in_tail(self) -> None:
+        out = article_writer.apply_disclosure("본문")
+        assert all(k in out[-800:] for k in article_writer.DISCLOSURE_FOOTER_KEYWORDS)
+
+    def test_idempotent_no_duplicate(self) -> None:
+        once = article_writer.apply_disclosure("본문 내용")
+        twice = article_writer.apply_disclosure(once)
+        assert once == twice  # 이미 삽입돼 있으면 중복 추가 안 함
+        # 첫머리 문구가 두 번 들어가지 않음
+        assert twice.count("일정 수수료를 제공받습니다") == 1
+
+
 class TestRecordScenarioCandidates:
     """collect-products → 시나리오 collected draft.raw_payload 후보 기록 (DB §5)."""
 
