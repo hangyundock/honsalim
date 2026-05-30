@@ -9,8 +9,9 @@ Phase 2 stub:
 - dry_run=False 호출은 사용자가 명시적으로 선택해야 안전
 
 BACKEND §3-1 매개변수:
-- 모델 claude-haiku-4-5-20251001
-- max_tokens 4096
+- 모델 claude-sonnet-4-6 (세션 #15 사용자 결정 — 카테고리 페이지 본문은 품질 우선·저볼륨이라 Sonnet.
+  tistory_revival도 글생성=Sonnet. 비용 보호는 seo_regenerate 재시도 상한·게이트 과민완화로 별도 대응)
+- max_tokens 8192
 - temperature 0.4
 
 BACKEND §3-2 캐시 친화 구조:
@@ -29,7 +30,9 @@ from . import prompt_loader
 # BACKEND §3-1 [확정] — max_tokens는 라이브 검증으로 상향 [확정 2026-05-30]:
 # 4096은 한국어 8섹션 본문 + META-JSON + FAQ 5개에 부족(응답 truncate → BODY-END 누락 → 분리 실패).
 # 8192로 상향(헤드룸 확보). BACKEND §3-1 문서도 갱신 필요.
-DEFAULT_MODEL = "claude-haiku-4-5-20251001"
+# 세션 #15: Haiku → Sonnet (카테고리 페이지 본문 품질 우선, 저볼륨이라 비용 부담 적음, 사용자 결정).
+# 비용 과다청구 방지는 enricher.seo_regenerate(재시도 상한 2)·validator.seo(게이트 과민완화)로 대응.
+DEFAULT_MODEL = "claude-sonnet-4-6"
 DEFAULT_MAX_TOKENS = 8192
 DEFAULT_TEMPERATURE = 0.4
 
@@ -89,6 +92,9 @@ class GenerateRequest:
     photos: list[dict[str, Any]] = field(default_factory=list)
     related_scenarios: list[dict[str, Any]] = field(default_factory=list)
     persona: dict[str, Any] = field(default_factory=dict)
+    # SEO 키워드 세트 {primary, secondary} (seo_keywords.gate_config 형태). 세션 #15.
+    # 있으면 build_user_prompt가 2층 키워드 배치 지시를 프롬프트에 주입. 없으면 무영향.
+    seo: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -127,7 +133,14 @@ def build_system_blocks() -> list[dict[str, Any]]:
 
 
 def build_user_prompt(request: GenerateRequest) -> str:
-    """user 프롬프트 = article_main 변수 치환 (BACKEND §3-2)."""
+    """user 프롬프트 = article_main 변수 치환 (BACKEND §3-2).
+
+    request.seo({primary, secondary})가 있으면 2층 키워드 배치 지시를 주입 (세션 #15).
+    """
+    from .seo_directive import build_seo_directive
+
+    seo = request.seo or {}
+    seo_directive = build_seo_directive(seo.get("primary"), seo.get("secondary"))
     return prompt_loader.render(
         "article_main",
         scenario=request.scenario,
@@ -135,6 +148,7 @@ def build_user_prompt(request: GenerateRequest) -> str:
         photos=request.photos,
         related_scenarios=request.related_scenarios,
         persona=request.persona,
+        seo_directive=seo_directive,
     )
 
 
@@ -204,6 +218,59 @@ class ClaudeClient:
             ),
             rate_limit_exc=anthropic.RateLimitError,
             # anthropic SDK 버전별 attribute 위치가 다를 수 있어 getattr fallback
+            overload_exc=getattr(anthropic, "OverloadedError", anthropic.APIError),
+            timeout_exc=anthropic.APITimeoutError,
+            bad_request_exc=anthropic.BadRequestError,
+            api_error_exc=anthropic.APIError,
+        )
+        return GenerateResult(
+            system_blocks=system_blocks,
+            user_prompt=user_prompt,
+            response_text="".join(
+                block.text for block in response.content if hasattr(block, "text")
+            ),
+            usage={
+                "input_tokens": getattr(response.usage, "input_tokens", 0),
+                "output_tokens": getattr(response.usage, "output_tokens", 0),
+            },
+            dry_run=False,
+            stop_reason=getattr(response, "stop_reason", None),
+        )
+
+    def generate_raw(
+        self, system_text: str, user_prompt: str, dry_run: bool = True
+    ) -> GenerateResult:
+        """범용 1회 생성 — 임의 system+user 프롬프트로 호출 (세션 #15 카테고리 가이드 등).
+
+        generate_article과 동일한 모델·재시도 정책을 쓰되 프롬프트 조립을 호출 측이 책임진다.
+        dry_run=True면 호출 없이 프롬프트만 반환(비용 0).
+        """
+        system_blocks = [
+            {"type": "text", "text": system_text, "cache_control": {"type": "ephemeral"}}
+        ]
+        if dry_run:
+            return GenerateResult(
+                system_blocks=system_blocks,
+                user_prompt=user_prompt,
+                response_text=None,
+                usage={},
+                dry_run=True,
+            )
+
+        client = self._get_sdk_client()
+        import anthropic
+
+        from .retry import retry_with_backoff
+
+        response = retry_with_backoff(
+            lambda: client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                system=system_blocks,
+                messages=[{"role": "user", "content": user_prompt}],
+            ),
+            rate_limit_exc=anthropic.RateLimitError,
             overload_exc=getattr(anthropic, "OverloadedError", anthropic.APIError),
             timeout_exc=anthropic.APITimeoutError,
             bad_request_exc=anthropic.BadRequestError,

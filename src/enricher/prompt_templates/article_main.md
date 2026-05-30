@@ -52,6 +52,8 @@
 - {{r.title_ko}} ({{r.slug}})
 {% endfor %}
 
+{{seo_directive}}
+
 ## non-commodity content 의무 (DECISIONS M1 [확정 세션 #6 Google AI Optimization])
 
 일반 지식 reword 회피, 세팅 = 라이프스타일×예산×시즌 결합 **고유 인사이트** 의무:

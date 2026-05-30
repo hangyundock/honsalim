@@ -214,6 +214,7 @@ def _check_phase2_modules() -> bool:
         ("validator", "check_schema"),
         ("validator", "check_disclosure"),
         ("validator", "check_links"),
+        ("validator", "check_seo"),
         ("writer.article_writer", "create_draft"),
         ("writer.article_writer", "save_enriched"),
         ("writer.article_writer", "validate_and_save"),
@@ -228,12 +229,20 @@ def _check_phase2_modules() -> bool:
         ("enricher.meta_extractor", "MetaExtractor"),
         ("enricher.retry", "retry_with_backoff"),
         ("enricher.retry", "RetryConfig"),
+        ("enricher.seo_directive", "build_seo_directive"),
+        ("enricher.seo_regenerate", "regenerate_until_seo_pass"),
+        ("enricher.category_writer", "generate_category_guide"),
         ("collector.scenario_loader", "list_active_scenarios"),
         ("collector.scenario_loader", "next_scenarios_for_collection"),
         ("collector.products_store", "upsert_products"),
         ("collector.keyword_map", "keywords_for_scenario"),
         ("collector.aliexpress", "query_products"),
         ("collector.aliexpress", "map_product"),
+        ("collector.naver_searchad", "fetch_related_keywords"),
+        ("collector.product_filter", "is_relevant"),
+        ("collector.keyword_research", "research_keywords"),
+        ("collector.keyword_research", "build_entry"),
+        ("collector.seo_keywords", "gate_config"),
         ("builder", "build_article_jsonld"),
         ("builder", "build_itemlist_jsonld"),
         ("builder", "build_product_jsonld"),
@@ -692,9 +701,11 @@ def cmd_validate(args: argparse.Namespace) -> int:
         payload = _json.loads(row[0])
         ok, report = article_writer.validate_and_save(conn, args.draft, payload)
         if ok:
-            print(f"{OK} draft {args.draft} → validated (4 게이트 모두 PASS)")
-            for gate in ("truth", "schema", "disclosure", "links"):
-                print(f"     {gate}: pass")
+            gates = report["gates"]
+            print(f"{OK} draft {args.draft} → validated (게이트 {len(gates)}개 모두 PASS)")
+            for gate, info in gates.items():
+                skipped = isinstance(info.get("metrics"), dict) and info["metrics"].get("skipped")
+                print(f"     {gate}: {'skip' if skipped else 'pass'}")
             return 0
         print(f"{WARN} draft {args.draft} → rejected")
         for gate, info in report["gates"].items():

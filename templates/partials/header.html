@@ -4,12 +4,14 @@
     <a class="wordmark" href="/">
       <span class="wm-main">혼살림</span><span class="wm-dot">.</span><span class="wm-sub">HONSALIM</span>
     </a>
+    {# 세션 #16 카테고리 우선 네비(사진2 확정). /categories/·/guides/ 라우트는 2단계에서 배선 #}
     <nav class="nav" id="site-nav">
       <a href="/"{% if active_nav == 'home' %} class="on"{% endif %}>홈</a>
-      <a href="/scenarios/"{% if active_nav == 'hub' %} class="on"{% endif %}>내맘대로 세팅</a>
-      <a href="/personas/"{% if active_nav == 'persona' %} class="on"{% endif %}>라이프스타일</a>
+      <a href="/categories/"{% if active_nav == 'category' %} class="on"{% endif %}>카테고리</a>
+      <a href="/guides/"{% if active_nav == 'guide' %} class="on"{% endif %}>구매가이드</a>
+      <a href="/scenarios/"{% if active_nav == 'hub' %} class="on"{% endif %}>세팅</a>
       <a href="/about/"{% if active_nav == 'about' %} class="on"{% endif %}>About</a>
-      <a class="hdr-cta" href="/scenarios/">세팅 보기</a>
+      <a class="hdr-cta" href="/categories/">카테고리 보기</a>
     </nav>
     <button class="burger" type="button" aria-label="메뉴"
             onclick="document.getElementById('site-nav').classList.toggle('open')">{{ icon('menu', 20) }}</button>

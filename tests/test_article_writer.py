@@ -260,7 +260,8 @@ class TestValidateAndSave:
         ]
         rpt = json.loads(raw)
         assert rpt["overall_pass"] is True
-        assert set(rpt["gates"]) == {"truth", "schema", "disclosure", "links"}
+        # 세션 #15: seo 게이트 추가 (seo 설정 없으면 skip-pass). 게이트 집합 5종.
+        assert set(rpt["gates"]) == {"truth", "schema", "disclosure", "links", "seo"}
 
     def test_requires_enriched_status(self) -> None:
         """status='collected' 인 draft에 호출 시 IllegalStateError (state_machine 매트릭스)."""

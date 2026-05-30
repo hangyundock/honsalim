@@ -5,6 +5,11 @@
 
 from __future__ import annotations
 
+from .category_writer import (
+    CATEGORY_SYSTEM,
+    build_category_prompt,
+    generate_category_guide,
+)
 from .claude_client import (
     CACHED_SYSTEM_TEMPLATES,
     DEFAULT_MAX_TOKENS,
@@ -45,10 +50,14 @@ from .prompt_loader import (
     verify_known_templates_present,
 )
 from .retry import DEFAULT_CONFIG, RetryConfig, RetryExhausted, retry_with_backoff
+from .seo_directive import build_seo_directive
+from .seo_regenerate import DEFAULT_MAX_ATTEMPTS, regenerate_until_seo_pass
 
 __all__ = (
     "CACHED_SYSTEM_TEMPLATES",
+    "CATEGORY_SYSTEM",
     "DEFAULT_CONFIG",
+    "DEFAULT_MAX_ATTEMPTS",
     "DEFAULT_MAX_TOKENS",
     "DEFAULT_MODEL",
     "DEFAULT_TEMPERATURE",
@@ -71,14 +80,18 @@ __all__ = (
     "MetaExtractor",
     "RetryConfig",
     "RetryExhausted",
+    "build_category_prompt",
+    "build_seo_directive",
     "build_system_blocks",
     "build_user_prompt",
     "extract",
+    "generate_category_guide",
     "is_truncated",
     "list_templates",
     "load",
     "normalize_meta",
     "parse_meta_json",
+    "regenerate_until_seo_pass",
     "render",
     "retry_with_backoff",
     "split_article_response",

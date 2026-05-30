@@ -87,9 +87,9 @@ class TestPromptLoader:
 
 class TestClaudeClient:
     def test_defaults_match_backend_spec(self) -> None:
-        """BACKEND §3-1 매개변수. max_tokens는 라이브 검증으로 8192 상향 [확정 2026-05-30]
-        (4096은 한국어 8섹션+META+FAQ에 부족 → 응답 truncate)."""
-        assert DEFAULT_MODEL == "claude-haiku-4-5-20251001"
+        """BACKEND §3-1 매개변수. 세션 #15: 모델 Haiku→Sonnet(카테고리 본문 품질 우선·사용자 결정).
+        max_tokens는 라이브 검증으로 8192 상향 [확정 2026-05-30]."""
+        assert DEFAULT_MODEL == "claude-sonnet-4-6"
         assert DEFAULT_MAX_TOKENS == 8192
         assert DEFAULT_TEMPERATURE == 0.4
 

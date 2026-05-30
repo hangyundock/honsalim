@@ -152,6 +152,26 @@ class TestMapProduct:
         row = ali.map_product({"product_id": "1", "product_title": "x"}, "T")
         assert row["price_krw"] is None
 
+    def test_original_price_and_discount(self) -> None:
+        # DECISIONS O③ — 정가·할인율 캡처. 할인율은 정가>판매가에서 계산.
+        item = {
+            "product_id": "200",
+            "product_title": "책상",
+            "target_sale_price": "239264",
+            "target_original_price": "498467",
+        }
+        row = ali.map_product(item, "T")
+        assert row["price_krw"] == 239264
+        assert row["original_price_krw"] == 498467
+        assert row["discount_pct"] == 52  # round((498467-239264)/498467*100)
+
+    def test_no_discount_when_no_original(self) -> None:
+        row = ali.map_product(
+            {"product_id": "3", "product_title": "x", "target_sale_price": "100000"}, "T"
+        )
+        assert row["original_price_krw"] is None
+        assert row["discount_pct"] is None
+
 
 class TestResponseParsing:
     """라이브 응답 구조 [확정 2026-05-30] 기반 — 성공·빈결과·시스템오류 파싱."""

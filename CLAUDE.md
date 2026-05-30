@@ -87,7 +87,7 @@
 - **분야**: 1인 가구·자취·홈오피스·일상살림 어필리에이트 (비YMYL)
 - **컨셉**: 시나리오 추천 + 미니멀+따뜻함
 - **수익**: 쿠팡 파트너스(메인) + AliExpress(보조). AdSense 6개월 후 결정.
-- **기술 스택**: Python 3.10 + Jinja2 직접 빌더 + Cloudflare Pages + SQLite + Claude API (Haiku)
+- **기술 스택**: Python 3.10 + Jinja2 직접 빌더 + Cloudflare Pages + SQLite + Claude API (본문 생성 **Sonnet** `claude-sonnet-4-6` — 세션 #15, 카테고리 페이지 품질 우선·저볼륨. 비용 과다청구 방지는 재시도 상한 2·게이트 과민완화로 대응)
 - **빌드**: GitHub Actions (공개 저장소, Linux Python 3.10)
 - **배포**: wrangler pages deploy (Direct Upload)
 - **DB**: `data/honsalim.db` (SQLite)

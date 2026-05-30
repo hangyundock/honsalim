@@ -3,15 +3,16 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 시급 (다음 세션 #15) — #14 갱신
+## ★ 시급 (다음 세션 #17) — #15–16 갱신 · 진행 순서 = 디자인(1단계 완료)→카테고리→제품 (DECISIONS O15)
 
-> #14: ① 용어 일상화(시나리오→**내맘대로 세팅**·페르소나→**라이프스타일**) 교체+재발방지 가드, 회귀 472. ② **★사이트 大전환 기획 확정 — "카테고리 우선 제품 비교·정보 사이트(노써치형)"**. 표준 `docs/CATEGORY_PAGE.md` · 프로토타입 `scripts/category_page_prototype.py`. **본구현(자동화)은 다음 세션.**
+> #15–16: ★SEO 자동 최적화 엔진(게이트·네이버 리서치·yml·directive·재생성) + 모델 Sonnet + 전체제품 카탈로그(점수 없음) + product_filter + **디자인 大전환 1단계**(우드톤→흰 바탕 NanumSquare Neo, tokens 교체). 회귀 553. **전부 로컬·미배포.** (DECISIONS O10~O15)
 
-- [x] ~~용어 일상화 교체+가드(472 PASS)·재설계 기획 확정·노써치 분석·카테고리 프로토타입~~ ✅ #14
-- [ ] **★페이지 재설계 본구현 (최우선)** (DECISIONS O / `CATEGORY_PAGE.md` §6): ① **콘텐츠 파이프라인**(혼살다 명의 8요소 자동작성 + 진실성 게이트, enrich 개편) ② **카테고리별 2티어 수집**(실속/고급 가격밴드 — `search_keywords.yml` 정형화) ③ 수집기 `target_original_price`·`discount` 필드 + DB 컬럼 + **가격 빌드시 재조회**(드리프트 가드) ④ **렌더러 category 템플릿 이식**(프로토타입 참조) ⑤ **"더 많은 제품 보기"(전체 제품)** 필터·정렬 페이지.
-- [ ] 용어 교체 build/site **배포 반영 확인**(honsalim.com에 시나리오→세팅).
-- [ ] **★/go/ 제휴 링크 작동**(D1 slug_map 쓰기 + go_gateway Worker 배포, deny-list라 사람/CI) — 수익 직결.
-- [ ] (확인) 알리 이미지 허용(affiliates@ 채널) · **네이버 폰트 확정**(Chrome 연결 시) · 알리 whitelist 답변 · main-protect 재활성화.
+- [x] ~~SEO 엔진·키워드 리서치·seo_keywords.yml(office-chair·desk)·Sonnet 전환·비용 가드·전체제품 카탈로그 시안+표준·product_filter·디자인 토대 이식(1단계)~~ ✅ #15–16
+- [ ] **★2단계 — 카테고리 구조**: 카테고리 인덱스(`/categories/`)+라우트 + **홈 콘텐츠 카테고리화**(현재 페르소나 구조, 디자인만 새것) + 네비 `카테고리`·`구매가이드` 링크 배선.
+- [ ] **★3단계 — 제품 렌더(완결)**: 카테고리 페이지(가이드+비교카드+전체제품)를 **렌더러 `builder/renderer.py`에 이식** + **DB 영속화**(`products`에 `original_price_krw`·`discount_pct` 컬럼 + 수집 저장 — 렌더러는 DB 읽음). 책상으로 build/preview 완결→확인.
+- [ ] **배포**(승인 후): 새 디자인+카테고리 → build/site → honsalim.com (방법A).
+- [ ] **★/go/ 제휴 링크 작동**(D1 slug_map 쓰기 + go_gateway Worker 배포) — 수익 직결.
+- [ ] (확인) 알리 이미지·whitelist 답변 · main-protect 재활성화 · 용어 배포 반영.
 
 ## 알리 통합 (D9)
 

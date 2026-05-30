@@ -137,12 +137,28 @@ def map_product(item: dict[str, Any], tracking_id: str) -> dict[str, Any]:
 
     pid = str(g("product_id", "productId", default="") or "")
     price = g("target_sale_price", "targetSalePrice", "sale_price", default=None)
+    orig = g("target_original_price", "targetOriginalPrice", "original_price", default=None)
+
+    def _num(v: Any) -> int | None:
+        return round(float(v)) if v not in (None, "") else None
+
+    sale_krw = _num(price)
+    orig_krw = _num(orig)
+    # 할인율: 정가>판매가일 때 계산(신뢰) — API의 'discount' 문자열보다 우선 (CATEGORY_PAGE §4 신뢰 신호).
+    discount_pct = (
+        round((orig_krw - sale_krw) / orig_krw * 100)
+        if orig_krw and sale_krw and orig_krw > sale_krw
+        else None
+    )
     return {
         "source": "aliexpress",
         "source_product_id": pid,
         "name": g("product_title", "productTitle", default=""),
         "category_path": g("second_level_category_name", "first_level_category_name", default=None),
-        "price_krw": round(float(price)) if price not in (None, "") else None,
+        "price_krw": sale_krw,
+        # 정가·할인율 — DECISIONS O③ 신뢰 신호. DB 컬럼은 추후(현재 in-memory 렌더용). upsert는 무시.
+        "original_price_krw": orig_krw,
+        "discount_pct": discount_pct,
         "currency": g("target_sale_price_currency", default="KRW"),
         "image_url_external": g("product_main_image_url", "productMainImageUrl", default=None),
         "deeplink_url": g("promotion_link", "promotionLink", default=None),

@@ -7,17 +7,17 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#14: ① 용어 일상화**(시나리오→**내맘대로 세팅**·페르소나→**라이프스타일**) 화면·글본문·프롬프트·renderer 교체 + 재발방지 가드, **회귀 472 PASS**, build/site 재빌드(배포 대기). **② ★페이지/콘텐츠 大전환 기획 확정** — "**카테고리 우선 제품 비교·정보 사이트(노써치형)**". 표준 `docs/CATEGORY_PAGE.md`+프로토타입 `scripts/category_page_prototype.py`(사무용 의자·흰 바탕·NanumSquare Neo·2분류·실데이터). #13: 첫 글 라이브·무인배포(방법A). **★본구현 미완(자동화)**: 파이프라인·2티어 수집·가격 재조회·렌더러 이식 (DECISIONS O) | 2026-05-31 #14 |
+| 진행 단계 | **#15–16: ★SEO 엔진 + 전체제품 카탈로그 + 디자인 大전환 1단계**(전부 로컬·미배포). ①**SEO 자동 최적화 엔진**(seo 게이트·네이버 검색광고 리서치·seo_keywords.yml office-chair·desk·directive·재생성, 네이버 1.7% 기준). ②**모델 Haiku→Sonnet** + 비용 과다청구 방지(재시도상한2·게이트 과민완화). 책상 가이드 라이브 1회 통과·$0.049. ③**전체제품 카탈로그**(점수 없음·§5-bis)+product_filter(오염·부풀린할인 제거). ④**디자인 1단계**: 우드톤→흰바탕 NanumSquare Neo(tokens 교체로 전 페이지)+카테고리 네비. **회귀 553**. 남음(#17)=2단계 카테고리 구조·3단계 렌더러 이식+DB 영속화 (DECISIONS O10~O15) | 2026-05-31 #15–16 |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·보안 5종·Secrets·Branch Protection main-protect) · Cloudflare(2FA·도메인·Pages·R2·D1) · Anthropic·INDEXNOW 키 · secrets .env · Git push · pre-commit 9종 Passed · Dependabot PR 3건 | #3 |
 | Phase 2 핵심 모듈 18개 (#3~#5) | cli · common/{config,logging,grading,db} · validator/{truth,schema,disclosure,links} · writer/{state_machine,article_writer} · collector/scenario_loader · enricher/{prompt_loader,claude_client,meta_extractor,retry} · builder/{jsonld,manifest} · deployer/{git_push,wrangler,verify} · tracker/{d1_aggregator,**report**} · **workers/go_gateway.js** | #5 |
-| Phase 2 회귀 테스트 | **472 / 472 PASS** [확정 pytest, #14] — #14 +2(용어 재발방지 가드 `test_renderer`), #13 +34 (article_writer link/slug 7 + cli promote/sync 5 + renderer 상세글·404·robots 8 + slug_map 11 + tracker ts가드 1 + disclosure ali 1 등). #12 436. CI(GitHub Actions)에서도 470 통과 후 배포 | 2026-05-30 |
+| Phase 2 회귀 테스트 | **553 / 553 PASS** [확정 pytest, #15–16] — #15–16 +81 (seo_gate·naver_searchad·keyword_research·seo_keywords·seo_directive·seo_regenerate·category_writer·product_filter·map_product 정가/할인). #14 472. black·ruff·mypy 클린 | 2026-05-31 |
 | CLI 명령 (BACKEND §9) | **14개** — doctor · db · collect · collect-products · enrich · validate · approve · **promote(#13 신규: article_fields 조립·md→HTML·article_products 연결)** · unapprove · deploy · **sync-slugmap(#13 신규: published 상품→D1 slug_map UPSERT, dry-run 기본)** · build · dashboard | #13 |
-| Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + 4 게이트 통합(validate_and_save) + META-JSON + Article JSON-LD + 1인칭/사진 게이트. 영구화 세션 #4 시점 5개 사항(tracker.d1_aggregator·deployer·builder.manifest·enricher.retry·state_machine 매트릭스 보강) → DECISIONS J + EVENTS #4·#5 누적 | #4~#5 |
-| doctor (BACKEND §9) | §1~§8 기본 + §9 prompt_templates 6종 · §10 모듈 진입점 **49개** (#13 +link_article_products·unique_article_slug·sync_slug_map·collect_slug_map_entries) · §11 state_machine 매트릭스 · §12 tests 로드 · §13 Workers JS · §14 size cap | #13 |
+| Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD. 세부 DECISIONS J·O + EVENTS | #4~#16 |
+| doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **58개** (#15–16 +seo/naver_searchad/keyword_research/seo_keywords/seo_directive/seo_regenerate/category_writer/product_filter) | #15–16 |
 | DB 초기화 | `data/honsalim.db` v1 + 13 테이블 + personas 3 + scenarios 10 (seed idempotent) | #3 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (PLAN·ARCH·DB·SCENARIOS·DESIGN·FRONTEND·BACKEND·POLICY·OPS·BACKUP·MAINTENANCE·SCHEDULE). 일관성 모순 0건 | #2 |
-| 사전 작성 산출물 (#2) | SQL 2편 + 설정 5건 + prompt_templates 6종 + 인프라 7건 (pyproject·wrangler·workflows·README·CHANGELOG 등). 세부는 EVENTS_202605.md | #2 |
+| 사전 작성 산출물 (#2) | SQL 2 + 설정 5 + prompt_templates 6 + 인프라 7. 세부 EVENTS_202605.md | #2 |
 | 메모리 시스템 | feedback 7건 (#9 [[no-unfounded-priority]] · **#12 [[incremental-critical-review]](배치금지·1건씩 점검·근본해결) · [[autonomous-safe-system]](무인·안전·자율)** 추가) + reference market_research + MEMORY.md | #12 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
 | 사이트 게시글 / 트래픽 / 수익 | **1편 라이브 게시** (honsalim.com/articles/homeoffice-chair-desk-50/, #13 배포) / N/A / N/A (수익은 /go/ 링크 작동+알리 whitelist 후) | #13 |
@@ -59,11 +59,13 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 시급 (다음 세션 #15) — #14 갱신 (상세: DECISIONS O · `docs/CATEGORY_PAGE.md` §6)
-0. **용어 일상화 배포 반영 확인**: #14 커밋 build/site(시나리오→세팅)가 Actions 배포로 honsalim.com에 실제 반영됐는지.
-1. **★페이지 재설계 본구현 (최우선, 자동화)**: ① 콘텐츠 파이프라인(혼살다 명의 8요소 자동작성+진실성 게이트, enrich 개편) ② 카테고리별 **2티어 수집**(실속/고급 가격밴드 — `search_keywords.yml` 정형화) ③ 수집기 `target_original_price`·`discount` 필드+DB 컬럼 + **가격 빌드시 재조회**(드리프트 가드) ④ **렌더러에 category 템플릿 이식**(프로토타입 = `scripts/category_page_prototype.py`) ⑤ **"더 많은 제품 보기"(전체 제품)** 필터·정렬 리스트 페이지.
-2. **★/go/ 제휴 링크 작동** — D1 slug_map 쓰기 + go_gateway Worker 배포(deny-list라 사람/CI). 수익 직결, 보류.
-3. (확인) 알리 이미지 허용(affiliates@ 채널) · **네이버 폰트 NanumSquare Neo 확정**(Chrome 연결 시 직접 inspect) · 알리 whitelist 답변 · main-protect 재활성화.
+### ★ 시급 (다음 세션 #17) — #15–16 갱신 (상세: DECISIONS O10~O15 · `docs/CATEGORY_PAGE.md` · EVENTS #15–16). **진행 순서 = 디자인(1단계 완료)→카테고리 구조→제품 렌더 (O15)**.
+1. **★2단계 — 카테고리 구조**: 카테고리 인덱스(`/categories/`)+라우트 + **홈 콘텐츠 카테고리화**(현재 페르소나 구조, **디자인만 새것**) + 네비 `카테고리`·`구매가이드` 링크 배선.
+2. **★3단계 — 제품 렌더(완결 목표)**: 카테고리 페이지(가이드+비교카드+전체제품)를 **렌더러 `builder/renderer.py`에 이식**(현재 home/hub/persona/article만; 카테고리·전체제품 미지원). + **DB 영속화**: `products`에 `original_price_krw`·`discount_pct` 컬럼(현재 map_product는 in-memory만) + 수집 저장 (렌더러는 DB를 읽음). 책상으로 build/preview 완결 → 확인.
+3. **배포**: 새 디자인+카테고리 → build/site → honsalim.com (방법A, **사용자 승인 필요**).
+4. **★/go/ 제휴 링크 작동** — D1 slug_map 쓰기 + go_gateway Worker 배포(deny-list라 사람/CI). 수익 직결, 보류.
+5. (확인) 알리 이미지 허용 · 알리 whitelist 답변 · main-protect 재활성화 · 용어 배포 반영.
+- 참고: 미리보기 = `build/preview`(디자인) / `docs/design_drafts/honsalim/`(카탈로그). naver_searchad.env = `D:\secrets\affiliate_hub\` 복사 완료.
 
 ### 해소 (세션 #13)
 - ~~게시 경로 배선~~ ✅ promote CLI(article_products 연결)·renderer 상세글·article.html 실데이터화 → **첫 글 honsalim.com 라이브 게시**

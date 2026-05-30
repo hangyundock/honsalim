@@ -15,8 +15,38 @@
   - 세션 #6 (2026-05-28~29 정책 대재설계 L2 AI이미지 + Google AI Guide 정합 M1~M7 + cross-project 통합 + 회귀 342 + 17 commits)
   - 세션 #7 (2026-05-29 cross-project 잔존 3건(AutoBlog Hana Kim·혼살림 M2 Person Schema·Scaled Content Abuse Step1)·필명 "혼살다" 확정·pip-audit 0건·2 commits)
   - 세션 #8 (2026-05-29 네이버 작업 D:\naver_blog\ 별도 프로젝트 분리(C안)·private repo·dazzling-hermann 폐기·1 commit)
+  - 세션 #9 (2026-05-29 자동 push 정책 N1 + dashboard 모듈 CLI 11/11 + secrets 경로 정정·회귀 352·9 commits)
 
 ## 최근 5세션
+
+### 세션 #15–16 — 2026-05-31 (Opus 4.8 1M, ★SEO 자동 최적화 엔진 + 전체제품 카탈로그 + ★디자인 大전환(우드톤→흰바탕 노써치) 1단계, 회귀 472→553)
+
+> 한 연속 세션이나 작업량이 커서 **코드 주석을 2단계로 태깅**: **#15=SEO 엔진** / **#16=카탈로그·디자인 전환**. 둘 다 본 세션. **다음 세션은 #17.**
+
+**시작 상황**: `/honsalim-start`(워크트리 blissful-poincare, HEAD #14 `d883fd6`). 사용자가 "카테고리 페이지 SEO 최적화"부터 요청 → 연속 진행.
+
+**핵심 진척 [확정]** (※전부 **미배포·로컬**. honsalim.com은 #13 옛 사이트 유지):
+
+1. **SEO 키워드 자동 최적화 엔진** (DECISIONS O10·O11): ①`validator/seo.py` 게이트(밀도·배치·보조키워드, opt-in payload["seo"], **하드 fail=대표키워드만**·네이버 1.7% 기준) = 5번째 검증 게이트 ②`collector/naver_searchad.py`(검색광고 API HMAC 클라이언트)+`keyword_research.py`(연관검색어→필터→보조 선별)+`seo_keywords.yml`(**office-chair·desk** 엔트리) ③`enricher/seo_directive.py`(2층 배치 지시)+`seo_regenerate.py`(게이트 통과까지 재생성). **라이브**: 사무용 의자 665개·컴퓨터 책상 874개 연관어→자동 선별.
+2. **모델 Haiku→Sonnet + 비용 과다청구 방지** (O12): `DEFAULT_MODEL=claude-sonnet-4-6`. tistory #7·#10 교훈 이식(재시도 상한 2·게이트 과민완화·다운스트림 생략·사전점검). **책상 가이드 라이브 생성**: Sonnet 1회 통과·밀도 1.67%·보조 12개 자연삽입·**$0.049**.
+3. **전체 제품 카탈로그** (O13): 노써치 종합점수 흉내 금지 → **점수 없는 가격·할인·타입 카탈로그**. 시안 `scripts/all_products_prototype.py`(데이터주도 `render_catalog`)+표준 `CATEGORY_PAGE.md §5-bis`. **책상 실수집 렌더**: 185 수집→오염 114 제거→유효 69 렌더 검증.
+4. **상품 데이터 품질 필터** (O14): `collector/product_filter.py` — 관련성(핵심어·액세서리/브랜드/off-target 제외)+부풀린할인(>70%) 차단. `map_product`에 `original_price_krw`·`discount_pct` 추가(in-memory; **DB 컬럼은 추후**).
+5. **★디자인 大전환 1단계** (O15·O3 구현): 라이브 사이트가 **옛 우드톤·페르소나 중심**임을 로컬 확인 → 확정 시안(흰 바탕·NanumSquare Neo·녹색) **렌더러 이식**. `static/css/tokens.css` 팔레트/폰트 1파일 교체로 **전 페이지 전환**(components/pages가 토큰 기반)+`base.html` 폰트+`header.html` 카테고리 네비. **`build/preview` 렌더·검증**(eval: bg흰색·NanumSquare·accent녹색·nav=홈/카테고리/구매가이드/세팅/About).
+6. **회귀 472→553 PASS** (신규 SEO·카탈로그·필터 테스트 다수). black·ruff·mypy 클린.
+
+**진행 순서 확정** (O15, 사용자): **디자인 토대→카테고리 구조→제품 렌더**. (1단계 디자인 완료)
+
+**무인·안전/진실성(§0)**: 가짜 점수·평점 금지(카탈로그) / 부풀린 할인 차단 / 비용 과다청구 근본대책(tistory 교훈) / 오염 상품 필터 / 디자인은 로컬만(배포는 승인 후).
+
+**잔존 미해결 (다음 세션 #17)**:
+- **2단계 카테고리 구조**: 카테고리 인덱스(`/categories/`)+라우트+**홈 콘텐츠 카테고리화**(현재 페르소나 구조, **디자인만 새것**)+네비 `카테고리`·`구매가이드` 링크 배선.
+- **3단계 제품 렌더**: 카테고리 페이지(가이드+비교카드+전체제품)를 **렌더러 `builder/renderer.py`에 이식**(현재 home/hub/persona/article만, 카테고리·전체제품 미지원)+**DB 영속화**(정가/할인 컬럼·수집 저장 — 렌더러는 DB를 읽음).
+- **배포**: 새 디자인+카테고리 → build/site → honsalim.com(방법A, **사용자 승인 필요**).
+- (이월) /go/ 링크 작동·알리 whitelist 답변·용어배포 확인·main-protect 재활성화. (미리보기 = `build/preview`)
+
+**다음 세션 할 일**: 1) **2단계 카테고리 구조**(카테고리 인덱스+홈 카테고리화+라우트) 2) **3단계 렌더러 이식+DB 영속화**로 **책상 카테고리 페이지를 실데이터로 build/preview 완결**→확인 3) (승인 후) 배포.
+
+---
 
 ### 세션 #14 — 2026-05-31 (Opus 4.8 1M, ★용어 일상화 + 사이트 大전환 기획(카테고리 비교·정보 사이트, 노써치형) + 카테고리 페이지 프로토타입, 회귀 470→472)
 
@@ -139,58 +169,3 @@
 1. 상품 수집 CLI(`collect-products`) → products 테이블 적재
 2. 상품↔시나리오 연결 → 첫 글 enrich·검증·승인·발행
 3. (자투리) main-protect 재활성화 · codeql-action 버전업 · 빌더 잔여
-
----
-
-### 세션 #9 — 2026-05-29 (Opus 4.7, Auto Mode, 자동 push 정책 N1 + dashboard 모듈 (CLI 11/11 완성) + secrets 경로 정정, 9 commits)
-
-**시작 상황**: `/honsalim-start` → 세션 #8 직후 상태 확인. 본 워크트리(peaceful-gagarin-b7fda4)는 #6 종료(bfb0cbb)에서 분기, main은 #8 (da69624)까지 진행. 메인 D:\affiliate_hub에서 직접 main 브랜치로 작업 진행.
-
-**핵심 진척 [확정]**:
-
-1. **N1 자동 push 정책 신설** [확정 사용자 결정]:
-   - 사용자 요청: "매 세션 종료마다 push 챙기는 부담 제거"
-   - CLAUDE.md §2(라)·§11 갱신 (사용자 직접 — Auto Mode classifier가 agent config 자체 수정 차단)
-   - `.claude/commands/honsalim-end.md` §7+규칙 갱신 (자동 push 단계 + destructive op 금지 명시)
-   - `.claude/settings.json` deny 확장 — force(`--force`·`-f`·`--force-with-lease`·`--force-if-includes`·`--mirror`·`--delete`·refspec)·reset --hard·rebase·branch -D·checkout --·restore --·clean·worktree remove --force·tag -d·update-ref -d·commit --amend·reflog expire·filter-branch·filter-repo (Bash·PowerShell 양쪽 21+ 패턴) / allow에 `git push origin main`+`HEAD:main` 추가
-   - DECISIONS N. 자동화 정책 신설 — **N1** 영구화
-
-2. **사용자 외부 작업 완료** [확정 사용자 보고]:
-   - SUMMARY/REVIEW_QUESTIONS/SUMMARY_PATCH_v1.1 정독 완료 (Phase 3 진입 게이트 통과)
-   - Google AI Studio API 키 발급 + 결제 활성화 + `D:\secrets\honsalim.env` (사용자 보안 결정: secrets/ 바로 아래 단일 파일로 격리)
-   - DECISIONS L6 경로 갱신 + DESIGN §11·IMAGE_GENERATION §3 정합 + STATE/TODO 시급 해소
-
-3. **DECISIONS G3 신설** [확정 사용자 결정]:
-   - Claude Design 적용 범위 = **공개 사이트 5종만** (홈·시나리오 허브·글·페르소나·About)
-   - dashboard(관리자 페이지)는 **Claude Design 미사용** — 단순 stub HTML로 충분 (1인 운영·외부 노출 X)
-   - STATE/TODO "dashboard 시안" stale 표기 정정 ("공개 사이트 5종 시안"이 정확)
-
-4. **dashboard 모듈 신설 — CLI 11/11 완성** [확정 회귀 10/10 PASS]:
-   - `src/dashboard/{__init__,render,approve}.py` 신설 (Jinja2 미사용, 단순 f-string + html.escape, BACKEND §2-6 명세)
-   - `render_dashboard(conn, output_path)` — 6 상태 그룹별 카드 + 1클릭 승인 명령 (복사 버튼) + validator fail 24h 3건+ 빨간 배너 + XSS escape
-   - `approve(conn, draft_id, user_note)` — state_machine.transition(validated→approved) + `.approve/<id>.flag` 파일 생성 (JSON)
-   - `src/cli.py` cmd_dashboard 추가 — `--output`·`--open` (브라우저 자동) 옵션
-   - `tests/test_dashboard.py` 신설 — render 7 + approve 3 = **10/10 PASS**
-   - doctor §10 진입점 37 → **41** (+4 dashboard.{render,render_html,fetch_drafts_by_status,approve})
-   - 회귀 342 → **352 PASS** [확정 pytest 3.18초]
-
-**누적 commits 9건 [확정 origin/main 모두 동기 — N1 자동 push 첫 적용]**:
-- 7705431 CLAUDE.md 포맷 정정 (사용자 직접 §2-라·§11 수정)
-- 433cbe3 N1 자동 push 정책 (4 파일 + DECISIONS N 신설)
-- 07a75e3 SUMMARY 정독 완료 + secrets honsalim.env 경로 정정
-- a788648 settings.json deny 보완 - force-with-lease 등 5 패턴
-- b8457ad G3 신설 - Claude Design은 공개 사이트 5종만
-- e5ee0e0 dashboard 모듈 구현 (CLI 11/11 완성)
-- (이 endcommit) /honsalim-end #9 종료
-
-**메모리 신설**: [[no-unfounded-priority]] — "다음 진행" 질문 = 작업 계속 의도. 마감 명령 추천 금지. 같은 답변 반복 금지 (세션 #9 사용자 비판).
-
-**잔존 미해결 (다음 세션)**:
-- 공개 사이트 5종 시안 (사용자 claude.ai/design 직접)
-- Phase 4 진입 시 about.html · Person Schema 적용 (M2-1~M2-7 사전 결정)
-- Scaled Content Abuse Step 2 (fail 게이트 승격) — 1~2주 운영 데이터 후 별도 세션
-- (선택) 본 워크트리들 폐기 검토
-
-**다음 세션 할 일**:
-1. 사용자 외부 작업 (claude.ai/design 5종 시안 생성·1개 선정)
-2. 시안 선정 후 Claude Code → DESIGN.md 토큰 갱신 + Jinja2 템플릿 작성 진입
