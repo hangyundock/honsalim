@@ -97,6 +97,46 @@ def create_draft(
     return int(cur.lastrowid or 0)
 
 
+def record_scenario_candidates(
+    conn: sqlite3.Connection,
+    scenario_id: int,
+    candidates: list[dict[str, Any]],
+    working_title: str | None = None,
+) -> int:
+    """수집된 상품 후보를 시나리오의 collected draft.raw_payload에 기록 (DB §5 collector 결과).
+
+    같은 시나리오에 'collected' 상태 draft가 있으면 그 raw_payload를 갱신,
+    없으면 새 draft 생성 — 반복 수집 시 draft 난립 방지(멱등). 반환: draft id.
+
+    raw_payload 형식: {"source": "collect-products", "candidate_count": N,
+                       "candidates": [후보 dict, ...]}.
+    enrich/큐레이션 단계가 이 후보 풀에서 article_products로 선별한다.
+    """
+    payload = {
+        "source": "collect-products",
+        "candidate_count": len(candidates),
+        "candidates": candidates,
+    }
+    raw_json = json.dumps(payload, ensure_ascii=False)
+    row = conn.execute(
+        "SELECT id FROM drafts WHERE scenario_id = ? AND status = 'collected' "
+        "ORDER BY id DESC LIMIT 1",
+        (scenario_id,),
+    ).fetchone()
+    if row is not None:
+        draft_id = int(row[0])
+        conn.execute("UPDATE drafts SET raw_payload = ? WHERE id = ?", (raw_json, draft_id))
+        conn.commit()
+        return draft_id
+    cur = conn.execute(
+        "INSERT INTO drafts (scenario_id, working_title, status, raw_payload) "
+        "VALUES (?, ?, 'collected', ?)",
+        (scenario_id, working_title, raw_json),
+    )
+    conn.commit()
+    return int(cur.lastrowid or 0)
+
+
 def save_enriched(
     conn: sqlite3.Connection,
     draft_id: int,

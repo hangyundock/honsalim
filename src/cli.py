@@ -697,6 +697,7 @@ def cmd_collect_products(args: argparse.Namespace) -> int:
     # 3) live: ali.env 로드 → 검색어별 호출(가격 밴드 적용) → 누적
     config.load_secrets()  # ali.env → ALI_APP_KEY/SECRET/TRACKING_ID
     all_products: list[dict] = []
+    candidates: list[dict] = []  # 시나리오 draft.raw_payload용 (검색어 출처 포함)
     for i, t in enumerate(terms):
         if i:
             time.sleep(0.2)  # BACKEND §2-1 호출 간 간격 (rate limit 보호)
@@ -722,21 +723,47 @@ def cmd_collect_products(args: argparse.Namespace) -> int:
         note = "  [NOTE] 0건 — 영어 검색어 권장" if n == 0 and not args.scenario else ""
         print(f"     {t.q:<22}{_band(t):<24} → {n}개{status}{note}")
         all_products.extend(res.products)
+        for p in res.products:
+            candidates.append(
+                {
+                    "source_product_id": p.get("source_product_id"),
+                    "deeplink_slug": p.get("deeplink_slug"),
+                    "name": p.get("name"),
+                    "price_krw": p.get("price_krw"),
+                    "keyword": t.q,  # 검색어 출처 (어느 카테고리로 수집됐는지)
+                }
+            )
 
     if not all_products:
         print(f"{WARN} 수신 상품 0개 — 적재할 데이터 없음")
         return 0
 
-    # 4) 누적 상품 일괄 upsert (같은 product_id 중복은 ON CONFLICT로 갱신 처리)
+    # 4) 누적 상품 일괄 upsert + (시나리오 모드) 후보를 시나리오 draft.raw_payload에 기록
+    from writer import article_writer
+
     conn = db.connect(db.DB_PATH)
+    draft_id: int | None = None
+    scenario_missing = False
     try:
         upsert = products_store.upsert_products(conn, all_products)
+        if args.scenario:
+            srow = conn.execute(
+                "SELECT id FROM scenarios WHERE slug = ?", (args.scenario,)
+            ).fetchone()
+            if srow is not None:
+                draft_id = article_writer.record_scenario_candidates(conn, int(srow[0]), candidates)
+            else:
+                scenario_missing = True
     finally:
         conn.close()
     print(
         f"{OK} products 적재 (수신 {len(all_products)}) — 신규 {upsert.inserted} · "
         f"갱신 {upsert.updated} · 스킵 {upsert.skipped} (필수 필드 누락)"
     )
+    if draft_id is not None:
+        print(f"{OK} 시나리오 draft {draft_id}에 후보 {len(candidates)}개 기록 — enrich 대상")
+    elif scenario_missing:
+        print(f"{WARN} 시나리오 {args.scenario!r}가 scenarios에 없어 draft 미기록 (db seed 필요)")
     return 0
 
 

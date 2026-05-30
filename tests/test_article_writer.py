@@ -355,6 +355,47 @@ class TestExtractDisclosureFirst:
         assert not out.endswith(" ")
 
 
+class TestRecordScenarioCandidates:
+    """collect-products → 시나리오 collected draft.raw_payload 후보 기록 (DB §5)."""
+
+    @staticmethod
+    def _candidates() -> list[dict[str, Any]]:
+        return [
+            {"source_product_id": "1", "deeplink_slug": "ali-1", "name": "A", "price_krw": 1000},
+            {"source_product_id": "2", "deeplink_slug": "ali-2", "name": "B", "price_krw": 2000},
+        ]
+
+    def test_creates_draft_when_none(self) -> None:
+        conn = _seeded_db()
+        did = article_writer.record_scenario_candidates(conn, 1, self._candidates())
+        row = conn.execute("SELECT status, raw_payload FROM drafts WHERE id = ?", (did,)).fetchone()
+        assert row[0] == "collected"
+        payload = json.loads(row[1])
+        assert payload["source"] == "collect-products"
+        assert payload["candidate_count"] == 2
+        assert [c["deeplink_slug"] for c in payload["candidates"]] == ["ali-1", "ali-2"]
+
+    def test_updates_existing_collected_draft(self) -> None:
+        conn = _seeded_db()
+        first = article_writer.create_draft(conn, scenario_id=1, raw_payload={"src": "old"})
+        did = article_writer.record_scenario_candidates(conn, 1, self._candidates())
+        assert did == first  # 새 draft 만들지 않고 기존 collected 갱신
+        assert conn.execute("SELECT COUNT(*) FROM drafts WHERE scenario_id = 1").fetchone()[0] == 1
+        payload = json.loads(
+            conn.execute("SELECT raw_payload FROM drafts WHERE id = ?", (did,)).fetchone()[0]
+        )
+        assert payload["candidate_count"] == 2
+
+    def test_does_not_touch_enriched_draft(self) -> None:
+        """이미 enriched로 진행한 draft는 건드리지 않고 새 collected 생성."""
+        conn = _seeded_db()
+        old = article_writer.create_draft(conn, scenario_id=1, raw_payload={"src": "old"})
+        transition(conn, old, "enriched")
+        did = article_writer.record_scenario_candidates(conn, 1, self._candidates())
+        assert did != old
+        assert conn.execute("SELECT COUNT(*) FROM drafts WHERE scenario_id = 1").fetchone()[0] == 2
+
+
 if __name__ == "__main__":
     if pytest is not None:
         pytest.main([__file__, "-v"])
