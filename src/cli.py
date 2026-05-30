@@ -21,11 +21,13 @@ from __future__ import annotations
 import argparse
 import importlib
 import importlib.util
+import json
 import shutil
 import sqlite3
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 # Windows 콘솔 cp949 기본 인코딩에서 한국어·유니코드 출력 보장
 # (PYTHONIOENCODING 환경 변수가 없어도 동작하도록 코드에서 강제)
@@ -494,7 +496,7 @@ def cmd_enrich(args: argparse.Namespace) -> int:
         row = conn.execute(
             """
             SELECT s.slug, s.title_ko, s.season_peak, s.description,
-                   p.slug, p.title_ko, p.description, p.age_range
+                   p.slug, p.title_ko, p.description, p.age_range, d.raw_payload
             FROM drafts d
             JOIN scenarios s ON d.scenario_id = s.id
             JOIN personas p ON s.persona_id = p.id
@@ -521,7 +523,16 @@ def cmd_enrich(args: argparse.Namespace) -> int:
             "description": row[6],
             "age_range": row[7],
         }
-        req = GenerateRequest(scenario=scenario_dict, persona=persona_dict)
+        # 수집 후보(C-1, raw_payload.candidates)를 본문 프롬프트의 {{products}}로 주입
+        products: list[dict] = []
+        if row[8]:
+            try:
+                rp = json.loads(row[8])
+                if isinstance(rp, dict) and isinstance(rp.get("candidates"), list):
+                    products = rp["candidates"]
+            except (json.JSONDecodeError, TypeError):
+                products = []
+        req = GenerateRequest(scenario=scenario_dict, persona=persona_dict, products=products)
 
         import os
 
@@ -534,30 +545,60 @@ def cmd_enrich(args: argparse.Namespace) -> int:
 
         from writer import article_writer, state_machine
 
+        # 라이브: 응답을 META-JSON + BODY-MARKDOWN으로 분리해 본문을 영구 저장.
+        # 분리 실패 시 본문 미저장·상태 전이 없음(돈만 쓰고 stub 저장 방지).
+        if not args.dry_run:
+            from enricher.claude_client import ArticleResponseError, split_article_response
+
+            if not result.response_text:
+                print(f"{FAIL} 라이브 응답 본문 비어있음 — 저장 안 함")
+                return 3
+            try:
+                meta, body_md = split_article_response(result.response_text)
+            except ArticleResponseError as e:
+                print(f"{FAIL} 응답 형식 오류(META-JSON/BODY 분리 실패): {e}")
+                return 3
+            enriched_payload: dict[str, Any] = {
+                "body_md": body_md,
+                "title": meta.get("title"),
+                "summary": meta.get("summary"),
+                "meta_description": meta.get("meta_description"),
+                "meta_keywords": meta.get("meta_keywords"),
+                "faqs": meta.get("faqs", []),
+                "products": products,
+                "usage": result.usage,
+                "model": client.model,
+            }
+        else:
+            enriched_payload = {
+                "dry_run": True,
+                "user_prompt_preview": result.user_prompt[:500],
+                "system_blocks_count": len(result.system_blocks),
+                "products_count": len(products),
+            }
+
         state_machine.transition(
             conn,
             args.draft,
             "enriched",
             reason=f"cli enrich ({'dry_run' if args.dry_run else 'live'})",
         )
-        article_writer.save_enriched(
-            conn,
-            args.draft,
-            {
-                "dry_run": result.dry_run,
-                "user_prompt_preview": result.user_prompt[:500],
-                "system_blocks_count": len(result.system_blocks),
-                "usage": result.usage,
-            },
-        )
+        article_writer.save_enriched(conn, args.draft, enriched_payload)
+
         mode = "dry_run" if args.dry_run else "live"
         print(f"{OK} draft {args.draft} → enriched ({mode})")
-        print(f"     user_prompt 길이: {len(result.user_prompt)}자")
-        print(f"     system_blocks: {len(result.system_blocks)}개 (cache_control)")
-        if not args.dry_run and result.usage:
+        print(f"     상품 후보 {len(products)}개 주입 · user_prompt {len(result.user_prompt)}자")
+        if args.dry_run:
+            print(f"     system_blocks: {len(result.system_blocks)}개 (cache_control)")
+        else:
             print(
-                f"     usage: input={result.usage.get('input_tokens')} output={result.usage.get('output_tokens')}"
+                f"     제목: {enriched_payload['title']!r} · 본문 {len(enriched_payload['body_md'])}자"
             )
+            if result.usage:
+                print(
+                    f"     usage: input={result.usage.get('input_tokens')} "
+                    f"output={result.usage.get('output_tokens')}"
+                )
         return 0
     finally:
         conn.close()

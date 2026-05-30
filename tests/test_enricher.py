@@ -30,12 +30,14 @@ from enricher import (
     DEFAULT_MODEL,
     DEFAULT_TEMPERATURE,
     KNOWN_TEMPLATES,
+    ArticleResponseError,
     ClaudeClient,
     GenerateRequest,
     build_system_blocks,
     build_user_prompt,
     list_templates,
     load,
+    split_article_response,
     verify_known_templates_present,
 )
 
@@ -135,6 +137,47 @@ class TestClaudeClient:
         )
         with raises(RuntimeError):
             client.generate_article(req, dry_run=False)
+
+
+class TestSplitArticleResponse:
+    """article_main 응답(META-JSON + BODY-MARKDOWN) 분리 — system §2 형식."""
+
+    _GOOD = (
+        "서두 잡담\n"
+        "---META-JSON-START---\n"
+        '{"title": "T", "summary": "S", "meta_keywords": "a,b,c"}\n'
+        "---META-JSON-END---\n"
+        "---BODY-MARKDOWN-START---\n"
+        "## 1. 섹션\n본문 내용입니다.\n"
+        "---BODY-MARKDOWN-END---\n"
+        "꼬리 잡담"
+    )
+
+    def test_splits_meta_and_body(self) -> None:
+        meta, body = split_article_response(self._GOOD)
+        assert meta["title"] == "T"
+        assert meta["meta_keywords"] == "a,b,c"
+        assert body.startswith("## 1. 섹션")
+        assert "본문 내용입니다." in body
+        assert "META-JSON" not in body  # 구분자·메타 누출 없음
+
+    def test_missing_meta_block_raises(self) -> None:
+        text = "---BODY-MARKDOWN-START---\n본문\n---BODY-MARKDOWN-END---"
+        with raises(ArticleResponseError):
+            split_article_response(text)
+
+    def test_missing_body_block_raises(self) -> None:
+        text = "---META-JSON-START---\n{}\n---META-JSON-END---"
+        with raises(ArticleResponseError):
+            split_article_response(text)
+
+    def test_invalid_meta_json_raises(self) -> None:
+        text = (
+            "---META-JSON-START---\n{not json}\n---META-JSON-END---\n"
+            "---BODY-MARKDOWN-START---\n본문\n---BODY-MARKDOWN-END---"
+        )
+        with raises(ArticleResponseError):
+            split_article_response(text)
 
 
 if __name__ == "__main__":

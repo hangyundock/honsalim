@@ -10,11 +10,13 @@ from .claude_client import (
     DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
     DEFAULT_TEMPERATURE,
+    ArticleResponseError,
     ClaudeClient,
     GenerateRequest,
     GenerateResult,
     build_system_blocks,
     build_user_prompt,
+    split_article_response,
 )
 from .meta_extractor import (
     KEYWORDS_MAX,
@@ -58,6 +60,7 @@ __all__ = (
     "SUMMARY_MAX",
     "SUMMARY_MIN",
     "TITLE_MAX",
+    "ArticleResponseError",
     "ClaudeClient",
     "ExtractRequest",
     "ExtractResult",
@@ -76,6 +79,7 @@ __all__ = (
     "parse_meta_json",
     "render",
     "retry_with_backoff",
+    "split_article_response",
     "validate_meta",
     "verify_known_templates_present",
 )

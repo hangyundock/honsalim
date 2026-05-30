@@ -20,6 +20,7 @@ BACKEND §3-2 캐시 친화 구조:
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -29,6 +30,49 @@ from . import prompt_loader
 DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 DEFAULT_MAX_TOKENS = 4096
 DEFAULT_TEMPERATURE = 0.4
+
+# system_base.md §2 출력 형식 구분자 [확정]
+META_START = "---META-JSON-START---"
+META_END = "---META-JSON-END---"
+BODY_START = "---BODY-MARKDOWN-START---"
+BODY_END = "---BODY-MARKDOWN-END---"
+
+
+class ArticleResponseError(ValueError):
+    """article_main 응답이 system §2 형식(META-JSON + BODY-MARKDOWN)을 벗어남."""
+
+
+def _between(text: str, start: str, end: str) -> str | None:
+    """start와 end 구분자 사이 텍스트 (없으면 None). strip 적용."""
+    i = text.find(start)
+    if i == -1:
+        return None
+    j = text.find(end, i + len(start))
+    if j == -1:
+        return None
+    return text[i + len(start) : j].strip()
+
+
+def split_article_response(response_text: str) -> tuple[dict[str, Any], str]:
+    """article_main 응답을 (meta_dict, body_md)로 분리 — system §2 형식 [확정].
+
+    META-JSON 블록은 JSON 파싱, BODY-MARKDOWN 블록은 그대로 본문. 형식 위반 시
+    ArticleResponseError (메타 추출 fallback·재요청 판단은 호출자 책임).
+    """
+    meta_raw = _between(response_text, META_START, META_END)
+    body_md = _between(response_text, BODY_START, BODY_END)
+    if meta_raw is None:
+        raise ArticleResponseError(f"META-JSON 블록 없음 ({META_START}…{META_END})")
+    if not body_md:
+        raise ArticleResponseError(f"BODY-MARKDOWN 블록 없음/빈값 ({BODY_START}…{BODY_END})")
+    try:
+        meta = json.loads(meta_raw)
+    except json.JSONDecodeError as e:
+        raise ArticleResponseError(f"META-JSON 파싱 실패: {e}") from e
+    if not isinstance(meta, dict):
+        raise ArticleResponseError(f"META-JSON 최상위가 객체 아님: {type(meta).__name__}")
+    return meta, body_md
+
 
 # BACKEND §3-2 캐시 대상 — system 블록 첫 부분
 CACHED_SYSTEM_TEMPLATES: tuple[str, ...] = ("system_base", "tone_examples")
