@@ -573,6 +573,20 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                 return 3
             # POLICY §2-2/§2-3 disclosure 자동 삽입 (모델은 미작성 — 시스템 책임). 멱등.
             body_md = article_writer.apply_disclosure(body_md)
+            # 모델이 선언한 featured 상품(deeplink_slug)만 검증·게시 대상으로 — 후보 풀 전체가
+            # 아니라 글이 실제 추천한 상품만 truth 가격 검증을 받아야 정확 (id는 식별용).
+            declared = meta.get("featured_products")
+            slug_set = {str(s).strip() for s in declared} if isinstance(declared, list) else set()
+            featured = [
+                {**c, "id": c.get("source_product_id")}
+                for c in products
+                if c.get("deeplink_slug") in slug_set
+            ]
+            if products and not featured:
+                print(
+                    f"{WARN} featured_products 미선언/미매칭 — truth 가격 검증 대상 0개 "
+                    "(모델이 추천 상품 ID를 안 냈거나 ID 불일치)"
+                )
             enriched_payload: dict[str, Any] = {
                 "body_md": body_md,
                 "title": meta.get("title"),
@@ -580,7 +594,8 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                 "meta_description": meta.get("meta_description"),
                 "meta_keywords": meta.get("meta_keywords"),
                 "faqs": meta.get("faqs", []),
-                "products": products,
+                "products": featured,
+                "candidate_count": len(products),
                 "usage": result.usage,
                 "model": client.model,
             }
@@ -626,6 +641,7 @@ def cmd_enrich(args: argparse.Namespace) -> int:
         else:
             print(
                 f"     제목: {enriched_payload['title']!r} · 본문 {len(enriched_payload['body_md'])}자"
+                f" · featured {len(enriched_payload['products'])}/{len(products)}"
             )
             if result.usage:
                 print(

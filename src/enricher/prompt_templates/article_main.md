@@ -24,11 +24,16 @@
 
 {% for p in products %}
 ### 상품 {{loop.index}}: {{p.name}}
+- 고유 ID: {{p.deeplink_slug}}
+- 검색 분류: {{p.keyword}}
 - 카테고리: {{p.category_path}}
 - 가격: {{p.price_krw}}원 (확인 시각: {{p.price_checked_at}})
 - 재고: {{p.availability}}
 - 카테고리 fit 이유: {{p.fit_reason}}
 {% endfor %}
+
+**가격 정확성 (진실성 게이트):** 본문에서 상품 가격을 언급할 때는 위 목록의 가격을 그대로 사용.
+임의 가격 생성 금지. 추천한 상품은 META-JSON `featured_products`에 그 상품의 **고유 ID를 그대로** 나열.
 
 ## 1인칭 표현 금지 (DECISIONS L3·L5 [확정 세션 #6])
 
@@ -54,3 +59,5 @@
 
 system 프롬프트의 §2 형식대로 META-JSON + BODY-MARKDOWN 두 블록 분리 출력.
 본문 분량 약 2,000~2,500자 (한국어). 8섹션 모두 포함. 1인칭 금지 + non-commodity 의무.
+META-JSON `featured_products`에는 본문에서 실제 추천·언급한 상품의 고유 ID(deeplink_slug)만 나열
+(추천 안 한 상품은 제외). 본문 가격은 반드시 위 목록 가격과 일치.

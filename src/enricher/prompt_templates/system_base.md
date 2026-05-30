@@ -27,6 +27,7 @@
   "summary": "100~150자 한국어 요약",
   "meta_description": "150자 한국어 SEO 메타",
   "meta_keywords": "쉼표 구분 5~8개",
+  "featured_products": ["본문 §3·§4에서 실제 추천한 상품의 고유 ID(아래 수집 상품 목록의 deeplink_slug 그대로)"],
   "faqs": [
     {"q": "...", "a": "..."},
     ...
