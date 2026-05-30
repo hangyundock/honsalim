@@ -383,6 +383,31 @@ class TestApplyDisclosure:
         # 첫머리 문구가 두 번 들어가지 않음
         assert twice.count("일정 수수료를 제공받습니다") == 1
 
+    def test_aliexpress_source_uses_ali_disclosure(self) -> None:
+        """알리 상품 글: 첫머리에 AliExpress 명시, 쿠팡 미명시 (공정위 정확성)."""
+        from validator.disclosure import check_disclosure
+
+        # 본문을 충분히 길게 — 짧으면 푸터(쿠팡 포함)가 head 범위로 끼어듦
+        out = article_writer.apply_disclosure(
+            "# 제목\n" + "본문 내용. " * 100, sources={"aliexpress"}
+        )
+        head = out[:200]
+        assert "AliExpress" in head
+        assert "쿠팡 파트너스" not in head  # 알리 글 첫머리엔 쿠팡 명시 안 함
+        ok, rpt = check_disclosure(out)  # 푸터는 둘 다라 게이트 통과
+        assert ok, rpt
+
+    def test_both_sources_uses_both_disclosure(self) -> None:
+        out = article_writer.apply_disclosure("본문", sources={"aliexpress", "coupang"})
+        assert "쿠팡 파트너스" in out[:300] and "AliExpress" in out[:300]
+
+    def test_first_disclosure_for_selection(self) -> None:
+        fd = article_writer.first_disclosure_for
+        assert fd({"aliexpress"}) == article_writer.FIRST_DISCLOSURE_ALI
+        assert fd({"coupang"}) == article_writer.FIRST_DISCLOSURE_COUPANG
+        assert fd(None) == article_writer.FIRST_DISCLOSURE_COUPANG  # 불명→쿠팡 기본
+        assert fd({"aliexpress", "coupang"}) == article_writer.FIRST_DISCLOSURE_BOTH
+
     def test_nonstandard_model_disclosure_gets_standard(self) -> None:
         """모델이 임의로 쓴 비표준 disclosure(키워드는 있음)여도 표준 문구를 삽입 (POLICY §2-4)."""
         # 키워드(쿠팡 파트너스·수수료)는 있지만 표준 문구는 아님 — 라이브에서 실제 발생한 케이스

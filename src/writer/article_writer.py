@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from typing import Any
 
@@ -30,11 +31,22 @@ DISCLOSURE_FIRST_KEYWORDS: tuple[str, ...] = ("쿠팡 파트너스", "수수료"
 # POLICY §2-3 [확정] — 푸터 disclosure 키워드 (validator.disclosure FOOTER_REQUIRED 일치)
 DISCLOSURE_FOOTER_KEYWORDS: tuple[str, ...] = ("쿠팡 파트너스", "AliExpress", "본인")
 
-# POLICY §2-2 표준 첫머리 문구 (verbatim — 표준 문구 글자 변경 ≤ 3자 규칙 §2-4 준수)
-FIRST_DISCLOSURE = (
+# POLICY §2-2 표준 첫머리 문구 — 제휴처 인지형 [확정 2026-05-30, 공정위 정확성].
+# 글이 실제 추천한 상품의 제휴처를 첫머리에 정확히 공시. 문구 패턴은 동일, 제휴처명만 교체.
+FIRST_DISCLOSURE_COUPANG = (
     "이 글에는 쿠팡 파트너스 활동의 일환으로 일정 수수료를 제공받습니다. "
     "(구매자에게 추가 비용은 발생하지 않습니다.)"
 )
+FIRST_DISCLOSURE_ALI = (
+    "이 글에는 AliExpress 어필리에이트 활동의 일환으로 일정 수수료를 제공받습니다. "
+    "(구매자에게 추가 비용은 발생하지 않습니다.)"
+)
+FIRST_DISCLOSURE_BOTH = (
+    "이 글에는 쿠팡 파트너스 및 AliExpress 어필리에이트 활동의 일환으로 일정 수수료를 "
+    "제공받습니다. (구매자에게 추가 비용은 발생하지 않습니다.)"
+)
+# 하위호환 기본값 (제휴처 불명 시) — 쿠팡(메인)
+FIRST_DISCLOSURE = FIRST_DISCLOSURE_COUPANG
 # POLICY §2-3 표준 푸터 풀 문구 (verbatim)
 FOOTER_DISCLOSURE = (
     "혼살림은 쿠팡 파트너스 및 AliExpress Portals 어필리에이트 활동의 일환으로, "
@@ -97,11 +109,27 @@ _FIRST_MARK = "일정 수수료를 제공받습니다"
 _FOOTER_MARK = "어필리에이트 정책을 준수합니다"
 
 
-def apply_disclosure(body_md: str) -> str:
+def first_disclosure_for(sources: Iterable[str] | None) -> str:
+    """featured 상품 제휴처 집합 → 첫머리 표준 문구 (제휴처 인지형, 공정위 정확성).
+
+    sources: {'aliexpress', 'coupang', ...}. 알리만→알리, 쿠팡만/불명→쿠팡, 둘 다→both.
+    """
+    src = {str(s).lower() for s in (sources or [])}
+    has_ali = "aliexpress" in src
+    has_coupang = "coupang" in src
+    if has_ali and has_coupang:
+        return FIRST_DISCLOSURE_BOTH
+    if has_ali:
+        return FIRST_DISCLOSURE_ALI
+    return FIRST_DISCLOSURE_COUPANG  # 쿠팡 또는 제휴처 불명(하위호환 기본)
+
+
+def apply_disclosure(body_md: str, sources: Iterable[str] | None = None) -> str:
     """POLICY §2-2 첫머리 + §2-3 푸터 **표준** disclosure를 본문에 자동 삽입 (system_base §2 '자동 삽입').
 
+    sources: featured 상품 제휴처 집합 — 첫머리를 제휴처 인지형으로 선택(알리 글엔 알리 명시).
     모델은 disclosure를 쓰지 않도록 지시받으므로(프롬프트) 생성 후 시스템이 표준 문구를 삽입한다.
-    멱등 판정은 **표준 문구 존재**(키워드 아님) 기준 — 모델이 임의로 쓴 비표준 disclosure가 있어도
+    멱등 판정은 **표준 문구 존재**(공통 구절) 기준 — 모델이 임의로 쓴 비표준 disclosure가 있어도
     표준 문구가 없으면 삽입한다(POLICY §2-4 표준 문구 보장). 결과는 validator.check_disclosure 통과.
     """
     body = body_md or ""
@@ -112,7 +140,7 @@ def apply_disclosure(body_md: str) -> str:
 
     parts: list[str] = []
     if need_first:
-        parts.append(FIRST_DISCLOSURE)
+        parts.append(first_disclosure_for(sources))
     if body:
         parts.append(body)
     if need_footer:

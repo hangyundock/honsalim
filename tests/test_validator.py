@@ -268,6 +268,29 @@ class TestDisclosure:
         assert ok is False
         assert "body_missing" in rpt["issues"]
 
+    def test_pass_aliexpress_only_first(self) -> None:
+        """알리 글: 첫머리에 'AliExpress'+'수수료'(쿠팡 없음)여도 통과 [확정 2026-05-30 제휴처 인지형]."""
+        body = (
+            "이 글에는 AliExpress 어필리에이트 활동의 일환으로 일정 수수료를 제공받습니다."
+            + "\n\n본문."
+            + " " * 600
+            + "혼살림은 쿠팡 파트너스 및 AliExpress 어필리에이트 활동의 일환으로 운영되며 "
+            "본인 및 가족 구매를 금지합니다."
+        )
+        ok, rpt = check_disclosure(body)
+        assert ok is True, rpt
+
+    def test_fail_first_no_affiliate_name(self) -> None:
+        """첫머리에 수수료는 있으나 제휴처명이 없으면 fail."""
+        body = (
+            "이 글에는 광고 활동으로 일정 수수료를 제공받습니다."
+            + " " * 600
+            + "혼살림은 쿠팡 파트너스 및 AliExpress 활동, 본인 구매 금지."
+        )
+        ok, rpt = check_disclosure(body)
+        assert ok is False
+        assert any("affiliate_name" in i for i in rpt["issues"])
+
     def test_fail_first_missing(self) -> None:
         # 첫 200자에 '수수료' 없음
         body = "안녕하세요. 일반 가이드입니다." + " " * 200 + GOOD_DISCLOSURE_BODY

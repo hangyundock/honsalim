@@ -571,8 +571,6 @@ def cmd_enrich(args: argparse.Namespace) -> int:
             except ArticleResponseError as e:
                 print(f"{FAIL} 응답 형식 오류(META-JSON/BODY 분리 실패): {e}")
                 return 3
-            # POLICY §2-2/§2-3 disclosure 자동 삽입 (모델은 미작성 — 시스템 책임). 멱등.
-            body_md = article_writer.apply_disclosure(body_md)
             # 모델이 선언한 featured 상품(deeplink_slug)만 검증·게시 대상으로 — 후보 풀 전체가
             # 아니라 글이 실제 추천한 상품만 truth 가격 검증을 받아야 정확 (id는 식별용).
             declared = meta.get("featured_products")
@@ -587,6 +585,18 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                     f"{WARN} featured_products 미선언/미매칭 — truth 가격 검증 대상 0개 "
                     "(모델이 추천 상품 ID를 안 냈거나 ID 불일치)"
                 )
+
+            # disclosure는 featured 상품의 실제 제휴처를 반영 (공정위 정확성). source 없으면
+            # deeplink_slug 접두어(ali-)로 추정. featured 비면 전체 후보로 fallback.
+            def _affiliate_of(c: dict[str, Any]) -> str | None:
+                if c.get("source"):
+                    return str(c["source"]).lower()
+                slug = str(c.get("deeplink_slug") or "")
+                return "aliexpress" if slug.startswith("ali-") else None
+
+            affiliates = {a for c in (featured or products) if (a := _affiliate_of(c))}
+            # POLICY §2-2/§2-3 disclosure 자동 삽입 (모델 미작성 — 시스템 책임). 멱등 + 제휴처 인지형.
+            body_md = article_writer.apply_disclosure(body_md, sources=affiliates)
             enriched_payload: dict[str, Any] = {
                 "body_md": body_md,
                 "title": meta.get("title"),
@@ -816,6 +826,7 @@ def cmd_collect_products(args: argparse.Namespace) -> int:
         for p in res.products:
             candidates.append(
                 {
+                    "source": p.get("source"),  # 제휴처 (aliexpress/coupang) — disclosure 정확성용
                     "source_product_id": p.get("source_product_id"),
                     "deeplink_slug": p.get("deeplink_slug"),
                     "name": p.get("name"),
