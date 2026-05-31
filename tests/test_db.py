@@ -106,15 +106,26 @@ class TestMigrate:
             applied = db.migrate(db_path=path)
             assert len(applied) >= 1
             conn = db.connect(path)
-            assert db.current_version(conn) == 1
-            # 13 핵심 테이블 생성 확인
+            # 적용 후 버전 = 발견된 마이그레이션의 최대 version.
+            # 하드코딩 금지 — 새 migration(002 categories ...) 추가 시 자동 정합 (재발 방지 가드).
+            expected_version = max(m.version for m in db.discover_migrations())
+            assert db.current_version(conn) == expected_version
+            # 핵심 테이블 생성 확인 (001 + 002 카테고리 구조 포함)
             tables = {
                 r[0]
                 for r in conn.execute(
                     "SELECT name FROM sqlite_master WHERE type='table'"
                 ).fetchall()
             }
-            for required in ("personas", "scenarios", "drafts", "articles", "schema_version"):
+            for required in (
+                "personas",
+                "scenarios",
+                "drafts",
+                "articles",
+                "schema_version",
+                "categories",
+                "category_products",
+            ):
                 assert required in tables
             conn.close()
         finally:

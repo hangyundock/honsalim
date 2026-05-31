@@ -1,0 +1,42 @@
+# category_page.md — 카테고리 페이지 콘텐츠 생성 user 프롬프트 (세션 #17, 의자 구성 표준)
+
+> 변수: category_name, products(list: slug·tier·price·name), seo_directive
+> 출력: JSON 1개 — 도입·타입 비교표·체크리스트6·흔한실수·추천 6선(+타입)·제품명기반 비교표·FAQ.
+> 신뢰박스(혼살림의 약속 / 이렇게 골랐어요)는 렌더러가 정적 삽입. 전체 제품 카탈로그는 별도 결합.
+
+"{{category_name}}" 카테고리 페이지 콘텐츠를 작성하세요. 1인 가구·홈오피스 관점의 **정직한 큐레이터**(운영자 "혼살다") 톤.
+
+## 제공된 제품 (추천 6선·비교표는 반드시 이 목록의 slug에서만)
+{% for p in products %}
+- slug={{p.slug}} | {{p.tier}} | {{p.price}} | {{p.name}}
+{% endfor %}
+
+## 작성 규칙 (엄수 — 위반 시 게이트 reject)
+- 저자 = 운영자 **"혼살다"**(개인). **AI가 작성했다는 표현 금지.**
+- **1인칭·소유격 표현 절대 금지** — "내가/제가/우리", "**내 책상**·내 방·우리집", "써보니·사용해보니·직접 써본" 등 금지(위반 시 reject). "책상 위·1인 가구 환경"처럼 일반화하세요.
+- **정직** — 직접 테스트하지 않는다. 위 제품명·가격·티어에 **명시된 것만** 근거. **가짜 평점·후기·판매량·없는 스펙 지어내기 금지.**
+- pros/cons/비교표는 **제품명에 드러난 특징**(서랍·높이조절·원목·금속·VESA·USB 등)과 **타입의 일반적 트레이드오프**만.
+- 과장·최상급·단정·의료효능 금지.
+
+{{seo_directive}}
+
+## 출력 형식 — JSON 1개만 (코드펜스·설명 없이)
+{
+  "title": "대표 키워드로 시작하는 제목 (예: '{{category_name}} 고르는 법 + 추천 6')",
+  "image_prompt": "개념 이미지용 영어 한 문장 — 이 카테고리 제품들이 놓인 깨끗한 환경 묘사(텍스트·브랜드·사람 없이, 사물 위주). 예: 'several monitor stand risers of different types on a tidy minimalist desk'",
+  "image_alt": "위 개념 이미지의 한글 대체 텍스트(접근성·SEO, 한 줄)",
+  "lead": "도입 2~3문장. 왜 중요한지 공감으로 시작. 핵심 단어는 **굵게**.",
+  "guide_intro": "타입이 무엇으로 갈리는지 1~2문장.",
+  "type_table": [{"type": "타입명", "trait": "지지 방식/핵심 특징", "for": "이런 분께"}],
+  "checkpoints": [{"title": "사기 전 체크 항목", "why": "왜 중요한지 1~2문장"}],
+  "mistakes": "흔한 실수 2~3가지를 ①②③로 묶은 prose.",
+  "picks": [{"slug": "<제공 slug>", "tier": "budget", "type": "짧은 타입명", "pros": ["장점1", "장점2"], "cons": ["단점/유의1"], "for": "이런 분께"}],
+  "compare": {"rows": ["비교 항목"], "cells": [{"slug": "<picks의 slug>", "values": ["O 또는 값 또는 —"]}]},
+  "faq": [{"q": "자주 묻는 질문", "a": "간결한 답"}]
+}
+
+규칙:
+- "type_table": 3~5행. "checkpoints": **정확히 6개**. "picks": **정확히 6개**(budget 3 + premium 3, 제공 목록 slug만).
+- "compare": "rows"는 핵심 비교 항목 4~6개(예: 높이조절·서랍·소재·VESA). "cells"는 **picks 6개 전부**, values는 rows 순서대로(확인 불가 항목은 반드시 "—").
+- "faq": 3~4개.
+- 대표 키워드 정확형을 lead·guide_intro·checkpoints·mistakes에 자연스럽게 반복(밀도 ~1.7%).

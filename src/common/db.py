@@ -158,7 +158,7 @@ def db_stats(db_path: Path = DB_PATH) -> dict[str, int]:
     conn = connect(db_path)
     try:
         stats: dict[str, int] = {}
-        for table in ("personas", "scenarios", "products", "drafts", "articles"):
+        for table in ("personas", "scenarios", "categories", "products", "drafts", "articles"):
             try:
                 # table 이름은 코드 내 화이트리스트 — SQL injection 아님
                 row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()  # noqa: S608

@@ -28,35 +28,20 @@ except ImportError:  # pragma: no cover
 
 from collector import aliexpress as ali
 from collector import products_store
-
-# sql/migrations/001_initial_schema.sql §products 와 동일 (CHECK·UNIQUE 포함)
-_PRODUCTS_DDL = """
-CREATE TABLE products (
-  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-  source              TEXT NOT NULL CHECK (source IN ('coupang','aliexpress')),
-  source_product_id   TEXT NOT NULL,
-  name                TEXT NOT NULL,
-  category_path       TEXT,
-  price_krw           INTEGER,
-  price_checked_at    TEXT,
-  currency            TEXT NOT NULL DEFAULT 'KRW',
-  image_url_external  TEXT,
-  deeplink_url        TEXT NOT NULL,
-  deeplink_slug       TEXT NOT NULL UNIQUE,
-  affiliate_tag       TEXT NOT NULL,
-  availability        TEXT CHECK (availability IN ('in_stock','out_of_stock','unknown')),
-  created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  last_seen_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (source, source_product_id)
-);
-"""
+from common import db as _db
 
 
 def _new_conn() -> sqlite3.Connection:
+    """실제 sql/migrations/*.sql 전체를 in-memory DB에 적용.
+
+    products DDL을 하드코딩 재현하지 않고 마이그레이션을 단일 소스로 적용한다 —
+    새 migration(002 정가·할인 컬럼·categories 등) 추가 시 자동 정합(재발 방지 가드).
+    NOT NULL·CHECK·UNIQUE 등 실제 제약을 그대로 검증한다.
+    """
     conn = sqlite3.connect(":memory:")
     conn.execute("PRAGMA foreign_keys = ON")
-    conn.executescript(_PRODUCTS_DDL)
+    for m in _db.discover_migrations():
+        conn.executescript(m.path.read_text(encoding="utf-8"))
     return conn
 
 

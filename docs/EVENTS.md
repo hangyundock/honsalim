@@ -16,8 +16,31 @@
   - 세션 #7 (2026-05-29 cross-project 잔존 3건(AutoBlog Hana Kim·혼살림 M2 Person Schema·Scaled Content Abuse Step1)·필명 "혼살다" 확정·pip-audit 0건·2 commits)
   - 세션 #8 (2026-05-29 네이버 작업 D:\naver_blog\ 별도 프로젝트 분리(C안)·private repo·dazzling-hermann 폐기·1 commit)
   - 세션 #9 (2026-05-29 자동 push 정책 N1 + dashboard 모듈 CLI 11/11 + secrets 경로 정정·회귀 352·9 commits)
+  - 세션 #11 (2026-05-29~30 디자인 시안 5종·Jinja2 템플릿·builder.renderer·SEO/JSON-LD·enrich 버그수정·알리 수집기 골격+라이브검증·회귀 378. ※#10은 워크트리 폐기 정리만)
 
 ## 최근 5세션
+
+### 세션 #17 — 2026-05-31 (Opus 4.8 1M, ★카테고리 자동 등록 파이프라인 완성 + 사무용 의자 구성 표준 + 개념이미지(Imagen) + CLI + 정형화 입증(책상), 회귀 553→569)
+
+**시작 상황**: `/honsalim-start`(워크트리 sad-wilbur-47961d, HEAD=origin/main #15–16 `ec6c3e4`). 회귀 553. 사용자 "다음 작업 진행"→#17 카테고리 구조. 도중 **"오늘 카테고리 제품 하나씩 실제 등록 테스트"** 요청 → end-to-end 파이프라인 구축으로 전환. 사용자가 의자(시안 있음) 대신 **모니터 받침대**(시안 없음)로 진짜 자동 등록 검증 지시.
+
+**핵심 진척 [확정]** (※전부 **로컬·미배포**. honsalim.com은 #13 첫 글 유지):
+
+1. **카테고리 데이터 모델** (O16): `categories`·`category_products` 테이블(migration 002~005) + `products` 정가/할인 컬럼 + products_store 저장 정합. seed=의자·책상·모니터. **렌더러가 DB 읽음**.
+2. **카테고리 수집·정제·2티어** (O20): `collector/category_collect.py`+`category_sources.yml`. product_filter 관련성·부풀린할인 차단. 모니터 60→41·책상 59→28 정제.
+3. **글 자동 생성** (O17): `enricher/category_page_builder.build_and_save` — 가이드8요소·추천6선(+타입)·FAQ·제품명비교표 JSON → disclosure → **SEO+진실성 통합게이트 통과까지 재생성**(상한2, 1인칭 fail 자동 재생성=자가복원) → 저장. 추천6선=AI 큐레이션(점수 금지). 비교표 확인불가="—".
+4. **사무용 의자 구성 표준** (O18, 사용자): 공정위고지·타입선택기·신뢰박스2·**배너형 개념이미지**·타입표·체크리스트2열·추천2티어·한눈비교표·FAQ·전체카탈로그·**연관카테고리 크로스링크**. `category.html`·`categories_index.html`+`category.css`(.catpage 스코프).
+5. **개념 이미지** (O19, 사용자): Imagen 4 Fast(AutoBlog 이식·REST·$0.02). ★**이미지엔 텍스트 없이 + 문구·CTA는 CSS 오버레이**(AI 한글 깨짐 방지·**SEO 노출**·수정 용이). webp(Pillow ~37KB). `GOOGLE.env`.
+6. **CLI + 정형화 입증** (O20): `collect-category`·`build-category`. **책상 2명령 자동완성**(collect 59→28 → build 글+이미지+게이트 자동, 모니터와 동일 구조) — 정형화 라이브 입증.
+7. **회귀 553→569** (+16). black·ruff·mypy 클린. 비용 ~$0.6.
+
+**무인·안전/진실성(§0)**: 가짜 점수·평점 금지(추천=큐레이션) / 비교표 확인불가="—"(없는 스펙 금지) / 1인칭 fail 자동 재생성 / 부풀린할인 차단 / 이미지 텍스트 없이(SEO·정직) / 전부 로컬(배포 승인 후). **근본수정**: products_store 정가/할인 저장 · test fixture=마이그레이션 단일소스 · 전역 `.chk` 충돌(클래스 분리) · Jinja `group.items`/`c.values` 메서드 함정(키명 변경).
+
+**잔존 미해결 (#18)**: ①**운영자 검토·1클릭 승인 게이트**(§2-마·E7 — 현재 build-category가 published 바로 전이) ②**배포**([6][7], build/site 갱신) ③doctor 보강(category 모듈) ④나머지 카테고리(모니터암 신규·의자 글생성) ⑤(이월) /go/·알리 whitelist·main-protect.
+
+**다음 세션 할 일**: 1) **운영자 승인 게이트**(published→pending+1클릭 승인) 2) **배포**(build/site 갱신→honsalim.com) 3) doctor 보강·나머지 카테고리. ★워크트리 실행=`PYTHONPATH=src python -m cli`(honsalim 명령은 메인 가리킴).
+
+---
 
 ### 세션 #15–16 — 2026-05-31 (Opus 4.8 1M, ★SEO 자동 최적화 엔진 + 전체제품 카탈로그 + ★디자인 大전환(우드톤→흰바탕 노써치) 1단계, 회귀 472→553)
 
@@ -128,44 +151,3 @@
 - **워크트리 브랜치 main 병합·push 필요**(ff 가능, main #11 미이동).
 
 **다음 세션 할 일**: 1) 게시 경로 배선(promote CLI+상세글 렌더)→첫 글 게시 2) 시나리오 3종 튜닝 3) (자투리) 알리 whitelist·main-protect 재활성화
-
----
-
-### 세션 #11 — 2026-05-29~30 (Opus 4.8 1M, 디자인 시안→Jinja2 5종 + builder.renderer + SEO/JSON-LD + enrich 버그수정 + 알리 수집기 골격, 회귀 352→378)
-
-> ※ #10은 워크트리 6개·브랜치 6개 폐기 정리 커밋(2b260b2)만 — EVENTS 블록 미기재.
-
-**시작 상황**: `/honsalim-start` → 워크트리 stupefied-lichterman (origin/main=#10 `2b260b2` 분기, 0/0 동기). 회귀 352. "공개 사이트 5종 시안"이 ★시급.
-
-**핵심 진척 [확정]**:
-
-1. **Claude Design 핸드오프 → 시안 5종 확정 (DECISIONS G4)**: "클로드 코드 인계" URL → WebFetch 4MB gzip → `docs/design_drafts/honsalim/`. 확정 조합 **톤 우드 / 카드 그림자 / 밀도 미니멀** (사용자 승인). 토큰 DESIGN §3 일치.
-   - Jinja2 템플릿: `base·home·scenario_list·article·persona_hub·about·404` + `partials/{header,footer}` + `_macros/{components,meta}` / `static/css/{tokens,components,pages}` + `static/js/hub-filter.js`
-   - 미리보기 `scripts/preview_build.py`(목업 19페이지) → 사용자 확인. `docs/design_drafts/CHOICE.md` 기록.
-   - 정책 정정: About 이미지 "직접 촬영"→**"AI 생성+표기, 제품은 공식 위젯"**(L2). 운영자 "혼살다"·이메일·등록 진행 중(M2). 제휴링크 `rel="sponsored nofollow"`.
-
-2. **정식 빌더 `src/builder/renderer.py`**: DB(personas·scenarios seed)→정적 사이트, `honsalim build --full`. 9페이지(home·hub·persona 3·about·404·sitemap). 게시 article 0편 → 상세글 미렌더(콘텐츠 단계).
-
-3. **SEO 메타 + JSON-LD**: `_macros/meta.html`(OG·Twitter) + `jsonld.py` +3빌더(Breadcrumb·WebSite·Organization)+as_script_tags. base.html 연동.
-
-4. **enrich 버그 수정**: `cmd_enrich`가 scenarios에 없는 컬럼 `s.keywords` 조회 → OperationalError. 제거 + 실행 회귀 테스트 추가.
-
-5. **알리 수집기 골격 (DECISIONS D9)**: `collector.aliexpress` dry-run(서명 sha256 HMAC — 문서 4.5 예시 일치 검증, HTTP 0). 쿠팡 게이팅(사이트 완성 후 승인)으로 알리를 첫 상품 소스로 앞당김.
-
-6. **회귀 352→378 PASS**: renderer 9 + jsonld 구조화 4 + cli-enrich 1 + aliexpress 12. `test_renderer`·`test_aliexpress_collector` 신설.
-
-**알리 외부 작업 (사용자, 진행 중·미완)**:
-- honsalim.com 사이트 등록이 **"ali" 부분문자열 오탐**(hons**ali**m)으로 거부 → whitelist 문의(대기).
-- 기존 제휴 계정(dugi2020@naver.com) 사용(새 계정 실수 삭제). k-Content Hub(blogspot) 백업 등록.
-- Open Platform Affiliate API 개발자 신청(Affiliates Individual·Korea) → **승인** → App Console에서 **Affiliates API 앱 생성** → App Key/Secret 발급·ali.env 저장 → **라이브 검증 성공** ✅ (밀리초 timestamp·응답 파싱·상품 매핑 전 필드 정상, deeplink=`s.click.aliexpress` 제휴링크). **수집기 production-ready**.
-- **저장소 visibility 정정**: 네이버 작업 때 private로 바꿨던 것 발견 → **public 복구**(H1 일치) → CodeQL 그린. (공개 전환으로 push ruleset 꺼짐 → main-protect 재활성화 필요)
-
-**잔존 미해결 (다음 세션)**:
-- 상품 수집 CLI → products 적재 → 첫 글 enrich(API 비용)·검증·승인·발행
-- 빌더 잔여: 상세글 렌더·Pretendard self-host·critical CSS·feed.xml·robots.txt
-- honsalim.com 사이트 whitelist 승인 / main-protect 브랜치 보호 재활성화 / codeql-action 버전업
-
-**다음 세션 할 일**:
-1. 상품 수집 CLI(`collect-products`) → products 테이블 적재
-2. 상품↔시나리오 연결 → 첫 글 enrich·검증·승인·발행
-3. (자투리) main-protect 재활성화 · codeql-action 버전업 · 빌더 잔여

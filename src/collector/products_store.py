@@ -35,11 +35,12 @@ REQUIRED_FIELDS: tuple[str, ...] = (
 _UPSERT_SQL = """
 INSERT INTO products (
     source, source_product_id, name, category_path,
-    price_krw, price_checked_at, currency, image_url_external,
+    price_krw, original_price_krw, discount_pct, price_checked_at,
+    currency, image_url_external,
     deeplink_url, deeplink_slug, affiliate_tag, availability, last_seen_at
 ) VALUES (
     :source, :source_product_id, :name, :category_path,
-    :price_krw,
+    :price_krw, :original_price_krw, :discount_pct,
     CASE WHEN :price_krw IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END,
     :currency, :image_url_external,
     :deeplink_url, :deeplink_slug, :affiliate_tag, :availability, CURRENT_TIMESTAMP
@@ -48,6 +49,8 @@ ON CONFLICT(source, source_product_id) DO UPDATE SET
     name               = excluded.name,
     category_path      = excluded.category_path,
     price_krw          = excluded.price_krw,
+    original_price_krw = excluded.original_price_krw,
+    discount_pct       = excluded.discount_pct,
     price_checked_at   = CASE
                             WHEN excluded.price_krw IS NOT NULL THEN CURRENT_TIMESTAMP
                             ELSE products.price_checked_at END,
@@ -100,6 +103,8 @@ def upsert_products(conn: sqlite3.Connection, rows: Iterable[dict[str, Any]]) ->
             "name": row["name"],
             "category_path": row.get("category_path"),
             "price_krw": row.get("price_krw"),
+            "original_price_krw": row.get("original_price_krw"),
+            "discount_pct": row.get("discount_pct"),
             "currency": row.get("currency") or "KRW",
             "image_url_external": row.get("image_url_external"),
             "deeplink_url": row["deeplink_url"],

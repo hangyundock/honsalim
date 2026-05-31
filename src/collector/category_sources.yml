@@ -1,0 +1,39 @@
+# category_sources.yml — 카테고리별 제품 수집 정의 (세션 #17)
+#
+# 소비: collector.category_collect (카테고리 단위 수집·정제·티어 분류·연결).
+# search_keywords.yml(시나리오·번들용)과 분리 — 이쪽은 "카테고리 1품목"을 실속/고급 2티어로 수집.
+#
+# ★ 운영자 검토·수정 대상 (§2-마 인간 편집 게이트).
+#   라이브 수집 실측으로 검색어·밴드·제외어를 다듬는다 (#16 교훈: 책상 185개 중 114개 오염 → 정제).
+#
+# 항목:
+#   require_any   : 상품명에 적어도 하나는 포함해야 하는 카테고리 핵심어(관련성 1차).
+#   exclude_terms : 하나라도 포함하면 제외(액세서리·타카테고리 오염 차단).
+#   tiers.budget  : 💰 실속형 — 가볍게 시작. 검색어 + 가격 밴드(KRW).
+#   tiers.premium : ⭐ 고급형 — 오래 쓸 본격. (1인가구엔 과한 3티어 프리미엄은 두지 않음, CATEGORY_PAGE §2-7)
+#   * 밴드(min/max)는 검색 단계에서 1차 필터 + 라이브 검증으로 카테고리별 적정대 조정.
+
+categories:
+  office-chair:
+    require_any: [의자]
+    exclude_terms: [차량, 자동차, 커버, 방석, 발받침, 발 받침, 바퀴, 부품, 인형, 미니어처, 다리, 후크, 보호, 캐스터, 헤드레스트, 쿠션만]
+    tiers:
+      budget:  {q: "office chair",           min: 40000,  max: 100000}
+      premium: {q: "ergonomic office chair", min: 100000, max: 250000}
+
+  desk:
+    require_any: [책상, 데스크]
+    exclude_terms: [스탠드, 홀더, 컵, 송풍기, 진공, 청소기, 클램프, 선풍기, 차량, 자동차, 트레이, 받침, 라이저, 의자, 매트, 마우스, 키보드, 정리함, 충전, 카메라, 거치대, 브래킷, 조명, 스피커, 가방, 인형, 미니어처, 지지대, 모니터암]
+    tiers:
+      budget:  {q: "small computer desk", min: 30000,  max: 100000}
+      premium: {q: "computer desk",       min: 100000, max: 300000}
+
+  # 모니터 받침대 — 세션 #17 첫 자동 등록 테스트 카테고리(시안 없음).
+  # 알리 소싱 양호(소형 액세서리, #12). 모니터 '본체'·'암(벽걸이/클램프)'·청소용품은 제외 대상.
+  # exclude_terms는 라이브 1차 수집 실측으로 다듬는다(#16 교훈).
+  monitor-stand:
+    require_any: [모니터]
+    exclude_terms: [청소, 필름, 보호필름, 케이블, 차량, 자동차, 거울, 카메라, 후드, 벽걸이, 암 거치대, 노트북, 키보드, 마우스, 가방, 인형, 미니어처, 스피커, 조명, 보안, 프라이버시]
+    tiers:
+      budget:  {q: "monitor riser stand",           min: 5000,  max: 25000}
+      premium: {q: "monitor stand storage drawer",  min: 25000, max: 80000}

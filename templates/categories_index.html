@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}카테고리 | 혼살림{% endblock %}
+
+{% block head_extra %}
+  <link rel="stylesheet" href="{{ asset_base | default('/static') }}/css/category.css">
+{% endblock %}
+
+{% block main %}
+<div class="wrap catindex">
+  <div class="eyebrow">카테고리</div>
+  <h1>제품 카테고리</h1>
+  <p class="sub">1인 가구·홈오피스 품목을 카테고리별로 비교하고 골라보세요. 새 카테고리는 검증을 거쳐 차례로 공개합니다.</p>
+
+  {% for group in groups %}
+  <div class="grp">{{ group.name }}</div>
+  <div class="grid">
+    {% for c in group.cards %}
+      {% if c.available %}
+      <a class="ccard" href="{{ c.url }}">
+        <div class="cn">{{ c.name }}</div>
+        <div class="ci">{{ c.intro }}</div>
+        <div class="cmeta">제품 {{ c.count }}개 보기 →</div>
+      </a>
+      {% else %}
+      <div class="ccard">
+        <div class="cn">{{ c.name }}<span class="soon-badge">준비 중</span></div>
+        <div class="ci">{{ c.intro }}</div>
+        <div class="cmeta">곧 공개합니다</div>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

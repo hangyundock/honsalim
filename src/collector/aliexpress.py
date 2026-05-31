@@ -156,7 +156,8 @@ def map_product(item: dict[str, Any], tracking_id: str) -> dict[str, Any]:
         "name": g("product_title", "productTitle", default=""),
         "category_path": g("second_level_category_name", "first_level_category_name", default=None),
         "price_krw": sale_krw,
-        # 정가·할인율 — DECISIONS O③ 신뢰 신호. DB 컬럼은 추후(현재 in-memory 렌더용). upsert는 무시.
+        # 정가·할인율 — DECISIONS O③ 신뢰 신호. products 컬럼에 영속화(세션 #17, products_store upsert).
+        # 부풀린 할인(>70%) 차단은 표시 단계에서 product_filter.trusted_discount로 적용(원본 보존).
         "original_price_krw": orig_krw,
         "discount_pct": discount_pct,
         "currency": g("target_sale_price_currency", default="KRW"),

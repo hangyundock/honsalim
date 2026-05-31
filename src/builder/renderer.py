@@ -14,6 +14,7 @@ SQLite DB(personas·scenarios·articles)를 읽어 공개 사이트를 생성한
 
 from __future__ import annotations
 
+import json
 import shutil
 import sqlite3
 import statistics
@@ -22,6 +23,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from builder import jsonld
+from collector import product_filter
 from common import db
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -278,6 +280,177 @@ def _load_article_pages(conn: sqlite3.Connection) -> list[dict]:
     return pages
 
 
+CATEGORY_CATALOG_SQL = """
+    SELECT p.name, p.price_krw, p.original_price_krw, p.discount_pct,
+           p.image_url_external, p.deeplink_slug, cp.tier, cp.display_order
+    FROM category_products cp
+    JOIN products p ON p.id = cp.product_id
+    WHERE cp.category_id = ?
+    ORDER BY CASE cp.tier WHEN 'budget' THEN 0 WHEN 'premium' THEN 1 ELSE 2 END,
+             cp.display_order, p.id
+"""
+
+_TIER_LABEL = {"budget": "💰 실속", "premium": "⭐ 고급"}
+
+
+def _catalog_item(row: sqlite3.Row) -> dict:
+    """category_products⋈products 행 → 카탈로그 카드 컨텍스트.
+
+    부풀린 할인(>70%)·정가 없는 경우는 product_filter.trusted_discount가 걸러 '단일가'로
+    표시(정가·할인율 미노출 — 공정위 가격표시 정확성, §0). 가짜 점수·평점은 두지 않는다.
+    """
+    disc = product_filter.trusted_discount(row["discount_pct"])
+    orig = row["original_price_krw"]
+    show = disc is not None and bool(orig)
+    tier = row["tier"] or "budget"
+    return {
+        "tier": tier,
+        "tier_label": _TIER_LABEL.get(tier, "💰 실속"),
+        "name": row["name"],
+        "price": _price_krw(row["price_krw"]),
+        "orig": _price_krw(orig) if show else "",
+        "disc": f"{disc}%" if show else "",
+        "img_url": row["image_url_external"] or "",
+        "url": f"/go/{row['deeplink_slug']}",
+        "slug": row["deeplink_slug"],
+    }
+
+
+CATEGORY_PICKS_SQL = """
+    SELECT p.name, p.price_krw, p.original_price_krw, p.discount_pct,
+           p.image_url_external, p.deeplink_slug, cp.tier,
+           cp.pros_json, cp.cons_json, cp.pick_reason, cp.pick_type, cp.display_order
+    FROM category_products cp
+    JOIN products p ON p.id = cp.product_id
+    WHERE cp.category_id = ? AND cp.is_featured = 1
+    ORDER BY CASE cp.tier WHEN 'budget' THEN 0 WHEN 'premium' THEN 1 ELSE 2 END,
+             cp.display_order, p.id
+"""
+
+
+def _pick_item(row: sqlite3.Row) -> dict:
+    """추천 6선 카드 컨텍스트 = 카탈로그 카드 + 장점·단점·추천대상·타입."""
+    item = _catalog_item(row)
+    item["pros"] = json.loads(row["pros_json"]) if row["pros_json"] else []
+    item["cons"] = json.loads(row["cons_json"]) if row["cons_json"] else []
+    item["reason"] = row["pick_reason"] or ""
+    item["type"] = row["pick_type"] or ""
+    return item
+
+
+def _load_category_pages(conn: sqlite3.Connection) -> list[dict]:
+    """제품이 연결된 카테고리만 → 카테고리 페이지 컨텍스트.
+
+    가이드 본문(guide_html)·추천 6선(is_featured)·FAQ가 있으면 포함, 없으면 카탈로그만('준비 중').
+    연결 제품 0인 카테고리(미수집)는 빈 페이지 방지를 위해 렌더하지 않음.
+    """
+    cats = conn.execute(
+        "SELECT id, slug, name_ko, intro, group_slug, guide_title, content_json, faq_json, "
+        "concept_image, concept_image_alt "
+        "FROM categories ORDER BY display_order, id"
+    ).fetchall()
+    pages: list[dict] = []
+    for c in cats:
+        prods = conn.execute(CATEGORY_CATALOG_SQL, (c["id"],)).fetchall()
+        if not prods:
+            continue
+        picks = [_pick_item(r) for r in conn.execute(CATEGORY_PICKS_SQL, (c["id"],)).fetchall()]
+        faq = json.loads(c["faq_json"]) if c["faq_json"] else []
+        content = json.loads(c["content_json"]) if c["content_json"] else {}
+        has_guide = bool(content.get("lead"))
+
+        # 한눈 비교표: cells의 slug → 추천 6선 헤더(이름·타입·가격) 매핑
+        pick_map = {p["slug"]: p for p in picks}
+        raw_compare = content.get("compare") or {}
+        cols: list[dict] = []
+        for cell in raw_compare.get("cells") or []:
+            p = pick_map.get(cell.get("slug"))
+            if p:
+                cols.append(
+                    {
+                        "name": p["name"],
+                        "type": p.get("type", ""),
+                        "tier": p["tier"],
+                        "price": p["price"],
+                        # 키 이름 'vals' — Jinja에서 c.values는 dict.values 메서드로 해석되는 함정 회피
+                        "vals": cell.get("values", []),
+                    }
+                )
+        compare = {"rows": raw_compare.get("rows") or [], "cols": cols}
+
+        # 같은 그룹의 다른 카테고리 — 하단 크로스링크 배너(연관 추천·내부링크·SEO)
+        related = [
+            {
+                "name": r["name_ko"],
+                "intro": r["intro"] or "",
+                "url": f"/categories/{r['slug']}/",
+                "available": r["pc"] > 0,  # 연결 제품 있으면 클릭, 없으면 '준비 중'
+            }
+            for r in conn.execute(
+                "SELECT slug, name_ko, intro, "
+                "(SELECT COUNT(*) FROM category_products WHERE category_id = categories.id) AS pc "
+                "FROM categories WHERE group_slug = ? AND id != ? ORDER BY display_order, id",
+                (c["group_slug"], c["id"]),
+            ).fetchall()
+        ]
+
+        pages.append(
+            {
+                "slug": c["slug"],
+                "category": {
+                    "name": c["name_ko"],
+                    "intro": c["intro"] or "",
+                    "guide_title": c["guide_title"] or "",
+                    "has_guide": has_guide,
+                    "lead": content.get("lead", ""),
+                    "guide_intro": content.get("guide_intro", ""),
+                    "type_table": content.get("type_table", []),
+                    "checkpoints": content.get("checkpoints", []),
+                    "mistakes": content.get("mistakes", ""),
+                    "faq": faq,
+                    "concept_image": c["concept_image"] or "",
+                    "concept_image_alt": c["concept_image_alt"] or "",
+                },
+                "products": [_catalog_item(r) for r in prods],
+                "picks_budget": [p for p in picks if p["tier"] == "budget"],
+                "picks_premium": [p for p in picks if p["tier"] == "premium"],
+                "has_picks": bool(picks),
+                "compare": compare,
+                "has_compare": bool(compare["rows"] and compare["cols"]),
+                "related": related,
+            }
+        )
+    return pages
+
+
+def _load_categories_index(conn: sqlite3.Connection) -> list[dict]:
+    """카테고리 인덱스 — 그룹별 카드 목록. available = 연결 제품 ≥ 1."""
+    rows = conn.execute(
+        "SELECT id, slug, name_ko, intro, group_name_ko FROM categories ORDER BY display_order, id"
+    ).fetchall()
+    groups: list[dict] = []
+    for c in rows:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM category_products WHERE category_id = ?", (c["id"],)
+        ).fetchone()[0]
+        item = {
+            "slug": c["slug"],
+            "name": c["name_ko"],
+            "intro": c["intro"] or "",
+            "count": count,
+            "available": count > 0,
+            "url": f"/categories/{c['slug']}/",
+        }
+        gname = c["group_name_ko"] or "기타"
+        grp = next((g for g in groups if g["name"] == gname), None)
+        if grp is None:
+            # 키 이름은 'cards' — Jinja에서 group.items는 dict.items 메서드로 해석되는 함정 회피
+            grp = {"name": gname, "cards": []}
+            groups.append(grp)
+        grp["cards"].append(item)
+    return groups
+
+
 def _sitemap(urls: list[str]) -> str:
     items = "\n".join(f"  <url><loc>{SITE_ORIGIN}{u}</loc></url>" for u in urls)
     return (
@@ -295,6 +468,8 @@ def render_site(out_dir: Path = DEFAULT_OUT, db_path: Path = db.DB_PATH) -> dict
         scenarios = _load_scenarios(conn)
         personas = _load_personas(conn)
         article_pages = _load_article_pages(conn)
+        category_pages = _load_category_pages(conn)
+        category_groups = _load_categories_index(conn)
     finally:
         conn.close()
 
@@ -449,9 +624,70 @@ def render_site(out_dir: Path = DEFAULT_OUT, db_path: Path = db.DB_PATH) -> dict
         )
     article_slugs = [pg["slug"] for pg in article_pages]
 
+    # 카테고리 인덱스 (/categories/) — 그룹별 카드, 미수집 카테고리는 '준비 중'
+    w(
+        "categories/index.html",
+        env.get_template("categories_index.html").render(
+            active_nav="category",
+            canonical_url=f"{SITE_ORIGIN}/categories/",
+            meta_title="카테고리 | 혼살림",
+            meta_description="1인 가구·홈오피스 품목을 카테고리별로 비교하고 골라보세요.",
+            schema_jsonld=jsonld.as_script_tags(
+                [
+                    jsonld.build_breadcrumb_jsonld(
+                        [{"name": "홈", "url": "/"}, {"name": "카테고리"}], SITE_ORIGIN
+                    ),
+                    org_ld,
+                ]
+            ),
+            groups=category_groups,
+            **common,
+        ),
+    )
+
+    # 카테고리 상세 (/categories/<slug>/) — 전체 제품 카탈로그 (점수 없음)
+    cat_tmpl = env.get_template("category.html")
+    for pg in category_pages:
+        cslug = pg["slug"]
+        cname = pg["category"]["name"]
+        w(
+            f"categories/{cslug}/index.html",
+            cat_tmpl.render(
+                active_nav="category",
+                canonical_url=f"{SITE_ORIGIN}/categories/{cslug}/",
+                meta_title=f"{cname} 전체 제품 | 혼살림",
+                meta_description=pg["category"]["intro"]
+                or f"{cname} 전체 제품을 가격·할인·티어로 비교하세요.",
+                schema_jsonld=jsonld.as_script_tags(
+                    [
+                        jsonld.build_breadcrumb_jsonld(
+                            [
+                                {"name": "홈", "url": "/"},
+                                {"name": "카테고리", "url": "/categories/"},
+                                {"name": cname},
+                            ],
+                            SITE_ORIGIN,
+                        ),
+                        org_ld,
+                    ]
+                ),
+                category=pg["category"],
+                products=pg["products"],
+                picks_budget=pg["picks_budget"],
+                picks_premium=pg["picks_premium"],
+                has_picks=pg["has_picks"],
+                compare=pg["compare"],
+                has_compare=pg["has_compare"],
+                related=pg["related"],
+                **common,
+            ),
+        )
+    category_slugs = [pg["slug"] for pg in category_pages]
+
     # sitemap.xml
     urls = (
-        ["/", "/scenarios/", "/about/"]
+        ["/", "/scenarios/", "/about/", "/categories/"]
+        + [f"/categories/{slug}/" for slug in category_slugs]
         + [f"/personas/{p['id']}/" for p in personas]
         + [f"/articles/{slug}/" for slug in article_slugs]
     )
@@ -469,6 +705,7 @@ def render_site(out_dir: Path = DEFAULT_OUT, db_path: Path = db.DB_PATH) -> dict
         "pages": len(written),
         "scenarios": len(scenarios),
         "personas": len(personas),
+        "categories": len(category_slugs),
         "articles_published": len(article_slugs),
         "written": written,
     }

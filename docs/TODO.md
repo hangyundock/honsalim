@@ -3,16 +3,16 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 시급 (다음 세션 #17) — #15–16 갱신 · 진행 순서 = 디자인(1단계 완료)→카테고리→제품 (DECISIONS O15)
+## ★ 시급 (다음 세션 #18) — #17 갱신 · 카테고리 파이프라인·정형화 완성 → 무인 운영 마무리 (DECISIONS O16~O20)
 
-> #15–16: ★SEO 자동 최적화 엔진(게이트·네이버 리서치·yml·directive·재생성) + 모델 Sonnet + 전체제품 카탈로그(점수 없음) + product_filter + **디자인 大전환 1단계**(우드톤→흰 바탕 NanumSquare Neo, tokens 교체). 회귀 553. **전부 로컬·미배포.** (DECISIONS O10~O15)
+> #17: 카테고리 자동 등록 파이프라인(DB migration 002~005·`category_collect` 수집·`category_page_builder` 글생성+SEO/진실성 통합게이트+개념이미지 Imagen·CLI `collect-category`/`build-category`) + 사무용 의자 구성 표준 + **정형화 입증**(책상 2명령 자동완성). 회귀 569. **전부 로컬·미배포.**
 
-- [x] ~~SEO 엔진·키워드 리서치·seo_keywords.yml(office-chair·desk)·Sonnet 전환·비용 가드·전체제품 카탈로그 시안+표준·product_filter·디자인 토대 이식(1단계)~~ ✅ #15–16
-- [ ] **★2단계 — 카테고리 구조**: 카테고리 인덱스(`/categories/`)+라우트 + **홈 콘텐츠 카테고리화**(현재 페르소나 구조, 디자인만 새것) + 네비 `카테고리`·`구매가이드` 링크 배선.
-- [ ] **★3단계 — 제품 렌더(완결)**: 카테고리 페이지(가이드+비교카드+전체제품)를 **렌더러 `builder/renderer.py`에 이식** + **DB 영속화**(`products`에 `original_price_krw`·`discount_pct` 컬럼 + 수집 저장 — 렌더러는 DB 읽음). 책상으로 build/preview 완결→확인.
-- [ ] **배포**(승인 후): 새 디자인+카테고리 → build/site → honsalim.com (방법A).
-- [ ] **★/go/ 제휴 링크 작동**(D1 slug_map 쓰기 + go_gateway Worker 배포) — 수익 직결.
-- [ ] (확인) 알리 이미지·whitelist 답변 · main-protect 재활성화 · 용어 배포 반영.
+- [x] ~~카테고리 DB·수집·글생성·통합게이트·렌더 이식·개념이미지(Imagen)·CLI·정형화 입증(책상)~~ ✅ #17
+- [ ] **★운영자 검토·1클릭 승인 게이트** (§2-마·E7): `build-category`가 현재 `published` 바로 전이 → `pending` 상태 + 대시보드 미리보기 → 사용자 1클릭 승인 게이트 삽입 (AI 자동승인 금지).
+- [ ] **★배포** ([6]→[7], 승인 후): 카테고리(모니터·책상) → renderer `build/site` 갱신 → honsalim.com (방법A). 현 build/site는 #13 옛 사이트.
+- [ ] **doctor 보강**: §10 진입점에 `category_collect`·`category_page_builder`·`concept_image` 추가.
+- [ ] **나머지 카테고리**: 모니터암 등 신규(category_sources·seo_keywords·seed 등록 후 2명령) · 의자 `build-category office-chair`(현재 카탈로그만).
+- [ ] (이월) **★/go/ 제휴 링크 작동**(D1 slug_map·go_gateway, 수익직결) · 알리 whitelist 답변 · main-protect 재활성화.
 
 ## 알리 통합 (D9)
 

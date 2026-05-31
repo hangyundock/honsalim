@@ -980,6 +980,99 @@ def cmd_collect_products(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_collect_category(args: argparse.Namespace) -> int:
+    """카테고리 단위 제품 수집·정제·2티어 분류·연결 (세션 #17). 기본 dry_run.
+
+    category_sources.yml의 카테고리 정의(검색어·밴드·필터)로 AliExpress 수집 →
+    product_filter 정제 → category_products 연결. --no-dry-run은 쿼터 소모(§2-라 승인 후).
+    """
+    import sqlite3
+
+    from collector import category_collect
+
+    conn = db.connect(db.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        res = category_collect.collect_category(
+            conn, args.slug, dry_run=args.dry_run, page_size=args.page_size
+        )
+    except (KeyError, ValueError) as e:
+        print(f"{FAIL} {e}")
+        return 2
+    finally:
+        conn.close()
+
+    mode = "dry_run" if args.dry_run else "live"
+    print(f"{OK} collect-category {args.slug!r} ({mode})")
+    for tname, term in res.terms:
+        print(f"     [{tname}] q={term.q!r} band={term.min_price}~{term.max_price} KRW")
+    if args.dry_run:
+        print("     [DRY] 실제 호출·DB 쓰기 없음 — 라이브 수집은 --no-dry-run")
+    else:
+        print(f"{OK} 수신 {res.received} · 정제 {res.relevant} · 연결 {res.linked}")
+        for tn, st in res.per_tier.items():
+            print(f"     [{tn}] received={st['received']} relevant={st['relevant']}")
+    return 0
+
+
+def cmd_build_category(args: argparse.Namespace) -> int:
+    """카테고리 콘텐츠(가이드·추천6선·FAQ·비교표·개념이미지) 생성·게이트·저장 (세션 #17).
+
+    기본 dry_run. --no-dry-run은 Claude(글)+Imagen(이미지) 비용. SEO+진실성 게이트
+    통과까지 재생성(상한 --max-attempts) 후 저장. 게이트 미통과 시 저장 안 함(가시화).
+    """
+    import os
+    import sqlite3
+
+    from enricher.category_page_builder import build_and_save
+    from enricher.claude_client import ClaudeClient
+
+    if not args.dry_run:
+        config.load_secrets()
+    client = ClaudeClient(api_key=os.environ.get("ANTHROPIC_API_KEY", "") or "dry-run")
+    conn = db.connect(db.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        res = build_and_save(
+            conn,
+            args.slug,
+            client,
+            dry_run=args.dry_run,
+            generate_image=not args.no_image,
+            max_attempts=args.max_attempts,
+        )
+    except (KeyError, ValueError) as e:
+        print(f"{FAIL} {e}")
+        return 2
+    finally:
+        conn.close()
+
+    if args.dry_run:
+        print(
+            f"{OK} build-category {args.slug!r} (dry_run) — "
+            f"제품 {res['products']} · 프롬프트 {res['prompt_len']}자"
+        )
+        print("     [DRY] 실제 생성·DB 쓰기 없음 — 라이브는 --no-dry-run (Claude+Imagen 비용)")
+        return 0
+
+    print(f"{OK} build-category {args.slug!r}: {res['title']}")
+    print(
+        f"     추천 {res['picks']} · 타입표 {res['type_table']} · 체크 {res['checkpoints']} · "
+        f"비교 {res['compare_rows']}항목 · FAQ {res['faq']}"
+    )
+    print(
+        f"     게이트(truth·disclosure·links)={res['overall_pass']} · "
+        f"SEO={res['seo_passed']}(밀도 {res['seo_density']}%) · 저장={res.get('saved')}"
+    )
+    if res.get("concept_image"):
+        print(f"     개념 이미지: {res['concept_image']}")
+    if res.get("concept_image_error"):
+        print(f"     {WARN} 이미지 실패: {res['concept_image_error']}")
+    if not res.get("saved"):
+        print(f"     {WARN} 게이트 미통과 — 저장 안 됨(인간 검토 필요): {res['gates']}")
+    return 0
+
+
 def cmd_unapprove(args: argparse.Namespace) -> int:
     """approved draft → validated 회귀. BACKEND §9 [확정]."""
     from writer import state_machine
@@ -1249,6 +1342,37 @@ def build_parser() -> argparse.ArgumentParser:
         help="실제 API 호출 + DB 적재 (쿼터 소모·외부 영향 — 명시 승인 후)",
     )
     p_collect_products.set_defaults(func=cmd_collect_products, dry_run=True)
+
+    # 카테고리 단위 수집 (세션 #17)
+    p_collect_cat = sub.add_parser(
+        "collect-category", help="카테고리 제품 수집·정제·2티어 연결 (기본 dry_run)"
+    )
+    p_collect_cat.add_argument("slug", type=str, help="categories.slug (예: office-chair, desk)")
+    p_collect_cat.add_argument("--page-size", type=int, default=30, help="티어당 조회 수 (기본 30)")
+    p_collect_cat.add_argument(
+        "--no-dry-run",
+        dest="dry_run",
+        action="store_false",
+        help="실제 API 호출 + DB 연결 (쿼터 소모 — 명시 승인 후)",
+    )
+    p_collect_cat.set_defaults(func=cmd_collect_category, dry_run=True)
+
+    # 카테고리 콘텐츠·이미지 생성 (세션 #17)
+    p_build_cat = sub.add_parser(
+        "build-category", help="카테고리 가이드·추천6선·FAQ·비교표·개념이미지 생성 (기본 dry_run)"
+    )
+    p_build_cat.add_argument("slug", type=str, help="categories.slug")
+    p_build_cat.add_argument(
+        "--no-dry-run",
+        dest="dry_run",
+        action="store_false",
+        help="실제 생성 (Claude 글 + Imagen 이미지 비용 — 명시 승인 후)",
+    )
+    p_build_cat.add_argument("--no-image", action="store_true", help="개념 이미지 생성 생략 (글만)")
+    p_build_cat.add_argument(
+        "--max-attempts", type=int, default=2, help="SEO+게이트 통과 재생성 상한 (기본 2)"
+    )
+    p_build_cat.set_defaults(func=cmd_build_category, dry_run=True)
 
     p_unapprove = sub.add_parser("unapprove", help="approved draft → validated 회귀")
     p_unapprove.add_argument("--draft", type=int, required=True, help="draft id")
