@@ -14,12 +14,14 @@
     {% if p.img_url %}<img loading="lazy" src="{{ p.img_url }}" alt="{{ p.name }}">{% endif %}
   </a>
   <div class="tnm">{{ p.name }}</div>
-  <div class="tprice">{{ p.price }}</div>
-  {% if p.disc %}<span class="tsig">정가 <s>{{ p.orig }}</s> · <b class="off">{{ p.disc }}↓</b></span>{% endif %}
-  <ul class="tpc">
-    {% for x in p.pros %}<li class="pro">{{ x }}</li>{% endfor %}
-    {% for x in p.cons %}<li class="con">{{ x }}</li>{% endfor %}
-  </ul>
+  <div class="tpriceline">
+    <span class="tprice">{{ p.price }}</span>
+    {% if p.disc %}<span class="tsig">정가 <s>{{ p.orig }}</s> · <b class="off">{{ p.disc }}↓</b></span>{% endif %}
+  </div>
+  {% if p.pros %}<div class="pc-group"><div class="pc-label pros">장점</div>
+    <ul class="tpc">{% for x in p.pros %}<li class="pro">{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+  {% if p.cons %}<div class="pc-group"><div class="pc-label cons">단점</div>
+    <ul class="tpc">{% for x in p.cons %}<li class="con">{{ x }}</li>{% endfor %}</ul></div>{% endif %}
   {% if p.reason %}<div class="tfor"><b>추천 대상</b> · {{ p.reason }}</div>{% endif %}
   <div class="tbtns"><a class="btn primary" href="{{ p.url }}" rel="sponsored nofollow">최저가/구매 →</a></div>
 </div>
@@ -146,7 +148,7 @@
   <div class="sub-h">자주 묻는 질문</div>
   <div class="faq">
     {% for f in category.faq %}
-    <details{% if loop.first %} open{% endif %}><summary>{{ f.q }}</summary><p>{{ f.a }}</p></details>
+    <details open><summary>{{ f.q }}</summary><p>{{ f.a }}</p></details>
     {% endfor %}
   </div>
   {% endif %}

@@ -185,6 +185,26 @@ class TestPhase2Commands:
         with raises(SystemExit):
             parser.parse_args(["approve"])
 
+    # approve-category / unapprove-category (세션 #18 — 카테고리 공개 승인 게이트)
+    def test_approve_category_subcommand_recognized(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["approve-category", "office-chair"])
+        assert args.command == "approve-category"
+        assert args.slug == "office-chair"
+        assert args.func == cli.cmd_approve_category
+
+    def test_approve_category_requires_slug(self) -> None:
+        parser = cli.build_parser()
+        with raises(SystemExit):
+            parser.parse_args(["approve-category"])
+
+    def test_unapprove_category_subcommand_recognized(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(["unapprove-category", "desk"])
+        assert args.command == "unapprove-category"
+        assert args.slug == "desk"
+        assert args.func == cli.cmd_unapprove_category
+
     # collect (positional arg)
     def test_collect_subcommand_recognized(self) -> None:
         parser = cli.build_parser()

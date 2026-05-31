@@ -14,13 +14,16 @@ SQLite DB(personas·scenarios·articles)를 읽어 공개 사이트를 생성한
 
 from __future__ import annotations
 
+import html
 import json
+import re
 import shutil
 import sqlite3
 import statistics
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from markupsafe import Markup
 
 from builder import jsonld
 from collector import product_filter
@@ -338,16 +341,46 @@ def _pick_item(row: sqlite3.Row) -> dict:
     return item
 
 
-def _load_category_pages(conn: sqlite3.Connection) -> list[dict]:
+_MD_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
+
+
+def _md_inline(text: str) -> Markup:
+    """카테고리 산문의 인라인 마크다운(**볼드**)을 안전한 HTML로 변환 (세션 #18).
+
+    AI가 생성한 lead·가이드 산문에 남는 raw `**`가 화면에 노출되는 것을 방지한다.
+    XSS 방지: 먼저 전체 escape 후 `**` 패턴만 <strong>으로 치환(AI 산문 신뢰 한정).
+    Markup 반환 → Jinja autoescape에서 이중 escape 없이 그대로 출력.
+    """
+    if not text:
+        return Markup("")
+    # html.escape를 먼저 적용했으므로 ** 치환 결과는 안전 — S704는 의도된 사용
+    return Markup(_MD_BOLD_RE.sub(r"<strong>\1</strong>", html.escape(text)))  # noqa: S704
+
+
+_CIRCLED_RE = re.compile(r"(?=[②③④⑤⑥⑦⑧⑨⑩])")
+
+
+def _md_mistakes(text: str) -> Markup:
+    """흔한 실수 — ①②③ 번호 항목을 단락으로 분리(② 이후 항목 앞에 빈 줄). 세션 #18."""
+    if not text:
+        return Markup("")
+    # _md_inline이 이미 escape한 안전 HTML에 <br>만 추가 — S704는 의도된 사용
+    return Markup(_CIRCLED_RE.sub("<br><br>", str(_md_inline(text))))  # noqa: S704
+
+
+def _load_category_pages(conn: sqlite3.Connection, include_drafts: bool = False) -> list[dict]:
     """제품이 연결된 카테고리만 → 카테고리 페이지 컨텍스트.
 
     가이드 본문(guide_html)·추천 6선(is_featured)·FAQ가 있으면 포함, 없으면 카탈로그만('준비 중').
     연결 제품 0인 카테고리(미수집)는 빈 페이지 방지를 위해 렌더하지 않음.
+    include_drafts=True는 미리보기(검토)용 — draft도 렌더(§2-마). 기본(공개 배포)은 published만.
     """
+    # include_drafts=1이면 (1 OR ...)로 전체, 0이면 published만 — 파라미터 바인딩(안전)
     cats = conn.execute(
         "SELECT id, slug, name_ko, intro, group_slug, guide_title, content_json, faq_json, "
         "concept_image, concept_image_alt "
-        "FROM categories ORDER BY display_order, id"
+        "FROM categories WHERE (? OR status = 'published') ORDER BY display_order, id",
+        (1 if include_drafts else 0,),
     ).fetchall()
     pages: list[dict] = []
     for c in cats:
@@ -389,8 +422,9 @@ def _load_category_pages(conn: sqlite3.Connection) -> list[dict]:
             for r in conn.execute(
                 "SELECT slug, name_ko, intro, "
                 "(SELECT COUNT(*) FROM category_products WHERE category_id = categories.id) AS pc "
-                "FROM categories WHERE group_slug = ? AND id != ? ORDER BY display_order, id",
-                (c["group_slug"], c["id"]),
+                "FROM categories WHERE group_slug = ? AND id != ? "
+                "AND (? OR status = 'published') ORDER BY display_order, id",
+                (c["group_slug"], c["id"], 1 if include_drafts else 0),
             ).fetchall()
         ]
 
@@ -402,12 +436,22 @@ def _load_category_pages(conn: sqlite3.Connection) -> list[dict]:
                     "intro": c["intro"] or "",
                     "guide_title": c["guide_title"] or "",
                     "has_guide": has_guide,
-                    "lead": content.get("lead", ""),
-                    "guide_intro": content.get("guide_intro", ""),
-                    "type_table": content.get("type_table", []),
-                    "checkpoints": content.get("checkpoints", []),
-                    "mistakes": content.get("mistakes", ""),
-                    "faq": faq,
+                    "lead": _md_inline(content.get("lead", "")),
+                    "guide_intro": _md_inline(content.get("guide_intro", "")),
+                    "type_table": [
+                        {
+                            "type": t.get("type", ""),
+                            "trait": _md_inline(t.get("trait", "")),
+                            "for": _md_inline(t.get("for", "")),
+                        }
+                        for t in content.get("type_table", [])
+                    ],
+                    "checkpoints": [
+                        {"title": cp.get("title", ""), "why": _md_inline(cp.get("why", ""))}
+                        for cp in content.get("checkpoints", [])
+                    ],
+                    "mistakes": _md_mistakes(content.get("mistakes", "")),
+                    "faq": [{"q": f.get("q", ""), "a": _md_inline(f.get("a", ""))} for f in faq],
                     "concept_image": c["concept_image"] or "",
                     "concept_image_alt": c["concept_image_alt"] or "",
                 },
@@ -423,10 +467,15 @@ def _load_category_pages(conn: sqlite3.Connection) -> list[dict]:
     return pages
 
 
-def _load_categories_index(conn: sqlite3.Connection) -> list[dict]:
-    """카테고리 인덱스 — 그룹별 카드 목록. available = 연결 제품 ≥ 1."""
+def _load_categories_index(conn: sqlite3.Connection, include_drafts: bool = False) -> list[dict]:
+    """카테고리 인덱스 — 그룹별 카드 목록. available = 연결 제품 ≥ 1.
+
+    include_drafts=True는 미리보기(검토)용 — draft도 포함(§2-마). 기본은 published만.
+    """
     rows = conn.execute(
-        "SELECT id, slug, name_ko, intro, group_name_ko FROM categories ORDER BY display_order, id"
+        "SELECT id, slug, name_ko, intro, group_name_ko FROM categories "
+        "WHERE (? OR status = 'published') ORDER BY display_order, id",
+        (1 if include_drafts else 0,),
     ).fetchall()
     groups: list[dict] = []
     for c in rows:
@@ -460,16 +509,22 @@ def _sitemap(urls: list[str]) -> str:
     )
 
 
-def render_site(out_dir: Path = DEFAULT_OUT, db_path: Path = db.DB_PATH) -> dict:
-    """DB → 정적 사이트 렌더. 반환: 빌드 요약 dict."""
+def render_site(
+    out_dir: Path = DEFAULT_OUT, db_path: Path = db.DB_PATH, include_drafts: bool = False
+) -> dict:
+    """DB → 정적 사이트 렌더. 반환: 빌드 요약 dict.
+
+    include_drafts=True는 미리보기(검토)용 — 미승인 draft 카테고리도 렌더(§2-마).
+    공개 배포(build/site)는 기본값(published만) 사용.
+    """
     conn = db.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
         scenarios = _load_scenarios(conn)
         personas = _load_personas(conn)
         article_pages = _load_article_pages(conn)
-        category_pages = _load_category_pages(conn)
-        category_groups = _load_categories_index(conn)
+        category_pages = _load_category_pages(conn, include_drafts)
+        category_groups = _load_categories_index(conn, include_drafts)
     finally:
         conn.close()
 

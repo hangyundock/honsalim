@@ -37,10 +37,12 @@ _PRODUCTS_SQL = """
              cp.display_order, p.id
 """
 
+# status는 'draft' 고정 — AI 자동 published 금지(§2-마·E7). 공개는 사용자 승인(approve-category)만.
+# 재빌드(콘텐츠 변경) 시에도 draft로 되돌려 재승인을 강제한다(미승인 변경 노출 방지).
 _SAVE_GUIDE_SQL = """
     UPDATE categories
     SET guide_title = ?, guide_md = ?, content_json = ?, faq_json = ?,
-        guide_generated_at = CURRENT_TIMESTAMP, status = 'published'
+        guide_generated_at = CURRENT_TIMESTAMP, status = 'draft'
     WHERE id = ?
 """
 

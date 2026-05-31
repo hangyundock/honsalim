@@ -225,6 +225,9 @@ def _check_phase2_modules() -> bool:
         ("writer.article_writer", "extract_disclosure_first"),
         ("writer.state_machine", "transition"),
         ("writer.state_machine", "VALID_TRANSITIONS"),
+        ("writer.category_state", "approve"),
+        ("writer.category_state", "unapprove"),
+        ("writer.category_state", "pending_approval"),
         ("enricher.claude_client", "ClaudeClient"),
         ("enricher.meta_extractor", "MetaExtractor"),
         ("enricher.retry", "retry_with_backoff"),
@@ -232,6 +235,8 @@ def _check_phase2_modules() -> bool:
         ("enricher.seo_directive", "build_seo_directive"),
         ("enricher.seo_regenerate", "regenerate_until_seo_pass"),
         ("enricher.category_writer", "generate_category_guide"),
+        ("enricher.category_page_builder", "build_and_save"),
+        ("enricher.concept_image", "generate_concept_image"),
         ("collector.scenario_loader", "list_active_scenarios"),
         ("collector.scenario_loader", "next_scenarios_for_collection"),
         ("collector.products_store", "upsert_products"),
@@ -240,6 +245,7 @@ def _check_phase2_modules() -> bool:
         ("collector.aliexpress", "map_product"),
         ("collector.naver_searchad", "fetch_related_keywords"),
         ("collector.product_filter", "is_relevant"),
+        ("collector.category_collect", "collect_category"),
         ("collector.keyword_research", "research_keywords"),
         ("collector.keyword_research", "build_entry"),
         ("collector.seo_keywords", "gate_config"),
@@ -1070,7 +1076,49 @@ def cmd_build_category(args: argparse.Namespace) -> int:
         print(f"     {WARN} 이미지 실패: {res['concept_image_error']}")
     if not res.get("saved"):
         print(f"     {WARN} 게이트 미통과 — 저장 안 됨(인간 검토 필요): {res['gates']}")
+    if res.get("saved"):
+        print(
+            f"     {WARN} status=draft(미공개) — 검토 후 'approve-category {args.slug}'로 공개 "
+            "(AI 자동승인 금지·§2-마)"
+        )
     return 0
+
+
+def cmd_approve_category(args: argparse.Namespace) -> int:
+    """draft 카테고리 → published (사용자 1클릭 승인·공개). AI 자동승인 금지(§2-마·E7)."""
+    from writer import category_state
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        res = category_state.approve(conn, args.slug)
+        print(f"{OK} 카테고리 {res['slug']!r}({res['name']}) → published (공개)")
+        if res["warned"]:
+            print(
+                f"     {WARN} 가이드 글이 아직 없음 — 빈약한 페이지일 수 있음(build-category 권장)"
+            )
+        print("     ※ 실제 공개 반영은 build(렌더) + deploy 후 (현재는 DB 상태만 전이)")
+        return 0
+    except category_state.CategoryStateError as e:
+        print(f"{FAIL} {e}")
+        return 2
+    finally:
+        conn.close()
+
+
+def cmd_unapprove_category(args: argparse.Namespace) -> int:
+    """published 카테고리 → draft (공개 취소·비공개)."""
+    from writer import category_state
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        res = category_state.unapprove(conn, args.slug)
+        print(f"{OK} 카테고리 {res['slug']!r}({res['name']}) → draft (비공개)")
+        return 0
+    except category_state.CategoryStateError as e:
+        print(f"{FAIL} {e}")
+        return 2
+    finally:
+        conn.close()
 
 
 def cmd_unapprove(args: argparse.Namespace) -> int:
@@ -1227,14 +1275,16 @@ def cmd_build(args: argparse.Namespace) -> int:
         f"templates={len(manifest.get('templates', {}))}"
     )
 
-    if args.full:
+    if args.full or args.preview:
         from builder import renderer
 
-        summary = renderer.render_site()
+        out_dir = (PROJECT_ROOT / "build" / "preview") if args.preview else renderer.DEFAULT_OUT
+        summary = renderer.render_site(out_dir=out_dir, include_drafts=args.preview)
+        mode = "미리보기(draft 포함·검토용)" if args.preview else "공개(published만)"
         print(
-            f"{OK} 사이트 렌더 → {summary['out_dir']} "
+            f"{OK} 사이트 렌더 [{mode}] → {summary['out_dir']} "
             f"(페이지 {summary['pages']} · 시나리오 {summary['scenarios']} · "
-            f"페르소나 {summary['personas']} · 게시글 {summary['articles_published']})"
+            f"카테고리 {summary['categories']} · 게시글 {summary['articles_published']})"
         )
         if summary["articles_published"] == 0:
             print(
@@ -1374,6 +1424,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_build_cat.set_defaults(func=cmd_build_category, dry_run=True)
 
+    # 카테고리 공개 승인 게이트 (세션 #18) — AI 자동승인 금지(§2-마·E7), 사용자 1클릭만 공개
+    p_approve_cat = sub.add_parser(
+        "approve-category", help="draft 카테고리 → published (사용자 1클릭 승인·공개)"
+    )
+    p_approve_cat.add_argument("slug", type=str, help="categories.slug")
+    p_approve_cat.set_defaults(func=cmd_approve_category)
+
+    p_unapprove_cat = sub.add_parser(
+        "unapprove-category", help="published 카테고리 → draft (공개 취소·비공개)"
+    )
+    p_unapprove_cat.add_argument("slug", type=str, help="categories.slug")
+    p_unapprove_cat.set_defaults(func=cmd_unapprove_category)
+
     p_unapprove = sub.add_parser("unapprove", help="approved draft → validated 회귀")
     p_unapprove.add_argument("--draft", type=int, required=True, help="draft id")
     p_unapprove.set_defaults(func=cmd_unapprove)
@@ -1442,7 +1505,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_build.add_argument(
         "--full",
         action="store_true",
-        help="전체 빌드 (현재 stub — renderer/pages/sitemap 미작성)",
+        help="공개 빌드 → build/site (published만 — 배포 대상)",
+    )
+    p_build.add_argument(
+        "--preview",
+        action="store_true",
+        help="미리보기 빌드 → build/preview (draft 포함·검토용, §2-마)",
     )
     p_build.add_argument(
         "--save-empty",

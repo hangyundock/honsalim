@@ -17,8 +17,29 @@
   - 세션 #8 (2026-05-29 네이버 작업 D:\naver_blog\ 별도 프로젝트 분리(C안)·private repo·dazzling-hermann 폐기·1 commit)
   - 세션 #9 (2026-05-29 자동 push 정책 N1 + dashboard 모듈 CLI 11/11 + secrets 경로 정정·회귀 352·9 commits)
   - 세션 #11 (2026-05-29~30 디자인 시안 5종·Jinja2 템플릿·builder.renderer·SEO/JSON-LD·enrich 버그수정·알리 수집기 골격+라이브검증·회귀 378. ※#10은 워크트리 폐기 정리만)
+  - 세션 #12 (2026-05-30 알리 상품수집 CLI→C-1 연결→enrich 풀구축→4게이트 통과 첫 글·회귀 378→436·10 commits·메모리 incremental-critical-review·autonomous-safe-system 신설)
 
 ## 최근 5세션
+
+### 세션 #18 — 2026-05-31 (Opus 4.8 1M, 운영자 승인 게이트 + doctor 보강 + ★카테고리 페이지 디자인 디버깅·정형화(글씨 흐림 진짜원인=backdrop-filter), 회귀 569→590)
+
+**시작 상황**: `/honsalim-start`(워크트리 beautiful-bose-63b4f9, HEAD=#17 `8710a5e`). 회귀 569. "다음 할 일 순서대로 진행" → #18 1순위 승인 게이트부터. 도중 디자인 작은 수정 요청이 카테고리 페이지 디자인 대거 디버깅으로 확대.
+
+**핵심 진척 [확정]** (※전부 **로컬·미배포**. honsalim.com은 #13 첫 글 유지):
+
+1. **운영자 1클릭 승인 게이트** (O21): `build-category`가 글 저장 시 **`status='draft'` 고정**(AI 자동 published 차단·E7, 재빌드 시 재승인 강제) · **`approve-category`/`unapprove-category` CLI** · `writer/category_state.py`(approve/unapprove/pending_approval+전이검증+부분DB 견고성) · renderer **`published`만 렌더**(+`include_drafts` 미리보기) · 대시보드 "카테고리 승인 대기" 섹션.
+2. **doctor 보강** (#18-3): §10 진입점 **64**(category_state·category_page_builder·concept_image·category_collect 등 6 추가, 64/64 OK).
+3. **★카테고리 페이지 디자인 디버깅·정형화** (O22, 사용자 라이브 피드백 다수·수십 분): 글씨 "흐리고 뭉개짐" 디버깅 — 색·폰트·굵기·크기·smoothing 다 만져도 안 됨 → 사용자 직관("뭔가 가미됨")으로 **진짜 원인 = `backdrop-filter`**(헤더 유리효과 → Windows Chrome 페이지 전체 텍스트 GPU 합성 → ClearType off → 흐림) **제거**가 근본 해결. 그 외: 본문색 #111 · 폭 1080px 단일칼럼 · 정보성 글씨 최소 14px · 마크다운 `**`→`<strong>` · 흔한실수 줄바꿈 · FAQ Q/A 구분(배경+마커) · 추천카드 장점/단점 그룹 · 가격+할인 같은 줄. 폰트 NanumSquare Neo 유지(나눔고딕 실험 후 사용자 선호로 복귀; cdnfonts NanumSquare Neo는 중간두께 없음·weight 400). **정형화 확인**: desk 수정 → monitor-stand 자동 동일(공통 CSS·템플릿·renderer).
+4. **#18 2순위 배포 진행**: 이 워크트리에 DB 재생성(desk·monitor `collect-category`+`build-category` --no-dry-run 라이브, 게이트 통과, **draft**). 디자인 확정. **승인+공개배포는 #19**.
+5. **회귀 569→590** (+21: category_state 9·renderer published게이트/마크다운·design_tokens 가드 3·cli 3 등). black·ruff·mypy 클린. 비용 ~$0.6.
+
+**무인·안전/진실성(§0)**: AI 자동 published 차단(E7) · 미승인 draft 완전 비공개 · 마크다운 XSS escape 후 변환 · 대시보드 부분DB 견고성 가드 · 디자인은 코드(공통)라 새 카테고리 자동 적용 + 재발방지 가드(색 대비·정렬·승인전이). 미리보기 캐시→강력새로고침/시크릿창.
+
+**잔존 미해결 (#19)**: ①**카테고리 페이지 추가 디자인 수정**(사용자 "이 페이지 수정할 부분 더 있다" — 연속 작업) ②#18 2순위 배포 완료(승인+공개) ③나머지 카테고리(의자 build·모니터암 신규) ④(이월) /go/·알리 whitelist·main-protect.
+
+**다음 세션 할 일**: 1) **카테고리 디자인 연속 수정**(DB 재생성→`build --preview`로 확인하며) 2) **승인(`approve-category`)+배포**(`build --full`→honsalim.com) 3) 나머지 카테고리. ★DB는 gitignore→재생성 필요(`collect-category`·`build-category` --no-dry-run, ~$0.6). 워크트리 실행=`PYTHONPATH=src python -m cli`.
+
+---
 
 ### 세션 #17 — 2026-05-31 (Opus 4.8 1M, ★카테고리 자동 등록 파이프라인 완성 + 사무용 의자 구성 표준 + 개념이미지(Imagen) + CLI + 정형화 입증(책상), 회귀 553→569)
 
@@ -122,32 +143,3 @@
 - 상품 이미지(우드톤 placeholder, 의도) · 시나리오 추가 글(현재 1편) · 알리 답변 대기 · 로컬 main pull(origin e763e0f, 로컬 main 7b572ad) · main-protect 재활성화.
 
 **다음 세션 할 일**: 1) **/go/ 링크 작동**(D1 동기화+go_gateway Worker 배포)→첫 글 수익화 2) 상품 이미지 보강 3) 알리 whitelist 답변 확인(무응답 3~4영업일 시 follow-up)
-
----
-
-### 세션 #12 — 2026-05-30 (Opus 4.8 1M, 알리 상품수집 CLI→C-1 연결→enrich 풀구축→4게이트 통과 첫 글, 회귀 378→436, 10 commits, 워크트리 goofy-hopper)
-
-**시작 상황**: `/honsalim-start` → 워크트리 `goofy-hopper-591e17`(main #11 bb6b50f 분기). 회귀 378. "상품 수집 CLI(collect-products)"가 다음 핵심.
-
-**핵심 진척 [확정]** — 전체 콘텐츠 생성 파이프라인 end-to-end 구축·라이브 검증:
-
-1. **collect-products CLI**: `--keywords`/`--scenario`, 기본 dry_run. AliExpress product.query → products upsert(멱등). 가격 밴드(min/max_sale_price)·검색어별 밴드(search_keywords.yml)·coupang_deferred 메커니즘.
-2. **라이브 검증 확정**: ①검색어=영어·결과=한글 ②**가격 밴드(KRW)가 관련성 핵심 레버**(정렬 역효과) ③일반어→엉뚱 카테고리, 구체 검색어 필수 ④**AliExpress=소형 액세서리·수납 전용**, 가전·가구·전자본체·침구는 쿠팡.
-3. **시나리오 튜닝**: homeoffice-chair-desk-50(8종 완벽)+wonroom·saehae·homeoffice-100·50-complete 적합분 + gajeon-100·gajeon-up-50 쿠팡 이관. (gaeul·isacheol·homeoffice-200 미착수)
-4. **C-1 상품↔시나리오 연결**: `article_writer.record_scenario_candidates` — 후보를 시나리오 collected draft.raw_payload에 검색어 출처와 함께 기록(DB §5, 멱등).
-5. **enrich 풀구축**: 후보 {{products}} 주입 + 응답 META/BODY 분리(split_article_response) + disclosure 자동삽입 + schema_jsonld + **featured 선언**(모델이 추천 ID 명시→truth 가격검증 정확 한정). max_tokens 4096→8192(잘림수정)+truncation 감지.
-6. **disclosure 제휴처 인지형 [확정 공정위]**: 알리 글엔 "AliExpress 어필리에이트" 첫머리, 푸터는 쿠팡+알리. validator 첫머리=수수료+제휴처명1개. 표준 문구 강제(모델 임의 disclosure 차단).
-7. **첫 글 4게이트 전부 통과**: validate(truth·schema·disclosure·links PASS), 실제 알리 상품 8개+실가격. draft 6 validated.
-
-**무인·안전 장치**: truncation 감지·중단 / 파싱 실패 무저장 / 표준 disclosure 멱등 강제 / featured 미매칭 경고 / reject 시 상태 보존. **프로세스**: 점검에 ruff·black·mypy 선제 실행(lint churn 차단), `.gitignore` tmp_*.py.
-
-**누적 commits 10건 [브랜치 claude/goofy-hopper-591e17 — main 미병합]**: 23e7466 인프라+5시나리오 / 7f6b99d C-1 / 4bc5a23 enrich 본문저장 / fd423bc max_tokens / 8e05f14 disclosure / 26603ae schema / 22d4b92 featured / a8f178c 프롬프트강화 / 10f87a3 표준강제 / c604c1d 제휴처 인지형 (+ 세션종료 docs).
-
-**메모리 신설**: [[incremental-critical-review]] · [[autonomous-safe-system]].
-
-**잔존 미해결 (다음 세션)**:
-- **게시 경로 미배선**: approve(CLI 有)→**promote(CLI 미배선·함수만)**→상세글 렌더(#11 미구현)→배포. markdown→HTML·slug·article 필드 조립·schema 확정값 필요.
-- 시나리오 3종 미튜닝 · 스타일 disclosure_banner(Phase 3~4 body 중복 조율) · schema_jsonld 임시값 promote 시 확정.
-- **워크트리 브랜치 main 병합·push 필요**(ff 가능, main #11 미이동).
-
-**다음 세션 할 일**: 1) 게시 경로 배선(promote CLI+상세글 렌더)→첫 글 게시 2) 시나리오 3종 튜닝 3) (자투리) 알리 whitelist·main-protect 재활성화

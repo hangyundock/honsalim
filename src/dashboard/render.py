@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from common import db
+from writer import category_state
 
 DEFAULT_OUTPUT = Path("data/dashboard/index.html")
 
@@ -84,7 +85,40 @@ def _format_card(row: sqlite3.Row) -> str:
     </article>"""
 
 
-def render_html(grouped: dict[str, list[sqlite3.Row]], fail_24h: int) -> str:
+def _format_category_card(row: sqlite3.Row) -> str:
+    """승인 대기 카테고리 카드 + approve-category 명령(복사 버튼). drafts 카드와 동형."""
+    name = html.escape(row["name_ko"])
+    slug = html.escape(row["slug"])
+    title = html.escape(row["guide_title"] or "")
+    gen = html.escape(row["guide_generated_at"] or "")
+    pc = row["product_count"]
+    approve_cmd = f"python -m honsalim approve-category {row['slug']}"
+    return f"""
+    <article class="card" data-status="cat-pending">
+      <header style="border-left:4px solid #e8a33c;padding-left:8px">
+        <h3>{name} <small>({slug})</small></h3>
+        <small>{title} · 제품 {pc}개 · 생성 {gen}</small>
+      </header>
+      <div class="cmd"><code>{html.escape(approve_cmd)}</code> <button onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent)">복사</button></div>
+    </article>"""
+
+
+def render_category_section(pending: list[sqlite3.Row]) -> str:
+    """카테고리 승인 대기(draft+글 생성됨) 섹션. 없으면 빈 문자열."""
+    if not pending:
+        return ""
+    cards = "\n".join(_format_category_card(r) for r in pending)
+    return (
+        f'<section class="status-group"><h2>카테고리 승인 대기 '
+        f'<span class="count">{len(pending)}</span></h2>'
+        f'<p class="reason">미리보기(<code>build/preview</code>) 검토 후 아래 명령으로 공개합니다 '
+        f"— AI 자동승인 금지(§2-마·E7).</p>{cards}</section>"
+    )
+
+
+def render_html(
+    grouped: dict[str, list[sqlite3.Row]], fail_24h: int, category_html: str = ""
+) -> str:
     """grouped drafts → 단일 HTML 문자열. BACKEND §490 빨간 배너 (fail 24h 3건+) 포함."""
     banner = ""
     if fail_24h >= 3:
@@ -101,7 +135,9 @@ def render_html(grouped: dict[str, list[sqlite3.Row]], fail_24h: int) -> str:
             f'<section class="status-group"><h2>{html.escape(label)} '
             f'<span class="count">{len(items)}</span></h2>{cards}</section>'
         )
-    body = "\n".join(sections) if sections else "<p>drafts 없음</p>"
+    # 카테고리 승인 대기를 상단에 (drafts 흐름과 별개 — 카테고리 우선 구조)
+    body_parts = ([category_html] if category_html else []) + sections
+    body = "\n".join(body_parts) if body_parts else "<p>대기 항목 없음</p>"
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return f"""<!doctype html>
 <html lang="ko">
@@ -150,7 +186,8 @@ def render_dashboard(
     try:
         grouped = fetch_drafts_by_status(conn)
         fail_24h = count_validation_fails_24h(conn)
-        html_str = render_html(grouped, fail_24h)
+        category_html = render_category_section(category_state.pending_approval(conn))
+        html_str = render_html(grouped, fail_24h, category_html)
     finally:
         if own_conn:
             conn.close()

@@ -3,16 +3,16 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 시급 (다음 세션 #18) — #17 갱신 · 카테고리 파이프라인·정형화 완성 → 무인 운영 마무리 (DECISIONS O16~O20)
+## ★ 시급 (다음 세션 #19) — #18 갱신 · 승인 게이트·doctor·디자인 디버깅 완료 → 디자인 마무리 + 배포 (DECISIONS O21~O22)
 
-> #17: 카테고리 자동 등록 파이프라인(DB migration 002~005·`category_collect` 수집·`category_page_builder` 글생성+SEO/진실성 통합게이트+개념이미지 Imagen·CLI `collect-category`/`build-category`) + 사무용 의자 구성 표준 + **정형화 입증**(책상 2명령 자동완성). 회귀 569. **전부 로컬·미배포.**
+> #18: 운영자 승인 게이트(`approve-category` CLI·`category_state`·build-category→draft·renderer published 필터·대시보드 승인대기) + doctor 진입점 64 + ★카테고리 디자인 대거 디버깅(backdrop-filter 흐림 제거·색#111·폭1080·14px·FAQ Q/A·장점단점·마크다운). 회귀 590. DB 이 워크트리 재생성됨(draft). **전부 로컬·미배포.**
 
-- [x] ~~카테고리 DB·수집·글생성·통합게이트·렌더 이식·개념이미지(Imagen)·CLI·정형화 입증(책상)~~ ✅ #17
-- [ ] **★운영자 검토·1클릭 승인 게이트** (§2-마·E7): `build-category`가 현재 `published` 바로 전이 → `pending` 상태 + 대시보드 미리보기 → 사용자 1클릭 승인 게이트 삽입 (AI 자동승인 금지).
-- [ ] **★배포** ([6]→[7], 승인 후): 카테고리(모니터·책상) → renderer `build/site` 갱신 → honsalim.com (방법A). 현 build/site는 #13 옛 사이트.
-- [ ] **doctor 보강**: §10 진입점에 `category_collect`·`category_page_builder`·`concept_image` 추가.
-- [ ] **나머지 카테고리**: 모니터암 등 신규(category_sources·seo_keywords·seed 등록 후 2명령) · 의자 `build-category office-chair`(현재 카탈로그만).
+- [x] ~~운영자 1클릭 승인 게이트 · doctor 보강 · 카테고리 디자인 디버깅(흐림·색·폭·폰트·FAQ·장점단점·14px)~~ ✅ #18
+- [ ] **★카테고리 페이지 추가 디자인 수정 (사용자 — 연속 작업)**: #18 디자인 대거 수정했으나 사용자가 "이 페이지 수정할 부분 더 있다". 다음 세션 이어서. (DB 재생성 후 `build --preview`로 desk/monitor 미리보기 확인하며)
+- [ ] **★#18 2순위 배포 완료** (승인 후): `approve-category desk`·`monitor-stand`(draft→published) → `build --full`(build/site, published만) → honsalim.com (방법A, **사용자 승인**).
+- [ ] **나머지 카테고리**: 의자 `build-category office-chair`(현재 카탈로그만) · 모니터암 등 신규(category_sources·seo_keywords·seed 등록 후 2명령).
 - [ ] (이월) **★/go/ 제휴 링크 작동**(D1 slug_map·go_gateway, 수익직결) · 알리 whitelist 답변 · main-protect 재활성화.
+- 참고: ★다음 워크트리는 **DB 재생성 필요**(gitignore) — `collect-category desk`·`monitor-stand` + `build-category` 각 `--no-dry-run`(API ~$0.6). 미리보기=`build --preview`(draft포함)·공개=`build --full`. 미리보기 시 강력새로고침/시크릿창.
 
 ## 알리 통합 (D9)
 

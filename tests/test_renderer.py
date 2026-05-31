@@ -12,7 +12,7 @@ import pytest
 from builder import renderer
 from builder.jsonld import build_article_jsonld
 from common import db
-from writer import article_writer
+from writer import article_writer, category_state
 from writer.state_machine import transition
 
 
@@ -228,6 +228,73 @@ class TestRenderArticleDetail:
         assert '"@type": "Article"' in html
         assert '"@type": "BreadcrumbList"' in html
         assert html.count('rel="canonical"') == 1
+
+
+class TestCategoryPublishGate:
+    """draft 카테고리는 렌더 제외, published만 공개 — 승인 게이트(세션 #18·§2-마·E7)."""
+
+    def _seed_category_product(self, db_path: Path) -> None:
+        conn = db.connect(db_path)
+        try:
+            conn.execute(
+                "INSERT INTO products (source, source_product_id, name, currency, price_krw, "
+                "deeplink_url, deeplink_slug, affiliate_tag, created_at, updated_at, last_seen_at) "
+                "VALUES ('aliexpress','cp1','의자 상품','KRW',50000,"
+                "'https://s.click.aliexpress.com/cp1','ali-cp1','honsalim',"
+                "datetime('now'),datetime('now'),datetime('now'))"
+            )
+            pid = conn.execute("SELECT id FROM products WHERE source_product_id='cp1'").fetchone()[
+                0
+            ]
+            cid = conn.execute("SELECT id FROM categories WHERE slug='office-chair'").fetchone()[0]
+            conn.execute(
+                "INSERT INTO category_products (category_id, product_id, tier) VALUES (?,?,'budget')",
+                (cid, pid),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def test_draft_category_not_rendered(self, tmp_path: Path) -> None:
+        db_path = tmp_path / "test.db"
+        db.migrate(db_path=db_path)
+        db.seed(db_path=db_path)  # seed 카테고리 = draft(미공개)
+        self._seed_category_product(db_path)
+        summary = renderer.render_site(out_dir=tmp_path / "site", db_path=db_path)
+        # draft → 상세 미생성·카운트 0 (AI 자동 published 금지·E7)
+        assert not (tmp_path / "site" / "categories" / "office-chair" / "index.html").exists()
+        assert summary["categories"] == 0
+
+    def test_published_category_rendered(self, tmp_path: Path) -> None:
+        db_path = tmp_path / "test.db"
+        db.migrate(db_path=db_path)
+        db.seed(db_path=db_path)
+        self._seed_category_product(db_path)
+        conn = db.connect(db_path)
+        try:
+            category_state.approve(conn, "office-chair")  # 사용자 승인 → published
+        finally:
+            conn.close()
+        summary = renderer.render_site(out_dir=tmp_path / "site", db_path=db_path)
+        assert (tmp_path / "site" / "categories" / "office-chair" / "index.html").exists()
+        assert summary["categories"] == 1
+
+
+class TestMarkdownInline:
+    """산문 인라인 마크다운(**볼드**) 변환 — raw ** 화면 노출 방지(세션 #18)."""
+
+    def test_bold_converted(self) -> None:
+        assert str(renderer._md_inline("**책상** 하나")) == "<strong>책상</strong> 하나"
+
+    def test_plain_passthrough(self) -> None:
+        assert str(renderer._md_inline("일반 텍스트")) == "일반 텍스트"
+
+    def test_xss_escaped(self) -> None:
+        out = str(renderer._md_inline("<script>x</script>"))
+        assert "<script>" not in out and "&lt;script&gt;" in out
+
+    def test_empty(self) -> None:
+        assert str(renderer._md_inline("")) == ""
 
     def test_sitemap_includes_article_url(self, built_with_article: dict) -> None:
         slug = built_with_article["slug"]

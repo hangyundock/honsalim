@@ -4,8 +4,9 @@
 /* ---------- 헤더 ---------- */
 .hdr {
   position: sticky; top: 0; z-index: 50;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: saturate(1.1) blur(10px);
+  background: var(--bg);
+  /* 세션 #18: backdrop-filter 제거 — Windows Chrome에서 페이지 전체 텍스트가 GPU 합성으로
+     전환돼 ClearType(선명 렌더링)이 꺼지고 흐릿해지는 현상의 원인. 불투명 배경으로 대체. */
   border-bottom: 1px solid var(--divider);
 }
 .hdr-in { display: flex; align-items: center; gap: 28px; height: 66px; }
