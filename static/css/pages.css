@@ -45,6 +45,7 @@
 }
 .season-card:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: var(--shadow-card); }
 .season-img { aspect-ratio: 5 / 3; border-radius: 0; }
+.season-img .ph-icon { color: rgba(255,255,255,.92); }
 .season-body { padding: 16px 18px 20px; }
 .season-top { display: flex; align-items: baseline; justify-content: space-between; }
 .season-top h3 { font-size: 20px; font-weight: 800; color: var(--text); }

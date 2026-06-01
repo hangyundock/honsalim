@@ -19,7 +19,7 @@
  * 배포: wrangler.toml + `wrangler deploy` (사용자 명시 승인 후).
  */
 
-const HOMEPAGE_URL = "https://honsalim.com/";
+const HOMEPAGE_URL = "https://honsallim.com/";
 
 export default {
   /**

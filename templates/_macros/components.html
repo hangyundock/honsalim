@@ -27,11 +27,29 @@
 {%- endmacro %}
 
 {# ---- 이미지 placeholder 블록 (우드톤 단색 + 캡션) ---- #}
-{% macro image_block(color='var(--wood-3)', cap='', icon_name='', cls='') -%}
-<div class="img-block {{ cls }}" style="background: {{ color }};">
+{% macro image_block(color='var(--wood-3)', cap='', icon_name='', cls='', src='', alt='') -%}
+<div class="img-block {{ cls }}"{% if not src %} style="background: {{ color }};"{% endif %}>
+  {%- if src -%}
+  <img class="img-real" src="{{ src }}" alt="{{ alt }}" loading="lazy">
+  {%- else -%}
   {%- if icon_name %}<div class="ph-icon">{{ icon(icon_name, 30, 1.3) }}</div>{% endif -%}
   {%- if cap %}<span class="cap">{{ cap }}</span>{% endif -%}
+  {%- endif -%}
 </div>
+{%- endmacro %}
+
+{# ---- 카테고리 카드 (카테고리 우선 홈 — 개념이미지 + 이름 + 소개 + 제품수) ---- #}
+{% macro category_card(c) -%}
+<a class="s-card" href="{{ c.url }}">
+  {{ image_block(src=c.concept_image, alt=c.concept_image_alt or c.name) }}
+  <div class="body">
+    <h3 class="title">{{ c.name }}</h3>
+    <p class="desc">{{ c.intro }}</p>
+    <div class="meta-row">
+      <span class="price">제품 {{ c.count }}개</span><span class="dot"></span><span>비교 보기 →</span>
+    </div>
+  </div>
+</a>
 {%- endmacro %}
 
 {# ---- 칩 ---- #}

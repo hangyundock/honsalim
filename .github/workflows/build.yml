@@ -55,4 +55,4 @@ jobs:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           command: pages deploy build/site --project-name=honsalim --branch=main
-        # --branch=main → 프로덕션 배포 (honsalim.com). 콘텐츠 승인(§2-마) 후에만 push.
+        # --branch=main → 프로덕션 배포 (honsallim.com). 콘텐츠 승인(§2-마) 후에만 push.

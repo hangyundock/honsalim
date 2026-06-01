@@ -27,7 +27,8 @@ SHORT_URL_DOMAINS = (
 
 # VALIDATOR §2 — 허용 도메인 (Phase 5 알리 추가 시 확장)
 ALLOWED_LINK_DOMAINS = (
-    r"honsalim\.com",
+    r"honsalim\.com",  # 구 도메인 — 301 전환기 유지 (세션 #20, 'ali' 차단으로 신 도메인 이전)
+    r"honsallim\.com",  # 신 도메인 — AliExpress 'ali' 문자열 차단 회피 (세션 #20)
     r"link\.coupang\.com",
     r"partners\.coupang\.com",
     r"ads-partners\.coupang\.com",

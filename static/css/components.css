@@ -71,6 +71,8 @@
   content: ""; position: absolute; inset: 0; z-index: 1;
   background: linear-gradient(180deg, rgba(20,30,40,0) 45%, rgba(20,30,40,.34) 100%);
 }
+/* 실제 이미지(개념이미지 등) — placeholder 대신 사진을 채울 때 */
+.img-block .img-real { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 
 /* ---------- 시나리오 카드 (카드=그림자 확정) ---------- */
 .s-card {

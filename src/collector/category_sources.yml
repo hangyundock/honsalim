@@ -61,3 +61,32 @@ categories:
     tiers:
       budget:  {q: "single monitor arm desk mount", min: 8000,  max: 30000}
       premium: {q: "gas spring monitor arm",         min: 30000, max: 90000}
+
+  # ── 1인 살림 확장 (세션 #20) — 네이버 실측 기반 선별(고볼륨·중간경쟁·알리적합 비가전) ──
+  #   "1인 ○○" 키워드는 빈약(1인냄비 350) → 대표어로 잡고 1인은 콘텐츠 앵글+보조키워드.
+  #   라이브 실측으로 제외어 보강(#16 교훈).
+
+  # 도마 — 알리 쿡웨어 최적. 라이브 실측(세션 #20)으로 보강:
+  #   정리대·랙·걸이·선반=수납기구(도마 아님), 도포기=관리도구, 샤퀴테리·치즈·플래터·선물·각인=혼수/접대(1인 비대상).
+  cutting-board:
+    require_any: [도마]
+    exclude_terms: [칼갈이, 칼블럭, 수세미, 행주, 거치대, 받침, 정리대, 랙, 걸이, 선반, 도포기, 커버, 인형, 미니어처, 차량, 자동차, 비누, 식품건조, 음식물, 샤퀴테리, 치즈, 플래터, 선물, 결혼, 약혼, 각인, 맞춤, 캠핑, 할로윈, 추수감사절]
+    tiers:
+      budget:  {q: "plastic cutting board kitchen", min: 3000,  max: 18000}
+      premium: {q: "wood cutting board",             min: 18000, max: 70000}
+
+  # 빨래건조대 — 그릇건조대·식품건조기·신발건조 오염 제외.
+  drying-rack:
+    require_any: [건조대]
+    exclude_terms: [그릇, 식기, 음식, 식품, 건조기, 신발, 과일, 낚시, 빨래집게, 집게, 커버, 차량, 자동차, 인형, 미니어처]
+    tiers:
+      budget:  {q: "foldable laundry drying rack",              min: 8000,  max: 35000}
+      premium: {q: "stainless steel clothes drying rack stand", min: 35000, max: 90000}
+
+  # 미니제습기 — 소형 전기 제습기만. 비전기 제습제·차량용·필터 제외.
+  mini-dehumidifier:
+    require_any: [제습기, 제습]
+    exclude_terms: [제습제, 습기제거제, 필터, 부품, 차량, 자동차, 신발, 옷장용, 인형, 미니어처, 실리카겔]
+    tiers:
+      budget:  {q: "mini dehumidifier",       min: 10000, max: 40000}
+      premium: {q: "small dehumidifier home", min: 40000, max: 90000}

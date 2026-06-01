@@ -56,7 +56,7 @@ WARN = "[WARN]"
 FAIL = "[FAIL]"
 
 # 사이트 origin (builder.renderer.SITE_ORIGIN과 일치 — JSON-LD URL 생성용)
-SITE_ORIGIN = "https://honsalim.com"
+SITE_ORIGIN = "https://honsallim.com"
 
 
 def _print_section(title: str) -> None:

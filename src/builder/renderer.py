@@ -33,7 +33,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 TEMPLATES_DIR = PROJECT_ROOT / "templates"
 STATIC_DIR = PROJECT_ROOT / "static"
 DEFAULT_OUT = PROJECT_ROOT / "build" / "site"
-SITE_ORIGIN = "https://honsalim.com"
+SITE_ORIGIN = "https://honsallim.com"
 SITE_DESC = "1인 가구·자취·홈오피스·일상살림 추천 가이드. 혼자 살림을 따뜻하게 시작하세요."
 
 # robots.txt — /go/ 게이트웨이(제휴 redirect)는 색인 제외, sitemap 안내
@@ -66,7 +66,7 @@ SEASON_CALENDAR = [
         "sub": "이사·풀세팅",
         "months": "2~4월",
         "desc": "이사 성수기. 원룸 첫 세팅과 수납 정리 수요가 가장 높은 시기.",
-        "img": "var(--wood-3)",
+        "img": "#8FBE74",
         "url": "/scenarios/",
     },
     {
@@ -75,7 +75,7 @@ SEASON_CALENDAR = [
         "sub": "제습·수면",
         "months": "5~8월",
         "desc": "습기·열대야 대응. 제습기·서큘레이터·암막·쿨매트 중심.",
-        "img": "var(--wood-1)",
+        "img": "#7BB8DE",
         "url": "/scenarios/",
     },
     {
@@ -84,7 +84,7 @@ SEASON_CALENDAR = [
         "sub": "주방·정리",
         "months": "9~10월",
         "desc": "환절기 정리와 주방 살림 보강. 빨래 건조 고민이 시작되는 시기.",
-        "img": "var(--wood-2)",
+        "img": "#DD9F62",
         "url": "/scenarios/",
     },
     {
@@ -93,7 +93,7 @@ SEASON_CALENDAR = [
         "sub": "난방·보온",
         "months": "11~1월",
         "desc": "난방비·보온이 핵심. 전기요·온수매트·가전 정착 수요 급증.",
-        "img": "var(--wood-4)",
+        "img": "#8FA1B5",
         "url": "/scenarios/",
     },
 ]
@@ -478,7 +478,8 @@ def _load_categories_index(conn: sqlite3.Connection, include_drafts: bool = Fals
     include_drafts=True는 미리보기(검토)용 — draft도 포함(§2-마). 기본은 published만.
     """
     rows = conn.execute(
-        "SELECT id, slug, name_ko, intro, group_name_ko FROM categories "
+        "SELECT id, slug, name_ko, intro, group_name_ko, "
+        "concept_image, concept_image_alt FROM categories "
         "WHERE (? OR status = 'published') ORDER BY display_order, id",
         (1 if include_drafts else 0,),
     ).fetchall()
@@ -494,6 +495,8 @@ def _load_categories_index(conn: sqlite3.Connection, include_drafts: bool = Fals
             "count": count,
             "available": count > 0,
             "url": f"/categories/{c['slug']}/",
+            "concept_image": c["concept_image"] or "",
+            "concept_image_alt": c["concept_image_alt"] or c["name_ko"],
         }
         gname = c["group_name_ko"] or "기타"
         grp = next((g for g in groups if g["name"] == gname), None)
@@ -567,6 +570,7 @@ def render_site(
                 ]
             ),
             featured_scenarios=scenarios[:6],
+            category_groups=category_groups,
             season_calendar=SEASON_CALENDAR,
             **common,
         ),

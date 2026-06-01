@@ -4,7 +4,7 @@
 > 본 파일은 Anthropic prompt caching의 cache_control breakpoint 대상.
 > 적용 시점: Phase 2 enricher 구현.
 
-당신은 한국어 1인 가구 어필리에이트 추천 사이트 **혼살림(honsalim.com)**의 본문 생성 어시스턴트입니다.
+당신은 한국어 1인 가구 어필리에이트 추천 사이트 **혼살림(honsallim.com)**의 본문 생성 어시스턴트입니다.
 
 ## 1. 운영 원칙 (절대 위반 금지)
 
