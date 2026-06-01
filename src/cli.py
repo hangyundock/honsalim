@@ -100,6 +100,20 @@ def _check_secrets() -> bool:
         print(f"{marker} env {key} {'존재' if present else '누락'}")
         if not present:
             all_ok = False
+
+    # LLM(본문 생성) 키 — 활성 모델 기준 점검 (세션 #19: DeepSeek=OpenRouter, claude=Anthropic).
+    import os
+
+    from enricher.claude_client import DEFAULT_MODEL, is_anthropic_model, load_openrouter_key
+
+    if is_anthropic_model(DEFAULT_MODEL):
+        llm_present, llm_label = bool(os.environ.get("ANTHROPIC_API_KEY")), "ANTHROPIC_API_KEY"
+    else:
+        llm_present, llm_label = bool(load_openrouter_key()), "OPENROUTER_API_KEY (DeepSeek)"
+    marker = OK if llm_present else FAIL
+    print(f"{marker} LLM 키 {llm_label} {'도달 가능' if llm_present else '없음'} [{DEFAULT_MODEL}]")
+    if not llm_present:
+        all_ok = False
     return all_ok
 
 
@@ -1018,6 +1032,8 @@ def cmd_collect_category(args: argparse.Namespace) -> int:
         print(f"{OK} 수신 {res.received} · 정제 {res.relevant} · 연결 {res.linked}")
         for tn, st in res.per_tier.items():
             print(f"     [{tn}] received={st['received']} relevant={st['relevant']}")
+        if res.removed_stale:
+            print(f"     [정합화] 옛 카탈로그 연결 {res.removed_stale}개 제거 (재수집 idempotent)")
     return 0
 
 

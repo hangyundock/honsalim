@@ -35,6 +35,7 @@ class CategorySpec:
 
     slug: str
     require_any: tuple[str, ...]
+    require_all: tuple[tuple[str, ...], ...]  # '타입+대상' 동시 검증 그룹 (세션 #19)
     exclude_terms: tuple[str, ...]
     tiers: dict[str, SearchTerm]  # tier_name(budget/premium) -> SearchTerm
 
@@ -70,9 +71,15 @@ def load_sources(path: Path = SOURCES_FILE) -> dict[str, CategorySpec]:
             term = _tier_term(traw)
             if term is not None:
                 tiers[str(tname)] = term
+        require_all = tuple(
+            tuple(str(x) for x in group if str(x).strip())
+            for group in (spec.get("require_all") or [])
+            if isinstance(group, list) and any(str(x).strip() for x in group)
+        )
         out[str(slug)] = CategorySpec(
             slug=str(slug),
             require_any=tuple(str(x) for x in spec.get("require_any", ()) if str(x).strip()),
+            require_all=require_all,
             exclude_terms=tuple(str(x) for x in spec.get("exclude_terms", ()) if str(x).strip()),
             tiers=tiers,
         )
@@ -89,6 +96,7 @@ class CategoryCollectResult:
     received: int = 0  # API 수신 총건
     relevant: int = 0  # 관련성 정제 통과 총건
     linked: int = 0  # category_products 연결 건수(중복 제외)
+    removed_stale: int = 0  # 정합화로 제거된 옛 카탈로그 연결(재수집 시 오염 청소, 세션 #19)
     per_tier: dict[str, dict[str, int]] = field(default_factory=dict)
     terms: list[tuple[str, SearchTerm]] = field(default_factory=list)
 
@@ -157,6 +165,7 @@ def collect_category(
             if product_filter.is_relevant(
                 r.get("name", ""),
                 require_any=spec.require_any,
+                require_all=spec.require_all,
                 exclude_terms=spec.exclude_terms,
             )
         ]
@@ -170,6 +179,18 @@ def collect_category(
         return result
 
     products_store.upsert_products(conn, all_rows)
+
+    # 정합화(세션 #19): 카탈로그(is_featured=0) 연결을 먼저 비우고 이번 수집분으로 재구성한다.
+    # → 필터를 강화해 재수집하면 옛 오염 상품이 자동 제거(재수집 idempotent). 추천 6선(is_featured=1)은
+    #   build-category가 관리하므로 보존(아래 INSERT의 ON CONFLICT는 is_featured를 건드리지 않음).
+    prev_catalog = conn.execute(
+        "SELECT COUNT(*) FROM category_products WHERE category_id = ? AND is_featured = 0",
+        (result.category_id,),
+    ).fetchone()[0]
+    conn.execute(
+        "DELETE FROM category_products WHERE category_id = ? AND is_featured = 0",
+        (result.category_id,),
+    )
 
     order = 0
     seen: set[int] = set()
@@ -195,6 +216,11 @@ def collect_category(
                 },
             )
             order += 1
+    new_catalog = conn.execute(
+        "SELECT COUNT(*) FROM category_products WHERE category_id = ? AND is_featured = 0",
+        (result.category_id,),
+    ).fetchone()[0]
     conn.commit()
     result.linked = len(seen)
+    result.removed_stale = max(0, int(prev_catalog) - int(new_catalog))
     return result

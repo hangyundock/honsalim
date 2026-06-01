@@ -60,14 +60,22 @@ def is_relevant(
     name: str,
     *,
     require_any: tuple[str, ...] = ("책상",),
+    require_all: tuple[tuple[str, ...], ...] = (),
     exclude_terms: tuple[str, ...] = DESK_EXCLUDE,
 ) -> bool:
-    """상품명이 카테고리에 관련 있는지. require_any 중 하나 포함 + exclude_terms 미포함.
+    """상품명이 카테고리에 관련 있는지. (require_all 그룹 모두) ∧ (require_any 중 하나) ∧ (exclude 미포함).
 
-    require_any: 적어도 하나는 포함해야 하는 카테고리 핵심어(예 책상/desk).
+    require_all: '타입+대상' 동시 검증(세션 #19). 각 그룹은 OR-set이고, **모든 그룹**을 만족해야 함.
+        예) [[노트북, 랩탑], [거치대, 스탠드]] → 노트북 계열 AND 거치대 계열을 둘 다 가진 상품만 통과.
+        → "노트북"만 언급한 캠핑 테이블은 거치대 그룹 미충족으로 구조적 탈락(OR 필터의 한계 보완).
+    require_any: 적어도 하나는 포함해야 하는 카테고리 핵심어(단일 그룹 호환 — 기존 카테고리용).
     exclude_terms: 하나라도 포함하면 제외(액세서리·타카테고리).
     """
     n = (name or "").lower()
+    # require_all: 각 그룹(OR)을 전부(AND) 만족해야 함 — 품목 정체성('이게 그 물건인가') 강제
+    for group in require_all:
+        if group and not any(t.lower() in n for t in group):
+            return False
     if require_any and not any(t.lower() in n for t in require_any):
         return False
     return not any(t.lower() in n for t in exclude_terms)

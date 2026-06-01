@@ -16,7 +16,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from collector import seo_keywords
+from collector import product_filter, seo_keywords
 from enricher import category_writer
 from validator import disclosure as disc_gate
 from validator import links as links_gate
@@ -29,13 +29,19 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 CONCEPT_IMG_DIR = _PROJECT_ROOT / "static" / "images" / "concepts"
 
 _PRODUCTS_SQL = """
-    SELECT p.id, p.deeplink_slug AS slug, p.name, p.price_krw, cp.tier
+    SELECT p.id, p.deeplink_slug AS slug, p.name, p.price_krw, cp.tier,
+           p.sales_volume, p.evaluate_rate, p.discount_pct
     FROM category_products cp
     JOIN products p ON p.id = cp.product_id
     WHERE cp.category_id = ?
     ORDER BY CASE cp.tier WHEN 'budget' THEN 0 WHEN 'premium' THEN 1 ELSE 2 END,
              cp.display_order, p.id
 """
+
+# 추천 6선 선정(세션 #19) — 긍정 피드백율 하한(%). 명백히 낮은 제품만 제외하는 '품질 floor'.
+# ★80%: 실측에서 90%는 과도했다 — 판매량 71·만족도 89.3%인 베스트셀러가 0.7% 차로 탈락하고
+#   판매량 2~6개(리뷰 2~3개라 '100%'는 무의미)가 추천되는 역전 발생. 80 미만(명백한 저품질)만 거른다.
+_SATISFACTION_FLOOR = 80.0
 
 # status는 'draft' 고정 — AI 자동 published 금지(§2-마·E7). 공개는 사용자 승인(approve-category)만.
 # 재빌드(콘텐츠 변경) 시에도 draft로 되돌려 재승인을 강제한다(미승인 변경 노출 방지).
@@ -72,9 +78,49 @@ def load_products(conn: sqlite3.Connection, category_id: int) -> list[dict[str, 
                 "name": r["name"],
                 "price": f"{price:,}원" if price else "",
                 "tier": r["tier"],
+                "volume": r["sales_volume"],  # 알리 최근 판매량 — 추천 선정 순위
+                "rate": r["evaluate_rate"],  # 긍정 피드백율 % — 선정 하한 필터
+                "discount_pct": r["discount_pct"],  # 신뢰 할인율 동률 tiebreak
             }
         )
     return out
+
+
+def select_featured(products: list[dict[str, Any]], per_tier: int = 3) -> list[dict[str, Any]]:
+    """추천 6선 자동 선정 (세션 #19) — 투명·재현 규칙. AI는 선정에 관여하지 않는다.
+
+    티어(실속/고급)별로 **항상 per_tier개를 채우되**, 정렬 우선순위로 품질을 반영한다:
+      정렬키 = (만족도 명백한 저평가 아님, 판매량 내림차순, 신뢰 할인율).
+      → ① 만족도 80% 이상/없음(0·None) 제품이 ② 명백한 저평가(0<rate<80) 제품보다 항상 앞.
+      → 같은 등급 안에서는 판매량 많은 순. 저평가 제품은 '맨 뒤'라 6개를 채우려 부족할 때만 들어온다.
+    반환: [{slug, tier, name, volume}] (티어별 per_tier개, 제품이 그만큼 있으면, budget→premium 순).
+
+    설계 근거(실측 보정·세션 #19): 추천 수가 6개로 항상 차도록(주인 요구) 하되, 만족도 낮은 제품은
+    뒤로 밀어 가급적 노출 안 한다. 만족도는 알리에서 절반만 제공·신상품은 0이므로 '없음'은 통과로
+    본다(부당 제외 방지). 하한 90%는 89%대 베스트셀러를 떨궈 80%로 보정(세션 #19 실측).
+    """
+
+    def _vol(p: dict[str, Any]) -> int:
+        return int(p.get("volume") or 0)
+
+    def _disc(p: dict[str, Any]) -> int:
+        return product_filter.trusted_discount(p.get("discount_pct")) or 0
+
+    def _is_poor(p: dict[str, Any]) -> bool:
+        # 명백한 저평가: 만족도가 '있고'(0/None=피드백 없음 제외) 0<rate<80. 이런 제품만 뒤로 민다.
+        r = p.get("rate")
+        return r is not None and 0 < float(r) < _SATISFACTION_FLOOR
+
+    chosen: list[dict[str, Any]] = []
+    for tier in ("budget", "premium"):
+        pool = [p for p in products if p.get("tier") == tier]
+        # 저평가 아님 → 판매량 → 할인율 순(reverse). 저평가 제품은 맨 뒤라 자리가 모자랄 때만 선정됨.
+        ranked = sorted(pool, key=lambda p: (not _is_poor(p), _vol(p), _disc(p)), reverse=True)
+        chosen += [
+            {"slug": p["slug"], "tier": tier, "name": p["name"], "volume": _vol(p)}
+            for p in ranked[:per_tier]
+        ]
+    return chosen
 
 
 def _prose(parsed: dict[str, Any], primary: str = "") -> str:
@@ -172,23 +218,52 @@ def build_and_save(
         raise ValueError(f"{slug}: 연결된 제품 없음 — 먼저 카테고리 수집 필요")
 
     seo_cfg = seo_keywords.gate_config(slug)
+    # 추천 6선 = 판매량 기준 결정적 선정(세션 #19). AI는 이 6개의 '설명'만 작성한다.
+    selected = select_featured(products)
 
     if dry_run:
-        prompt = category_writer.build_category_page_prompt(cat_name, products, seo_cfg)
-        return {"dry_run": True, "products": len(products), "prompt_len": len(prompt)}
+        prompt = category_writer.build_category_page_prompt(
+            cat_name, products, seo_cfg, selected=selected
+        )
+        return {
+            "dry_run": True,
+            "products": len(products),
+            "selected": len(selected),
+            "prompt_len": len(prompt),
+        }
 
-    valid = {p["slug"] for p in products}
+    # picks는 선정된 6개 slug로 제한(AI가 다른 제품을 추천에 넣지 못하게)
+    valid = {s["slug"] for s in selected}
     primary = (seo_cfg or {}).get("primary", "")
 
     # SEO + 진실성(truth·disclosure·links) 통합 게이트를 통과할 때까지 재생성(상한 max_attempts).
     # 1인칭 등 truth 미달도 issues를 피드백으로 다시 생성 — 자가복원(§0). 비용 상한은 tistory 교훈.
     feedback: list[str] | None = None
     final: dict[str, Any] = {}
+    last_parse_error: str | None = None
     for attempt in range(1, max(1, max_attempts) + 1):
         res = category_writer.generate_category_page(
-            client, cat_name, products, seo=seo_cfg, feedback=feedback, dry_run=False
+            client,
+            cat_name,
+            products,
+            seo=seo_cfg,
+            feedback=feedback,
+            selected=selected,
+            dry_run=False,
         )
-        parsed = category_writer.parse_category_page_response(res.response_text, valid_slugs=valid)
+        try:
+            parsed = category_writer.parse_category_page_response(
+                res.response_text, valid_slugs=valid
+            )
+        except category_writer.CategoryPageError as ex:
+            # B(세션 #19): 파싱 실패도 자가복원 — 순수 JSON 재요청 후 재생성(전체 중단 방지·무인 안전)
+            last_parse_error = str(ex)
+            feedback = [
+                f"직전 응답이 유효한 JSON이 아니었습니다({ex}). "
+                "코드펜스·설명문 없이 순수 JSON 객체 하나만 출력하고, 후행 콤마를 넣지 마세요."
+            ]
+            continue
+        last_parse_error = None
         prose = _prose(parsed, primary)
         guide_md = article_writer.apply_disclosure(prose, sources={"aliexpress"})
         safe_ok, gates = _run_gates(guide_md)  # truth·disclosure·links
@@ -213,7 +288,34 @@ def build_and_save(
         fb = [i for g in gates.values() if not g["pass"] for i in g["issues"]]
         if not seo_ok:
             fb += seo_rep.get("issues", [])
+            # A(세션 #19): 밀도 초과 시 행동 가능한 힌트 — 대표키워드 통째 반복 줄이고 대체 표현
+            fb.append(
+                f"대표키워드 '{primary}'를 본문에서 통째로 반복하지 말고 '제품'·줄임말·대명사로 "
+                "대체해 정확형 밀도를 3% 이내로 낮추세요(과밀=스팸)."
+            )
         feedback = fb or None
+
+    if not final:
+        # 모든 시도가 파싱 실패 — 명확히 보고하고 중단(저장 안 함, 무인 진단)
+        raise category_writer.CategoryPageError(
+            f"JSON 파싱 {max(1, max_attempts)}회 모두 실패: {last_parse_error}"
+        )
+
+    # 추천 6선 = 결정적 선정(판매량) 고정 + AI가 쓴 설명을 slug로 매칭(세션 #19).
+    # → 선정은 규칙(투명·재현), 설명만 AI. AI가 누락/오선택해도 featured는 선정 6개로 강제.
+    parsed_final = final["parsed"]
+    ai_by_slug = {p["slug"]: p for p in parsed_final.get("picks", [])}
+    parsed_final["picks"] = [
+        {
+            "slug": s["slug"],
+            "tier": s["tier"],
+            "type": ai_by_slug.get(s["slug"], {}).get("type", ""),
+            "pros": ai_by_slug.get(s["slug"], {}).get("pros", []),
+            "cons": ai_by_slug.get(s["slug"], {}).get("cons", []),
+            "for": ai_by_slug.get(s["slug"], {}).get("for", ""),
+        }
+        for s in selected
+    ]
 
     parsed = final["parsed"]
     report: dict[str, Any] = {

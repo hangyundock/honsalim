@@ -4,11 +4,13 @@
 
 {% block head_extra %}
   <link rel="stylesheet" href="{{ asset_base | default('/static') }}/css/category.css">
+  {# 전체 제품 정렬(추천/가격/할인)·티어 필터 인터랙션 — defer로 DOM 준비 후 실행 #}
+  <script defer src="{{ asset_base | default('/static') }}/js/category.js"></script>
 {% endblock %}
 
-{# 추천 6선 비교 카드 (💰실속/⭐고급 공용) #}
-{% macro pick_card(p) %}
-<div class="tcard">
+{# 추천 6선 비교 카드 (💰실속/⭐고급 공용). area = 데스크톱 그리드 배치(row/col) — 좌우 같은 행 정렬용 #}
+{% macro pick_card(p, area='') %}
+<div class="tcard"{% if area %} style="grid-area: {{ area }}"{% endif %}>
   <div class="trank">{% if p.type %}<b>{{ p.type }}</b>{% endif %}</div>
   <a class="timg" href="{{ p.url }}" rel="sponsored nofollow">
     {% if p.img_url %}<img loading="lazy" src="{{ p.img_url }}" alt="{{ p.name }}">{% endif %}
@@ -18,6 +20,7 @@
     <span class="tprice">{{ p.price }}</span>
     {% if p.disc %}<span class="tsig">정가 <s>{{ p.orig }}</s> · <b class="off">{{ p.disc }}↓</b></span>{% endif %}
   </div>
+  {% if p.volume %}<div class="tvol">🔥 알리 최근 판매량 <b>{{ p.volume }}</b><span class="dim"> · 판매처 기준</span></div>{% endif %}
   {% if p.pros %}<div class="pc-group"><div class="pc-label pros">장점</div>
     <ul class="tpc">{% for x in p.pros %}<li class="pro">{{ x }}</li>{% endfor %}</ul></div>{% endif %}
   {% if p.cons %}<div class="pc-group"><div class="pc-label cons">단점</div>
@@ -109,15 +112,14 @@
   {# 추천 6선 — 💰실속 / ⭐고급 2티어 (큐레이션, 점수 아님) #}
   <div class="sechead" id="picks"><div class="eb">추천 · 비교</div><h2>혼살림이 고른 {{ category.name }}</h2></div>
   <p class="tier-intro">예산에 따라 <b>💰 실속형</b>(가볍게 시작)과 <b>⭐ 고급형</b>(오래 쓸 본격)으로 나눠 비교합니다. <span class="dim">점수·순위가 아니라 1인 가구 관점의 큐레이션입니다.</span></p>
+  {# 좌(실속)·우(고급)를 한 그리드에 배치하고 카드마다 grid-area(행/열)를 지정 →
+     장점·단점 개수가 달라도 같은 행끼리 높이가 맞아 카드 아래단이 정렬됨(세션 #19).
+     DOM은 실속 묶음→고급 묶음 순(열 우선)이라 모바일(1열)에서 그룹이 유지된다. #}
   <div class="picks">
-    <div class="pick-col">
-      <div class="tier-label budget">💰 실속형</div>
-      {% for p in picks_budget %}{{ pick_card(p) }}{% endfor %}
-    </div>
-    <div class="pick-col">
-      <div class="tier-label premium">⭐ 고급형</div>
-      {% for p in picks_premium %}{{ pick_card(p) }}{% endfor %}
-    </div>
+    <div class="tier-label budget" style="grid-area: 1 / 1">💰 실속형</div>
+    {% for p in picks_budget %}{{ pick_card(p, (loop.index + 1) ~ ' / 1') }}{% endfor %}
+    <div class="tier-label premium" style="grid-area: 1 / 2">⭐ 고급형</div>
+    {% for p in picks_premium %}{{ pick_card(p, (loop.index + 1) ~ ' / 2') }}{% endfor %}
   </div>
   {% endif %}
 
@@ -160,22 +162,23 @@
   {# 전체 제품 카탈로그 (점수 없음) #}
   <div id="all"></div>
   <div class="sechead"><div class="eb">전체 제품</div><h2>{{ category.name }} 전체 보기</h2></div>
-  <div class="sortbar">
+  <div class="sortbar" id="catSort">
     <span class="lbl">정렬</span>
-    <span class="sort on">추천순</span><span class="sort">낮은 가격순</span><span class="sort">할인율 높은순</span>
+    <span class="sort on" data-sort="reco">추천순</span><span class="sort" data-sort="price">낮은 가격순</span><span class="sort" data-sort="disc">할인율 높은순</span>
   </div>
   <div class="filters">
-    <div class="frow"><span class="fl">티어</span><span class="chip on">전체</span><span class="chip">💰 실속형</span><span class="chip">⭐ 고급형</span></div>
+    <div class="frow" id="catTier"><span class="fl">티어</span><span class="chip on" data-tier="all">전체</span><span class="chip" data-tier="budget">💰 실속형</span><span class="chip" data-tier="premium">⭐ 고급형</span></div>
   </div>
-  <div class="countbar"><span>전체 <b>{{ products | length }}</b>개 · 추천순</span><span>가격·할인 기준 정렬</span></div>
-  <div class="grid">
+  <div class="countbar"><span id="catCount">전체 <b>{{ products | length }}</b>개 · 추천순</span><span>가격·할인 기준 정렬</span></div>
+  <div class="grid" id="catGrid">
     {% for p in products %}
-    <div class="card">
+    <div class="card" data-tier="{{ p.tier }}" data-price="{{ p.price_num }}" data-disc="{{ p.disc_num }}" data-idx="{{ loop.index0 }}">
       <div class="badges"><span class="tier t-{{ p.tier }}">{{ p.tier_label }}</span></div>
       <a class="img" href="{{ p.url }}" rel="sponsored nofollow">{% if p.img_url %}<img loading="lazy" src="{{ p.img_url }}" alt="{{ p.name }}">{% endif %}</a>
       <div class="nm">{{ p.name }}</div>
       <div class="price">{{ p.price }}</div>
       {% if p.disc %}<span class="sig">정가 <s>{{ p.orig }}</s> · <b class="off">{{ p.disc }}↓</b></span>{% else %}<span class="sig nodisc">단일가</span>{% endif %}
+      {% if p.volume %}<div class="vol">판매량 <b>{{ p.volume }}</b><span class="dim"> · 알리 기준</span></div>{% endif %}
       <div class="btns"><a class="btn primary" href="{{ p.url }}" rel="sponsored nofollow">최저가/구매 →</a></div>
     </div>
     {% endfor %}

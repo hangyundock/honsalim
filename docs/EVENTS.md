@@ -18,8 +18,29 @@
   - 세션 #9 (2026-05-29 자동 push 정책 N1 + dashboard 모듈 CLI 11/11 + secrets 경로 정정·회귀 352·9 commits)
   - 세션 #11 (2026-05-29~30 디자인 시안 5종·Jinja2 템플릿·builder.renderer·SEO/JSON-LD·enrich 버그수정·알리 수집기 골격+라이브검증·회귀 378. ※#10은 워크트리 폐기 정리만)
   - 세션 #12 (2026-05-30 알리 상품수집 CLI→C-1 연결→enrich 풀구축→4게이트 통과 첫 글·회귀 378→436·10 commits·메모리 incremental-critical-review·autonomous-safe-system 신설)
+  - 세션 #13 (2026-05-30 게시 경로 완성·★첫 글 honsalim.com 라이브 게시·무인 배포 파이프라인(방법A)·알리 whitelist 2채널 제출·회귀 436→470·1 commit e763e0f 배포 success)
 
 ## 최근 5세션
+
+### 세션 #19 — 2026-06-01 (Opus 4.8 1M, ★DeepSeek v4-pro 전면 전환 + 카테고리 디자인 마무리 + 관련성 필터 근본수정 + ★판매량 기준 추천 6선 + 신규 2카테고리, 회귀 590→623)
+
+**시작 상황**: `/honsalim-start`(워크트리 determined-bouman, HEAD #18). 회귀 590. 카테고리 페이지 추가 디자인 수정 요청으로 시작 → 도중 "AI를 DeepSeek로 바꿨다"(옆 AutoBlog #99가 메인에 미커밋 드롭인) 확인·전면 전환 → 추천 선정 기준(판매량) 개선까지 확대.
+
+**핵심 진척 [확정]** (※전부 로컬·미배포. honsalim.com은 #13 첫 글 유지):
+
+1. **카테고리 디자인 마무리**: 추천 카드 좌우 **행 정렬**(grid stretch·버튼 하단 고정 — 장단점 개수 달라도 아래단 일치) · 전체제품 **정렬(추천/가격/할인)·티어 필터 JS 작동**(`static/js/category.js`+data 속성, 기존엔 버튼만 있고 무동작) · 조건 버튼 **손가락 커서**(cursor:pointer). 브라우저 eval 측정으로 검증.
+2. **★DeepSeek v4-pro 전면 전환**: 본문생성 Sonnet→`deepseek/deepseek-v4-pro`. `claude_client.build_llm_client` 모델 라우팅(claude→Anthropic SDK, 그 외→OpenRouter REST), 응답을 Anthropic 형태로 감싸 파싱·게이트 무수정. meta_extractor 통일·config ANTHROPIC 필수키 제거·doctor LLM 키 점검. 키=`D:\secrets\.env` OPENROUTER_API_KEY. 라이브 검증. 이미지는 Imagen 유지.
+3. **DeepSeek 출력 변동 안정화**: 과밀(5.02%)·JSON 깨짐·"무조건" 단정표현 → 파서 후행콤마 관용+파싱실패 자가복원 + SEO 지시문 강화(통째반복 금지·밀도 3%·단정표현 금지). 결과 3%대 안정(노트북만 3.52% 수용).
+4. **★관련성 필터 근본수정**: laptop-stand 상위 캠핑 테이블 오염 — 원인=`require_any`(OR, "노트북"만 있으면 통과). `require_all`('타입+대상' 동시) 도입→구조적 탈락 + 재수집 정합화(옛 오염 제거) + 과도 제외어 보정.
+5. **★추천 6선 판매량 기준 선정**: "판매량·평점 기준" 요청 → 라이브 확인(`lastest_volume` 제공·`evaluate_rate` %만·별점 없음). migration 006 + 수집기 추출 + `select_featured`(판매량순·만족도 80% 하한·**항상 6개**·저평가 뒤로·부족분 0판매로) + 렌더러 판매량 정직표기. AI는 설명만. 89%대 보존·20%/66.7% 제외 검증.
+6. **신규 2 + 기존 2 재빌드**: 노트북거치대·모니터암 신규 + 모니터받침대·책상 재빌드 → 4개 전부 판매량 기준 6선·draft. office-chair 제품 0(미생성).
+7. **회귀 590→623** (+33). black·ruff·mypy 클린. CLAUDE.md §6 DeepSeek 갱신. 비용 ~$1.
+
+**무인·안전(§0)**: 가짜 평점 금지(별점 없음→판매량만 정직표기)·저평가(<80%) 추천 제외·require_all 오염 차단·DeepSeek 출력 자가복원·AI 자동 published 차단. 전부 draft.
+
+**다음 세션(#20) 할 일**: 1) 카테고리 4개 검토→`approve-category`+`build --full`→배포 2) 노트북 '전화' 제외어 결정 3) office-chair 생성 4) 메인 미커밋 DeepSeek 임시본 정리 5)(이월) /go/·알리 whitelist·main-protect. ★DB gitignore→재생성 시 collect(판매량 채움) 먼저.
+
+---
 
 ### 세션 #18 — 2026-05-31 (Opus 4.8 1M, 운영자 승인 게이트 + doctor 보강 + ★카테고리 페이지 디자인 디버깅·정형화(글씨 흐림 진짜원인=backdrop-filter), 회귀 569→590)
 
@@ -110,36 +131,3 @@
 - 용어 교체 배포 반영 확인 · /go/ 링크 미작동 · 알리 이미지 허용 확인 · 네이버 폰트 확정(Chrome) · 알리 whitelist 답변.
 
 **다음 세션 할 일**: 1) **페이지 재설계 본구현**(파이프라인→2티어 수집→가격재조회→렌더러→더보기) 2) 용어 배포 반영 확인 3) /go/ 링크 작동.
-
----
-
-### 세션 #13 — 2026-05-30 (Opus 4.8 1M, 게시 경로 완성·★첫 글 honsalim.com 라이브 게시·무인 배포 파이프라인(방법 A)·알리 whitelist 2채널 제출, 회귀 436→470, 1 commit e763e0f 배포 success)
-
-**시작 상황**: `/honsalim-start` → 워크트리 `laughing-raman-13b581`(main=origin/main=7b572ad #12, 0/0 동기). 회귀 436. "잔존작업 정리 후 게시 경로 배선" 사용자 지시.
-
-**핵심 진척 [확정]**:
-
-1. **잔존작업 정리**: 문서 stale 정정(#12 워크트리 병합 이미 완료 확인·cap STATE 10KB↓)·**codeql v3→v4**. 잔존 워크트리 5개 폐기는 수동 거부로 보류.
-
-2. **게시 경로 핵심 완성** (조사로 진짜 갭 발견 — 본문에 제휴 링크 0개라 순수 prose=수익0):
-   - `extract_disclosure_first` **제휴처 무관 근본수정**(알리 글이 None→promote NOT NULL 위반하던 잠복버그 + 회귀 가드)
-   - **promote CLI**(`cmd_promote`): enriched→article_fields 조립(md→HTML·slug·content_hash·disclosure)·`promote_to_article`·**`link_article_products`**(featured→article_products=/go/ 소스). 검증된 body_md 무변형(content_hash 무결)
-   - **renderer 상세글**: articles⋈article_products⋈products → article.html → `articles/<slug>/index.html` + `.art-body` prose CSS
-   - **article.html 실데이터화**(목업→body_html 산문 + 실제 product_card `/go/`·`rel=sponsored nofollow`) · **시나리오 카드 404 방지**(글 없으면 비클릭 "준비 중")
-   - 라이브 검증: draft 6→article 1(8 제휴상품·실가격·고지). 데스크톱 3열/모바일 1열 반응형 확인
-
-3. **D1 slug_map 동기화**: `tracker/slug_map.py`(published 상품→D1 UPSERT·SQL escape·dry-run 기본)+`sync-slugmap` CLI+`sql/d1/schema.sql`. dry-run 실데이터 검증(렌더 /go/ 8개와 동일집합). **d1_aggregator `clicks.timestamp→ts` 버그 근본수정+가드**(라이브 집계 실패 잠복).
-
-4. **무인 배포 파이프라인 (방법 A — DECISIONS N2)**: `.gitignore` build/site 커밋 허용 · `build.yml` 재작성(test 게이트→build/site 검증→`pages deploy build/site`, CI 재빌드 없음) · robots.txt·_headers · renderer LF · pre-commit build/site 제외.
-
-5. **★첫 글 go-live [확정]**: e763e0f(40파일, build/site 포함) commit → `git push origin HEAD:main`(FF) → **GitHub Actions deploy success**(CI 470 통과·CF_API_TOKEN Pages 권한 확인). honsalim.com placeholder→진짜 사이트(첫 글 "홈오피스 50만원 세팅" 8 제휴상품·고지) 라이브 검증.
-
-6. **알리 whitelist 2채널 제출 [확정 사용자]**: ①이메일(새벽 affiliates@service.alibaba.com) ②**포털 XFeedback**(portals.aliexpress.com 우하단 봉투, 'ali' 오탐 해명+스크린샷 증거, My Feedbacks "To do"). **사이트등록폼은 'ali' 자동검증으로 Submit 불가 확정** → 사람 화이트리스트만 길. 채널유형=Content/Vertical sites 안내.
-
-**무인·안전**: 배포 deny-list 확인(`wrangler deploy`·`honsalim deploy` Claude 차단=의도된 §2-라/마 장치) → 방법 A로 CI 배포. pre-commit이 mypy·line-ending 잡음(훅 정상). §0 원칙대로 발견 버그(d1_aggregator) 근본수정.
-
-**잔존 미해결 (다음 세션)**:
-- **★/go/ 제휴 링크 미작동(수익 직결)**: D1 slug_map 라이브 쓰기(`sync-slugmap --no-dry-run`, deny-list라 사람/CI) + go_gateway Worker 배포(deny-list). 현재 "추천 보기"→홈.
-- 상품 이미지(우드톤 placeholder, 의도) · 시나리오 추가 글(현재 1편) · 알리 답변 대기 · 로컬 main pull(origin e763e0f, 로컬 main 7b572ad) · main-protect 재활성화.
-
-**다음 세션 할 일**: 1) **/go/ 링크 작동**(D1 동기화+go_gateway Worker 배포)→첫 글 수익화 2) 상품 이미지 보강 3) 알리 whitelist 답변 확인(무응답 3~4영업일 시 follow-up)

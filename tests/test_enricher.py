@@ -87,9 +87,9 @@ class TestPromptLoader:
 
 class TestClaudeClient:
     def test_defaults_match_backend_spec(self) -> None:
-        """BACKEND §3-1 매개변수. 세션 #15: 모델 Haiku→Sonnet(카테고리 본문 품질 우선·사용자 결정).
+        """BACKEND §3-1 매개변수. 세션 #19: 본문 생성 모델 Sonnet→DeepSeek v4-pro(전 K-Content 통일).
         max_tokens는 라이브 검증으로 8192 상향 [확정 2026-05-30]."""
-        assert DEFAULT_MODEL == "claude-sonnet-4-6"
+        assert DEFAULT_MODEL == "deepseek/deepseek-v4-pro"
         assert DEFAULT_MAX_TOKENS == 8192
         assert DEFAULT_TEMPERATURE == 0.4
 
@@ -130,9 +130,15 @@ class TestClaudeClient:
         assert len(result.system_blocks) == 2
         assert "원룸 30만원" in result.user_prompt
 
-    def test_generate_real_call_requires_api_key(self) -> None:
-        """dry_run=False + 키 없음 → RuntimeError."""
-        client = ClaudeClient(api_key=None)
+    def test_generate_real_call_requires_api_key(self, monkeypatch) -> None:
+        """dry_run=False + LLM 키 없음 → 네트워크 호출 전에 RuntimeError (세션 #19 DeepSeek 경로).
+
+        OpenRouter 키 로더를 빈 값으로 강제해 실제 HTTP 호출 없이 결정적으로 검증한다.
+        """
+        import enricher.claude_client as cc
+
+        monkeypatch.setattr(cc, "load_openrouter_key", lambda: "")
+        client = ClaudeClient(api_key=None)  # 기본 모델 = deepseek → OpenRouter 경로
         req = GenerateRequest(
             scenario={"slug": "test", "title_ko": "x"},
             persona={"slug": "cheot-jachi"},

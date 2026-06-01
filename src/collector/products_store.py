@@ -36,12 +36,14 @@ _UPSERT_SQL = """
 INSERT INTO products (
     source, source_product_id, name, category_path,
     price_krw, original_price_krw, discount_pct, price_checked_at,
+    sales_volume, evaluate_rate,
     currency, image_url_external,
     deeplink_url, deeplink_slug, affiliate_tag, availability, last_seen_at
 ) VALUES (
     :source, :source_product_id, :name, :category_path,
     :price_krw, :original_price_krw, :discount_pct,
     CASE WHEN :price_krw IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END,
+    :sales_volume, :evaluate_rate,
     :currency, :image_url_external,
     :deeplink_url, :deeplink_slug, :affiliate_tag, :availability, CURRENT_TIMESTAMP
 )
@@ -54,6 +56,8 @@ ON CONFLICT(source, source_product_id) DO UPDATE SET
     price_checked_at   = CASE
                             WHEN excluded.price_krw IS NOT NULL THEN CURRENT_TIMESTAMP
                             ELSE products.price_checked_at END,
+    sales_volume       = excluded.sales_volume,
+    evaluate_rate      = excluded.evaluate_rate,
     currency           = excluded.currency,
     image_url_external = excluded.image_url_external,
     deeplink_url       = excluded.deeplink_url,
@@ -105,6 +109,8 @@ def upsert_products(conn: sqlite3.Connection, rows: Iterable[dict[str, Any]]) ->
             "price_krw": row.get("price_krw"),
             "original_price_krw": row.get("original_price_krw"),
             "discount_pct": row.get("discount_pct"),
+            "sales_volume": row.get("sales_volume"),
+            "evaluate_rate": row.get("evaluate_rate"),
             "currency": row.get("currency") or "KRW",
             "image_url_external": row.get("image_url_external"),
             "deeplink_url": row["deeplink_url"],

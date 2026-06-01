@@ -179,15 +179,11 @@ class MetaExtractor:
         self._sdk_client: Any = None
 
     def _get_sdk_client(self) -> Any:
-        if self._sdk_client is not None:
-            return self._sdk_client
-        try:
-            import anthropic
-        except ImportError as e:
-            raise RuntimeError("anthropic SDK 미설치 — pip install anthropic") from e
-        if not self.api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY 누락 — config.load_secrets() 호출 필요")
-        self._sdk_client = anthropic.Anthropic(api_key=self.api_key)
+        """모델 라우팅 LLM 클라이언트 lazy 생성 (claude→Anthropic SDK, 그 외→OpenRouter). 세션 #19."""
+        if self._sdk_client is None:
+            from enricher.claude_client import build_llm_client
+
+            self._sdk_client = build_llm_client(self.model, self.api_key)
         return self._sdk_client
 
     def extract(self, request: ExtractRequest, dry_run: bool = True) -> ExtractResult:

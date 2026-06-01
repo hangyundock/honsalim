@@ -87,7 +87,7 @@
 - **분야**: 1인 가구·자취·홈오피스·일상살림 어필리에이트 (비YMYL)
 - **컨셉**: 시나리오 추천 + 미니멀+따뜻함
 - **수익**: 쿠팡 파트너스(메인) + AliExpress(보조). AdSense 6개월 후 결정.
-- **기술 스택**: Python 3.10 + Jinja2 직접 빌더 + Cloudflare Pages + SQLite + Claude API (본문 생성 **Sonnet** `claude-sonnet-4-6` — 세션 #15, 카테고리 페이지 품질 우선·저볼륨. 비용 과다청구 방지는 재시도 상한 2·게이트 과민완화로 대응)
+- **기술 스택**: Python 3.10 + Jinja2 직접 빌더 + Cloudflare Pages + SQLite + LLM API (본문 생성 **DeepSeek v4-pro** `deepseek/deepseek-v4-pro` via OpenRouter — 세션 #19, 전 K-Content 통일·주인 결정 2026-06-01. 모델명이 `claude`로 시작하면 Anthropic SDK, 그 외는 OpenRouter REST로 라우팅(`enricher/claude_client.build_llm_client`). 키=`OPENROUTER_API_KEY`(환경변수 또는 `D:\secrets\.env`). 이미지 생성은 Google Imagen 유지(텍스트 LLM 무관). 비용 과다청구 방지는 재시도 상한 2·게이트 과민완화로 대응)
 - **빌드**: GitHub Actions (공개 저장소, Linux Python 3.10)
 - **배포**: wrangler pages deploy (Direct Upload)
 - **DB**: `data/honsalim.db` (SQLite)

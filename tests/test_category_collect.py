@@ -56,6 +56,15 @@ class TestLoadSources:
         assert oc.tiers["budget"].q == "office chair"
         assert oc.tiers["premium"].min_price == 100000
 
+    def test_laptop_stand_uses_require_all_groups(self) -> None:
+        # 세션 #19: '타입+대상' 동시 충족 그룹이 yml에서 파싱되는지
+        s = cc.load_sources()
+        assert "laptop-stand" in s
+        ls = s["laptop-stand"]
+        assert len(ls.require_all) == 2  # [노트북 계열] + [거치대 계열]
+        assert any("노트북" in g for g in ls.require_all)
+        assert any("거치대" in g for g in ls.require_all)
+
 
 class TestDryRun:
     def test_dry_run_no_db_write(self) -> None:
@@ -139,6 +148,77 @@ class TestLiveMocked:
         res = cc.collect_category(conn, "office-chair", dry_run=False, sleep=0)
         assert res.linked == 1  # 중복 제외 — 한 번만 연결
         assert conn.execute("SELECT COUNT(*) FROM category_products").fetchone()[0] == 1
+
+    def test_recollect_removes_stale_catalog(self, monkeypatch: Any) -> None:
+        """재수집 정합화(세션 #19): 이전엔 잡혔다가 이번엔 안 잡힌 카탈로그 상품을 자동 제거.
+
+        필터를 강화해 재수집하면 옛 오염(예 캠핑 테이블)이 idempotent하게 청소되는지 검증.
+        """
+        if pytest is None:  # pragma: no cover
+            return
+        conn = _conn()
+        state = {"run": 0}
+
+        def fake_query(q: str, **kw: Any) -> ali.QueryResult:
+            items = [_item("P1", "메쉬 사무용 의자")]
+            if state["run"] == 0:
+                items.append(_item("P2", "가죽 사무용 의자"))  # 1차에만 등장 → 2차에 제거되어야
+            return ali.QueryResult(dry_run=False, request={}, products=items, resp_code="200")
+
+        monkeypatch.setattr(cc.ali, "query_products", fake_query)
+        monkeypatch.setattr("common.config.load_secrets", lambda *a, **k: None)
+
+        r1 = cc.collect_category(conn, "office-chair", dry_run=False, sleep=0)
+        assert r1.removed_stale == 0
+        ids1 = {
+            r[0]
+            for r in conn.execute(
+                "SELECT p.source_product_id FROM category_products cp "
+                "JOIN products p ON p.id = cp.product_id"
+            )
+        }
+        assert ids1 == {"P1", "P2"}
+
+        state["run"] = 1
+        r2 = cc.collect_category(conn, "office-chair", dry_run=False, sleep=0)
+        ids2 = {
+            r[0]
+            for r in conn.execute(
+                "SELECT p.source_product_id FROM category_products cp "
+                "JOIN products p ON p.id = cp.product_id"
+            )
+        }
+        assert ids2 == {"P1"}  # 오염(P2) 청소됨 — 재수집 idempotent
+        assert r2.removed_stale == 1
+
+    def test_recollect_preserves_featured_picks(self, monkeypatch: Any) -> None:
+        """정합화는 카탈로그(is_featured=0)만 비우고 추천 6선(is_featured=1)은 보존."""
+        if pytest is None:  # pragma: no cover
+            return
+        conn = _conn()
+
+        def fake_query(q: str, **kw: Any) -> ali.QueryResult:
+            return ali.QueryResult(
+                dry_run=False,
+                request={},
+                products=[_item("P1", "메쉬 사무용 의자")],
+                resp_code="200",
+            )
+
+        monkeypatch.setattr(cc.ali, "query_products", fake_query)
+        monkeypatch.setattr("common.config.load_secrets", lambda *a, **k: None)
+
+        cc.collect_category(conn, "office-chair", dry_run=False, sleep=0)
+        cid = conn.execute("SELECT id FROM categories WHERE slug='office-chair'").fetchone()[0]
+        conn.execute("UPDATE category_products SET is_featured = 1 WHERE category_id = ?", (cid,))
+        conn.commit()
+
+        cc.collect_category(conn, "office-chair", dry_run=False, sleep=0)  # 재수집
+        feat = conn.execute(
+            "SELECT COUNT(*) FROM category_products WHERE category_id = ? AND is_featured = 1",
+            (cid,),
+        ).fetchone()[0]
+        assert feat == 1  # 추천(featured) 보존 — ON CONFLICT가 is_featured를 내리지 않음
 
 
 if __name__ == "__main__":

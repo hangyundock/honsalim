@@ -37,6 +37,21 @@ class TestBuildDirective:
         out = build_seo_directive(PRIMARY, ["컴퓨터의자", "  ", ""])
         assert "컴퓨터의자" in out
 
+    def test_caps_repetition_and_bans_absolutes(self) -> None:
+        # 세션 #19(A): 통째 반복 금지·대체 표현·밀도 상한·단정/과장 표현 금지 — DeepSeek 과밀 대책
+        out = build_seo_directive("노트북 거치대", [])
+        assert "통째로 반복하지" in out  # 키워드 통째 반복 금지
+        assert "3% 이내" in out  # 밀도 상한 명시
+        assert "제품" in out  # 대체 표현 안내
+        assert "무조건" in out and "절대" in out  # 단정·과장 금지 어휘
+
+    def test_short_form_substitution(self) -> None:
+        from enricher.seo_directive import _short_form
+
+        assert _short_form("노트북 거치대") == "거치대"
+        assert _short_form("컴퓨터 책상") == "책상"
+        assert _short_form("모니터암") == "모니터암"  # 단일어는 그대로
+
 
 class TestPromptInjection:
     def test_directive_injected_when_seo_present(self) -> None:

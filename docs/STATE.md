@@ -7,19 +7,19 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#18: 운영자 승인 게이트 + doctor 보강 + ★카테고리 디자인 디버깅·정형화** (로컬·미배포). 승인 게이트(build-category→`draft`·`approve-category` CLI·`category_state`·renderer published 필터·대시보드) / doctor 진입점 64 / 디자인(★흐림 진짜원인=`backdrop-filter` 제거·색#111·폭1080 단일칼럼·정보성 14px·FAQ Q/A·장점단점 그룹·마크다운, **새 카테고리 자동적용**) / 2순위 배포 진행중(DB 재생성 desk·monitor=draft). 회귀 569→**590**. 남음=승인+공개배포·**카테고리 추가 디자인 수정(사용자, 다음세션 연속)**. 상세 DECISIONS O21~O22·EVENTS #18 | 2026-05-31 #18 |
+| 진행 단계 | **#19: ★DeepSeek v4-pro 전면 전환 + 카테고리 디자인 마무리 + 관련성 필터 근본수정 + ★판매량 기준 추천 6선 + 신규 2카테고리** (로컬·미배포). 본문생성 Sonnet→DeepSeek(OpenRouter 라우팅·출력 안정화) / 디자인(추천카드 행정렬·정렬·필터 JS·커서) / 관련성 `require_all`(타입+대상)+재수집 정합화 / 추천6선=판매량순·만족도80%하한·항상6개·정직표기 / 카테고리 **4개 전부 draft·6선**. 회귀 590→**623**. 남음=승인+배포·노트북'전화'제외어. 상세 EVENTS #19 | 2026-06-01 #19 |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·Secrets·main-protect)·Cloudflare(도메인·Pages·R2·D1)·Anthropic·INDEXNOW 키·secrets·Git push·pre-commit 9종·Dependabot (세부 archive) | #3 |
 | Phase 2 핵심 모듈 (#3~#5) | cli·common·validator·writer·collector·enricher·builder·deployer·tracker·workers (세부 BACKEND §2) + **#17: category_collect·category_page_builder·concept_image·category_writer** | #17 |
-| Phase 2 회귀 테스트 | **590 / 590 PASS** [확정 pytest, #18] — #18 +21 (category_state 9·renderer published게이트/마크다운 4·design_tokens 가드 3·cli 3 등). #17 569. black·ruff·mypy 클린 | 2026-05-31 |
+| Phase 2 회귀 테스트 | **623 / 623 PASS** [확정 pytest, #19] — #19 +33 (test_llm_routing 10·require_all/정합화·select_featured 판매량선정·파서 견고화·지시문·map_product 신호 등). #18 590. black·ruff·mypy 클린 | 2026-06-01 |
 | CLI 명령 (BACKEND §9) | **18개** — doctor · db · collect · collect-products · enrich · validate · approve · promote · unapprove · deploy · sync-slugmap · build(+`--preview` draft포함 미리보기, #18) · dashboard · collect-category · build-category · **approve-category(#18 신규: draft→published 1클릭 승인)** · **unapprove-category(#18 신규: 공개 취소)** | #18 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD. 세부 DECISIONS J·O + EVENTS | #4~#16 |
-| doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **64개** (#18: category_state·category_page_builder·concept_image·category_collect 등 6 추가). 64/64 OK | #18 |
-| DB 초기화 | `data/honsalim.db` **v5** + categories(3: 의자·책상·모니터)·category_products + products 정가/할인 컬럼 (migration 002~005, #17) + personas 3·scenarios 10. ※DB는 gitignore — 다음 워크트리는 `collect-category`·`build-category`로 재생성 | #17 |
+| doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **64개** + #19 **LLM 키 점검**(활성 모델 기준 OPENROUTER/ANTHROPIC). 64/64 OK | #19 |
+| DB 초기화 | `data/honsalim.db` **v6** + categories(**5**: 의자·책상·모니터받침대·**노트북거치대·모니터암**)·category_products + products 정가/할인·**판매량(sales_volume)/만족도(evaluate_rate)** 컬럼 (migration 002~**006**, #19) + personas 3·scenarios 10. ※DB는 gitignore — 다음 워크트리는 `collect-category`·`build-category`로 재생성 | #19 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (docs/ 참조). 일관성 모순 0건 | #2 |
 | 메모리 시스템 | feedback 7건([[incremental-critical-review]]·[[autonomous-safe-system]] 등) + reference market_research + MEMORY.md | #12 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
-| 사이트 게시글 / 트래픽 / 수익 | **1편 라이브 게시** (honsalim.com/articles/homeoffice-chair-desk-50/, #13 배포) + **카테고리 2개(모니터 받침대·컴퓨터 책상) 로컬 `draft`**(글+이미지+#18 디자인 정형화, **미승인·미배포** — 승인+배포는 #19) / N/A / N/A (수익은 /go/ 링크 작동+알리 whitelist 후) | #18 |
+| 사이트 게시글 / 트래픽 / 수익 | **1편 라이브 게시** (honsalim.com/articles/homeoffice-chair-desk-50/, #13 배포) + **카테고리 4개(노트북거치대·모니터암·모니터받침대·컴퓨터책상) 로컬 `draft`**(글+이미지+**판매량 기준 추천 6선 각 6개**, **미승인·미배포** — 승인+배포는 #20) / N/A / N/A (수익은 /go/ 링크 작동+알리 whitelist 후) | #19 |
 
 ## 인프라
 
@@ -32,8 +32,8 @@
 | GitHub Secrets / Branch Protection | CF_API_TOKEN · CF_ACCOUNT_ID · INDEXNOW_KEY 등록 / ruleset `main-protect` Active |
 | R2 / D1 | `honsalim-images` (APAC) / `honsalim-clicks` ID `9bae858e-456f-40e7-8084-c3b90e4ec3ca` |
 | Python | 3.10 32-bit (TIMA·AutoBlog 시스템 공유) |
-| DB / 로그 | `data/honsalim.db` (v1) / `logs/honsalim.log` (Phase 2) |
-| secrets | **`D:\secrets\affiliate_hub\`** (cloudflare.env·indexnow.env·ali.env·복구 코드 2종) + **`D:\secrets\honsalim.env`** (GOOGLE_API_KEY, 세션 #9 사용자 보안 결정 — secrets/ 바로 아래 단일 파일) |
+| DB / 로그 | `data/honsalim.db` (v6) / `logs/honsalim.log` (Phase 2) |
+| secrets | **`D:\secrets\affiliate_hub\`** (cloudflare.env·indexnow.env·ali.env·복구 코드 2종) + **`D:\secrets\honsalim.env`** (GOOGLE_API_KEY) + **`D:\secrets\.env` OPENROUTER_API_KEY** (K-Content 공유 — DeepSeek 본문생성 경유, 세션 #19) |
 
 ## 자격증명 만료 (시급 사안)
 
@@ -58,19 +58,20 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 시급 (다음 세션 #19) — #18 갱신 (상세: DECISIONS O21~O22 · EVENTS #18). 승인 게이트·doctor 완료, 디자인 디버깅 큰 진척 → **카테고리 페이지 디자인 마무리 + 배포**가 다음 단계.
-1. **★카테고리 페이지 추가 디자인 수정 (사용자 — 연속 작업)**: #18에서 색·폰트·폭·흐림·FAQ·장점단점·글씨크기 대거 수정했으나 **"이 페이지 수정할 부분 더 있다"**고 함. 다음 세션 이어서 연속 수정. (현재 desk/monitor 미리보기 `build/preview`에서 확인 가능 — DB 재생성 후)
-2. **★#18 2순위 배포 완료** (승인 후): `approve-category desk`·`monitor-stand`(draft→published) → `build --full`(build/site, published만) → honsalim.com (방법A, **사용자 승인**). 현 `build/site`는 #13 옛 사이트.
-3. **나머지 카테고리**: 의자(카탈로그만 → `build-category office-chair`) · 모니터암 등 신규(category_sources·seo_keywords·seed 등록 후 2명령).
-4. (이월) ★/go/ 제휴 링크 작동(D1 slug_map·go_gateway, 수익직결) · 알리 whitelist 답변 · main-protect 재활성화.
-- 참고: **미리보기=`PYTHONPATH=src python -m cli build --preview`**(draft 포함·검토용, `build/preview`) / 공개=`build --full`(published만, `build/site`). ★워크트리 실행=`PYTHONPATH=src python -m cli <명령>`(`honsalim`은 메인 체크아웃 가리킴). **DB는 gitignore→다음 워크트리에서 `collect-category desk`·`monitor-stand` --no-dry-run + `build-category` --no-dry-run으로 재생성**(API ~$0.6). 미리보기 시 브라우저 캐시→강력새로고침/시크릿창.
+### ★ 시급 (다음 세션 #20) — #19 갱신 (상세 EVENTS #19). DeepSeek 전환·디자인·관련성·판매량 선정·신규 2카테고리 완료 → **검토·승인·배포**가 다음 단계.
+1. **★카테고리 4개 검토 → 승인 → 배포**: 노트북거치대·모니터암·모니터받침대·컴퓨터책상(전부 draft·6선). 검토 후 `approve-category <slug>`(draft→published) → `build --full`(build/site) → honsalim.com(방법A, **사용자 승인**). 현 `build/site`는 #13 옛 사이트.
+2. **노트북거치대 '전화' 제외어 결정**: 1위 픽이 "전화 태블릿 겸용" 베스트셀러(판매량 1391·노트북 거치 가능). 노트북 전용만 원하면 `category_sources.yml` laptop-stand exclude에 "전화" 추가.
+3. **office-chair(사무용 의자) 콘텐츠 생성**: 현재 제품 0 — `collect-category office-chair`(category_sources에 정의됨) → `build-category`.
+4. **메인 작업본 미커밋 DeepSeek 임시본 정리**: 메인(D:\affiliate_hub)에 AutoBlog #99가 넣은 미커밋 `claude_client.py`(드롭인) 있음 — 이 워크트리의 정식 버전이 supersede. 머지 전 메인 미커밋분 되돌리면 충돌 없음.
+5. (이월) ★/go/ 제휴 링크 작동(D1 slug_map·go_gateway, 수익직결) · 알리 whitelist 답변 · main-protect 재활성화.
+- 참고: **미리보기=`PYTHONPATH=src python -m cli build --preview`**(draft 포함, `build/preview`) / 공개=`build --full`(published만). ★워크트리 실행=`PYTHONPATH=src python -m cli`. **DB는 gitignore→다음 워크트리에서 4개 카테고리 `collect-category` --no-dry-run + `build-category` --no-dry-run 재생성 필요**(판매량 채우려면 collect 먼저, API ~$1). 미리보기 시 강력새로고침/시크릿창.
 
-### 해소 (세션 #18)
-- ~~★운영자 1클릭 승인 게이트~~ ✅ `writer/category_state`(approve/unapprove/pending_approval) · build-category→`draft`(AI 자동 published 차단·재빌드 시 재승인 강제) · renderer `published`만 렌더(+`include_drafts` 미리보기) · 대시보드 승인대기 섹션 · `approve-category`/`unapprove-category` CLI
-- ~~doctor 보강~~ ✅ §10 진입점 64개(category_state·category_page_builder·concept_image·category_collect 등 6 추가, 64/64 OK)
-- ~~★카테고리 페이지 흐림·가독성·정형화 (라이브 디버깅)~~ ✅ **진짜 원인=`backdrop-filter`**(헤더 유리효과 → Windows Chrome 페이지 전체 텍스트 GPU 합성 → ClearType off → 뿌연 흐림) **제거** · 본문색 #111 · 폭 1080px 단일칼럼 통일 · 정보성 글씨 최소 14px · 마크다운 `**`→`<strong>` · 흔한실수 ①②③ 줄바꿈 · FAQ Q/A 구분(배경+마커) · 추천카드 장점/단점 그룹 · 가격+할인 같은 줄 · 폰트 NanumSquare Neo(중간두께 없음·weight 400)
-- **재발방지 가드(신규)**: `tests/test_design_tokens.py`(색 대비·위계·`.wrap` 좌우패딩·마크다운) · `tests/test_category_state.py`(승인 전이·견고성). 회귀 +21=590
-- **정형화 확인**: desk에서 수정 → monitor-stand도 자동 동일(공통 CSS·템플릿·renderer). 새 카테고리는 콘텐츠만 AI 생성, 디자인은 자동
+### 해소 (세션 #19) — 상세 EVENTS #19
+- ~~디자인 마무리~~ ✅ 추천카드 행 정렬·정렬/필터 JS 작동·손가락 커서
+- ~~★DeepSeek 전면 전환~~ ✅ `build_llm_client` 라우팅(claude→Anthropic, 그 외→OpenRouter) + 출력 변동 안정화(파서 견고화·자가복원·SEO 지시문 강화로 과밀 3%대)
+- ~~★관련성 필터 한계(캠핑 테이블 오염)~~ ✅ `require_all`(타입+대상) + 재수집 정합화
+- ~~★추천 6선 불투명~~ ✅ **판매량 기준 선정**(migration 006·만족도 80% 하한·항상 6개·정직표기·AI는 설명만)
+- 재발방지 가드 다수(회귀 +33=623). 공통 코드라 신규 카테고리 자동 적용·기존 4개 재빌드 완료
 
 ### Phase 2 진척 가능 (검토 의존 큼)
 - `src/builder/manifest.py` 증분 빌드 (ARCH §7·DB §10) · `src/collector/coupang.py` (Phase 4)
@@ -90,7 +91,6 @@
 
 | 일자 | 이벤트 |
 |------|--------|
-| ~~2026-05-29~06-01~~ | ~~알리 심사 결과~~ → **2026-05-28 승인 [확정]** |
 | 2026-06 | Phase 2 핵심 시스템 본격 |
 | 2026-07 중반 | Phase 3 디자인·콘텐츠 |
 | 2026-07 말 | Phase 4 첫 출시 |

@@ -172,6 +172,23 @@ class TestMapProduct:
         assert row["original_price_krw"] is None
         assert row["discount_pct"] is None
 
+    def test_sales_volume_and_evaluate_rate(self) -> None:
+        # 세션 #19 — 추천 6선 선정 신호: lastest_volume(정수) + evaluate_rate("93.8%"→93.8)
+        item = {
+            "product_id": "9",
+            "product_title": "노트북 거치대",
+            "lastest_volume": 9217,
+            "evaluate_rate": "93.8%",
+        }
+        row = ali.map_product(item, "T")
+        assert row["sales_volume"] == 9217
+        assert row["evaluate_rate"] == 93.8
+
+    def test_signals_none_when_absent(self) -> None:
+        row = ali.map_product({"product_id": "10", "product_title": "x"}, "T")
+        assert row["sales_volume"] is None
+        assert row["evaluate_rate"] is None
+
 
 class TestResponseParsing:
     """라이브 응답 구조 [확정 2026-05-30] 기반 — 성공·빈결과·시스템오류 파싱."""

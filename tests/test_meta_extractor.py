@@ -249,9 +249,15 @@ class TestMetaExtractor:
         assert len(result.system_blocks) == 2  # system_base + tone_examples
         assert "본문 내용" in result.user_prompt
 
-    def test_extract_real_call_requires_api_key(self) -> None:
-        """dry_run=False + 키 없음 → RuntimeError."""
-        extractor = MetaExtractor(api_key=None)
+    def test_extract_real_call_requires_api_key(self, monkeypatch) -> None:
+        """dry_run=False + LLM 키 없음 → 네트워크 호출 전에 RuntimeError (세션 #19 DeepSeek 경로).
+
+        OpenRouter 키 로더를 빈 값으로 강제해 실제 HTTP 호출 없이 결정적으로 검증한다.
+        """
+        import enricher.claude_client as cc
+
+        monkeypatch.setattr(cc, "load_openrouter_key", lambda: "")
+        extractor = MetaExtractor(api_key=None)  # 기본 모델 = deepseek → OpenRouter 경로
         req = ExtractRequest(body_md="본문", persona={"slug": "p"}, scenario={"slug": "s"})
         with raises(RuntimeError):
             extractor.extract(req, dry_run=False)

@@ -24,10 +24,12 @@ except ImportError:  # 의존성 미설치 환경 대비
 SECRETS_DIR = Path(r"D:\secrets\affiliate_hub")
 
 # BACKEND §11-1 환경 변수 표 — Phase 1 운영 시점 필수 키
+# 세션 #19: 본문 생성이 DeepSeek(OpenRouter)로 전환되며 ANTHROPIC_API_KEY는 더 이상 필수 아님.
+# LLM 키(활성 모델 기준 OPENROUTER_API_KEY / ANTHROPIC_API_KEY)는 doctor가 별도 점검한다
+# (OPENROUTER_API_KEY는 K-Content 공유 D:\secrets\.env에 있어 이 폴더 .env 로딩 대상이 아님).
 REQUIRED_KEYS_PHASE1: tuple[str, ...] = (
     "CF_API_TOKEN",
     "CF_ACCOUNT_ID",
-    "ANTHROPIC_API_KEY",
     "INDEXNOW_KEY",
 )
 

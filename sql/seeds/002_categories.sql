@@ -17,4 +17,11 @@ VALUES
    'homeoffice', '홈오피스', 'homeoffice-chair-desk-50', 20, 'draft'),
   ('monitor-stand', '모니터 받침대',
    '책상 위 공간을 정리하고 모니터를 눈높이에 맞추는 받침대. 형태·수납·재질을 1인 가구 책상 기준으로 비교합니다.',
-   'homeoffice', '홈오피스', 'homeoffice-chair-desk-50', 30, 'draft');
+   'homeoffice', '홈오피스', 'homeoffice-chair-desk-50', 30, 'draft'),
+  -- 세션 #19 홈오피스 클러스터 확장 (DeepSeek 전환 후 첫 신규 생성)
+  ('laptop-stand', '노트북 거치대',
+   '노트북을 눈높이에 맞춰 목·어깨 부담을 줄이는 거치대. 높이·각도·접이·재질을 1인 가구 책상 기준으로 비교합니다.',
+   'homeoffice', '홈오피스', 'homeoffice-chair-desk-50', 40, 'draft'),
+  ('monitor-arm', '모니터암',
+   '책상 위를 비우고 모니터 위치를 자유롭게 잡는 거치 암. VESA 호환·가동 방식·내구를 1인 가구 책상 기준으로 비교합니다.',
+   'homeoffice', '홈오피스', 'homeoffice-chair-desk-50', 50, 'draft');

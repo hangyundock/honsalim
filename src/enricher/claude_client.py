@@ -1,16 +1,16 @@
-"""Claude API 클라이언트 — Anthropic SDK 진입.
+"""LLM 클라이언트 — 모델 라우팅 진입 (claude→Anthropic SDK, deepseek→OpenRouter).
 
-출처: BACKEND §3 [확정] + DECISIONS A·E·I [확정].
+출처: BACKEND §3 [확정] + DECISIONS A·E·I [확정] + 세션 #19 DeepSeek 전환.
 
-Phase 2 stub:
+구조:
 - 클라이언트 인스턴스 생성·캐시 친화 프롬프트 빌더 구현
-- 실제 .messages.create() 호출은 활성화하지 않음 (API 비용·트레이드오프 사용자 결정 영역)
-- generate_article()은 dry_run=True가 기본 — 빌드된 프롬프트만 반환
-- dry_run=False 호출은 사용자가 명시적으로 선택해야 안전
+- generate_article()/generate_raw()은 dry_run=True가 기본 — 빌드된 프롬프트만 반환
+- dry_run=False 호출은 사용자가 명시적으로 선택해야 안전 (외부 비용)
+- build_llm_client가 모델명으로 백엔드 라우팅: "claude*"→Anthropic SDK, 그 외→OpenRouter REST
 
 BACKEND §3-1 매개변수:
-- 모델 claude-sonnet-4-6 (세션 #15 사용자 결정 — 카테고리 페이지 본문은 품질 우선·저볼륨이라 Sonnet.
-  tistory_revival도 글생성=Sonnet. 비용 보호는 seo_regenerate 재시도 상한·게이트 과민완화로 별도 대응)
+- 모델 deepseek/deepseek-v4-pro (세션 #19 주인 결정 2026-06-01, 전 K-Content 통일. OpenRouter 경유).
+  비용 보호는 seo_regenerate 재시도 상한·게이트 과민완화로 별도 대응. 이미지는 Google Imagen 유지.
 - max_tokens 8192
 - temperature 0.4
 
@@ -22,7 +22,10 @@ BACKEND §3-2 캐시 친화 구조:
 from __future__ import annotations
 
 import json
+import os
+import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from . import prompt_loader
@@ -32,7 +35,10 @@ from . import prompt_loader
 # 8192로 상향(헤드룸 확보). BACKEND §3-1 문서도 갱신 필요.
 # 세션 #15: Haiku → Sonnet (카테고리 페이지 본문 품질 우선, 저볼륨이라 비용 부담 적음, 사용자 결정).
 # 비용 과다청구 방지는 enricher.seo_regenerate(재시도 상한 2)·validator.seo(게이트 과민완화)로 대응.
-DEFAULT_MODEL = "claude-sonnet-4-6"
+# ★ 세션 #19 (주인 결정 2026-06-01, 전 K-Content 통일): 본문 생성 Sonnet → DeepSeek v4-pro.
+#   OpenRouter 경유(키=OPENROUTER_API_KEY, 환경변수 또는 D:\secrets\.env 공유). 라우팅은 아래 build_llm_client.
+#   모델명이 "claude"로 시작하면 Anthropic SDK, 그 외(deepseek 등)는 OpenRouter REST로 전송.
+DEFAULT_MODEL = "deepseek/deepseek-v4-pro"
 DEFAULT_MAX_TOKENS = 8192
 DEFAULT_TEMPERATURE = 0.4
 
@@ -152,8 +158,221 @@ def build_user_prompt(request: GenerateRequest) -> str:
     )
 
 
+# ── LLM 백엔드 라우팅 (세션 #19) ──────────────────────────────────────────
+# 본문 생성 모델을 claude-sonnet-4-6 → deepseek/deepseek-v4-pro로 전면 전환(주인 결정 2026-06-01).
+# OpenRouter 응답을 Anthropic Message 형태(.content[0].text·.usage.*·.stop_reason)로 감싸
+# 기존 파싱(split_article_response)·게이트·잘림감지(is_truncated)를 무수정 재사용한다.
+_OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+_SHARED_ENV = Path(r"D:\secrets\.env")  # K-Content 공유 OPENROUTER_API_KEY 위치
+
+
+def is_anthropic_model(model: str) -> bool:
+    """claude 계열이면 True(Anthropic SDK 경로). 그 외는 OpenRouter 경로."""
+    return model.lstrip().startswith("claude")
+
+
+def load_openrouter_key() -> str:
+    """OPENROUTER_API_KEY 조회 — 환경변수 우선, 없으면 공유 .env에서 그 키만 읽음.
+
+    값은 반환만 하고 로그·출력하지 않는다(POLICY §14-bis-1). 다른 비밀은 로드하지 않는다.
+    """
+    key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    if key:
+        return key
+    try:
+        for line in _SHARED_ENV.read_text(encoding="utf-8", errors="ignore").splitlines():
+            stripped = line.strip()
+            if stripped.startswith("OPENROUTER_API_KEY") and "=" in stripped:
+                return stripped.split("=", 1)[1].strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return ""
+
+
+def _system_to_text(system: Any) -> str:
+    """system 블록(list[{text}]) 또는 문자열 → 평문. OpenRouter는 system을 messages로 보냄."""
+    if isinstance(system, str):
+        return system
+    if isinstance(system, list):
+        return "\n".join(b.get("text", "") for b in system if isinstance(b, dict))
+    return ""
+
+
+class _TextBlock:
+    """Anthropic content 블록 호환(.type·.text)."""
+
+    def __init__(self, text: str) -> None:
+        self.type = "text"
+        self.text = text or ""
+
+
+class _Usage:
+    """Anthropic usage 호환(.input_tokens·.output_tokens)."""
+
+    def __init__(self, input_tokens: int, output_tokens: int) -> None:
+        self.input_tokens = input_tokens or 0
+        self.output_tokens = output_tokens or 0
+
+
+class _LLMResponse:
+    """OpenRouter 응답을 Anthropic Message 형태로 감싼 호환 객체."""
+
+    def __init__(
+        self,
+        text: str,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        stop_reason: str = "end_turn",
+    ) -> None:
+        self.content = [_TextBlock(text)]
+        self.usage = _Usage(input_tokens, output_tokens)
+        self.stop_reason = stop_reason
+
+
+class _AnthropicBackend:
+    """claude-* 모델 — Anthropic SDK. 재시도는 retry_with_backoff(SDK 예외)로."""
+
+    def __init__(self, api_key: str | None) -> None:
+        self._api_key = api_key
+        self._sdk: Any = None
+
+    def _sdk_client(self) -> Any:
+        if self._sdk is None:
+            try:
+                import anthropic
+            except ImportError as e:
+                raise RuntimeError("anthropic SDK 미설치 — pip install anthropic") from e
+            if not self._api_key:
+                raise RuntimeError("ANTHROPIC_API_KEY 누락 — config.load_secrets() 호출 필요")
+            self._sdk = anthropic.Anthropic(api_key=self._api_key)
+        return self._sdk
+
+    def create(
+        self, *, model: str, max_tokens: int, temperature: Any, system: Any, messages: Any
+    ) -> Any:
+        import anthropic
+
+        from .retry import retry_with_backoff
+
+        sdk = self._sdk_client()
+        kwargs: dict[str, Any] = {"model": model, "max_tokens": max_tokens, "messages": messages}
+        if system is not None:
+            kwargs["system"] = system
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        return retry_with_backoff(
+            lambda: sdk.messages.create(**kwargs),
+            rate_limit_exc=anthropic.RateLimitError,
+            overload_exc=getattr(anthropic, "OverloadedError", anthropic.APIError),
+            timeout_exc=anthropic.APITimeoutError,
+            bad_request_exc=anthropic.BadRequestError,
+            api_error_exc=anthropic.APIError,
+        )
+
+
+class _OpenRouterBackend:
+    """deepseek 등 — OpenRouter REST(httpx). 429/5xx/timeout 재시도 내장(무인 견고성)."""
+
+    def __init__(self, key_loader: Any = None) -> None:
+        self._key_loader = key_loader or load_openrouter_key
+
+    def create(
+        self, *, model: str, max_tokens: int, temperature: Any, system: Any, messages: Any
+    ) -> _LLMResponse:
+        import json as _json
+
+        import requests
+
+        from .retry import DEFAULT_CONFIG, _with_jitter
+
+        key = self._key_loader()
+        if not key:
+            raise RuntimeError(
+                r"OPENROUTER_API_KEY 누락 — 환경변수 또는 D:\secrets\.env 확인 (DeepSeek 경유 키)"
+            )
+        chat: list[dict[str, Any]] = []
+        sys_text = _system_to_text(system)
+        if sys_text:
+            chat.append({"role": "system", "content": sys_text})
+        chat.extend(messages or [])
+        payload: dict[str, Any] = {"model": model, "max_tokens": max_tokens, "messages": chat}
+        if temperature is not None:
+            payload["temperature"] = temperature
+        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+
+        cfg = DEFAULT_CONFIG
+        attempt = 0
+        while True:
+            try:
+                resp = requests.post(
+                    _OPENROUTER_URL, headers=headers, data=_json.dumps(payload), timeout=300.0
+                )
+            except requests.exceptions.Timeout as e:
+                raise RuntimeError(f"OpenRouter 타임아웃 — 다음 실행 재시도 권장: {e}") from e
+            except requests.exceptions.RequestException as e:
+                raise RuntimeError(f"OpenRouter 연결 오류: {e}") from e
+            if resp.status_code == 429 or resp.status_code >= 500:
+                if attempt < len(cfg.rate_limit_backoffs):
+                    time.sleep(_with_jitter(cfg.rate_limit_backoffs[attempt], cfg.jitter_factor))
+                    attempt += 1
+                    continue
+                raise RuntimeError(f"OpenRouter {resp.status_code} 재시도 소진: {resp.text[:200]}")
+            if resp.status_code >= 400:
+                raise RuntimeError(f"OpenRouter {resp.status_code}: {resp.text[:200]}")
+            data = resp.json()
+            choices = data.get("choices")
+            if not choices:
+                raise RuntimeError(f"OpenRouter 응답에 choices 없음: {data.get('error') or data}")
+            message = choices[0].get("message") or {}
+            usage = data.get("usage") or {}
+            finish = choices[0].get("finish_reason")
+            return _LLMResponse(
+                message.get("content") or "",
+                usage.get("prompt_tokens", 0),
+                usage.get("completion_tokens", 0),
+                "max_tokens" if finish == "length" else "end_turn",
+            )
+
+
+class _Messages:
+    """SDK의 client.messages.create 인터페이스 호환 — 백엔드로 위임."""
+
+    def __init__(self, backend: Any) -> None:
+        self._backend = backend
+
+    def create(
+        self,
+        *,
+        model: str,
+        max_tokens: int,
+        temperature: Any = None,
+        system: Any = None,
+        messages: Any = None,
+    ) -> Any:
+        return self._backend.create(
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system=system,
+            messages=messages or [],
+        )
+
+
+class _RoutedClient:
+    """모델에 맞는 백엔드로 라우팅하는 LLM 클라이언트(.messages.create)."""
+
+    def __init__(self, backend: Any) -> None:
+        self.messages = _Messages(backend)
+
+
+def build_llm_client(model: str = DEFAULT_MODEL, api_key: str | None = None) -> Any:
+    """모델 라우팅 LLM 클라이언트 생성 — claude→Anthropic SDK, 그 외→OpenRouter(DeepSeek)."""
+    backend: Any = _AnthropicBackend(api_key) if is_anthropic_model(model) else _OpenRouterBackend()
+    return _RoutedClient(backend)
+
+
 class ClaudeClient:
-    """Anthropic SDK 래퍼 — Phase 2 stub.
+    """LLM 클라이언트 래퍼 — 모델 라우팅(claude→Anthropic SDK, deepseek→OpenRouter, 세션 #19).
 
     실제 API 호출은 dry_run=False 명시 시에만. 기본 동작은 프롬프트 빌드 + 반환.
     """
@@ -172,16 +391,9 @@ class ClaudeClient:
         self._sdk_client: Any = None  # lazy
 
     def _get_sdk_client(self) -> Any:
-        """anthropic.Anthropic 인스턴스 lazy 생성. API 키 누락 시 RuntimeError."""
-        if self._sdk_client is not None:
-            return self._sdk_client
-        try:
-            import anthropic
-        except ImportError as e:
-            raise RuntimeError("anthropic SDK 미설치 — pip install anthropic") from e
-        if not self.api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY 누락 — config.load_secrets() 호출 필요")
-        self._sdk_client = anthropic.Anthropic(api_key=self.api_key)
+        """모델 라우팅 LLM 클라이언트 lazy 생성 (claude→Anthropic SDK, 그 외→OpenRouter)."""
+        if self._sdk_client is None:
+            self._sdk_client = build_llm_client(self.model, self.api_key)
         return self._sdk_client
 
     def generate_article(self, request: GenerateRequest, dry_run: bool = True) -> GenerateResult:
@@ -201,27 +413,14 @@ class ClaudeClient:
                 dry_run=True,
             )
 
-        # 실제 호출 경로 — Phase 2 후반 활성 (현재는 명시적 사용자 승인 후만)
-        # BACKEND §3-5 [확정] 재시도 정책 적용
+        # 실제 호출 — 모델 라우팅(claude→Anthropic, deepseek→OpenRouter). 재시도는 백엔드 내부.
         client = self._get_sdk_client()
-        import anthropic  # SDK가 _get_sdk_client에서 import 검증됨
-
-        from .retry import retry_with_backoff
-
-        response = retry_with_backoff(
-            lambda: client.messages.create(
-                model=self.model,
-                max_tokens=self.max_tokens,
-                temperature=self.temperature,
-                system=system_blocks,
-                messages=[{"role": "user", "content": user_prompt}],
-            ),
-            rate_limit_exc=anthropic.RateLimitError,
-            # anthropic SDK 버전별 attribute 위치가 다를 수 있어 getattr fallback
-            overload_exc=getattr(anthropic, "OverloadedError", anthropic.APIError),
-            timeout_exc=anthropic.APITimeoutError,
-            bad_request_exc=anthropic.BadRequestError,
-            api_error_exc=anthropic.APIError,
+        response = client.messages.create(
+            model=self.model,
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+            system=system_blocks,
+            messages=[{"role": "user", "content": user_prompt}],
         )
         return GenerateResult(
             system_blocks=system_blocks,
@@ -257,24 +456,14 @@ class ClaudeClient:
                 dry_run=True,
             )
 
+        # 실제 호출 — 모델 라우팅(claude→Anthropic, deepseek→OpenRouter). 재시도는 백엔드 내부.
         client = self._get_sdk_client()
-        import anthropic
-
-        from .retry import retry_with_backoff
-
-        response = retry_with_backoff(
-            lambda: client.messages.create(
-                model=self.model,
-                max_tokens=self.max_tokens,
-                temperature=self.temperature,
-                system=system_blocks,
-                messages=[{"role": "user", "content": user_prompt}],
-            ),
-            rate_limit_exc=anthropic.RateLimitError,
-            overload_exc=getattr(anthropic, "OverloadedError", anthropic.APIError),
-            timeout_exc=anthropic.APITimeoutError,
-            bad_request_exc=anthropic.BadRequestError,
-            api_error_exc=anthropic.APIError,
+        response = client.messages.create(
+            model=self.model,
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+            system=system_blocks,
+            messages=[{"role": "user", "content": user_prompt}],
         )
         return GenerateResult(
             system_blocks=system_blocks,

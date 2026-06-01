@@ -37,3 +37,27 @@ categories:
     tiers:
       budget:  {q: "monitor riser stand",           min: 5000,  max: 25000}
       premium: {q: "monitor stand storage drawer",  min: 25000, max: 80000}
+
+  # 노트북 거치대 — 세션 #19. ★require_all('타입+대상' 동시)이 근본 필터:
+  #   1그룹=노트북 계열 ∧ 2그룹=거치대 계열을 둘 다 가져야 통과 → "노트북"만 언급한 캠핑 테이블은
+  #   거치대 그룹 미충족으로 구조적 탈락(테이블/데스크/책상 제외어 불필요).
+  #   exclude_terms는 require_all로 못 거르는 것만 최소로: 거치대형이지만 비대상(가방·휴대폰 스탠드 등).
+  #   ※테이블·데스크·책상·태블릿은 '데스크탑 스탠드'·'태블릿 겸용' 같은 정상 노트북 스탠드를
+  #     잘못 탈락시키므로 제외하지 않는다(과도 제외 = 정상 상품 손실, 세션 #19 실측 교훈).
+  laptop-stand:
+    require_all:
+      - [노트북, 랩탑, 맥북, laptop, macbook]
+      - [거치대, 스탠드, 받침, 홀더, 마운트, stand, holder, riser]
+    exclude_terms: [가방, 파우치, 슬리브, 케이스, 쿨러, 쿨링, 충전, 어댑터, 도크, 허브, 키보드, 마우스, 거울, 차량, 자동차, 카메라, 인형, 미니어처, 보호필름, 스킨, 청소, 휴대폰]
+    tiers:
+      budget:  {q: "foldable laptop stand",           min: 4000,  max: 25000}
+      premium: {q: "aluminum laptop stand adjustable", min: 25000, max: 70000}
+
+  # 모니터암 — 세션 #19. 받침대(riser)와 구분: 거치 암/마운트만. 받침대·라이저·서랍형·벽걸이 TV 제외.
+  # require_any=[모니터] + q="monitor arm"로 암 편향. 라이브 실측으로 제외어 보강.
+  monitor-arm:
+    require_any: [모니터]
+    exclude_terms: [받침대, 라이저, 서랍, 청소, 필름, 보호필름, 케이블, 차량, 자동차, 카메라, 노트북, 키보드, 마우스, 가방, 인형, 미니어처, 스피커, 조명, 프라이버시, 보안, TV, 텔레비전]
+    tiers:
+      budget:  {q: "single monitor arm desk mount", min: 8000,  max: 30000}
+      premium: {q: "gas spring monitor arm",         min: 30000, max: 90000}

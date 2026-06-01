@@ -284,7 +284,7 @@ def _load_article_pages(conn: sqlite3.Connection) -> list[dict]:
 
 
 CATEGORY_CATALOG_SQL = """
-    SELECT p.name, p.price_krw, p.original_price_krw, p.discount_pct,
+    SELECT p.name, p.price_krw, p.original_price_krw, p.discount_pct, p.sales_volume,
            p.image_url_external, p.deeplink_slug, cp.tier, cp.display_order
     FROM category_products cp
     JOIN products p ON p.id = cp.product_id
@@ -313,6 +313,11 @@ def _catalog_item(row: sqlite3.Row) -> dict:
         "price": _price_krw(row["price_krw"]),
         "orig": _price_krw(orig) if show else "",
         "disc": f"{disc}%" if show else "",
+        # 정렬/필터 JS용 숫자값(화면 비노출) — 가격 오름차순·할인율 내림차순 정렬 키
+        "price_num": row["price_krw"] or 0,
+        "disc_num": disc or 0,
+        # 알리 최근 판매량 — 정직 표기("판매처 기준"). 추천 6선 선정 근거(세션 #19)
+        "volume": f"{row['sales_volume']:,}" if row["sales_volume"] else "",
         "img_url": row["image_url_external"] or "",
         "url": f"/go/{row['deeplink_slug']}",
         "slug": row["deeplink_slug"],
@@ -320,14 +325,14 @@ def _catalog_item(row: sqlite3.Row) -> dict:
 
 
 CATEGORY_PICKS_SQL = """
-    SELECT p.name, p.price_krw, p.original_price_krw, p.discount_pct,
+    SELECT p.name, p.price_krw, p.original_price_krw, p.discount_pct, p.sales_volume,
            p.image_url_external, p.deeplink_slug, cp.tier,
            cp.pros_json, cp.cons_json, cp.pick_reason, cp.pick_type, cp.display_order
     FROM category_products cp
     JOIN products p ON p.id = cp.product_id
     WHERE cp.category_id = ? AND cp.is_featured = 1
     ORDER BY CASE cp.tier WHEN 'budget' THEN 0 WHEN 'premium' THEN 1 ELSE 2 END,
-             cp.display_order, p.id
+             p.sales_volume DESC, cp.display_order, p.id
 """
 
 

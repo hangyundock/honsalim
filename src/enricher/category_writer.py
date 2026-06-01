@@ -69,8 +69,13 @@ def build_category_page_prompt(
     products: list[dict[str, Any]],
     seo: dict[str, Any] | None = None,
     feedback: list[str] | None = None,
+    selected: list[dict[str, Any]] | None = None,
 ) -> str:
-    """category_page 프롬프트 조립 — 제품 목록(6선 후보) + SEO 지시(선택) 주입."""
+    """category_page 프롬프트 조립 — 제품 목록 + 선정된 추천 6선 + SEO 지시(선택) 주입.
+
+    selected(세션 #19): 판매량 기준으로 미리 선정된 추천 6선 [{slug, tier, name}]. AI는 이 6개의
+    장점·단점·추천대상·타입 '설명'만 작성한다(선정 권한 없음 — picks는 이 slug로만).
+    """
     seo = seo or {}
     directive = (
         build_seo_directive(seo.get("primary"), seo.get("secondary")) if seo.get("primary") else ""
@@ -79,6 +84,7 @@ def build_category_page_prompt(
         "category_page",
         category_name=category_name,
         products=products,
+        selected=selected or [],
         seo_directive=directive,
     )
     if feedback:
@@ -93,13 +99,15 @@ def generate_category_page(
     *,
     seo: dict[str, Any] | None = None,
     feedback: list[str] | None = None,
+    selected: list[dict[str, Any]] | None = None,
     dry_run: bool = True,
 ) -> Any:
     """카테고리 페이지 콘텐츠 1회 생성. 반환 = GenerateResult(response_text=JSON 문자열).
 
-    feedback: 직전 SEO 게이트 미달 issues — 재생성 시 프롬프트에 보완 지시로 주입.
+    selected: 미리 선정된 추천 6선(판매량 기준). AI는 설명만 작성.
+    feedback: 직전 게이트 미달 issues — 재생성 시 프롬프트에 보완 지시로 주입.
     """
-    user_prompt = build_category_page_prompt(category_name, products, seo, feedback)
+    user_prompt = build_category_page_prompt(category_name, products, seo, feedback, selected)
     return client.generate_raw(CATEGORY_SYSTEM, user_prompt, dry_run=dry_run)
 
 
@@ -117,11 +125,17 @@ def parse_category_page_response(
     start, end = text.find("{"), text.rfind("}")
     if start == -1 or end == -1 or end <= start:
         raise CategoryPageError("응답에서 JSON 객체를 찾을 수 없음")
+    candidate = text[start : end + 1]
+    # strict=False — guide_md(마크다운)의 raw 개행 등 제어문자 허용 (모델 응답 방어)
     try:
-        # strict=False — guide_md(마크다운)의 raw 개행 등 제어문자 허용 (모델 응답 방어)
-        data = json.loads(text[start : end + 1], strict=False)
-    except json.JSONDecodeError as ex:
-        raise CategoryPageError(f"JSON 파싱 실패: {ex}") from ex
+        data = json.loads(candidate, strict=False)
+    except json.JSONDecodeError:
+        # B(세션 #19): LLM 흔한 오류 = 후행 콤마(,} 또는 ,]). 제거 후 1회 재시도(견고화).
+        repaired = re.sub(r",(\s*[}\]])", r"\1", candidate)
+        try:
+            data = json.loads(repaired, strict=False)
+        except json.JSONDecodeError as ex:
+            raise CategoryPageError(f"JSON 파싱 실패: {ex}") from ex
 
     title = str(data.get("title", "")).strip()
     lead = str(data.get("lead", "")).strip()

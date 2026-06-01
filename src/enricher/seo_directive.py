@@ -16,23 +16,37 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 
+def _short_form(primary: str) -> str:
+    """대표키워드의 대체용 줄임말 — 다단어면 마지막 토큰(예 '노트북 거치대'→'거치대'). 단일어면 그대로."""
+    parts = primary.split()
+    return parts[-1] if len(parts) > 1 else primary
+
+
 def build_seo_directive(primary: str | None, secondary: Sequence[str] | None = None) -> str:
-    """키워드 배치 지시 마크다운 블록 반환. primary 없으면 빈 문자열(지시 생략)."""
+    """키워드 배치 지시 마크다운 블록 반환. primary 없으면 빈 문자열(지시 생략).
+
+    세션 #19: 대표키워드 '통째 반복'을 줄이고 대체 표현을 쓰도록 구체화 — DeepSeek가
+    키워드를 과다 반복(밀도 4~5%)해 SEO 게이트(상한 3.5%)에 걸리던 문제의 근본 지시(A).
+    """
     primary = (primary or "").strip()
     if not primary:
         return ""
     secondary_list = [s.strip() for s in (secondary or []) if s and s.strip()]
+    short = _short_form(primary)
 
     lines = [
-        "## SEO 키워드 배치 (검색 노출 최적화 — 자연스럽게, 도배 금지)",
+        "## SEO 키워드 배치 (검색 노출 최적화 — 자연스럽게, 도배 절대 금지)",
         "",
         "아래 키워드는 실제 검색 수요가 있는 단어다. **자연스럽게** 본문에 녹여 검색 노출을 높여라.",
-        "과밀(도배)은 오히려 스팸 패널티이니 금지한다.",
+        "★과밀(도배)은 스팸 패널티이며, 본 작업에서 가장 흔한 실패 원인이다. 반드시 절제하라.",
         "",
-        f'**대표키워드: "{primary}"** (검색 노출의 핵심 — 이것만큼은 확실히)',
-        f'- 제목 앞쪽 + 도입부 첫 문단에 반드시 "{primary}"를 포함.',
-        f'- 소제목(##)에 "{primary}"(또는 자연스러운 변형)를 1~2개 포함.',
-        f'- 본문 전체에서 정확히 "{primary}" 형태로 **약 1.7% 밀도(네이버 기준, 과하지 않게)**로 반복.',
+        f'**대표키워드: "{primary}"** (정확히 이 형태로, 단 과하지 않게)',
+        f'- 제목 앞쪽 1회 + 도입부 첫 문단 1회에만 "{primary}"를 정확히 포함.',
+        f'- 소제목(##)은 1개에만 "{primary}"(또는 자연 변형)를 포함. 나머지 소제목엔 넣지 마라.',
+        f'- 본문에서는 "{primary}"를 **통째로 반복하지 말고** '
+        f'"{short}"·"제품"·"이 도구"·대명사 등으로 대체하라.',
+        f'- 정확형 "{primary}" 총 등장 밀도는 **약 1.7%, 최대 3% 이내**(초과 시 스팸 — 절대 금지).',
+        '- "무조건·절대·100%·반드시·최고·완벽" 등 단정·과장 표현 금지(정직성 게이트 — 위반 시 탈락).',
     ]
 
     if secondary_list:

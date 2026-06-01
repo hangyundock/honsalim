@@ -3,16 +3,17 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 시급 (다음 세션 #19) — #18 갱신 · 승인 게이트·doctor·디자인 디버깅 완료 → 디자인 마무리 + 배포 (DECISIONS O21~O22)
+## ★ 시급 (다음 세션 #20) — #19 갱신 · DeepSeek 전환·디자인·관련성·판매량 선정·신규 2카테고리 완료 → 검토·승인·배포 (상세 EVENTS #19)
 
-> #18: 운영자 승인 게이트(`approve-category` CLI·`category_state`·build-category→draft·renderer published 필터·대시보드 승인대기) + doctor 진입점 64 + ★카테고리 디자인 대거 디버깅(backdrop-filter 흐림 제거·색#111·폭1080·14px·FAQ Q/A·장점단점·마크다운). 회귀 590. DB 이 워크트리 재생성됨(draft). **전부 로컬·미배포.**
+> #19: 본문생성 Sonnet→**DeepSeek v4-pro**(OpenRouter 라우팅·파서견고화·SEO지시문 강화) + 카테고리 디자인 마무리(행정렬·정렬/필터 JS·커서) + 관련성 `require_all`(타입+대상)+재수집 정합화 + **추천6선 판매량 기준 선정**(만족도80%하한·항상6개·정직표기) + 신규 2카테고리. 회귀 623. 카테고리 4개 전부 draft. **전부 로컬·미배포.**
 
-- [x] ~~운영자 1클릭 승인 게이트 · doctor 보강 · 카테고리 디자인 디버깅(흐림·색·폭·폰트·FAQ·장점단점·14px)~~ ✅ #18
-- [ ] **★카테고리 페이지 추가 디자인 수정 (사용자 — 연속 작업)**: #18 디자인 대거 수정했으나 사용자가 "이 페이지 수정할 부분 더 있다". 다음 세션 이어서. (DB 재생성 후 `build --preview`로 desk/monitor 미리보기 확인하며)
-- [ ] **★#18 2순위 배포 완료** (승인 후): `approve-category desk`·`monitor-stand`(draft→published) → `build --full`(build/site, published만) → honsalim.com (방법A, **사용자 승인**).
-- [ ] **나머지 카테고리**: 의자 `build-category office-chair`(현재 카탈로그만) · 모니터암 등 신규(category_sources·seo_keywords·seed 등록 후 2명령).
+- [x] ~~카테고리 디자인 마무리 · DeepSeek 전환 · 출력 안정화 · 관련성 require_all · 판매량 기준 추천 6선 · 신규 2카테고리~~ ✅ #19
+- [ ] **★카테고리 4개 검토 → 승인 → 배포**: 노트북거치대·모니터암·모니터받침대·컴퓨터책상(draft·6선). `approve-category <slug>` → `build --full` → honsalim.com (방법A, **사용자 승인**).
+- [ ] **노트북거치대 '전화' 제외어 결정**(사용자): 1위 픽이 "전화 태블릿 겸용" 베스트셀러. 노트북 전용만 원하면 `category_sources.yml` laptop-stand exclude에 "전화" 추가 후 재수집·재빌드.
+- [ ] **office-chair 콘텐츠 생성**: 제품 0 — `collect-category office-chair` → `build-category office-chair`.
+- [ ] **메인 미커밋 DeepSeek 임시본 정리**: 메인(D:\affiliate_hub) AutoBlog #99 미커밋 `claude_client.py` → 이 워크트리 정식본이 supersede. 머지 전 되돌리기.
 - [ ] (이월) **★/go/ 제휴 링크 작동**(D1 slug_map·go_gateway, 수익직결) · 알리 whitelist 답변 · main-protect 재활성화.
-- 참고: ★다음 워크트리는 **DB 재생성 필요**(gitignore) — `collect-category desk`·`monitor-stand` + `build-category` 각 `--no-dry-run`(API ~$0.6). 미리보기=`build --preview`(draft포함)·공개=`build --full`. 미리보기 시 강력새로고침/시크릿창.
+- 참고: ★다음 워크트리 **DB 재생성 필요**(gitignore) — 4개 카테고리 `collect-category` --no-dry-run(판매량 채움) + `build-category` --no-dry-run(API ~$1). 미리보기=`build --preview`·공개=`build --full`. 강력새로고침/시크릿창.
 
 ## 알리 통합 (D9)
 
@@ -20,17 +21,10 @@
 - [x] ~~honsalim.com whitelist 제출~~ ✅ #13 — **이메일 + 포털 XFeedback(스크린샷 증거, "To do") 제출, 답변 대기**. 사이트등록폼은 'ali' 자동검증으로 Submit 불가 → 사람 화이트리스트만 길.
 - [ ] 알리 답변 후속 (승인 시 /go/ 동작 + 수익 추적 활성)
 
-## 세션 #6 잔존 (시점 의존)
+## 시점 의존 잔존 (세션 #6~7)
 
-- [ ] **알리 이미지·상세페이지 정책 조사** — Phase 5 진입 전 (현재 docs 명시 없음)
-- [ ] **M2/M4/M5/M6 Phase 3~6 진척 시점 작업** — `docs/GOOGLE_AI_OPTIMIZATION.md` §6
-
-## 세션 #6 SEO 정합 통합 후 잔존 (cross-project · 별도 세션 권장)
-
-- [ ] **혼살림 M2 Person Schema + about 페이지 운영자 정보** — Phase 4 진입 시 (E-E-A-T author 강화)
-  - 세션 #7 사전 결정 완료: 필명 "혼살다" / 운영 철학 / 전문성 영역 / 사진 없음 (DECISIONS M2-1~M2-7)
-  - 코드 작업: `_macros/person.html` 매크로 작성 (FRONTEND §4-5-bis 명세) + `about.html` 본문 적용 (FRONTEND §4-5 초안)
-  - 작업 시점: Phase 3 디자인 후 Phase 4 진입 직전
+- [ ] 알리 이미지·상세페이지 정책 조사 (Phase 5 전) · M2/M4/M5/M6 (`GOOGLE_AI_OPTIMIZATION.md` §6, Phase 3~6)
+- [ ] **혼살림 M2 Person Schema + about 운영자 정보** (Phase 4, E-E-A-T) — 사전결정 완료(필명 "혼살다"·사진없음, DECISIONS M2). 코드=`_macros/person.html`+`about.html`(FRONTEND §4-5)
 
 ## Phase 1: 인프라 — 남음
 

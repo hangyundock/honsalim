@@ -142,6 +142,15 @@ def map_product(item: dict[str, Any], tracking_id: str) -> dict[str, Any]:
     def _num(v: Any) -> int | None:
         return round(float(v)) if v not in (None, "") else None
 
+    def _pct(v: Any) -> float | None:
+        """'93.8%' → 93.8 (긍정 피드백율). 숫자 변환 불가면 None."""
+        if v in (None, ""):
+            return None
+        try:
+            return float(str(v).replace("%", "").strip())
+        except ValueError:
+            return None
+
     sale_krw = _num(price)
     orig_krw = _num(orig)
     # 할인율: 정가>판매가일 때 계산(신뢰) — API의 'discount' 문자열보다 우선 (CATEGORY_PAGE §4 신뢰 신호).
@@ -160,6 +169,9 @@ def map_product(item: dict[str, Any], tracking_id: str) -> dict[str, Any]:
         # 부풀린 할인(>70%) 차단은 표시 단계에서 product_filter.trusted_discount로 적용(원본 보존).
         "original_price_krw": orig_krw,
         "discount_pct": discount_pct,
+        # 추천 6선 선정 신호 (세션 #19) — 판매량(순위)·긍정 피드백율(하한 필터)
+        "sales_volume": _num(g("lastest_volume", "lastestVolume", default=None)),
+        "evaluate_rate": _pct(g("evaluate_rate", "evaluateRate", default=None)),
         "currency": g("target_sale_price_currency", default="KRW"),
         "image_url_external": g("product_main_image_url", "productMainImageUrl", default=None),
         "deeplink_url": g("promotion_link", "promotionLink", default=None),
