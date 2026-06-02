@@ -54,5 +54,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy build/site --project-name=honsalim --branch=main
+          # --commit-message/--commit-dirty 명시: wrangler가 git 커밋 메시지를 CF 배포 메타데이터로
+          # 보낼 때, 우리 커밋 규칙의 한국어·특수문자(★ → 등)를 CF API가 거부함(code 8000111,
+          # "Invalid commit message ... valid UTF-8"). 안전한 ASCII 메시지로 고정해 전 배포에서 차단(세션 #20).
+          command: pages deploy build/site --project-name=honsalim --branch=main --commit-dirty=true --commit-message=honsalim-auto-deploy
         # --branch=main → 프로덕션 배포 (honsalim.com). 콘텐츠 승인(§2-마) 후에만 push.
