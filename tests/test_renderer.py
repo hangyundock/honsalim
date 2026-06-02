@@ -117,6 +117,8 @@ class TestRenderSite:
             "index.html",
             "scenarios/index.html",
             "about/index.html",
+            "categories/index.html",
+            "guides/index.html",  # 구매가이드 — 네비 링크 깨짐(/guides/ 404) 방지(세션 #20)
             "404.html",
             "sitemap.xml",
             "personas/index.html",
@@ -137,7 +139,9 @@ class TestRenderSite:
 
     def test_home_real_data_no_template_leftovers(self, built: dict) -> None:
         html = (built["out"] / "index.html").read_text(encoding="utf-8")
-        assert "원룸 첫 자취" in html  # 실제 seed 시나리오 제목
+        # 카테고리 우선 홈(세션 #20): 히어로 카피·카테고리 섹션은 항상 존재(안정 검사)
+        assert "1인 가구" in html  # 히어로 eyebrow
+        assert "카테고리 둘러보기" in html  # 카테고리 CTA
         assert "{{" not in html and "{%" not in html  # Jinja 미전개 잔재 없음
         assert "&lt;svg" not in html  # 아이콘 SVG 미이스케이프
 
@@ -162,6 +166,20 @@ class TestRenderSite:
         html = (built["out"] / "about" / "index.html").read_text(encoding="utf-8")
         assert "AI로 생성" in html
         assert "직접 촬영" not in html
+
+    def test_unregistered_business_info_not_shown(self, built: dict) -> None:
+        """미등록 사업자 정보 숨김 (세션 #20 정직성).
+
+        '등록 진행 중' 과장 표기는 어떤 경우에도 노출 금지. 미등록(빈 값)이면 빈
+        사업자등록번호 라벨을 숨기고 '개인 운영'으로 정직 표기(사업자 등록=DECISIONS D4 이후).
+        """
+        home = (built["out"] / "index.html").read_text(encoding="utf-8")
+        about = (built["out"] / "about" / "index.html").read_text(encoding="utf-8")
+        assert "등록 진행 중" not in home
+        assert "등록 진행 중" not in about
+        if not renderer.BUSINESS_INFO["bizno"]:
+            assert "사업자등록번호" not in home  # 빈 번호 라벨 미노출
+            assert "통신판매업" not in home
 
     def test_sitemap_lists_core_urls(self, built: dict) -> None:
         xml = (built["out"] / "sitemap.xml").read_text(encoding="utf-8")
@@ -427,6 +445,67 @@ class TestCategoryProductImages:
         assert "this.dataset.r" in html  # 재시도 1회 가드(무한루프 방지)
         assert "?r='+Date.now()" in html  # 캐시버스터 재요청
         assert "this.style.display='none'" in html  # 2차 실패 시 숨김
+
+
+class TestHomeRichSections:
+    """홈 콘텐츠 모듈(판매량 BEST·오늘의 딜·테마 큐레이션) 렌더 가드 (세션 #20).
+
+    - 테마 dict 키는 'picks'여야 함 — 'items'면 Jinja에서 dict.items() 메서드로 해석돼
+      렌더가 TypeError로 죽는 함정(group.cards·compare.vals와 동일 계열).
+    - 실데이터(판매량·할인) 기반 섹션이 데이터 있을 때 실제 노출되는지 구조로 고정.
+    """
+
+    def _seed_two_categories(self, db_path: Path) -> None:
+        conn = db.connect(db_path)
+        try:
+            specs = [
+                ("desk", "hb-desk", 50000, 71400, 30, 300),
+                ("monitor-arm", "hb-arm", 30000, None, None, 200),
+            ]
+            for slug, spid, price, orig, disc, vol in specs:
+                conn.execute(
+                    "INSERT INTO products (source, source_product_id, name, currency, price_krw, "
+                    "original_price_krw, discount_pct, sales_volume, image_url_external, "
+                    "deeplink_url, deeplink_slug, affiliate_tag, created_at, updated_at, last_seen_at) "
+                    "VALUES ('aliexpress',?,?,'KRW',?,?,?,?,?,?,?,'honsalim',"
+                    "datetime('now'),datetime('now'),datetime('now'))",
+                    (
+                        spid,
+                        f"{slug} 상품",
+                        price,
+                        orig,
+                        disc,
+                        vol,
+                        "https://ae-pic-a1.aliexpress-media.com/kf/x.jpg",
+                        f"https://s.click.aliexpress.com/{spid}",
+                        f"ali-{spid}",
+                    ),
+                )
+                pid = conn.execute(
+                    "SELECT id FROM products WHERE source_product_id=?", (spid,)
+                ).fetchone()[0]
+                cid = conn.execute("SELECT id FROM categories WHERE slug=?", (slug,)).fetchone()[0]
+                conn.execute(
+                    "INSERT INTO category_products (category_id, product_id, tier, is_featured) "
+                    "VALUES (?,?,'budget',1)",
+                    (cid, pid),
+                )
+                category_state.approve(conn, slug)
+            conn.commit()
+        finally:
+            conn.close()
+
+    def test_best_deals_theme_render(self, tmp_path: Path) -> None:
+        db_path = tmp_path / "test.db"
+        db.migrate(db_path=db_path)
+        db.seed(db_path=db_path)
+        self._seed_two_categories(db_path)
+        out = tmp_path / "site"
+        renderer.render_site(out_dir=out, db_path=db_path)  # picks 키 오류 시 여기서 TypeError
+        html = (out / "index.html").read_text(encoding="utf-8")
+        assert "판매량 BEST" in html  # sales_volume>0 제품 존재 → 노출
+        assert "오늘의 딜" in html  # 신뢰 할인(30%) 존재 → 노출
+        assert "테마 추천" in html and "재택 홈오피스" in html  # 2개 카테고리 featured → 테마 노출
 
 
 class TestBuildSiteClean:

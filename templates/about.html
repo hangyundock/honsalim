@@ -93,9 +93,9 @@
       <dl class="biz-dl">
         <div><dt>상호</dt><dd>{{ business_info.name }}</dd></div>
         <div><dt>대표</dt><dd>{{ business_info.rep }}</dd></div>
-        <div><dt>사업자등록번호</dt><dd>{{ business_info.bizno }}</dd></div>
-        <div><dt>통신판매업신고</dt><dd>{{ business_info.mailorder }}</dd></div>
-        <div><dt>주소</dt><dd>{{ business_info.addr }}</dd></div>
+        {% if business_info.bizno %}<div><dt>사업자등록번호</dt><dd>{{ business_info.bizno }}</dd></div>{% endif %}
+        {% if business_info.mailorder %}<div><dt>통신판매업신고</dt><dd>{{ business_info.mailorder }}</dd></div>{% endif %}
+        {% if business_info.addr %}<div><dt>주소</dt><dd>{{ business_info.addr }}</dd></div>{% endif %}
         <div><dt>이메일</dt><dd>{{ business_info.email }}</dd></div>
       </dl>
     </div>

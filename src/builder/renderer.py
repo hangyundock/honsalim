@@ -102,14 +102,17 @@ SEASON_CALENDAR = [
     },
 ]
 
-# 사업자 정보 — M2 결정(세션 #7)
+# 사업자 정보 — M2 결정(세션 #7) + 세션 #20: 미등록 필드는 빈 값으로 숨김.
+# bizno·mailorder·addr는 사업자 등록(DECISIONS D4: 월 10만원 누적 후) 전까지 빈 값 →
+# footer/about/article에서 조건부로 미표시(정직성 §0: "등록 진행 중" 과장 표기 제거).
+# 등록 후 실제 값을 채우면 자동으로 다시 노출된다.
 BUSINESS_INFO = {
     "name": "혼살림",
     "rep": "혼살다 (운영자)",
-    "bizno": "등록 진행 중",
-    "mailorder": "등록 진행 중",
-    "email": "dugihappyending@gmail.com",
-    "addr": "등록 진행 중",
+    "bizno": "",
+    "mailorder": "",
+    "email": "dugi2020@naver.com",
+    "addr": "",
 }
 
 # 허브 예산 필터 — 실제 시드 예산 분포 기준
@@ -509,6 +512,185 @@ def _load_categories_index(conn: sqlite3.Connection, include_drafts: bool = Fals
     return groups
 
 
+def _load_home_categories(conn: sqlite3.Connection, include_drafts: bool = False) -> list[dict]:
+    """홈 카테고리 그리드용 — 공개(또는 미리보기 시 draft 포함) 카테고리 카드.
+
+    카테고리 인덱스와 달리 홈은 라인업을 보여주는 자리라 제품 0개도 '준비 중'으로 노출.
+    concept_image를 포함해 시각적 카드로 렌더한다(세션 #20 홈 카테고리화).
+    """
+    rows = conn.execute(
+        "SELECT id, slug, name_ko, intro, concept_image, concept_image_alt FROM categories "
+        "WHERE (? OR status = 'published') ORDER BY display_order, id",
+        (1 if include_drafts else 0,),
+    ).fetchall()
+    cats: list[dict] = []
+    for c in rows:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM category_products WHERE category_id = ?", (c["id"],)
+        ).fetchone()[0]
+        cats.append(
+            {
+                "slug": c["slug"],
+                "name": c["name_ko"],
+                "intro": c["intro"] or "",
+                "count": count,
+                "available": count > 0,
+                "url": f"/categories/{c['slug']}/",
+                "concept_image": c["concept_image"] or "",
+                "concept_image_alt": c["concept_image_alt"] or c["name_ko"],
+            }
+        )
+    return cats
+
+
+# 홈 기획전 배너 (A) — 큰 키비주얼 캐러셀. 운영자 편집 대상, 실제 내용만 노출(가짜 세일 금지, §0).
+# image는 static 기준 상대경로. 알리 세일 등 기간 한정 기획전은 운영자가 슬라이드 추가/삭제.
+HOME_BANNERS: list[dict] = [
+    {
+        "eyebrow": "NEW",
+        "title": "새 카테고리 4종, 지금 열었어요",
+        "sub": "노트북거치대·컴퓨터책상·모니터암·모니터받침대 — 판매량·정가·할인 기준으로 비교했어요.",
+        "href": "/categories/",
+        "cta": "카테고리 보기",
+        "image": "images/concepts/monitor-arm.webp",
+    },
+    {
+        "eyebrow": "정직 비교",
+        "title": "가짜 평점 없이, 기준으로 고릅니다",
+        "sub": "알리 판매량과 정가·할인율로만 추천합니다. 별점·후기를 지어내지 않아요.",
+        "href": "/about/",
+        "cta": "운영 원칙 보기",
+        "image": "images/concepts/desk.webp",
+    },
+]
+
+# 홈 테마 큐레이션 (E) — 상황·테마 기반 정직 묶음(인구통계 데이터 주장 아님, §0).
+# 각 테마는 카테고리별 1순위(판매량 기준 추천)를 모아 '세팅'으로 제안. 품목이 늘면 테마 추가.
+HOME_THEMES: list[dict] = [
+    {
+        "title": "재택 홈오피스 책상 세팅",
+        "desc": "오래 앉아 일하는 책상 위 — 자세와 공간을 한 번에 정리하는 조합.",
+        "categories": ["desk", "monitor-arm", "monitor-stand", "laptop-stand"],
+    },
+]
+
+HOME_CROSS_SQL = """
+    SELECT p.id, p.name, p.price_krw, p.original_price_krw, p.discount_pct, p.sales_volume,
+           p.image_url_external, p.deeplink_slug, cp.tier,
+           ca.name_ko AS cat_name, ca.slug AS cat_slug
+    FROM category_products cp
+    JOIN products p ON p.id = cp.product_id
+    JOIN categories ca ON ca.id = cp.category_id
+    WHERE (? OR ca.status = 'published')
+"""
+
+
+def _home_product_item(row: sqlite3.Row) -> dict:
+    """홈 BEST·딜·테마 공용 제품 카드 컨텍스트 (카테고리명 포함)."""
+    disc = product_filter.trusted_discount(row["discount_pct"])
+    orig = row["original_price_krw"]
+    show = disc is not None and bool(orig)
+    return {
+        "name": row["name"],
+        "cat_name": row["cat_name"],
+        "cat_url": f"/categories/{row['cat_slug']}/",
+        "price": _price_krw(row["price_krw"]),
+        "orig": _price_krw(orig) if show else "",
+        "disc": f"{disc}%" if show else "",
+        "disc_num": disc or 0,
+        "volume": f"{row['sales_volume']:,}" if row["sales_volume"] else "",
+        "img_url": row["image_url_external"] or "",
+        "url": f"/go/{row['deeplink_slug']}",
+    }
+
+
+def _load_home_best(
+    conn: sqlite3.Connection, include_drafts: bool = False, limit: int = 8
+) -> list[dict]:
+    """판매량 BEST (C) — 공개 카테고리 제품 중 알리 최근 판매량 상위. 실데이터·정직 표기."""
+    rows = conn.execute(
+        HOME_CROSS_SQL
+        + " AND COALESCE(p.sales_volume,0) > 0 ORDER BY COALESCE(p.sales_volume,0) DESC, p.id",
+        (1 if include_drafts else 0,),
+    ).fetchall()
+    seen: set = set()
+    out: list[dict] = []
+    for r in rows:
+        if r["id"] in seen:
+            continue
+        seen.add(r["id"])
+        out.append(_home_product_item(r))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _load_home_deals(
+    conn: sqlite3.Connection, include_drafts: bool = False, limit: int = 8
+) -> list[dict]:
+    """오늘의딜/할인 BEST (D) — 신뢰 가능한 할인율(부풀림 제외) 높은 순. 수집시점 기준."""
+    rows = conn.execute(HOME_CROSS_SQL + " ORDER BY p.id", (1 if include_drafts else 0,)).fetchall()
+    seen: set = set()
+    scored: list[tuple] = []
+    for r in rows:
+        if r["id"] in seen:
+            continue
+        seen.add(r["id"])
+        disc = product_filter.trusted_discount(r["discount_pct"])
+        if disc and r["original_price_krw"]:
+            scored.append((disc, _home_product_item(r)))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [it for _, it in scored[:limit]]
+
+
+def _load_home_themes(conn: sqlite3.Connection, include_drafts: bool = False) -> list[dict]:
+    """테마 큐레이션 (E) — 테마별 카테고리 1순위 묶음. 최소 2품목 모여야 노출."""
+    out: list[dict] = []
+    for th in HOME_THEMES:
+        items: list[dict] = []
+        for slug in th["categories"]:
+            row = conn.execute(
+                HOME_CROSS_SQL + " AND ca.slug = ? AND cp.is_featured = 1 "
+                "ORDER BY COALESCE(p.sales_volume,0) DESC, cp.display_order LIMIT 1",
+                (1 if include_drafts else 0, slug),
+            ).fetchone()
+            if row:
+                items.append(_home_product_item(row))
+        if len(items) >= 2:
+            # 키 이름 'picks' — Jinja에서 t.items는 dict.items 메서드로 해석되는 함정 회피
+            out.append({"title": th["title"], "desc": th["desc"], "picks": items})
+    return out
+
+
+def _load_guides(conn: sqlite3.Connection, include_drafts: bool = False) -> list[dict]:
+    """구매가이드 인덱스 (/guides/) — 가이드 본문이 있는 카테고리의 '고르는 법' 모음.
+
+    가이드는 카테고리 페이지 상단에 렌더되므로 링크는 해당 카테고리 페이지로 보낸다.
+    content_json.lead가 있어야(=가이드 생성됨) 노출(세션 #20, 깨진 /guides/ 링크 해소).
+    """
+    rows = conn.execute(
+        "SELECT slug, name_ko, intro, guide_title, content_json, concept_image, concept_image_alt "
+        "FROM categories WHERE (? OR status = 'published') ORDER BY display_order, id",
+        (1 if include_drafts else 0,),
+    ).fetchall()
+    out: list[dict] = []
+    for c in rows:
+        content = json.loads(c["content_json"]) if c["content_json"] else {}
+        if not content.get("lead"):  # 가이드 본문 있는 카테고리만
+            continue
+        out.append(
+            {
+                "title": c["guide_title"] or f"{c['name_ko']} 고르는 법",
+                "name": c["name_ko"],
+                "intro": c["intro"] or "",
+                "url": f"/categories/{c['slug']}/",
+                "concept_image": c["concept_image"] or "",
+                "concept_image_alt": c["concept_image_alt"] or c["name_ko"],
+            }
+        )
+    return out
+
+
 def _sitemap(urls: list[str]) -> str:
     items = "\n".join(f"  <url><loc>{SITE_ORIGIN}{u}</loc></url>" for u in urls)
     return (
@@ -534,6 +716,11 @@ def render_site(
         article_pages = _load_article_pages(conn)
         category_pages = _load_category_pages(conn, include_drafts)
         category_groups = _load_categories_index(conn, include_drafts)
+        home_categories = _load_home_categories(conn, include_drafts)
+        home_best = _load_home_best(conn, include_drafts)
+        home_deals = _load_home_deals(conn, include_drafts)
+        home_themes = _load_home_themes(conn, include_drafts)
+        guides = _load_guides(conn, include_drafts)
     finally:
         conn.close()
 
@@ -558,7 +745,13 @@ def render_site(
     # 정적 사이트는 DB 현재 상태와 정확히 일치해야 한다(예: 글 unpublish/삭제 → 라이브에서도 제거).
     # 안전장치: 빌드 산출물 디렉토리(site/preview)만 청소 — 저장소 루트 등 오삭제 방지.
     if out_dir.exists() and out_dir.name in ("site", "preview"):
-        shutil.rmtree(out_dir)
+        # 디렉토리 자체가 아니라 '내용물'만 제거 — 실행 중인 미리보기 서버가 out_dir을
+        # cwd로 점유해도 안전(Windows WinError 32 회피). 정적 사이트는 DB 상태와 정확히 일치.
+        for child in out_dir.iterdir():
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
     out_dir.mkdir(parents=True, exist_ok=True)
     written: list[str] = []
 
@@ -585,6 +778,11 @@ def render_site(
             ),
             featured_scenarios=scenarios[:6],
             season_calendar=SEASON_CALENDAR,
+            home_categories=home_categories,
+            home_banners=HOME_BANNERS,
+            home_best=home_best,
+            home_deals=home_deals,
+            home_themes=home_themes,
             **common,
         ),
     )
@@ -722,6 +920,27 @@ def render_site(
         ),
     )
 
+    # 구매가이드 인덱스 (/guides/) — 카테고리별 '고르는 법' 모음 (없으면 '준비 중'으로 graceful)
+    w(
+        "guides/index.html",
+        env.get_template("guides_index.html").render(
+            active_nav="guide",
+            canonical_url=f"{SITE_ORIGIN}/guides/",
+            meta_title="구매가이드 | 혼살림",
+            meta_description="1인 가구·홈오피스 품목을 무엇을 보고 골라야 하는지 카테고리별로 정리한 구매가이드.",
+            schema_jsonld=jsonld.as_script_tags(
+                [
+                    jsonld.build_breadcrumb_jsonld(
+                        [{"name": "홈", "url": "/"}, {"name": "구매가이드"}], SITE_ORIGIN
+                    ),
+                    org_ld,
+                ]
+            ),
+            guides=guides,
+            **common,
+        ),
+    )
+
     # 카테고리 상세 (/categories/<slug>/) — 전체 제품 카탈로그 (점수 없음)
     cat_tmpl = env.get_template("category.html")
     for pg in category_pages:
@@ -763,7 +982,7 @@ def render_site(
 
     # sitemap.xml
     urls = (
-        ["/", "/scenarios/", "/about/", "/categories/"]
+        ["/", "/scenarios/", "/about/", "/categories/", "/guides/"]
         + [f"/categories/{slug}/" for slug in category_slugs]
         + [f"/personas/{p['id']}/" for p in personas]
         + [f"/articles/{slug}/" for slug in article_slugs]

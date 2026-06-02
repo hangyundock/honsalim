@@ -38,7 +38,7 @@
   /* 간격 */
   --gap: 28px;
   --pad-card: 22px;
-  --section-y: 84px;
+  --section-y: 20px;
 
   /* 노써치식 = 플랫 + 얇은 보더. 그림자 최소화 */
   --shadow-card: 0 1px 2px rgba(20,30,40,.04);

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "_macros/components.html" import icon %}
+
+{% block title %}구매가이드 | 혼살림{% endblock %}
+
+{% block main %}
+<div class="hub-head">
+  <div class="wrap">
+    <div class="eyebrow">구매가이드</div>
+    <h1>품목별 고르는 법</h1>
+    <p class="hub-lead">무엇을 보고 골라야 하는지, 카테고리마다 기준을 정리했습니다.</p>
+  </div>
+</div>
+
+<section class="section">
+  <div class="wrap">
+    {% if guides %}
+    <div class="home-cats">
+      {% for g in guides %}
+      <a class="hcat" href="{{ g.url }}">
+        <div class="hcat-img"{% if g.concept_image %} style="background-image:url('{{ g.concept_image }}')"{% endif %} role="img" aria-label="{{ g.concept_image_alt }}"></div>
+        <div class="hcat-body">
+          <h3>{{ g.title }}</h3>
+          <p>{{ g.intro }}</p>
+          <span class="hcat-meta">가이드 보기 {{ icon('arrow', 14) }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">구매가이드를 준비하고 있습니다. 카테고리가 공개되면 차례로 올라옵니다.</div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

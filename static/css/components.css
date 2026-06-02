@@ -100,7 +100,7 @@
 .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--gap); }
 
 /* ---------- 섹션 헤더 ---------- */
-.sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 36px; }
+.sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
 .sec-head h2 { font-size: var(--fs-h2); font-weight: 800; letter-spacing: -.02em; }
 .sec-head .lead { font-size: 15px; color: var(--meta); margin-top: 8px; max-width: 52ch; line-height: 1.6; }
 

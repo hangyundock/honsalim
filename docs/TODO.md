@@ -3,17 +3,18 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 시급 (다음 세션 #20) — #19 갱신 · DeepSeek 전환·디자인·관련성·판매량 선정·신규 2카테고리 완료 → 검토·승인·배포 (상세 EVENTS #19)
+## ★ 시급 (다음 세션 #21) — 사용자 지시: **홈페이지 완성도 우선** → "제법 홈페이지 같다" 판단 시 제품 등록 (상세 EVENTS #20)
 
-> #19: 본문생성 Sonnet→**DeepSeek v4-pro**(OpenRouter 라우팅·파서견고화·SEO지시문 강화) + 카테고리 디자인 마무리(행정렬·정렬/필터 JS·커서) + 관련성 `require_all`(타입+대상)+재수집 정합화 + **추천6선 판매량 기준 선정**(만족도80%하한·항상6개·정직표기) + 신규 2카테고리. 회귀 623. 카테고리 4개 전부 draft. **전부 로컬·미배포.**
+> #20: 카테고리 4개 라이브 배포 + 홈 카테고리우선 大리디자인(히어로 대표이미지·기획전 캐러셀·BEST·딜·테마·신뢰·구매가이드) + 버그 4종 근본수정(이미지 lazy오인·산출물청소·wrangler커밋메시지·HTML캐시) + 사업자표기/이메일. 회귀 632. **origin/main 배포 완료.**
 
-- [x] ~~카테고리 디자인 마무리 · DeepSeek 전환 · 출력 안정화 · 관련성 require_all · 판매량 기준 추천 6선 · 신규 2카테고리~~ ✅ #19
-- [ ] **★카테고리 4개 검토 → 승인 → 배포**: 노트북거치대·모니터암·모니터받침대·컴퓨터책상(draft·6선). `approve-category <slug>` → `build --full` → honsalim.com (방법A, **사용자 승인**).
-- [ ] **노트북거치대 '전화' 제외어 결정**(사용자): 1위 픽이 "전화 태블릿 겸용" 베스트셀러. 노트북 전용만 원하면 `category_sources.yml` laptop-stand exclude에 "전화" 추가 후 재수집·재빌드.
+- [x] ~~카테고리 4개 승인·배포 · '전화' 제외 · 이미지 누락 근본수정 · 산출물 청소 · wrangler/HTML캐시 fix · 홈 大리디자인 · 구매가이드 · 사업자표기·이메일~~ ✅ #20
+- [ ] **★미충전 이미지 전부 채우기**(사용자 핵심): 이미지 자리 있는데 빈 곳 다 채워 "완성된 페이지" 모습으로. 확인된 곳=**`/about/` 우측 히어로 아트(about.html placeholder)**. 점검=scenario_card·persona·season `image_block(var(--wood))` 다수. 생성=`concept_image.generate_concept_image`(Imagen ~$0.02).
+- [ ] **★제품 등록 준비 — 수익 카테고리 리스트화 + 순차 자동 적용**(사용자): 수익 카테고리(제품 선택) 선별→리스트→순차 자동 등록(`collect-category`→`build-category` 반복) 설계. 알리+쿠팡 둘 다 예정 → 구조부터.
+- [ ] **★/go/ 제휴 링크 작동**(D1 slug_map·go_gateway 워커, 수익직결) — 무인 자동등록 전 필수 골격.
 - [ ] **office-chair 콘텐츠 생성**: 제품 0 — `collect-category office-chair` → `build-category office-chair`.
-- [ ] **메인 미커밋 DeepSeek 임시본 정리**: 메인(D:\affiliate_hub) AutoBlog #99 미커밋 `claude_client.py` → 이 워크트리 정식본이 supersede. 머지 전 되돌리기.
-- [ ] (이월) **★/go/ 제휴 링크 작동**(D1 slug_map·go_gateway, 수익직결) · 알리 whitelist 답변 · main-protect 재활성화.
-- 참고: ★다음 워크트리 **DB 재생성 필요**(gitignore) — 4개 카테고리 `collect-category` --no-dry-run(판매량 채움) + `build-category` --no-dry-run(API ~$1). 미리보기=`build --preview`·공개=`build --full`. 강력새로고침/시크릿창.
+- [ ] (이월) 알리 whitelist 답변 · 쿠팡 파트너스 재가입(Phase 4) · 무인 발행 스케줄러(매일 11시) · main-protect.
+- 참고: ★홈 리디자인 코드는 **origin/main 배포 완료** — 다음 워크트리에 그대로 이어짐. **DB 재생성 필요**(gitignore) — 4개 카테고리 `collect-category`+`build-category` --no-dry-run(API ~$1). 워크트리 실행=`PYTHONPATH=src python -m cli`. 미리보기=`build --preview`·공개=`build --full`. CSS확인=Ctrl+Shift+R.
+- **무인 자동등록 준비 체크리스트**(사용자 원칙): 내부링크 0 broken ✅ / 페이지 graceful ✅ / 법적페이지 ✅ / 배포 ✅ / **미충전 이미지** ⬜ / **/go/ 작동** ⬜ / **스케줄러** ⬜ → 골격 완성 후 제품 등록.
 
 ## 알리 통합 (D9)
 

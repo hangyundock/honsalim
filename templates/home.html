@@ -1,7 +1,29 @@
 {% extends "base.html" %}
-{% from "_macros/components.html" import icon, image_block, scenario_card, section_head, persona_button %}
+{% from "_macros/components.html" import icon, image_block, section_head %}
 
 {% block title %}혼살림 — 혼자 살림을 따뜻하게 시작하는 가이드{% endblock %}
+
+{% block head_extra %}
+  {# 기획전 배너 캐러셀 — defer, JS 없으면 첫 슬라이드만 표시(진행 향상) #}
+  <script defer src="{{ asset_base | default('/static') }}/js/home.js"></script>
+{% endblock %}
+
+{% macro prod_card(p, rank=0, deal=False) %}
+<a class="pcardx{% if deal %} deal{% endif %}" href="{{ p.url }}" rel="sponsored nofollow">
+  {% if rank %}<div class="px-rank">{{ rank }}</div>{% endif %}
+  {% if deal and p.disc %}<div class="px-disc">{{ p.disc }}↓</div>{% endif %}
+  <div class="px-img"{% if p.img_url %} style="background-image:url('{{ p.img_url }}')"{% endif %}></div>
+  <div class="px-body">
+    <span class="px-cat">{{ p.cat_name }}</span>
+    <p class="px-name">{{ p.name }}</p>
+    <div class="px-foot">
+      <span class="px-price">{{ p.price }}</span>
+      {% if deal and p.orig %}<span class="px-orig"><s>{{ p.orig }}</s></span>
+      {% elif p.volume %}<span class="px-vol">🔥 {{ p.volume }}</span>{% endif %}
+    </div>
+  </div>
+</a>
+{% endmacro %}
 
 {% block main %}
 {# ===== Hero ===== #}
@@ -9,60 +31,172 @@
   <div class="wrap hero-in">
     <div class="hero-copy">
       <div class="eyebrow">1인 가구 · 자취 · 홈오피스 · 일상살림</div>
-      <h1 class="hero-title">혼자 살림을<br><em>따뜻하게</em> 시작하는 가이드</h1>
+      <h1 class="hero-title">혼자 살림,<br><em>정직하게</em> 비교하고 고르세요</h1>
       <p class="hero-lead">
-        무엇부터 사야 할지 막막할 때. 상황별로 정리한 추천을 따라가며
-        내 예산에 맞는 살림을 차근차근 갖춰보세요. 배너 광고 없이, 필요한 것만.
+        무엇부터 사야 할지 막막할 때. 카테고리별로 실속·고급을 나눠
+        판매량과 정가·할인 기준으로 비교했습니다. 배너 광고 없이, 필요한 것만.
       </p>
-      <div class="persona-entry">
-        <div class="pe-label">어떤 상황이신가요?</div>
-        <div class="pe-btns">
-          {% for p in personas %}{{ persona_button(p) }}{% endfor %}
-        </div>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="/categories/">카테고리 둘러보기 {{ icon('arrow', 15) }}</a>
+        <a class="btn btn-text" href="/about/">운영 원칙 보기</a>
       </div>
     </div>
-    <div class="hero-art">
-      {{ image_block('var(--wood-2)', '따뜻한 원룸 거실', 'plant', 'ha-1') }}
-      {{ image_block('var(--wood-1)', '홈오피스 책상', '', 'ha-2') }}
-      {{ image_block('var(--wood-3)', '작은 주방', '', 'ha-3') }}
-    </div>
+    <div class="hero-art-img" style="background-image:url('{{ asset_base | default('/static') }}/images/concepts/home-hero.webp')" role="img" aria-label="햇살 드는 1인 가구 홈오피스 — 책상·모니터·식물이 놓인 따뜻한 공간"></div>
   </div>
 </section>
 
-{# ===== 인기 시나리오 ===== #}
-<section class="section" style="background: var(--section-tint)">
+{# ===== 기획전 배너 (A) — 큰 키비주얼 캐러셀 ===== #}
+{% if home_banners %}
+<section class="promo-sec">
   <div class="wrap">
-    {{ section_head(
-        '인기 세팅',
-        '요즘 많이 본 살림 가이드',
-        '상황 · 시즌 · 예산을 한눈에. 카드를 누르면 상세 추천으로 이동합니다.',
-        action_label='전체 보기', action_url='/scenarios/'
-    ) }}
-    <div class="grid-3">
-      {% for s in featured_scenarios %}{{ scenario_card(s) }}{% endfor %}
-    </div>
-  </div>
-</section>
-
-{# ===== 시즌 캘린더 ===== #}
-<section class="section season-sec">
-  <div class="wrap">
-    {{ section_head(
-        '시즌 캘린더',
-        '지금 챙기면 좋은 살림',
-        '계절마다 필요한 살림은 달라집니다. 시기에 맞춰 미리 준비하세요.'
-    ) }}
-    <div class="season-grid">
-      {% for s in season_calendar %}
-      <a class="season-card" href="{{ s.url }}">
-        {{ image_block(s.img, '', s.icon, 'season-img') }}
-        <div class="season-body">
-          <div class="season-top"><h3>{{ s.name }}</h3><span class="months">{{ s.months }}</span></div>
-          <div class="season-sub">{{ s.sub }}</div>
-          <p class="season-desc">{{ s.desc }}</p>
+    <div class="promo" id="promo">
+      {% for b in home_banners %}
+      <a class="promo-slide{% if loop.first %} on{% endif %}" href="{{ b.href }}" data-i="{{ loop.index0 }}"
+         {% if b.image %}style="background-image: linear-gradient(95deg, rgba(18,26,22,.78) 0%, rgba(18,26,22,.45) 45%, rgba(18,26,22,.12) 100%), url('{{ asset_base | default('/static') }}/{{ b.image }}')"{% endif %}>
+        <div class="promo-text">
+          {% if b.eyebrow %}<span class="promo-eyebrow">{{ b.eyebrow }}</span>{% endif %}
+          <h2>{{ b.title }}</h2>
+          {% if b.sub %}<p>{{ b.sub }}</p>{% endif %}
+          <span class="promo-cta">{{ b.cta }} {{ icon('arrow', 16) }}</span>
         </div>
       </a>
       {% endfor %}
+      {% if home_banners | length > 1 %}
+      <div class="promo-dots" id="promoDots">
+        {% for b in home_banners %}<button class="promo-dot{% if loop.first %} on{% endif %}" data-i="{{ loop.index0 }}" aria-label="배너 {{ loop.index }}"></button>{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ===== 카테고리 (메인) ===== #}
+<section class="section" style="background: var(--section-tint)">
+  <div class="wrap">
+    {{ section_head(
+        '카테고리',
+        '품목별로 비교해 보세요',
+        '각 카테고리마다 실속·고급 추천 6선과 전체 제품 비교를 정리했습니다.',
+        action_label='전체 카테고리', action_url='/categories/'
+    ) }}
+    {% if home_categories %}
+    <div class="home-cats">
+      {% for c in home_categories %}
+      {% if c.available %}
+      <a class="hcat" href="{{ c.url }}">
+        <div class="hcat-img"{% if c.concept_image %} style="background-image:url('{{ c.concept_image }}')"{% endif %} role="img" aria-label="{{ c.concept_image_alt }}"></div>
+        <div class="hcat-body">
+          <h3>{{ c.name }}</h3>
+          <p>{{ c.intro }}</p>
+          <span class="hcat-meta">제품 {{ c.count }}개 비교 {{ icon('arrow', 14) }}</span>
+        </div>
+      </a>
+      {% else %}
+      <div class="hcat soon">
+        <div class="hcat-img"{% if c.concept_image %} style="background-image:url('{{ c.concept_image }}')"{% endif %} role="img" aria-label="{{ c.concept_image_alt }}"></div>
+        <div class="hcat-body">
+          <h3>{{ c.name }} <span class="soon-badge">준비 중</span></h3>
+          <p>{{ c.intro }}</p>
+          <span class="hcat-meta muted">곧 공개합니다</span>
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">카테고리를 준비하고 있습니다. 곧 공개합니다.</div>
+    {% endif %}
+  </div>
+</section>
+
+{# ===== 판매량 BEST (C) ===== #}
+{% if home_best %}
+<section class="section">
+  <div class="wrap">
+    {{ section_head(
+        '판매량 BEST',
+        '지금 많이 담는 제품',
+        '알리 최근 판매량 기준입니다. 임의 점수 없이 실제 판매량 순으로 보여드려요.'
+    ) }}
+    <div class="prod-row">
+      {% for p in home_best %}{{ prod_card(p, rank=loop.index) }}{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ===== 오늘의 딜 / 할인 BEST (D) ===== #}
+{% if home_deals %}
+<section class="section" style="background: var(--section-tint)">
+  <div class="wrap">
+    {{ section_head(
+        '오늘의 딜',
+        '지금 할인 폭이 큰 제품',
+        '정가 대비 할인율 순입니다. 가격은 수집 시점 기준이라 구매 전 최종가를 확인하세요.'
+    ) }}
+    <div class="prod-row">
+      {% for p in home_deals %}{{ prod_card(p, deal=True) }}{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ===== 테마 큐레이션 (E) ===== #}
+{% if home_themes %}
+<section class="section">
+  <div class="wrap">
+    {{ section_head(
+        '테마 추천',
+        '상황에 맞춰 한 번에',
+        '함께 쓰면 좋은 조합을 묶었습니다. 각 카테고리의 판매량 1순위로 구성했습니다.'
+    ) }}
+    {% for t in home_themes %}
+    <div class="theme">
+      <div class="theme-head">
+        <h3>{{ t.title }}</h3>
+        <p>{{ t.desc }}</p>
+      </div>
+      <div class="theme-items">
+        {% for p in t.picks %}
+        <a class="titem" href="{{ p.url }}" rel="sponsored nofollow">
+          <div class="ti-img"{% if p.img_url %} style="background-image:url('{{ p.img_url }}')"{% endif %}></div>
+          <span class="ti-cat">{{ p.cat_name }}</span>
+          <p class="ti-name">{{ p.name }}</p>
+          <span class="ti-price">{{ p.price }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ===== 왜 믿을 수 있나 ===== #}
+<section class="section">
+  <div class="wrap">
+    {{ section_head(
+        '왜 믿을 수 있나',
+        '광고가 아니라, 기준으로 추천합니다',
+        '보기 좋은 제품이 아니라 공개된 데이터와 기준으로 고릅니다.'
+    ) }}
+    <div class="trust-grid">
+      <div class="trust-item">
+        <div class="ti-ic">{{ icon('won', 22) }}</div>
+        <h3>판매량 · 할인 기준</h3>
+        <p>추천은 알리 최근 판매량과 정가·할인율로 선정합니다. 임의 점수를 매기지 않습니다.</p>
+      </div>
+      <div class="trust-item">
+        <div class="ti-ic">{{ icon('check', 22) }}</div>
+        <h3>가짜 평점 없음</h3>
+        <p>별점·후기를 지어내지 않습니다. 제공되지 않는 정보는 비워 둡니다.</p>
+      </div>
+      <div class="trust-item">
+        <div class="ti-ic">{{ icon('info', 22) }}</div>
+        <h3>공정위 고지 · 광고 없음</h3>
+        <p>제휴 링크는 항상 글머리에 고지합니다. 상단·본문 배너 광고를 넣지 않습니다.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -71,7 +205,7 @@
 <section class="section about-strip">
   <div class="wrap about-in">
     <div class="about-art">
-      {{ image_block('var(--wood-4)', '혼살림 작업 공간', 'leaf') }}
+      <div class="hero-art-img" style="background-image:url('{{ asset_base | default('/static') }}/images/concepts/about.webp')" role="img" aria-label="혼살림 — 1인 가구의 따뜻한 작업·생활 공간"></div>
     </div>
     <div class="about-copy">
       <div class="eyebrow">About 혼살림</div>
@@ -83,7 +217,7 @@
       </p>
       <div class="about-actions">
         <a class="btn btn-primary" href="/about/">운영 원칙 보기</a>
-        <a class="btn btn-text" href="/scenarios/">세팅 둘러보기 {{ icon('arrow', 15) }}</a>
+        <a class="btn btn-text" href="/categories/">카테고리 둘러보기 {{ icon('arrow', 15) }}</a>
       </div>
     </div>
   </div>

@@ -222,6 +222,16 @@
 - **P4. 상품 관련성 = require_all('타입+대상' 동시) [확정 #19, 실측 근본수정]**: `product_filter.is_relevant`에 `require_all`(OR-그룹들의 AND) 추가. `require_any`(OR 한 줄)는 "노트북"만 언급한 캠핑 테이블도 통과시켜 카탈로그 오염 → laptop-stand는 `[[노트북 계열],[거치대 계열]]` 둘 다 가진 상품만 통과(구조적 차단). + `category_collect` **재수집 정합화**(is_featured=0 카탈로그를 비우고 재구성 → 필터 강화 후 재수집하면 옛 오염 자동 제거, 추천 6선은 보존). 과도 제외어(데스크탑/태블릿이 정상 노트북 스탠드 탈락)는 require_all이 거르므로 최소화.
 - **P5. 카테고리 페이지 인터랙션 [확정 #19]**: 추천 카드 좌우 **행 정렬**(grid-area 행 배치·stretch·버튼 `margin-top:auto`로 장단점 개수 달라도 아래단 일치, 모바일은 그룹 스택). 전체 제품 **정렬(추천/가격/할인)·티어 필터 = `static/js/category.js`**(서버 렌더 카드 data 속성 기반 클라이언트 재정렬·표시; JS 없으면 서버 기본=추천순·전체, 점진 향상). 조건 버튼 `cursor:pointer`. ★전부 공통 코드(template/css/js·select_featured·build_llm_client)라 **신규 카테고리 자동 적용**.
 
+## Q. 카테고리 배포·홈 리디자인·배포 안정화 [확정] — 세션 #20 신규
+
+- **Q1. 배포 wrangler 커밋메시지 = ASCII 고정 [확정 #20, 라이브 근본수정]**: `cloudflare/wrangler-action@v4`의 `pages deploy`가 **git 커밋 메시지를 CF 배포 메타데이터로 전송**하는데, 본 프로젝트 커밋 규칙(`[YYYY-MM-DD #N]` 한국어+`★`·`→` 등)을 Cloudflare API가 거부(**code 8000111 "Invalid commit message, must be valid UTF-8"**) → 파일 업로드 성공·배포 생성만 실패. `build.yml` 명령에 `--commit-message=honsalim-auto-deploy`(ASCII)+`--commit-dirty=true` 명시로 git 메시지 스크래핑 우회 → 전 배포 안전. 가드 `tests/test_deploy_workflow.py`. (wrangler-action이 매번 최신 wrangler 설치 → 4.96.0부터 메타 전송이 드러난 것으로 [추정])
+- **Q2. 정적 산출물 청소 = build 시 out_dir 내용물 제거 후 재생성 [확정 #20]**: `render_site`가 out_dir을 안 비워 **미게시·삭제된 콘텐츠의 옛 HTML이 build/site에 잔존**(배포 시 라이브에서 안 내려감 — 무인 'unpublish→라이브 반영' 깨짐). site/preview 디렉토리 **내용물만** 제거 후 재생성(디렉토리 자체는 유지 → 실행 중 미리보기 서버가 cwd로 점유해도 Windows WinError 32 회피). 가드 `tests/test_renderer.py::TestBuildSiteClean`.
+- **Q3. HTML 엣지캐시 단축 [확정 #20]**: `_headers` `/*`에 `Cache-Control: public, max-age=0, s-maxage=300, must-revalidate`(HTML 5분·브라우저 재검증), `/static/*`는 1년 immutable 유지. 콘텐츠 수정/삭제가 최대 7일 지연되던 문제 근본수정(무인 일일 발행 전제). ※CF 측 Cache Rule이 장기 캐시를 강제하면 우선하므로 대시보드 병행 점검. 옛 캐시본은 Purge Everything/Custom Purge로 비움.
+- **Q4. 이미지 로딩 = 미리보기 eager / 공개 lazy + onerror 재시도 [확정 #20]**: '이미지 누락' 신고의 원인은 **데이터가 아니라 `loading="lazy"`+전체페이지 스크린샷**(화면 밖 이미지 미로드; 데이터·URL 148/148 200 정상). 미리보기(`include_drafts`)=eager(검토 시 전부 표시)·공개=lazy(외부 이미지 다발 요청 방지·CWV). 깨진 외부 이미지는 `onerror`로 1회 재시도(캐시버스터)→재실패 시 숨김(자가복원). 가드 `TestCategoryProductImages`.
+- **Q5. 홈 = 카테고리 우선 + 콘텐츠 모듈 [확정 #20, 사용자·레퍼런스 노서치/오늘의집/무신사]**: 옛 페르소나/시나리오 중심 홈(임시방편)→**카테고리 우선**. 모듈: 히어로(대표 개념이미지)·**기획전 캐러셀(A, 운영자 기획·가짜 세일 금지)**·카테고리 그리드·**판매량 BEST(C)**·**오늘의 딜(D, 할인율순)**·**테마 큐레이션(E, 상황 기반)**·신뢰3박스·About. ★**C/D/E의 상품은 빌드마다 DB에서 자동 재계산**(고정 아님 — 제품 늘면 자동 반영), **테마 주제·기획전 배너는 운영자 기획**(품질·정직성). 인구통계 "20대 BEST"는 데이터 없어 금지 → 상황 테마로. 가드 `TestHomeRichSections`.
+- **Q6. 구매가이드 페이지 /guides/ [확정 #20]**: 상단 네비 구매가이드가 가리키던 `/guides/`가 페이지 없어 404(유일 깨진 링크) → 카테고리별 '고르는 법' 가이드를 모은 `/guides/` 인덱스 생성. 내부링크 167종 0 broken 확인. 무인 자동화 전 **사이트 골격(모든 링크·페이지)이 에러 없이 완성** 후 제품 등록 — 사용자 원칙(§0).
+- **Q7. 사업자 정보 미등록 시 숨김 [확정 #20, M2 갱신]**: 사업자등록 전(DECISIONS D4: 월10만원 누적 후)에는 footer·about·article에서 **빈 사업자번호·통신판매업·주소 필드를 조건부 숨김**("등록 진행 중" 과장 표기 제거 — 정직성 §0). 등록 후 실제 값 채우면 자동 재노출. 사이트 표기 이메일 = **dugi2020@naver.com**(BUSINESS_INFO·Organization JSON-LD 포함 전체).
+
 ## 폐기된 결정 (역사 참조용)
 
 | 폐기일 | 결정 | 폐기 사유 |

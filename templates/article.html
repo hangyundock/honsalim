@@ -46,8 +46,9 @@
       </p>
       <div class="biz-grid">
         <span>상호 {{ business_info.name }}</span><span>대표 {{ business_info.rep }}</span>
-        <span>사업자등록번호 {{ business_info.bizno }}</span><span>통신판매업 {{ business_info.mailorder }}</span>
-        <span>문의 {{ business_info.email }}</span><span>주소 {{ business_info.addr }}</span>
+        {% if business_info.bizno %}<span>사업자등록번호 {{ business_info.bizno }}</span>{% endif %}
+        {% if business_info.mailorder %}<span>통신판매업 {{ business_info.mailorder }}</span>{% endif %}
+        <span>문의 {{ business_info.email }}</span>{% if business_info.addr %}<span>주소 {{ business_info.addr }}</span>{% endif %}
       </div>
     </div>
   </div>
