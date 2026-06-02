@@ -1087,7 +1087,8 @@ def cmd_build_category(args: argparse.Namespace) -> int:
         f"SEO={res['seo_passed']}(밀도 {res['seo_density']}%) · 저장={res.get('saved')}"
     )
     if res.get("concept_image"):
-        print(f"     개념 이미지: {res['concept_image']}")
+        _tag = "재사용" if res.get("concept_image_reused") else "신규 생성"
+        print(f"     개념 이미지({_tag}): {res['concept_image']}")
     if res.get("concept_image_error"):
         print(f"     {WARN} 이미지 실패: {res['concept_image_error']}")
     if not res.get("saved"):
@@ -1098,6 +1099,83 @@ def cmd_build_category(args: argparse.Namespace) -> int:
             "(AI 자동승인 금지·§2-마)"
         )
     return 0
+
+
+def cmd_register_categories(args: argparse.Namespace) -> int:
+    """수익 카테고리 리스트를 순차로 자동 등록(collect→build). 세션 #21.
+
+    category_sources.yml의 카테고리(또는 지정 slug)를 차례로 수집·생성한다. 한 카테고리가
+    실패해도 다음으로 계속(무인 안전·실패 격리) 후 마지막에 요약. 저장은 build_and_save가
+    draft 고정 → 자동 공개 없음(E7·§2-마). 공개는 사용자가 approve-category로.
+    기본 dry_run. --no-dry-run은 알리 수집 쿼터 + DeepSeek/Imagen 비용(§2-라 승인 후).
+    """
+    import os
+    import sqlite3
+
+    from collector import category_collect
+    from enricher.category_page_builder import build_and_save
+    from enricher.claude_client import ClaudeClient
+
+    sources = category_collect.load_sources()
+    slugs = sorted(sources) if args.all else list(args.slugs)
+    if not slugs:
+        print(f"{FAIL} 등록할 카테고리 없음 — slug를 지정하거나 --all 사용")
+        return 2
+    unknown = [s for s in slugs if s not in sources]
+    if unknown:
+        print(f"{FAIL} category_sources.yml에 정의 없는 slug: {unknown}")
+        return 2
+
+    if not args.dry_run:
+        config.load_secrets()
+    client = ClaudeClient(api_key=os.environ.get("ANTHROPIC_API_KEY", "") or "dry-run")
+    conn = db.connect(db.DB_PATH)
+    conn.row_factory = sqlite3.Row
+
+    summary: list[tuple[str, str]] = []
+    try:
+        for i, slug in enumerate(slugs, 1):
+            print(f"\n=== [{i}/{len(slugs)}] {slug} 등록 ===")
+            try:
+                if not args.skip_collect:
+                    cres = category_collect.collect_category(
+                        conn, slug, dry_run=args.dry_run, page_size=args.page_size
+                    )
+                    if not args.dry_run:
+                        print(f"     수집: 수신 {cres.received} · 연결 {cres.linked}")
+                bres = build_and_save(
+                    conn,
+                    slug,
+                    client,
+                    dry_run=args.dry_run,
+                    generate_image=not args.no_image,
+                    max_attempts=args.max_attempts,
+                )
+                if args.dry_run:
+                    summary.append((slug, "DRY"))
+                    print("     [DRY] 실제 수집·생성 없음")
+                elif bres.get("saved"):
+                    summary.append((slug, "OK(draft)"))
+                    print(
+                        f"     {OK} 저장(draft) 게이트={bres.get('overall_pass')} "
+                        f"SEO={bres.get('seo_passed')} 이미지={bres.get('concept_image') or '—'}"
+                    )
+                else:
+                    summary.append((slug, "게이트미통과"))
+                    print(f"     {WARN} 게이트 미통과 — 저장 안 됨: {bres.get('gates')}")
+            except Exception as e:  # 한 카테고리 실패 격리(무인 안전·다음 진행)
+                summary.append((slug, f"실패:{type(e).__name__}"))
+                print(f"     {FAIL} {slug}: {e}")
+    finally:
+        conn.close()
+
+    print("\n=== 등록 요약 ===")
+    for slug, status in summary:
+        print(f"  {slug}: {status}")
+    done = sum(1 for _, s in summary if s.startswith("OK") or s == "DRY")
+    tag = OK if done == len(slugs) else WARN
+    print(f"{tag} {done}/{len(slugs)} 완료 — 전부 draft (approve-category로 공개·E7)")
+    return 0 if done == len(slugs) else 1
 
 
 def cmd_approve_category(args: argparse.Namespace) -> int:
@@ -1439,6 +1517,27 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-attempts", type=int, default=2, help="SEO+게이트 통과 재생성 상한 (기본 2)"
     )
     p_build_cat.set_defaults(func=cmd_build_category, dry_run=True)
+
+    # 수익 카테고리 순차 자동 등록 (세션 #21) — 리스트(또는 --all)를 collect→build 반복, draft 저장(E7)
+    p_register = sub.add_parser(
+        "register-categories",
+        help="수익 카테고리 리스트 순차 자동 등록(collect→build, draft 저장·E7)",
+    )
+    p_register.add_argument("slugs", nargs="*", help="categories.slug 목록 (없으면 --all)")
+    p_register.add_argument("--all", action="store_true", help="category_sources.yml 전체 등록")
+    p_register.add_argument(
+        "--no-dry-run",
+        dest="dry_run",
+        action="store_false",
+        help="실제 수집(쿼터)+생성(비용) — 명시 승인 후",
+    )
+    p_register.add_argument("--skip-collect", action="store_true", help="수집 생략, 생성만")
+    p_register.add_argument("--no-image", action="store_true", help="개념 이미지 생성 생략")
+    p_register.add_argument("--page-size", type=int, default=30, help="티어당 조회 수 (기본 30)")
+    p_register.add_argument(
+        "--max-attempts", type=int, default=2, help="게이트 재생성 상한 (기본 2)"
+    )
+    p_register.set_defaults(func=cmd_register_categories, dry_run=True)
 
     # 카테고리 공개 승인 게이트 (세션 #18) — AI 자동승인 금지(§2-마·E7), 사용자 1클릭만 공개
     p_approve_cat = sub.add_parser(

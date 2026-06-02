@@ -319,7 +319,18 @@ class _OpenRouterBackend:
                 raise RuntimeError(f"OpenRouter {resp.status_code} 재시도 소진: {resp.text[:200]}")
             if resp.status_code >= 400:
                 raise RuntimeError(f"OpenRouter {resp.status_code}: {resp.text[:200]}")
-            data = resp.json()
+            try:
+                data = resp.json()
+            except _json.JSONDecodeError as e:
+                # 200인데 본문이 불완전/비JSON(프록시·스트림 잘림 등) — 일시적 가정, 백오프 재시도.
+                # 소진 시 RuntimeError(호출 측 build_and_save가 재생성으로 흡수·자가복원 §0).
+                if attempt < len(cfg.rate_limit_backoffs):
+                    time.sleep(_with_jitter(cfg.rate_limit_backoffs[attempt], cfg.jitter_factor))
+                    attempt += 1
+                    continue
+                raise RuntimeError(
+                    f"OpenRouter 응답 JSON 파싱 실패(잘림 의심) 재시도 소진: {e}"
+                ) from e
             choices = data.get("choices")
             if not choices:
                 raise RuntimeError(f"OpenRouter 응답에 choices 없음: {data.get('error') or data}")

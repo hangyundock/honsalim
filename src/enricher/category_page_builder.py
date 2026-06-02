@@ -242,24 +242,25 @@ def build_and_save(
     final: dict[str, Any] = {}
     last_parse_error: str | None = None
     for attempt in range(1, max(1, max_attempts) + 1):
-        res = category_writer.generate_category_page(
-            client,
-            cat_name,
-            products,
-            seo=seo_cfg,
-            feedback=feedback,
-            selected=selected,
-            dry_run=False,
-        )
         try:
+            res = category_writer.generate_category_page(
+                client,
+                cat_name,
+                products,
+                seo=seo_cfg,
+                feedback=feedback,
+                selected=selected,
+                dry_run=False,
+            )
             parsed = category_writer.parse_category_page_response(
                 res.response_text, valid_slugs=valid
             )
-        except category_writer.CategoryPageError as ex:
-            # B(세션 #19): 파싱 실패도 자가복원 — 순수 JSON 재요청 후 재생성(전체 중단 방지·무인 안전)
+        except (category_writer.CategoryPageError, RuntimeError) as ex:
+            # 자가복원(§0): JSON 파싱 실패 + LLM 호출/응답 오류(타임아웃·응답 잘림·일시적 API)를
+            # 모두 재생성으로 흡수 — 전체 중단 방지(무인 안전). 영속 오류는 상한 소진 후 명확히 보고.
             last_parse_error = str(ex)
             feedback = [
-                f"직전 응답이 유효한 JSON이 아니었습니다({ex}). "
+                f"직전 생성이 실패했습니다({ex}). "
                 "코드펜스·설명문 없이 순수 JSON 객체 하나만 출력하고, 후행 콤마를 넣지 마세요."
             ]
             continue
@@ -347,14 +348,18 @@ def build_and_save(
 
         try:
             out_path = CONCEPT_IMG_DIR / f"{slug}.webp"
-            if concept_image.generate_concept_image(parsed["image_prompt"], out_path):
-                rel = f"/static/images/concepts/{slug}.webp"
+            rel = f"/static/images/concepts/{slug}.webp"
+            # 이미 생성된 개념 이미지가 있으면 재사용 — Imagen 비용 절약 + 기존 확정 이미지
+            # 보존(랜덤 재생성 퇴행 방지). 재생성 강제는 해당 webp를 먼저 삭제. 세션 #21.
+            reused = out_path.exists()
+            if reused or concept_image.generate_concept_image(parsed["image_prompt"], out_path):
                 conn.execute(
                     "UPDATE categories SET concept_image = ?, concept_image_alt = ? WHERE id = ?",
                     (rel, parsed.get("image_alt", ""), category_id),
                 )
                 conn.commit()
                 report["concept_image"] = rel
+                report["concept_image_reused"] = reused
         except Exception as exc:  # 이미지 실패는 글 저장에 영향 없음 — 가시화만
             report["concept_image_error"] = str(exc)[:200]
     return report

@@ -6,19 +6,19 @@ published article에 연결된 상품만 노출 + SQL escape + dry_run 기본 �
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 
+from common import db as _db
 from tracker import slug_map
 from writer import article_writer
 from writer.state_machine import transition
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-MIGRATION_001 = PROJECT_ROOT / "sql" / "migrations" / "001_initial_schema.sql"
-
 
 def _base_db() -> sqlite3.Connection:
+    # 전체 migration 적용 — slug_map이 article·category 양쪽을 조회하므로 categories·
+    # category_products 테이블도 필요(세션 #21 UNION 확장). 운영 DB와 동일 스키마.
     conn = sqlite3.connect(":memory:")
-    conn.executescript(MIGRATION_001.read_text(encoding="utf-8"))
+    for m in _db.discover_migrations():
+        conn.executescript(m.path.read_text(encoding="utf-8"))
     conn.executescript(
         "INSERT INTO personas (slug, title_ko, description) VALUES ('p1', 'P', 'd');"
         "INSERT INTO scenarios (slug, title_ko, description, persona_id) VALUES ('s1','S','d',1);"
@@ -193,6 +193,37 @@ class TestSyncSlugMap:
         )
         result = slug_map.sync_slug_map(conn, database_name="custom-db", dry_run=True)
         assert "custom-db" in result.command
+
+
+class TestCategorySlugMap:
+    """세션 #21: published 카테고리 연결 상품도 slug_map 포함(메인 콘텐츠=카테고리). draft는 제외."""
+
+    def _link_category(
+        self, conn: sqlite3.Connection, *, slug: str, status: str, spid: str
+    ) -> None:
+        pid = _insert_product(conn, spid)
+        conn.execute(
+            "INSERT INTO categories (slug, name_ko, status) VALUES (?, ?, ?)", (slug, "C", status)
+        )
+        cid = conn.execute("SELECT id FROM categories WHERE slug = ?", (slug,)).fetchone()[0]
+        conn.execute(
+            "INSERT INTO category_products (category_id, product_id, tier) VALUES (?, ?, 'budget')",
+            (cid, pid),
+        )
+        conn.commit()
+
+    def test_published_category_products_collected(self) -> None:
+        conn = _base_db()
+        self._link_category(conn, slug="desk", status="published", spid="501")
+        slugs = {e["slug"] for e in slug_map.collect_slug_map_entries(conn)}
+        assert "ali-501" in slugs
+
+    def test_draft_category_products_excluded(self) -> None:
+        # draft 카테고리 제품은 비노출 — 미게시 딥링크 안전(E7·POLICY §6)
+        conn = _base_db()
+        self._link_category(conn, slug="draftcat", status="draft", spid="601")
+        slugs = {e["slug"] for e in slug_map.collect_slug_map_entries(conn)}
+        assert "ali-601" not in slugs
 
 
 def test_sql_str_escaping() -> None:

@@ -38,7 +38,9 @@ class SlugMapSyncResult:
     error: str | None = None
 
 
-# published article에 연결된 상품만 — 게시 안 된 딥링크 비노출 (POLICY §6 / 안전)
+# published article·카테고리에 연결된 상품 — 게시 안 된 딥링크 비노출 (POLICY §6 / 안전).
+# 세션 #21: 메인 콘텐츠가 카테고리 페이지라 category_products(published 카테고리)도 UNION —
+# 카테고리 제품 /go/ 클릭이 D1 slug_map 미스로 홈 fallback 되던 문제 근본수정.
 _COLLECT_SQL = """
     SELECT DISTINCT p.deeplink_slug AS slug,
            p.deeplink_url,
@@ -50,7 +52,18 @@ _COLLECT_SQL = """
     WHERE a.status = 'published'
       AND p.deeplink_slug IS NOT NULL
       AND p.deeplink_url IS NOT NULL
-    ORDER BY p.deeplink_slug
+    UNION
+    SELECT DISTINCT p.deeplink_slug AS slug,
+           p.deeplink_url,
+           p.source,
+           p.id AS product_id_local
+    FROM products p
+    JOIN category_products cp ON cp.product_id = p.id
+    JOIN categories c ON c.id = cp.category_id
+    WHERE c.status = 'published'
+      AND p.deeplink_slug IS NOT NULL
+      AND p.deeplink_url IS NOT NULL
+    ORDER BY slug
 """
 
 

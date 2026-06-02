@@ -56,10 +56,12 @@ HEADERS_FILE = (
 
 WOOD = ["var(--wood-1)", "var(--wood-2)", "var(--wood-3)", "var(--wood-4)"]
 PERSONA_ICON = {"cheot-jachi": "key", "homeoffice": "laptop", "minimal-life": "plant"}
+# 페르소나 공간 개념이미지(scripts/gen_persona_images.py 생성). 값이 비면 image_block
+# 매크로가 우드톤 placeholder로 폴백(graceful·무인 안전). 세션 #21: 미충전 placeholder 채움.
 PERSONA_IMG = {
-    "cheot-jachi": "var(--wood-1)",
-    "homeoffice": "var(--wood-4)",
-    "minimal-life": "var(--wood-2)",
+    "cheot-jachi": "/static/images/concepts/persona-cheot-jachi.webp",
+    "homeoffice": "/static/images/concepts/persona-homeoffice.webp",
+    "minimal-life": "/static/images/concepts/persona-minimal-life.webp",
 }
 
 # 시즌 캘린더 — 콘텐츠 무관 정적 4분기 (홈 섹션)
@@ -141,7 +143,7 @@ def _budget_tier(mx: int | None) -> str:
     return "high"
 
 
-def _scenario_card(row: sqlite3.Row, idx: int) -> dict:
+def _scenario_card(row: sqlite3.Row) -> dict:
     slug = row["slug"]
     # 게시된 글이 있는 시나리오만 /articles/<slug>/로 링크 — 없으면 url=None(비클릭 '준비 중').
     # 글 없는 카드가 404로 가는 것을 방지 (콘텐츠 단계적 발행 중 깨진 링크 회피).
@@ -160,7 +162,8 @@ def _scenario_card(row: sqlite3.Row, idx: int) -> dict:
         "budget": _budget_display(row["budget_min_krw"], row["budget_max_krw"]),
         "budget_tier": _budget_tier(row["budget_max_krw"]),
         "count": product_count if has_article else 0,
-        "img": WOOD[idx % len(WOOD)],
+        # 시나리오 카드 이미지 = 소속 페르소나 개념이미지 재사용(추가 비용 0). 세션 #21.
+        "img": PERSONA_IMG.get(row["persona_slug"], ""),
         "cap": row["season_peak"] or "",
         "url": f"/articles/{article_slug}/" if has_article else None,
         "available": has_article,
@@ -180,7 +183,7 @@ def _load_scenarios(conn: sqlite3.Connection) -> list[dict]:
         WHERE s.active = 1
         ORDER BY s.priority DESC, s.id
         """).fetchall()
-    return [_scenario_card(r, i) for i, r in enumerate(rows)]
+    return [_scenario_card(r) for r in rows]
 
 
 def _load_personas(conn: sqlite3.Connection) -> list[dict]:

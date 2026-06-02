@@ -26,12 +26,17 @@
   {%- endif -%}
 {%- endmacro %}
 
-{# ---- 이미지 placeholder 블록 (우드톤 단색 + 캡션) ---- #}
-{% macro image_block(color='var(--wood-3)', cap='', icon_name='', cls='') -%}
+{# ---- 이미지 블록 (img_url 있으면 실사진, 없으면 우드톤 단색 placeholder) ---- #}
+{# img_url은 색상보다 우선. 세션 #21: 미충전 placeholder를 개념이미지로 채움(하위호환). #}
+{% macro image_block(color='var(--wood-3)', cap='', icon_name='', cls='', img_url='') -%}
+{%- if img_url -%}
+<div class="img-block {{ cls }}" style="background-image:url('{{ img_url }}'); background-size:cover; background-position:center;" role="img" aria-label="{{ cap }}"></div>
+{%- else -%}
 <div class="img-block {{ cls }}" style="background: {{ color }};">
   {%- if icon_name %}<div class="ph-icon">{{ icon(icon_name, 30, 1.3) }}</div>{% endif -%}
   {%- if cap %}<span class="cap">{{ cap }}</span>{% endif -%}
 </div>
+{%- endif -%}
 {%- endmacro %}
 
 {# ---- 칩 ---- #}
@@ -70,7 +75,7 @@
 {% macro scenario_card(s) -%}
   {%- set SI = {'봄':'spring','여름':'summer','가을':'fall','겨울':'winter'} -%}
 <a class="s-card{% if not s.url %} s-card-soon{% endif %}"{% if s.url %} href="{{ s.url }}"{% endif %} data-persona="{{ s.persona }}" data-season="{{ s.season }}" data-budget="{{ s.budget_tier | default('') }}"{% if not s.url %} aria-disabled="true"{% endif %}>
-  {{ image_block(s.img, s.cap, SI.get(s.season, '')) }}
+  {{ image_block(cap=s.cap, icon_name=SI.get(s.season, ''), img_url=s.img) }}
   <div class="body">
     <div class="chip-row">
       {{ persona_chip(s.persona, s.persona_name, icon_name=s.persona_icon | default('')) }}

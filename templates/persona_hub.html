@@ -24,7 +24,7 @@
       <p class="ph-desc">{{ persona.desc }}</p>
     </div>
     <div class="ph-art">
-      {{ image_block(persona.img, persona.name ~ ' 공간', persona.icon) }}
+      {{ image_block(cap=persona.name ~ ' 공간', icon_name=persona.icon, img_url=persona.img) }}
     </div>
   </div>
 </section>

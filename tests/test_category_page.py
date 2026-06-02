@@ -184,6 +184,21 @@ class _FakeClient:
         return _Res(t)
 
 
+class _FlakyClient:
+    """1차 generate에서 예외(LLM 호출/응답 오류) → 2차 정상 JSON (자가복원 검증·세션 #21)."""
+
+    def __init__(self, seq: list) -> None:
+        self._seq = seq
+        self.calls = 0
+
+    def generate_raw(self, system_text: str, user_prompt: str, dry_run: bool = True) -> _Res:
+        item = self._seq[min(self.calls, len(self._seq) - 1)]
+        self.calls += 1
+        if isinstance(item, Exception):
+            raise item
+        return _Res(item)
+
+
 _GOOD_JSON = (
     '{"title":"노트북 거치대 고르는 법","lead":"노트북 거치대는 화면을 눈높이에 맞추는 도구다.",'
     '"guide_intro":"소재와 높이를 기준으로 고른다.","type_table":[],"checkpoints":[],'
@@ -242,3 +257,64 @@ class TestBuildAndSaveRecovery:
             raise AssertionError("CategoryPageError 기대")
         except cw.CategoryPageError:
             pass
+
+    def test_recovers_after_llm_runtime_error(self) -> None:
+        # 세션 #21: OpenRouter 응답 잘림 등 LLM 호출 RuntimeError도 재생성으로 흡수(자가복원·§0).
+        conn = self._conn()
+        client = _FlakyClient(
+            [RuntimeError("OpenRouter 응답 JSON 파싱 실패(잘림 의심)"), _GOOD_JSON]
+        )
+        rep = cpb.build_and_save(
+            conn, "parse-test", client, dry_run=False, generate_image=False, max_attempts=2
+        )
+        assert rep["saved"] is True  # 1차 RuntimeError → 2차 재생성 성공
+        assert client.calls == 2
+
+
+_GOOD_JSON_IMG = (
+    '{"title":"노트북 거치대 고르는 법","lead":"노트북 거치대는 화면을 눈높이에 맞추는 도구다.",'
+    '"guide_intro":"소재와 높이를 기준으로 고른다.","image_prompt":"clean minimal laptop stand",'
+    '"image_alt":"노트북 거치대","type_table":[],"checkpoints":[],'
+    '"mistakes":"","picks":[],"compare":{"rows":[],"cells":[]},"faq":[]}'
+)
+
+
+class TestConceptImageReuse:
+    """개념 이미지가 이미 있으면 재생성하지 않고 재사용 (세션 #21 비용·일관성·#20 이미지 보존)."""
+
+    def _run(self, tmp_path: Any, monkeypatch: Any, *, preexist: bool) -> tuple[dict, int]:
+        from enricher import concept_image
+
+        calls = {"n": 0}
+
+        def _fake_gen(*a: Any, **k: Any) -> bool:
+            calls["n"] += 1
+            a[1].write_bytes(b"new")  # 실제 생성처럼 파일 기록
+            return True
+
+        monkeypatch.setattr(concept_image, "generate_concept_image", _fake_gen)
+        monkeypatch.setattr(cpb, "CONCEPT_IMG_DIR", tmp_path)
+        if preexist:
+            (tmp_path / "parse-test.webp").write_bytes(b"old")
+        rep = cpb.build_and_save(
+            TestBuildAndSaveRecovery()._conn(),
+            "parse-test",
+            _FakeClient([_GOOD_JSON_IMG]),
+            dry_run=False,
+            generate_image=True,
+            max_attempts=2,
+        )
+        return rep, calls["n"]
+
+    def test_reuses_existing_image(self, tmp_path: Any, monkeypatch: Any) -> None:
+        rep, n = self._run(tmp_path, monkeypatch, preexist=True)
+        assert rep["saved"] is True
+        assert n == 0  # 파일이 있으면 재생성(API) 호출 없음
+        assert rep.get("concept_image_reused") is True
+        assert rep.get("concept_image", "").endswith("parse-test.webp")
+
+    def test_generates_when_missing(self, tmp_path: Any, monkeypatch: Any) -> None:
+        rep, n = self._run(tmp_path, monkeypatch, preexist=False)
+        assert rep["saved"] is True
+        assert n == 1  # 파일이 없으면 신규 생성 1회
+        assert rep.get("concept_image_reused") is False
