@@ -175,8 +175,14 @@ class TestRenderSite:
         assert "Sitemap: https://honsalim.com/sitemap.xml" in robots
         assert "Disallow: /go/" in robots  # 제휴 redirect 색인 제외
         headers = (built["out"] / "_headers").read_text(encoding="utf-8")
-        assert "Cache-Control: public, max-age=31536000" in headers
+        # 정적 자산: 1년 immutable (성능)
+        assert "Cache-Control: public, max-age=31536000, immutable" in headers
         assert "X-Content-Type-Options: nosniff" in headers
+        # HTML(/*): 짧은 엣지 캐시 — 콘텐츠 수정/삭제가 수 분 내 반영(7일 지연 방지, 세션 #20)
+        assert "s-maxage=300" in headers
+        assert "max-age=0" in headers  # 브라우저 재검증
+        # 더 구체적 경로(/static/*) 규칙이 /*(HTML) 규칙보다 먼저 와야 정적 1년 캐시가 우선 적용됨
+        assert headers.index("max-age=31536000") < headers.index("s-maxage=300")
 
     def test_home_meta_and_schema(self, built: dict) -> None:
         html = (built["out"] / "index.html").read_text(encoding="utf-8")

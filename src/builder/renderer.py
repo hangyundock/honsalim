@@ -41,10 +41,14 @@ ROBOTS_TXT = f"User-agent: *\nAllow: /\nDisallow: /go/\n\nSitemap: {SITE_ORIGIN}
 
 # Cloudflare Pages _headers — 정적 자산 장기 캐시 + 기본 보안 헤더 (FRONTEND §9 / POLICY §6)
 HEADERS_FILE = (
+    # 정적 자산(해시·버전 무관 안정 자산)은 1년 immutable — 더 구체적 경로라 /* 보다 우선 적용.
     "/static/*\n"
     "  Cache-Control: public, max-age=31536000, immutable\n"
     "\n"
+    # HTML 등 그 외 전체 — 짧은 엣지 캐시(5분)+브라우저 재검증. 무인 일일 발행/수정·삭제가
+    # 최대 7일 지연되던 문제(세션 #20) 방지: 콘텐츠 변경이 수 분 내 반영되도록 origin에서 명시.
     "/*\n"
+    "  Cache-Control: public, max-age=0, s-maxage=300, must-revalidate\n"
     "  X-Content-Type-Options: nosniff\n"
     "  Referrer-Policy: strict-origin-when-cross-origin\n"
     "  X-Frame-Options: DENY\n"
