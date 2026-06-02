@@ -92,8 +92,8 @@ def _good_payload(body_md: str = GOOD_BODY) -> dict[str, Any]:
     jsonld = build_article_jsonld(
         meta=meta,
         scenario=scenario,
-        site_base_url="https://honsalim.com",
-        image_url="https://honsalim.com/static/img/wonroom.jpg",
+        site_base_url="https://honsallim.com",
+        image_url="https://honsallim.com/static/img/wonroom.jpg",
         published_at="2026-05-28",
     )
     return {
@@ -114,8 +114,8 @@ def _article_fields_from(scenario_id: int, body_md: str) -> dict[str, Any]:
     jsonld = build_article_jsonld(
         meta=meta,
         scenario={"slug": "wonroom-30man"},
-        site_base_url="https://honsalim.com",
-        image_url="https://honsalim.com/static/img/wonroom.jpg",
+        site_base_url="https://honsallim.com",
+        image_url="https://honsallim.com/static/img/wonroom.jpg",
         published_at="2026-05-28",
     )
     return {
@@ -414,7 +414,7 @@ class TestDeployerDryRunChain:
         assert "wrangler" in wrangler_res.command[0]
         assert "honsalim" in wrangler_res.command
 
-        verify_res = verify_deploy("https://honsalim.com/", dry_run=True)
+        verify_res = verify_deploy("https://honsallim.com/", dry_run=True)
         assert verify_res.ok is True
         assert verify_res.status_code is None
         assert "[DRY]" in (verify_res.error or "")

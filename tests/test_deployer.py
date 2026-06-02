@@ -89,10 +89,10 @@ class TestWranglerDeploy:
 
 class TestVerifyDeploy:
     def test_dry_run_returns_ok(self) -> None:
-        result = verify_deploy("https://honsalim.com/", dry_run=True)
+        result = verify_deploy("https://honsallim.com/", dry_run=True)
         assert result.ok is True
         assert result.status_code is None
-        assert result.url == "https://honsalim.com/"
+        assert result.url == "https://honsallim.com/"
         assert result.error is not None and "DRY" in result.error
 
     def test_empty_url_raises(self) -> None:
@@ -101,7 +101,7 @@ class TestVerifyDeploy:
 
     def test_invalid_url_scheme_raises(self) -> None:
         with raises(ValueError):
-            verify_deploy("honsalim.com", dry_run=True)
+            verify_deploy("honsallim.com", dry_run=True)
         with raises(ValueError):
             verify_deploy("ftp://x", dry_run=True)
 

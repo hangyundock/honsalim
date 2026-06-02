@@ -454,7 +454,7 @@ def build() -> Path:
         "index.html",
         env.get_template("home.html").render(
             active_nav="home",
-            canonical_url="https://honsalim.com/",
+            canonical_url="https://honsallim.com/",
             featured_scenarios=[s for s in SCENARIOS if s["hot"]][:6],
             season_calendar=SEASONS,
             **common,
@@ -466,7 +466,7 @@ def build() -> Path:
         "scenarios/index.html",
         env.get_template("scenario_list.html").render(
             active_nav="hub",
-            canonical_url="https://honsalim.com/scenarios/",
+            canonical_url="https://honsallim.com/scenarios/",
             scenarios=SCENARIOS,
             budget_filters=BUDGET_FILTERS,
             season_filters=SEASON_FILTERS,
@@ -479,7 +479,7 @@ def build() -> Path:
     for i, p in enumerate(PERSONAS):
         html = persona_tmpl.render(
             active_nav="persona",
-            canonical_url=f"https://honsalim.com/personas/{p['id']}/",
+            canonical_url=f"https://honsallim.com/personas/{p['id']}/",
             persona=p,
             scenarios=[s for s in SCENARIOS if s["persona"] == p["id"]],
             **common,
@@ -493,7 +493,7 @@ def build() -> Path:
         "about/index.html",
         env.get_template("about.html").render(
             active_nav="about",
-            canonical_url="https://honsalim.com/about/",
+            canonical_url="https://honsallim.com/about/",
             **common,
         ),
     )
@@ -505,7 +505,7 @@ def build() -> Path:
             f"articles/{scn['id']}/index.html",
             art_tmpl.render(
                 active_nav="hub",
-                canonical_url=f"https://honsalim.com/articles/{scn['id']}/",
+                canonical_url=f"https://honsallim.com/articles/{scn['id']}/",
                 article=scn,
                 products=PRODUCTS,
                 budget=BUDGET_TABLE,

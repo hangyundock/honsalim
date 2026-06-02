@@ -65,7 +65,7 @@ def build_article_jsonld(
     인자:
         meta: meta_extractor 결과 (필수: title, meta_description / 선택: meta_keywords)
         scenario: {slug, ...} — slug로 mainEntityOfPage 생성
-        site_base_url: "https://honsalim.com" (끝 슬래시 자동 처리)
+        site_base_url: "https://honsallim.com" (끝 슬래시 자동 처리)
         image_url: 대표 이미지 절대 URL
         published_at: ISO 8601 (예: "2026-05-28" 또는 "2026-05-28T11:00:00+09:00")
         modified_at: ISO 8601. None이면 published_at과 동일

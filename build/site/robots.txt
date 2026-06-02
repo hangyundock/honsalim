@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /go/
 
-Sitemap: https://honsalim.com/sitemap.xml
+Sitemap: https://honsallim.com/sitemap.xml

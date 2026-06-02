@@ -55,8 +55,8 @@ def _build_default() -> str:
     out: str = build_article_jsonld(
         meta=_minimal_meta(),
         scenario=_scenario(),
-        site_base_url="https://honsalim.com",
-        image_url="https://honsalim.com/static/img/wonroom-30man-cover.jpg",
+        site_base_url="https://honsallim.com",
+        image_url="https://honsallim.com/static/img/wonroom-30man-cover.jpg",
         published_at="2026-05-28",
     )
     return out
@@ -104,19 +104,19 @@ class TestFieldMapping:
 
     def test_main_entity_url_from_slug(self) -> None:
         doc = json.loads(_build_default())
-        assert doc["mainEntityOfPage"] == "https://honsalim.com/articles/wonroom-30man"
+        assert doc["mainEntityOfPage"] == "https://honsallim.com/articles/wonroom-30man"
 
     def test_base_url_trailing_slash_stripped(self) -> None:
         """site_base_url 끝 / 자동 제거."""
         jsonld = build_article_jsonld(
             meta=_minimal_meta(),
             scenario=_scenario(),
-            site_base_url="https://honsalim.com/",
+            site_base_url="https://honsallim.com/",
             image_url="https://x/i.jpg",
             published_at="2026-05-28",
         )
         doc = json.loads(jsonld)
-        assert doc["mainEntityOfPage"] == "https://honsalim.com/articles/wonroom-30man"
+        assert doc["mainEntityOfPage"] == "https://honsallim.com/articles/wonroom-30man"
 
     def test_modified_at_defaults_to_published_at(self) -> None:
         doc = json.loads(_build_default())
@@ -126,7 +126,7 @@ class TestFieldMapping:
         jsonld = build_article_jsonld(
             meta=_minimal_meta(),
             scenario=_scenario(),
-            site_base_url="https://honsalim.com",
+            site_base_url="https://honsallim.com",
             image_url="https://x/i.jpg",
             published_at="2026-05-28",
             modified_at="2026-06-15",
@@ -151,7 +151,7 @@ class TestAuthorPublisher:
         jsonld = build_article_jsonld(
             meta=_minimal_meta(),
             scenario=_scenario(),
-            site_base_url="https://honsalim.com",
+            site_base_url="https://honsallim.com",
             image_url="https://x/i.jpg",
             published_at="2026-05-28",
             author_name="홍길동",
@@ -169,7 +169,7 @@ class TestKeywords:
         jsonld = build_article_jsonld(
             meta=meta,
             scenario=_scenario(),
-            site_base_url="https://honsalim.com",
+            site_base_url="https://honsallim.com",
             image_url="https://x/i.jpg",
             published_at="2026-05-28",
         )
@@ -182,7 +182,7 @@ class TestKeywords:
         jsonld = build_article_jsonld(
             meta=meta,
             scenario=_scenario(),
-            site_base_url="https://honsalim.com",
+            site_base_url="https://honsallim.com",
             image_url="https://x/i.jpg",
             published_at="2026-05-28",
         )
@@ -196,7 +196,7 @@ class TestKeywords:
         jsonld = build_article_jsonld(
             meta=meta,
             scenario=_scenario(),
-            site_base_url="https://honsalim.com",
+            site_base_url="https://honsallim.com",
             image_url="https://x/i.jpg",
             published_at="2026-05-28",
         )
@@ -222,7 +222,7 @@ class TestValidation:
             build_article_jsonld(
                 meta={"meta_description": "x"},
                 scenario=_scenario(),
-                site_base_url="https://honsalim.com",
+                site_base_url="https://honsallim.com",
                 image_url="https://x/i.jpg",
                 published_at="2026-05-28",
             )
@@ -232,7 +232,7 @@ class TestValidation:
             build_article_jsonld(
                 meta={"title": "x"},
                 scenario=_scenario(),
-                site_base_url="https://honsalim.com",
+                site_base_url="https://honsallim.com",
                 image_url="https://x/i.jpg",
                 published_at="2026-05-28",
             )
@@ -242,7 +242,7 @@ class TestValidation:
             build_article_jsonld(
                 meta={"title": "", "meta_description": "x"},
                 scenario=_scenario(),
-                site_base_url="https://honsalim.com",
+                site_base_url="https://honsallim.com",
                 image_url="https://x/i.jpg",
                 published_at="2026-05-28",
             )
@@ -252,7 +252,7 @@ class TestValidation:
             build_article_jsonld(
                 meta=_minimal_meta(),
                 scenario={},
-                site_base_url="https://honsalim.com",
+                site_base_url="https://honsallim.com",
                 image_url="https://x/i.jpg",
                 published_at="2026-05-28",
             )
@@ -282,7 +282,7 @@ class TestItemListBuilder:
 
     def test_passes_validator_schema_gate(self) -> None:
         out = build_itemlist_jsonld(
-            [{"name": "상품 A", "url": "https://honsalim.com/p/a"}],
+            [{"name": "상품 A", "url": "https://honsallim.com/p/a"}],
             list_name="원룸 추천",
         )
         ok, rpt = check_schema(out)
@@ -409,29 +409,31 @@ class TestStructuredSchemas:
     def test_breadcrumb_positions_and_absolute_urls(self) -> None:
         doc = json.loads(
             build_breadcrumb_jsonld(
-                [{"name": "홈", "url": "/"}, {"name": "시나리오"}], "https://honsalim.com"
+                [{"name": "홈", "url": "/"}, {"name": "시나리오"}], "https://honsallim.com"
             )
         )
         assert doc["@type"] == "BreadcrumbList"
         els = doc["itemListElement"]
         assert els[0]["position"] == 1 and els[1]["position"] == 2
-        assert els[0]["item"] == "https://honsalim.com/"  # 상대→절대 변환
+        assert els[0]["item"] == "https://honsallim.com/"  # 상대→절대 변환
         assert "item" not in els[1]  # 마지막(현재) url 생략
 
     def test_breadcrumb_empty_raises(self) -> None:
         with raises(ValueError):
-            build_breadcrumb_jsonld([], "https://honsalim.com")
+            build_breadcrumb_jsonld([], "https://honsallim.com")
 
     def test_website_and_organization(self) -> None:
-        web = json.loads(build_website_jsonld("https://honsalim.com", "혼살림"))
-        assert web["@type"] == "WebSite" and web["url"] == "https://honsalim.com/"
+        web = json.loads(build_website_jsonld("https://honsallim.com", "혼살림"))
+        assert web["@type"] == "WebSite" and web["url"] == "https://honsallim.com/"
         org = json.loads(
-            build_organization_jsonld("https://honsalim.com", "혼살림", "dugihappyending@gmail.com")
+            build_organization_jsonld(
+                "https://honsallim.com", "혼살림", "dugihappyending@gmail.com"
+            )
         )
         assert org["@type"] == "Organization" and org["email"] == "dugihappyending@gmail.com"
 
     def test_as_script_tags_wraps_and_skips_empty(self) -> None:
-        out = as_script_tags([build_website_jsonld("https://honsalim.com"), ""])
+        out = as_script_tags([build_website_jsonld("https://honsallim.com"), ""])
         assert out.count('<script type="application/ld+json">') == 1
         assert "WebSite" in out
 

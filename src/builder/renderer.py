@@ -34,7 +34,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 TEMPLATES_DIR = PROJECT_ROOT / "templates"
 STATIC_DIR = PROJECT_ROOT / "static"
 DEFAULT_OUT = PROJECT_ROOT / "build" / "site"
-SITE_ORIGIN = "https://honsalim.com"
+SITE_ORIGIN = "https://honsallim.com"
 SITE_DESC = "1인 가구·자취·홈오피스·일상살림 추천 가이드. 혼자 살림을 따뜻하게 시작하세요."
 
 # robots.txt — /go/ 게이트웨이(제휴 redirect)는 색인 제외, sitemap 안내

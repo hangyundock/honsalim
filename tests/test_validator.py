@@ -39,12 +39,12 @@ def _good_article_schema() -> str:
             "@type": "Article",
             "headline": "원룸 자취",
             "description": "30만원 가이드",
-            "image": "https://honsalim.com/img.jpg",
+            "image": "https://honsallim.com/img.jpg",
             "datePublished": "2026-05-28",
             "dateModified": "2026-05-28",
             "author": {"@type": "Person", "name": "운영자"},
             "publisher": {"@type": "Organization", "name": "혼살림"},
-            "mainEntityOfPage": "https://honsalim.com/articles/x",
+            "mainEntityOfPage": "https://honsallim.com/articles/x",
         }
     )
 
@@ -354,7 +354,7 @@ class TestLinks:
         assert len([i for i in rpt["issues"] if "short_url_blocked" in i]) >= 2
 
     def test_pass_internal_link(self) -> None:
-        body = '<a href="https://honsalim.com/articles/abc">관련글</a>'
+        body = '<a href="https://honsallim.com/articles/abc">관련글</a>'
         ok, rpt = check_links(body)
         assert ok is True
         assert rpt["issues"] == []

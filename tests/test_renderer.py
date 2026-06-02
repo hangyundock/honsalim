@@ -75,8 +75,8 @@ def built_with_article(tmp_path: Path) -> dict:
         schema = build_article_jsonld(
             meta={"title": "홈오피스 50만원 세팅", "meta_description": "재택 세팅 가이드"},
             scenario={"slug": slug},
-            site_base_url="https://honsalim.com",
-            image_url="https://honsalim.com/static/img/og-default.png",
+            site_base_url="https://honsallim.com",
+            image_url="https://honsallim.com/static/img/og-default.png",
             published_at="2026-05-30",
         )
         fields = {
@@ -183,14 +183,14 @@ class TestRenderSite:
 
     def test_sitemap_lists_core_urls(self, built: dict) -> None:
         xml = (built["out"] / "sitemap.xml").read_text(encoding="utf-8")
-        assert "https://honsalim.com/" in xml
-        assert "https://honsalim.com/scenarios/" in xml
-        assert "https://honsalim.com/personas/cheot-jachi/" in xml
+        assert "https://honsallim.com/" in xml
+        assert "https://honsallim.com/scenarios/" in xml
+        assert "https://honsallim.com/personas/cheot-jachi/" in xml
 
     def test_robots_and_headers_written(self, built: dict) -> None:
         """배포 산출물 — robots.txt(색인 규칙·sitemap) + _headers(캐시·보안)."""
         robots = (built["out"] / "robots.txt").read_text(encoding="utf-8")
-        assert "Sitemap: https://honsalim.com/sitemap.xml" in robots
+        assert "Sitemap: https://honsallim.com/sitemap.xml" in robots
         assert "Disallow: /go/" in robots  # 제휴 redirect 색인 제외
         headers = (built["out"] / "_headers").read_text(encoding="utf-8")
         # 정적 자산: 1년 immutable (성능)
@@ -559,7 +559,7 @@ class TestMarkdownInline:
     def test_sitemap_includes_article_url(self, built_with_article: dict) -> None:
         slug = built_with_article["slug"]
         xml = (built_with_article["out"] / "sitemap.xml").read_text(encoding="utf-8")
-        assert f"https://honsalim.com/articles/{slug}/" in xml
+        assert f"https://honsallim.com/articles/{slug}/" in xml
 
     def test_scenario_with_article_links_others_soon(self, built_with_article: dict) -> None:
         """게시 글이 있는 시나리오 카드만 /articles/<slug>/로 링크, 나머지는 '준비 중'."""

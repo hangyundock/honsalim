@@ -27,7 +27,8 @@ SHORT_URL_DOMAINS = (
 
 # VALIDATOR §2 — 허용 도메인 (Phase 5 알리 추가 시 확장)
 ALLOWED_LINK_DOMAINS = (
-    r"honsalim\.com",
+    r"honsallim\.com",  # 신 도메인(알리 'ali' 차단 회피·세션 #21)
+    r"honsalim\.com",  # 구 도메인(301 전환 중 — 잔존 내부 링크도 internal 인정)
     r"link\.coupang\.com",
     r"partners\.coupang\.com",
     r"ads-partners\.coupang\.com",

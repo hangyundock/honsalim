@@ -305,8 +305,8 @@ class TestDeployParser:
 
     def test_deploy_verify_url_arg(self) -> None:
         parser = cli.build_parser()
-        args = parser.parse_args(["deploy", "--verify-url", "https://honsalim.com/"])
-        assert args.verify_url == "https://honsalim.com/"
+        args = parser.parse_args(["deploy", "--verify-url", "https://honsallim.com/"])
+        assert args.verify_url == "https://honsallim.com/"
 
     def test_deploy_remote_branch_defaults(self) -> None:
         parser = cli.build_parser()
@@ -432,8 +432,8 @@ class TestPromoteCommandExecution:
             schema = build_article_jsonld(
                 meta={"title": "제목", "meta_description": "메타 설명입니다"},
                 scenario={"slug": scenario_slug},
-                site_base_url="https://honsalim.com",
-                image_url="https://honsalim.com/static/img/og-default.png",
+                site_base_url="https://honsallim.com",
+                image_url="https://honsallim.com/static/img/og-default.png",
                 published_at="2026-05-30",
             )
             did = article_writer.create_draft(conn, scenario_id=scenario_id)

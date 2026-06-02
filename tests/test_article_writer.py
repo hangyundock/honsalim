@@ -186,12 +186,12 @@ def _good_article_jsonld() -> str:
             "@type": "Article",
             "headline": "원룸",
             "description": "가이드",
-            "image": "https://honsalim.com/i.jpg",
+            "image": "https://honsallim.com/i.jpg",
             "datePublished": "2026-05-28",
             "dateModified": "2026-05-28",
             "author": {"@type": "Person", "name": "운영자"},
             "publisher": {"@type": "Organization", "name": "혼살림"},
-            "mainEntityOfPage": "https://honsalim.com/articles/x",
+            "mainEntityOfPage": "https://honsallim.com/articles/x",
         }
     )
 

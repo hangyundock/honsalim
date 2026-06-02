@@ -72,7 +72,7 @@ def main() -> int:
         return 3
     print("[OK] slug_map UPSERT")
 
-    # 4. Workers 배포 (go_gateway.js → honsalim.com/go/*)
+    # 4. Workers 배포 (go_gateway.js → honsallim.com/go/*)
     _run(["wrangler", "deploy"], "Workers 배포 (go_gateway.js)")
 
     print("\n=== /go/ 인프라 배포 완료 ===")
