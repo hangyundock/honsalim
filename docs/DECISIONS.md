@@ -7,8 +7,8 @@
 ## A. 프로젝트 정체 [확정]
 
 - **A1. 사이트명**: 혼살림 (Honsalim) — 세션 #1
-- **A2. 도메인**: honsalim.com (Cloudflare Registrar, 마진 0) — 세션 #1
-  - **세션 #2 (2026-05-28) 등록 완료**: 만료 2027-05-28·Auto Renew ON·SSL Active·Custom domain 연결
+- **A2. 도메인**: ~~honsalim.com~~ → **honsallim.com**(겹ㄹ) [확정 #21] — 알리(AliExpress)가 'ali' 포함 url(honsa**li**m)을 영구 차단("url containing string ali cannot be added", 자동+사람) → 'll' 표준표기 honsa**ll**im.com으로 이전. Cloudflare Registrar.
+  - 세션 #2 honsalim.com 등록(만료 2027-05-28). **세션 #21 honsallim.com Pages 커스텀도메인 연결·SSL Active·라이브**(만료 2027-06-01·Auto Renew). honsalim.com(구)은 **301 Page Rule**(`honsalim.com/*` → `https://honsallim.com/$1`, 경로보존)로 신 도메인 전환·유지. 코드 SITE_ORIGIN·sitemap·canonical 전부 honsallim. ※인프라 리소스명(`honsalim-clicks` D1·Pages 프로젝트 `honsalim`·`honsalim.db`)은 불변
 - **A3. 분야**: 1인 가구·자취·홈오피스·일상살림 (비YMYL) — 세션 #1
 - **A4. 타겟 언어**: 한국어 단일 (영어 확장은 6개월 후 검토) — 세션 #1
 - **A5. 컨셉**: 시나리오 추천 + 특화 결합 (페르소나×예산×시나리오) — 세션 #1

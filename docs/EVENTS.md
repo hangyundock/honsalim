@@ -20,8 +20,31 @@
   - 세션 #12 (2026-05-30 알리 상품수집 CLI→C-1 연결→enrich 풀구축→4게이트 통과 첫 글·회귀 378→436·10 commits·메모리 incremental-critical-review·autonomous-safe-system 신설)
   - 세션 #13 (2026-05-30 게시 경로 완성·★첫 글 honsalim.com 라이브 게시·무인 배포 파이프라인(방법A)·알리 whitelist 2채널 제출·회귀 436→470·1 commit e763e0f 배포 success)
   - 세션 #14 (2026-05-31 용어 일상화(내맘대로 세팅·라이프스타일)+사이트 大전환 기획(카테고리 비교·노써치형 DECISIONS O1~O9)+카테고리 프로토타입·알리 API 라이브검증·회귀 470→472)
+  - 세션 #15–16 (2026-05-31 SEO 자동최적화 엔진·네이버 검색광고·전체제품 카탈로그·product_filter·디자인 大전환 1단계(우드톤→흰바탕 tokens 교체)·회귀 472→553 / 다음=#17)
 
 ## 최근 5세션
+
+### 세션 #21 — 2026-06-02 (Opus 4.8 1M, ★도메인 honsalim→honsallim 이전·연결·301(알리 'ali' 차단 돌파) + 알리 채널 등록 + 미충전이미지·순차등록엔진·홈 흰바탕캐시 근본수정, 회귀 632→641)
+
+**시작 상황**: `/honsalim-start`(워크트리 trusting-lamarr, HEAD #20 `a34955d`). 회귀 632. 사용자 "1·2·3 순서대로·승인 미리받고 끝까지" → 미충전이미지·제품등록·/go/ 착수. 도중 홈 흰바탕 안보임(캐시)·★honsallim 도메인 미반영(loving-herschel 갈래에만 존재) 발견 → 도메인 이전·연결·알리등록까지 확대.
+
+**핵심 진척 [확정]**:
+1. **1번 미충전 이미지**(라이브): 페르소나 3장(`scripts/gen_persona_images.py`)·about 히어로(기존 about.webp)·시나리오 카드=소속 페르소나 이미지 재사용(비용0). `image_block` `img_url` 지원(하위호환). build-category **이미지 있으면 재사용**(#20 보존·비용절감). 단색 placeholder **0**.
+2. **2번 순차등록 엔진**(라이브): `register-categories [slugs|--all]` — 순차 collect→build·실패격리·draft(E7). office-chair 등록(카테고리 5). **근본수정**: ①OpenRouter 응답 잘림(JSONDecodeError) 자가복원(claude_client resp.json 재시도 + build_and_save가 RuntimeError도 재생성) ②Windows wrangler.cmd subprocess 미해석(FileNotFoundError) → `common/proc.resolve_argv`(실행시 shutil.which, command필드 불변→테스트 0영향).
+3. **★홈 흰바탕=CSS 캐시** 근본수정: tokens/pages.css는 흰바탕 최신(배포 정상)인데 `immutable`+버전없는 파일명 → 옛 우드톤 CSS가 브라우저 캐시에 박힘. renderer `asset_version`(static CSS·JS 내용해시)을 모든 링크 `?v=` 부착(cache-busting). 일반 새로고침으로 새 디자인 받음.
+4. **★도메인 honsalim.com → honsallim.com 이전·연결·301**(알리 'ali' 차단 돌파): 알리가 'ali' 포함 url(honsa**li**m) 영구차단 → 'll' honsa**ll**im.com. 코드·테스트 치환(인프라명 honsalim-clicks·Pages명·DB 보존)+validator 허용도메인 신·구 둘다. Cloudflare Pages 커스텀도메인·SSL Active + **Page Rule 301**(honsalim.com/* → https://honsallim.com/$1 경로보존, 라이브검증). sitemap·canonical honsallim.
+5. **★알리 채널 honsallim 등록** [확정]: Portals "나의 웹사이트"에 honsallim.com 채널(Non-network·content>vertical sites·Korea·영어 desc) **등록완료**(별도 승인게이트 없음). 이전 honsalim.com은 Submit 자체 차단이었음 → 'ali' 돌파.
+6. 회귀 **632→641**. black·ruff·mypy 클린. 비용 ~$1(수집·빌드)+페르소나 3장. origin/main 배포 3회(#21·#21-2 cache-busting·#21-3 도메인).
+
+**★중요 — 갈라진 작업 갈래 인지**: honsallim 도메인 이전·**살림 카테고리**는 `loving-herschel-0091c7` 브랜치 #20에 있었으나 **origin/main 미머지**(내 베이스=zealous #20 `a34955d`)라 인수인계 STATE에 없었음. 도메인은 이번에 origin/main 직접 적용 완료. **살림 카테고리(cutting-board 도마·drying-rack 빨래건조대·mini-dehumidifier 미니제습기) = seed `003_categories_living.sql` + category_sources.yml 3개 = loving-herschel에만 존재** → #22에 합쳐야(register-categories 엔진으로 데이터 생성).
+
+**무인·안전(§0)**: 이미지 재사용(가짜·퇴행 방지)·실패격리(무인 안전)·자가복원(잘림·일시 API)·cache-busting(변경 반영 보장)·도메인 301(SEO 중복 정리)·알리 honest disclosure description.
+
+**잔존 미해결 (#22)**: ①**살림 카테고리 합치기**(loving-herschel seed003·sources 살림3개 → `db seed` → `register-categories cutting-board drying-rack mini-dehumidifier --no-dry-run` → approve+build --full+push, 비용~$1.5) ②**Tracking ID 연결**(honsallim 채널 tracking ID → `ali.env` 주인직접 → 개별 deeplink; 현 deeplink는 공통 트래킹링크) ③**/go/ 작동**(deny 룰: 주인이 `.claude/settings.json` wrangler deny 제거 후 `scripts/deploy_go_gateway.py` 또는 Actions. slug_map 191·D1 schema·resolve_argv 준비됨) ④Chrome lookalike 경고(301+시간 해소·관찰) ⑤쿠팡(방문자 후).
+
+**다음 세션 할 일**: 1)**살림 카테고리 합치기**(register-categories로) 2)Tracking ID 연결+개별 deeplink 3)/go/ 작동(주인 deny 해제 후). ★DB gitignore→재생성(`db migrate`+`db seed`+카테고리 collect/build). 워크트리 실행=`PYTHONPATH=src python -m cli`.
+
+---
 
 ### 세션 #20 — 2026-06-02 (Opus 4.8 1M, ★카테고리 4개 라이브 배포 + 홈 카테고리우선 大리디자인 + 버그 4종 근본수정, 회귀 623→632)
 
@@ -105,32 +128,3 @@
 **잔존 미해결 (#18)**: ①**운영자 검토·1클릭 승인 게이트**(§2-마·E7 — 현재 build-category가 published 바로 전이) ②**배포**([6][7], build/site 갱신) ③doctor 보강(category 모듈) ④나머지 카테고리(모니터암 신규·의자 글생성) ⑤(이월) /go/·알리 whitelist·main-protect.
 
 **다음 세션 할 일**: 1) **운영자 승인 게이트**(published→pending+1클릭 승인) 2) **배포**(build/site 갱신→honsalim.com) 3) doctor 보강·나머지 카테고리. ★워크트리 실행=`PYTHONPATH=src python -m cli`(honsalim 명령은 메인 가리킴).
-
----
-
-### 세션 #15–16 — 2026-05-31 (Opus 4.8 1M, ★SEO 자동 최적화 엔진 + 전체제품 카탈로그 + ★디자인 大전환(우드톤→흰바탕 노써치) 1단계, 회귀 472→553)
-
-> 한 연속 세션이나 작업량이 커서 **코드 주석을 2단계로 태깅**: **#15=SEO 엔진** / **#16=카탈로그·디자인 전환**. 둘 다 본 세션. **다음 세션은 #17.**
-
-**시작 상황**: `/honsalim-start`(워크트리 blissful-poincare, HEAD #14 `d883fd6`). 사용자가 "카테고리 페이지 SEO 최적화"부터 요청 → 연속 진행.
-
-**핵심 진척 [확정]** (※전부 **미배포·로컬**. honsalim.com은 #13 옛 사이트 유지):
-
-1. **SEO 키워드 자동 최적화 엔진** (DECISIONS O10·O11): ①`validator/seo.py` 게이트(밀도·배치·보조키워드, opt-in payload["seo"], **하드 fail=대표키워드만**·네이버 1.7% 기준) = 5번째 검증 게이트 ②`collector/naver_searchad.py`(검색광고 API HMAC 클라이언트)+`keyword_research.py`(연관검색어→필터→보조 선별)+`seo_keywords.yml`(**office-chair·desk** 엔트리) ③`enricher/seo_directive.py`(2층 배치 지시)+`seo_regenerate.py`(게이트 통과까지 재생성). **라이브**: 사무용 의자 665개·컴퓨터 책상 874개 연관어→자동 선별.
-2. **모델 Haiku→Sonnet + 비용 과다청구 방지** (O12): `DEFAULT_MODEL=claude-sonnet-4-6`. tistory #7·#10 교훈 이식(재시도 상한 2·게이트 과민완화·다운스트림 생략·사전점검). **책상 가이드 라이브 생성**: Sonnet 1회 통과·밀도 1.67%·보조 12개 자연삽입·**$0.049**.
-3. **전체 제품 카탈로그** (O13): 노써치 종합점수 흉내 금지 → **점수 없는 가격·할인·타입 카탈로그**. 시안 `scripts/all_products_prototype.py`(데이터주도 `render_catalog`)+표준 `CATEGORY_PAGE.md §5-bis`. **책상 실수집 렌더**: 185 수집→오염 114 제거→유효 69 렌더 검증.
-4. **상품 데이터 품질 필터** (O14): `collector/product_filter.py` — 관련성(핵심어·액세서리/브랜드/off-target 제외)+부풀린할인(>70%) 차단. `map_product`에 `original_price_krw`·`discount_pct` 추가(in-memory; **DB 컬럼은 추후**).
-5. **★디자인 大전환 1단계** (O15·O3 구현): 라이브 사이트가 **옛 우드톤·페르소나 중심**임을 로컬 확인 → 확정 시안(흰 바탕·NanumSquare Neo·녹색) **렌더러 이식**. `static/css/tokens.css` 팔레트/폰트 1파일 교체로 **전 페이지 전환**(components/pages가 토큰 기반)+`base.html` 폰트+`header.html` 카테고리 네비. **`build/preview` 렌더·검증**(eval: bg흰색·NanumSquare·accent녹색·nav=홈/카테고리/구매가이드/세팅/About).
-6. **회귀 472→553 PASS** (신규 SEO·카탈로그·필터 테스트 다수). black·ruff·mypy 클린.
-
-**진행 순서 확정** (O15, 사용자): **디자인 토대→카테고리 구조→제품 렌더**. (1단계 디자인 완료)
-
-**무인·안전/진실성(§0)**: 가짜 점수·평점 금지(카탈로그) / 부풀린 할인 차단 / 비용 과다청구 근본대책(tistory 교훈) / 오염 상품 필터 / 디자인은 로컬만(배포는 승인 후).
-
-**잔존 미해결 (다음 세션 #17)**:
-- **2단계 카테고리 구조**: 카테고리 인덱스(`/categories/`)+라우트+**홈 콘텐츠 카테고리화**(현재 페르소나 구조, **디자인만 새것**)+네비 `카테고리`·`구매가이드` 링크 배선.
-- **3단계 제품 렌더**: 카테고리 페이지(가이드+비교카드+전체제품)를 **렌더러 `builder/renderer.py`에 이식**(현재 home/hub/persona/article만, 카테고리·전체제품 미지원)+**DB 영속화**(정가/할인 컬럼·수집 저장 — 렌더러는 DB를 읽음).
-- **배포**: 새 디자인+카테고리 → build/site → honsalim.com(방법A, **사용자 승인 필요**).
-- (이월) /go/ 링크 작동·알리 whitelist 답변·용어배포 확인·main-protect 재활성화. (미리보기 = `build/preview`)
-
-**다음 세션 할 일**: 1) **2단계 카테고리 구조**(카테고리 인덱스+홈 카테고리화+라우트) 2) **3단계 렌더러 이식+DB 영속화**로 **책상 카테고리 페이지를 실데이터로 build/preview 완결**→확인 3) (승인 후) 배포.

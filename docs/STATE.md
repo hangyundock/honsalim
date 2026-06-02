@@ -7,11 +7,11 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#20: ★카테고리 4개 라이브 배포 + 홈 카테고리우선 大리디자인 + 버그 4종 근본수정** (origin/main 배포 완료). 카테고리 배포(옛 #13 글 제거)·이미지 누락 근본수정·산출물 청소 버그·wrangler 커밋메시지(CF 8000111)·HTML캐시 fix / **홈**: 히어로 대표이미지·기획전 캐러셀·BEST·딜·테마·신뢰·구매가이드(/guides/)·섹션간격·사업자표기/이메일. 회귀 **632**. 상세 EVENTS #20 | 2026-06-02 #20 |
+| 진행 단계 | **#21: ★도메인 honsalim→honsallim 이전·연결·301(알리 'ali' 차단 돌파) + 알리 채널 등록 + 미충전이미지·순차등록엔진(register-categories)·홈 흰바탕캐시 근본수정** (origin/main 배포). honsallim.com 라이브·SSL·**301 Page Rule**(경로보존). 알리 Portals honsallim 채널 등록(별도승인 없음). 페르소나/about/시나리오 이미지 채움(placeholder 0)·이미지 재사용. OpenRouter 잘림 자가복원·Windows wrangler `resolve_argv`·cache-busting(`?v=`). 회귀 **641**. ★살림 카테고리는 `loving-herschel` 갈래에만(미머지)→#22 합침. 상세 EVENTS #21 | 2026-06-02 #21 |
 | 운영 모델 | 자동 게시 활성 (윈도우 스케줄러 매일 11:00 KST) + 발행 편수 최대화 + 보안 강화 7건. 자동 "승인"은 절대 금지 (E7) | #2 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·Secrets·main-protect)·Cloudflare(도메인·Pages·R2·D1)·Anthropic·INDEXNOW 키·secrets·Git push·pre-commit 9종·Dependabot (세부 archive) | #3 |
 | Phase 2 핵심 모듈 (#3~#5) | cli·common·validator·writer·collector·enricher·builder·deployer·tracker·workers (세부 BACKEND §2) + **#17: category_collect·category_page_builder·concept_image·category_writer** | #17 |
-| Phase 2 회귀 테스트 | **632 / 632 PASS** [확정 pytest, #20] — #20 +9 (이미지 lazy/eager·onerror 가드·산출물 청소 가드·배포 워크플로 commit-message 가드·홈 BEST/딜/테마 렌더·HTML캐시·사업자 숨김·/guides/ 핵심페이지). #19 623. black·ruff·mypy 클린 | 2026-06-02 |
+| Phase 2 회귀 테스트 | **641 / 641 PASS** [확정 pytest, #21] — #21 +9 (cache-busting `?v=`·`common.proc.resolve_argv`·자가복원 RuntimeError·이미지 재사용·slug_map 카테고리 UNION·도메인 honsallim). #20 632. black·ruff·mypy 클린 | 2026-06-02 |
 | CLI 명령 (BACKEND §9) | **18개** — doctor · db · collect · collect-products · enrich · validate · approve · promote · unapprove · deploy · sync-slugmap · build(+`--preview` draft포함 미리보기, #18) · dashboard · collect-category · build-category · **approve-category(#18 신규: draft→published 1클릭 승인)** · **unapprove-category(#18 신규: 공개 취소)** | #18 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD. 세부 DECISIONS J·O + EVENTS | #4~#16 |
 | doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **64개** + #19 **LLM 키 점검**(활성 모델 기준 OPENROUTER/ANTHROPIC). 64/64 OK | #19 |
@@ -19,14 +19,14 @@
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (docs/ 참조). 일관성 모순 0건 | #2 |
 | 메모리 시스템 | feedback 7건([[incremental-critical-review]]·[[autonomous-safe-system]] 등) + reference market_research + MEMORY.md | #12 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
-| 사이트 게시글 / 트래픽 / 수익 | **★카테고리 4개 라이브** (honsalim.com/categories/ + 노트북거치대·컴퓨터책상·모니터받침대·모니터암, #20 배포 성공·옛 #13 글 제거) + **홈 카테고리우선 리디자인 라이브**(/honsalim-end #20 배포분) + /guides/·/about/ / N/A / N/A (수익은 **/go/ 링크 작동**+알리 whitelist 후 — 미작동) | #20 |
+| 사이트 게시글 / 트래픽 / 수익 | **★카테고리 5개 라이브** (**honsallim.com**/categories/ : 노트북거치대·컴퓨터책상·모니터받침대·모니터암·**사무용의자**) + 홈·/guides/·/about/·페르소나/시나리오 이미지 채움 / N/A / N/A (수익=Tracking ID 연결 + /go/ 작동 후 — #22) | #21 |
 
 ## 인프라
 
 | 항목 | 값 |
 |------|----|
 | 프로젝트 폴더 | `D:\affiliate_hub\` (docs·archive·.claude/commands 하위) |
-| 사이트 / 도메인 | 혼살림 / **honsalim.com** (만료 2027-05-28·Auto Renew·SSL Active) |
+| 사이트 / 도메인 | 혼살림 / **honsallim.com**(신·겹ㄹ·알리 'ali' 차단 회피·Cloudflare Pages 커스텀도메인 연결·SSL Active·**라이브**, 만료 2027-06-01·Auto Renew) + honsalim.com(구·만료 2027-05-28·**→honsallim 301 Page Rule** 적용·경로보존) |
 | 호스팅 | **Cloudflare Pages `honsalim`** + Custom domain (Dugi2020@naver.com) |
 | GitHub | **`hangyundock/honsalim` Public** — origin/main = **#20 (홈 리디자인 포함)**, 배포됨. **build-and-deploy: main push → 커밋된 build/site Cloudflare Pages 배포 (CI 재빌드 없음, 글 DB 로컬)**. #20 배포 success(run #39·#40) + CodeQL·lint ✅. ★**wrangler `pages deploy`에 `--commit-message=honsalim-auto-deploy`(ASCII)+`--commit-dirty=true` 명시** — git 한글 커밋메시지 CF 거부(code 8000111) 근본수정. ※로컬 main worktree는 뒤처짐 — 다음 워크트리는 origin/main 기준 |
 | GitHub Secrets / Branch Protection | CF_API_TOKEN · CF_ACCOUNT_ID · INDEXNOW_KEY 등록 / ruleset `main-protect` Active |
@@ -44,7 +44,7 @@
 | Anthropic API Key | 영구 [관찰] | 6개월 회전 권장 — **2026-11-28** [추정] |
 | INDEXNOW_KEY | 영구 [확정 — 공개 키] | 회전 불요 |
 | GitHub PAT | 미발급 (Actions는 GITHUB_TOKEN 자동) [확정] | — |
-| AliExpress Portals | **App Key/Secret·라이브 검증 완료** [확정]. honsalim.com whitelist('ali' 오탐) — **2채널 제출 완료, 답변 대기** [확정 #13]: ①이메일(새벽 affiliates@service.alibaba.com) ②**포털 XFeedback(스크린샷 증거 포함, My Feedbacks 상태 "To do")**. 사이트 라이브 상태로 제출. 사이트등록폼은 'ali' 자동검증으로 Submit 불가 → 사람 화이트리스트만 길. 무응답 3~4영업일 시 follow-up | 2026-05-30 |
+| AliExpress Portals | **App Key/Secret·라이브 검증 완료** [확정]. ~~honsalim.com whitelist('ali' 차단)~~ → **honsallim.com 채널 등록 완료** [확정 #21]: Portals 나의 웹사이트에 honsallim 채널(Non-network·content>vertical sites·Korea·영어 desc) 등록 — **별도 승인 게이트 없이 즉시 등록**(다비교·k-Content Hub와 동일). 이전 honsalim.com은 'ali' 자동검증으로 Submit 자체 차단이었음 → 겹ㄹ 도메인으로 돌파. **다음: 채널 Tracking ID → ali.env 연결 → 개별 deeplink**(#22) | 2026-06-02 |
 | 쿠팡 파트너스 | 보류 | Phase 4 (콘텐츠 누적 후) 재가입 |
 
 ## 보안 / 권한
@@ -58,16 +58,16 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 시급 (다음 세션 #21) — 사용자 지시: **홈페이지 완성도 우선(제품 대량등록 아님)** → "제법 홈페이지 같다" 판단 시 제품 등록. 상세 EVENTS #20.
-1. **★미충전 이미지 전부 채우기** (사용자 핵심 지시): 이미지 자리는 있는데 비어있는 곳을 다 채워 "페이지 다운(=완성된) 모습" 만들기. 확인된 곳: **`/about/` 페이지 우측 히어로 아트(about.html — 회색 placeholder)**. 점검 필요: scenario_card·persona·season 등 `image_block(var(--wood-N))` placeholder 다수. (홈 hero/about·카테고리 개념이미지는 이미 채움). → 개념이미지 파이프라인(`enricher/concept_image.generate_concept_image`, Imagen 4:3/16:9, ~$0.02/장)로 생성.
-2. **★제품 등록 준비 — 수익 카테고리 리스트화 + 순차 자동 적용**(사용자 지시): 미리 수익 카테고리(제품 선택)를 선별해 **리스트**로 만들고, 그 리스트를 **순차적으로 자동 등록**(`collect-category`→`build-category` 반복)되게 설계. 알리+쿠팡 둘 다 등록 예정이라 우선 구조부터.
-3. **★/go/ 제휴 링크 작동**(D1 slug_map·go_gateway 워커) — 제품 클릭·수익 직결. 무인 자동등록 전 필수 골격(현재 미작동·정적 audit 제외).
-4. **office-chair 콘텐츠 생성**: 제품 0 — `collect-category office-chair`→`build-category`.
-5. (이월) 알리 whitelist 답변 · 쿠팡 파트너스 재가입(Phase 4) · 무인 발행 스케줄러(매일 11시, Phase 2) · main-protect.
-- ★**홈 大리디자인 코드는 #20에서 origin/main 배포 완료** — 다음 워크트리(origin/main 기준)에 그대로 이어짐. **DB는 gitignore→다음 워크트리에서 4개 카테고리 `collect-category` --no-dry-run + `build-category` --no-dry-run 재생성 필요**(API ~$1). 워크트리 실행=`PYTHONPATH=src python -m cli`. 미리보기=`build --preview`(draft포함)·공개=`build --full`. CSS 변경 확인 시 강력새로고침(Ctrl+Shift+R).
+### ★ 시급 (다음 세션 #22) — #21에서 1·2번·홈캐시·도메인 이전·알리 채널 등록 완료. 남은 핵심 = **살림 카테고리 합치기 + 수익 연결(Tracking ID·/go/)**. 상세 EVENTS #21.
+1. **★살림 카테고리 합치기**: `loving-herschel-0091c7` 갈래에만 있는 `sql/seeds/003_categories_living.sql` + `category_sources.yml` 살림3(**cutting-board 도마·drying-rack 빨래건조대·mini-dehumidifier 미니제습기**) 가져오기 → `db seed` → `register-categories cutting-board drying-rack mini-dehumidifier --no-dry-run`(2번에서 만든 순차 엔진) → approve+build --full+push. 비용~$1.5. ※origin/main 미머지라 git show로 파일 추출.
+2. **★Tracking ID 연결**: 알리 honsallim 채널 Tracking ID → `D:\secrets\affiliate_hub\ali.env`(**주인 직접** 수정·Claude 접근금지) → 제품 재수집 시 **개별 deeplink** 생성. 현재 `deeplink_url`은 공통 트래킹링크(모든 제품 동일·whitelist 전 한계).
+3. **★/go/ 작동**: wrangler **`deny` 룰**(`.claude/settings.json`)로 Claude 배포 차단(권한 자기수정 불가) → **주인이 wrangler deny 제거** 후 `PYTHONPATH=src python scripts/deploy_go_gateway.py`(D1 schema·sync-slugmap 191·Workers go_gateway 배포). 또는 Actions 워크플로 추가. 코드(slug_map 카테고리 UNION·resolve_argv) 준비됨.
+4. (관찰) **Chrome lookalike 경고**: honsalim↔honsallim 1글자 차이로 Chrome 사칭 의심(주인 브라우저 히스토리 기반) → 301+시간·honsallim 정상방문 학습으로 해소. 일반 방문자는 안 볼 가능성 큼.
+5. (이월) 쿠팡(방문자·트래픽 누적 후) · 무인 발행 스케줄러(매일 11시) · main-protect.
+- ★**DB는 gitignore→다음 워크트리에서 `db migrate`+`db seed`+카테고리 재생성 필요**(`register-categories --all --no-dry-run` 또는 개별 collect/build, API ~$1.5). 워크트리 실행=`PYTHONPATH=src python -m cli`. 미리보기=`build --preview`(draft포함)·공개=`build --full`. ★코드·도메인은 origin/main(#21) 배포 완료 — 다음 워크트리 그대로 이어짐.
 
-### 해소 (세션 #20) — 상세 EVENTS #20
-- ✅ 카테고리 4개 배포 · '전화' 제외 · 이미지 누락 근본수정(lazy+스크린샷) · 산출물 청소 버그 · wrangler 커밋메시지(8000111)·HTML캐시 fix · **홈 카테고리우선 大리디자인** · 구매가이드(/guides/, 내부링크 0 broken) · 사업자표기 정직화·이메일. 회귀 632(+9 가드).
+### 해소 (세션 #21) — 상세 EVENTS #21
+- ✅ **도메인 honsalim→honsallim 이전·Cloudflare Pages 연결·SSL·301 Page Rule(경로보존)** · **알리 honsallim 채널 등록**('ali' 차단 돌파) · 미충전이미지(페르소나 3·about·시나리오, placeholder 0)·이미지 재사용 · `register-categories` 순차엔진·office-chair 등록(카테고리 5) · OpenRouter 잘림 자가복원 · Windows wrangler `resolve_argv` · ★홈 흰바탕 안보임=CSS 캐시→cache-busting(`?v=`). 회귀 641.
 
 ### Phase 2 진척 가능 (검토 의존 큼)
 - `src/builder/manifest.py` 증분 빌드 (ARCH §7·DB §10) · `src/collector/coupang.py` (Phase 4)
