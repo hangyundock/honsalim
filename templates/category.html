@@ -13,7 +13,7 @@
 <div class="tcard"{% if area %} style="grid-area: {{ area }}"{% endif %}>
   <div class="trank">{% if p.type %}<b>{{ p.type }}</b>{% endif %}</div>
   <a class="timg" href="{{ p.url }}" rel="sponsored nofollow">
-    {% if p.img_url %}<img loading="lazy" src="{{ p.img_url }}" alt="{{ p.name }}">{% endif %}
+    {% if p.img_url %}<img loading="{{ 'eager' if eager_images else 'lazy' }}" decoding="async" src="{{ p.img_url }}" alt="{{ p.name }}" onerror="if(!this.dataset.r){this.dataset.r='1';this.src=this.src.split('?')[0]+'?r='+Date.now()}else{this.style.display='none'}">{% endif %}
   </a>
   <div class="tnm">{{ p.name }}</div>
   <div class="tpriceline">
@@ -52,7 +52,7 @@
   <div class="typesel">
     {% for p in picks_budget + picks_premium %}
     <a class="tsel" href="{{ p.url }}" rel="sponsored nofollow">
-      <div class="ti">{% if p.img_url %}<img loading="lazy" src="{{ p.img_url }}" alt="{{ p.name }}">{% endif %}</div>
+      <div class="ti">{% if p.img_url %}<img loading="{{ 'eager' if eager_images else 'lazy' }}" decoding="async" src="{{ p.img_url }}" alt="{{ p.name }}" onerror="if(!this.dataset.r){this.dataset.r='1';this.src=this.src.split('?')[0]+'?r='+Date.now()}else{this.style.display='none'}">{% endif %}</div>
       <div class="tl">{{ '💰' if p.tier == 'budget' else '⭐' }} {{ p.type or p.name[:10] }}</div>
     </a>
     {% endfor %}
@@ -174,7 +174,7 @@
     {% for p in products %}
     <div class="card" data-tier="{{ p.tier }}" data-price="{{ p.price_num }}" data-disc="{{ p.disc_num }}" data-idx="{{ loop.index0 }}">
       <div class="badges"><span class="tier t-{{ p.tier }}">{{ p.tier_label }}</span></div>
-      <a class="img" href="{{ p.url }}" rel="sponsored nofollow">{% if p.img_url %}<img loading="lazy" src="{{ p.img_url }}" alt="{{ p.name }}">{% endif %}</a>
+      <a class="img" href="{{ p.url }}" rel="sponsored nofollow">{% if p.img_url %}<img loading="{{ 'eager' if eager_images else 'lazy' }}" decoding="async" src="{{ p.img_url }}" alt="{{ p.name }}" onerror="if(!this.dataset.r){this.dataset.r='1';this.src=this.src.split('?')[0]+'?r='+Date.now()}else{this.style.display='none'}">{% endif %}</a>
       <div class="nm">{{ p.name }}</div>
       <div class="price">{{ p.price }}</div>
       {% if p.disc %}<span class="sig">정가 <s>{{ p.orig }}</s> · <b class="off">{{ p.disc }}↓</b></span>{% else %}<span class="sig nodisc">단일가</span>{% endif %}

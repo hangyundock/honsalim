@@ -350,6 +350,102 @@ class TestCategoryInteraction:
         ), ".tbtns margin-top:auto 누락 — 버튼이 바닥에 안 붙어 카드 아래단 어긋남(세션 #19)"
 
 
+class TestCategoryProductImages:
+    """카탈로그 상품 이미지 로딩 가드 (세션 #20 재발방지).
+
+    증상: 검토 중 '이미지를 다 못 가져왔다'고 오인. 실제 원인은 loading="lazy" +
+      전체페이지 스크린샷(화면 밖 이미지가 아직 미로드)일 뿐, 데이터·URL은 정상이었다
+      (148개 전부 image_url_external 채움·알리 CDN 200 OK).
+    대책: ①미리보기(검토)=eager 로딩 → 스크롤·전체스크린샷 없이 전부 표시
+          ②공개 배포=lazy 유지(외부 이미지 40+ 동시 요청 방지·CWV/LCP)
+          ③깨진 외부 이미지는 onerror로 자동 숨김(무인 graceful degrade·broken-icon 방지).
+    무인 운영에서 시각 확인이 어려우므로 구조로 고정.
+    """
+
+    _IMG = "https://ae-pic-a1.aliexpress-media.com/kf/Simg1.jpg"
+
+    def _render(self, tmp_path: Path, include_drafts: bool) -> str:
+        db_path = tmp_path / "test.db"
+        db.migrate(db_path=db_path)
+        db.seed(db_path=db_path)
+        conn = db.connect(db_path)
+        try:
+            conn.execute(
+                "INSERT INTO products (source, source_product_id, name, currency, price_krw, "
+                "image_url_external, deeplink_url, deeplink_slug, affiliate_tag, "
+                "created_at, updated_at, last_seen_at) "
+                "VALUES ('aliexpress','img1','책상 상품','KRW',50000,?,"
+                "'https://s.click.aliexpress.com/img1','ali-img1','honsalim',"
+                "datetime('now'),datetime('now'),datetime('now'))",
+                (self._IMG,),
+            )
+            pid = conn.execute("SELECT id FROM products WHERE source_product_id='img1'").fetchone()[
+                0
+            ]
+            cid = conn.execute("SELECT id FROM categories WHERE slug='desk'").fetchone()[0]
+            conn.execute(
+                "INSERT INTO category_products (category_id, product_id, tier, is_featured) "
+                "VALUES (?,?,'budget',1)",
+                (cid, pid),
+            )
+            category_state.approve(conn, "desk")  # 승인 → published
+            conn.commit()
+        finally:
+            conn.close()
+        out = tmp_path / ("preview" if include_drafts else "site")
+        renderer.render_site(out_dir=out, db_path=db_path, include_drafts=include_drafts)
+        return (out / "categories" / "desk" / "index.html").read_text(encoding="utf-8")
+
+    def test_catalog_image_src_present(self, tmp_path: Path) -> None:
+        # 이미지 URL이 실제로 박혀야 함 — 빈 src·미수집은 회귀
+        html = self._render(tmp_path, include_drafts=False)
+        assert f'src="{self._IMG}"' in html
+        assert 'src=""' not in html
+
+    def test_production_uses_lazy(self, tmp_path: Path) -> None:
+        # 공개 배포는 lazy (CWV/LCP 보호) — eager가 새지 않도록 고정
+        html = self._render(tmp_path, include_drafts=False)
+        assert 'loading="lazy"' in html
+        assert 'loading="eager"' not in html
+
+    def test_preview_uses_eager(self, tmp_path: Path) -> None:
+        # 미리보기(검토)는 eager → 전체페이지 스크린샷·스크롤 없이 전부 표시(오인 재발 방지)
+        html = self._render(tmp_path, include_drafts=True)
+        assert 'loading="eager"' in html
+        assert 'loading="lazy"' not in html
+
+    def test_broken_image_onerror_retry_then_hide(self, tmp_path: Path) -> None:
+        # 깨진 외부 이미지: 1회 재시도(일시 throttle 자가복구) → 그래도 실패 시 숨김(graceful degrade)
+        html = self._render(tmp_path, include_drafts=False)
+        assert "onerror=" in html
+        assert "this.dataset.r" in html  # 재시도 1회 가드(무한루프 방지)
+        assert "?r='+Date.now()" in html  # 캐시버스터 재요청
+        assert "this.style.display='none'" in html  # 2차 실패 시 숨김
+
+
+class TestBuildSiteClean:
+    """산출물 청소 가드 (세션 #20 재발방지).
+
+    버그: render_site가 out_dir을 청소하지 않아, 미게시/삭제된 콘텐츠의 옛 HTML이
+      build/site에 잔존 → 배포 시 라이브에서 안 내려감(예: 옛 글 제거 지시 무력화).
+    무인 운영에서 'unpublish/삭제 → 라이브 반영'이 깨지면 치명적이라 구조로 고정.
+    """
+
+    def test_stale_output_removed_on_rebuild(self, tmp_path: Path) -> None:
+        db_path = tmp_path / "test.db"
+        db.migrate(db_path=db_path)
+        db.seed(db_path=db_path)
+        out = tmp_path / "site"
+        out.mkdir(parents=True)
+        # 이전 빌드에만 있던(이제 DB에 없는) 옛 산출물
+        stale = out / "articles" / "old-removed" / "index.html"
+        stale.parent.mkdir(parents=True)
+        stale.write_text("STALE", encoding="utf-8")
+        renderer.render_site(out_dir=out, db_path=db_path)
+        assert not stale.exists(), "옛 산출물 잔존 — 미게시/삭제 콘텐츠가 라이브에 남음"
+        assert (out / "index.html").exists()  # 정상 재생성은 유지
+
+
 class TestMarkdownInline:
     """산문 인라인 마크다운(**볼드**) 변환 — raw ** 화면 노출 방지(세션 #18)."""
 

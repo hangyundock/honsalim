@@ -539,9 +539,22 @@ def render_site(
         trim_blocks=True,
         lstrip_blocks=True,
     )
-    common = {"asset_base": "/static", "personas": personas, "business_info": BUSINESS_INFO}
+    # eager_images: 미리보기(검토)는 즉시 로딩 — 운영자가 전체페이지 스크린샷·스크롤 없이도
+    # 모든 상품 이미지를 한 번에 확인(세션 #20 재발방지: lazy+전체스크린샷 → 화면 밖 이미지 미로드 오인).
+    # 공개 배포는 lazy 유지(외부 이미지 40+ 다발 요청 방지·CWV/LCP 보호).
+    common = {
+        "asset_base": "/static",
+        "personas": personas,
+        "business_info": BUSINESS_INFO,
+        "eager_images": include_drafts,
+    }
     org_ld = jsonld.build_organization_jsonld(SITE_ORIGIN, "혼살림", BUSINESS_INFO["email"])
 
+    # 산출물 청소 후 재생성 — 미게시·삭제된 콘텐츠가 배포물(라이브)에 잔존하지 않도록(세션 #20).
+    # 정적 사이트는 DB 현재 상태와 정확히 일치해야 한다(예: 글 unpublish/삭제 → 라이브에서도 제거).
+    # 안전장치: 빌드 산출물 디렉토리(site/preview)만 청소 — 저장소 루트 등 오삭제 방지.
+    if out_dir.exists() and out_dir.name in ("site", "preview"):
+        shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     written: list[str] = []
 

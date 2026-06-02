@@ -4,8 +4,9 @@
 /* ---------- 헤더 ---------- */
 .hdr {
   position: sticky; top: 0; z-index: 50;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: saturate(1.1) blur(10px);
+  background: var(--bg);
+  /* 세션 #18: backdrop-filter 제거 — Windows Chrome에서 페이지 전체 텍스트가 GPU 합성으로
+     전환돼 ClearType(선명 렌더링)이 꺼지고 흐릿해지는 현상의 원인. 불투명 배경으로 대체. */
   border-bottom: 1px solid var(--divider);
 }
 .hdr-in { display: flex; align-items: center; gap: 28px; height: 66px; }
@@ -60,7 +61,7 @@
 .img-block .cap {
   position: relative; z-index: 2; font-size: 12px; font-weight: 600;
   color: rgba(255,255,255,.95); padding: 10px 12px; letter-spacing: .02em;
-  text-shadow: 0 1px 3px rgba(60,40,20,.45);
+  text-shadow: 0 1px 3px rgba(20,30,40,.45);
 }
 .img-block .ph-icon {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -68,7 +69,7 @@
 }
 .img-block::after { /* subtle vignette so caption is legible */
   content: ""; position: absolute; inset: 0; z-index: 1;
-  background: linear-gradient(180deg, rgba(60,40,20,0) 45%, rgba(60,40,20,.34) 100%);
+  background: linear-gradient(180deg, rgba(20,30,40,0) 45%, rgba(20,30,40,.34) 100%);
 }
 
 /* ---------- 시나리오 카드 (카드=그림자 확정) ---------- */
@@ -104,7 +105,7 @@
 .sec-head .lead { font-size: 15px; color: var(--meta); margin-top: 8px; max-width: 52ch; line-height: 1.6; }
 
 /* ---------- 푸터 ---------- */
-.ftr { background: #F1E7D8; border-top: 1px solid var(--border); margin-top: 40px; }
+.ftr { background: var(--card-bg); border-top: 1px solid var(--border); margin-top: 40px; }
 .ftr-in { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 40px; padding: 56px 0 28px; }
 .ftr h4 { font-size: 13px; font-weight: 700; color: var(--brand); margin-bottom: 14px; letter-spacing: .02em; }
 .ftr a, .ftr p { display: block; font-size: 13.5px; color: var(--sub); margin-bottom: 9px; line-height: 1.55; }

@@ -1,56 +1,58 @@
 /* ===== 혼살림 — 디자인 토큰 =====
-   출처: Claude Design 핸드오프 (docs/design_drafts/honsalim).
-   확정 조합: 톤=우드 / 카드=그림자 / 밀도=미니멀 (DECISIONS G3 기반, 세션 #11).
-   변형 토글(data-tone/card/density)은 제거하고 확정값만 baked-in. */
+   세션 #16 ★대전환: 우드톤 → 노써치식 흰 바탕(사진2 확정 디자인) + NanumSquare Neo(확정 글씨체).
+   components.css·pages.css가 전부 토큰 기반이라, 본 파일 팔레트/폰트 교체로 사이트 전체가 전환된다.
+   (DECISIONS O3 흰 바탕 / CATEGORY_PAGE §1) */
 :root {
-  /* 우드톤 + 잉크 팔레트 (DESIGN §3-1 일치) */
-  --bg: #FAF6F1;          /* 따뜻한 화이트 배경 */
-  --card-bg: #F1E9DC;     /* 카드 배경 */
-  --surface: #FFFFFF;     /* 카드 표면 */
-  --accent: #A87F4D;      /* 강조/링크/버튼 */
-  --accent-ink: #936C3E;  /* hover */
-  --brand: #7A5530;       /* 진한 강조·브랜드 */
-  --border: #D4B896;      /* 보더·태그 */
-  --text: #1C1A17;        /* 본문 */
-  --sub: #3D3A35;         /* 서브 */
-  --meta: #6B6660;        /* 메타·캡션 */
-  --divider: #E8E5E0;     /* 구분선 */
+  /* 흰 바탕 + 잉크·녹색 팔레트 (프로토타입 확정값) */
+  --bg: #ffffff;          /* 흰 배경 */
+  --card-bg: #f6f7f9;     /* 소프트 그레이(카드/탭 배경) */
+  --surface: #ffffff;     /* 카드 표면 */
+  --accent: #1f7a5e;      /* 강조/링크/버튼(녹색) */
+  --accent-ink: #155c46;  /* hover/진한 녹색 */
+  --brand: #155c46;       /* 브랜드·강조 텍스트 */
+  --border: #e6e8eb;      /* 보더 */
+  --text: #000000;        /* 제목·강조 — 순수 검정 (세션 #18 3차: 사용자 요청 더 검정) */
+  --sub: #111111;         /* 본문 단락 — 거의 순수 검정 (세션 #18 3차) */
+  --meta: #383838;        /* 메타·캡션 — 진한 회색 (세션 #18 3차) */
+  --divider: #eef0f2;     /* 옅은 구분선 */
 
-  /* 우드 단색 블록 톤 (placeholder 이미지) */
-  --wood-1: #C9A876;
-  --wood-2: #B8946A;
-  --wood-3: #D8C3A0;
-  --wood-4: #A87F4D;
+  /* placeholder 이미지 블록 — 중립 그레이 (우드 단색 폐기) */
+  --wood-1: #eef0f2;
+  --wood-2: #e6e8eb;
+  --wood-3: #f2f3f5;
+  --wood-4: #dfe3e7;
 
-  --maxw: 1140px;
-  --radius: 14px;
+  --maxw: 1080px;        /* 콘텐츠 폭 — 단일 칼럼 통일(세션 #18). 산문·표·카드 동일 폭으로 위아래 일관 */
+  --radius: 12px;
   --radius-sm: 9px;
 
-  /* 타입 스케일 — 미니멀 밀도 확정 */
-  --fs-hero: 50px;
-  --fs-h1: 36px;
-  --fs-h2: 26px;
-  --fs-h3: 19px;
-  --fs-body: 16.5px;
+  /* 타입 스케일 */
+  --fs-hero: 46px;
+  --fs-h1: 34px;
+  --fs-h2: 24px;
+  --fs-h3: 18px;
+  --fs-body: 16px;
   --fs-meta: 13px;
-  --lh-body: 1.78;
+  --lh-body: 1.75;
 
-  /* 간격 — 미니멀 밀도 확정 */
-  --gap: 32px;
-  --pad-card: 26px;
-  --section-y: 104px;
+  /* 간격 */
+  --gap: 28px;
+  --pad-card: 22px;
+  --section-y: 84px;
 
-  --shadow-card: 0 1px 2px rgba(28,26,23,.04), 0 8px 28px rgba(122,85,48,.07);
-  --shadow-soft: 0 1px 3px rgba(28,26,23,.05);
+  /* 노써치식 = 플랫 + 얇은 보더. 그림자 최소화 */
+  --shadow-card: 0 1px 2px rgba(20,30,40,.04);
+  --shadow-soft: 0 1px 3px rgba(20,30,40,.05);
 
-  --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
-          'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  /* 네이버 글씨체 NanumSquare Neo — 제목·본문 공통 (세션 #18: 사용자 선호로 본문도 복귀) */
+  --font: "NanumSquare Neo", "NanumSquareNeo", Pretendard, -apple-system, BlinkMacSystemFont,
+          "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
 
-  /* 톤 — 우드(따뜻한 강조) 확정 */
-  --hero-bg: linear-gradient(168deg, #F4ECDF 0%, #EADBC4 100%);
-  --hero-accent: var(--brand);
+  /* 톤 — 흰 바탕(담백) */
+  --hero-bg: linear-gradient(180deg, #ffffff 0%, #f6f7f9 100%);
+  --hero-accent: var(--accent);
   --label-color: var(--accent);
-  --section-tint: #F6EEE2;
+  --section-tint: #f6f7f9;
   --block-sat: 1;
 }
 
@@ -62,19 +64,19 @@ body {
   background: var(--bg);
   color: var(--text);
   word-break: keep-all;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  /* 세션 #18: antialiased·optimizeLegibility 제거 — 회색 배경 위 글자 뭉개짐(흐림) 개선.
+     기본 렌더링(subpixel)이 어두운 글자를 더 선명하게 표현한다. */
 }
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-ink); }
 img { max-width: 100%; display: block; }
 button { font-family: inherit; cursor: pointer; }
-::selection { background: #E7D6BC; }
+::selection { background: #d6efe6; }
 
 .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
 .section { padding: var(--section-y) 0; }
 .eyebrow {
-  font-size: var(--fs-meta); font-weight: 600; letter-spacing: .14em;
+  font-size: var(--fs-meta); font-weight: 700; letter-spacing: .12em;
   text-transform: uppercase; color: var(--label-color);
 }
 h1, h2, h3, h4, p { margin: 0; text-wrap: pretty; }
@@ -84,7 +86,7 @@ h1, h2, h3, h4, p { margin: 0; text-wrap: pretty; }
 /* 미니멀 밀도: 정보밀도 전용 메타는 숨김 */
 .dense-only { display: none; }
 
-/* 스크롤바 — 우드톤 */
+/* 스크롤바 — 중립 그레이 */
 ::-webkit-scrollbar { width: 11px; height: 11px; }
-::-webkit-scrollbar-thumb { background: #D9C7AC; border-radius: 8px; border: 3px solid var(--bg); }
+::-webkit-scrollbar-thumb { background: #d4d8dd; border-radius: 8px; border: 3px solid var(--bg); }
 ::-webkit-scrollbar-track { background: var(--bg); }
