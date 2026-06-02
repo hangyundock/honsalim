@@ -14,6 +14,7 @@ SQLite DB(personas·scenarios·articles)를 읽어 공개 사이트를 생성한
 
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import re
@@ -703,6 +704,29 @@ def _sitemap(urls: list[str]) -> str:
     )
 
 
+def _asset_version() -> str:
+    """static CSS·JS 내용 해시(8자) — cache-busting 버전 (세션 #21).
+
+    파일이 바뀌면 값이 달라져 링크 URL(?v=)이 바뀌므로, immutable 장기 캐시여도 브라우저·
+    엣지가 새 자산을 받는다. CSS/JS 변경이 방문자에게 반영 안 되던 근본 문제 해결(흰바탕
+    디자인이 옛 우드톤 캐시에 막히던 현상). 내용 불변이면 값도 동일 → 캐시 이점 유지.
+    """
+    h = hashlib.sha256()
+    for rel in (
+        "css/tokens.css",
+        "css/components.css",
+        "css/pages.css",
+        "css/category.css",
+        "js/home.js",
+        "js/category.js",
+        "js/hub-filter.js",
+    ):
+        p = STATIC_DIR / rel
+        if p.exists():
+            h.update(p.read_bytes())
+    return h.hexdigest()[:8]
+
+
 def render_site(
     out_dir: Path = DEFAULT_OUT, db_path: Path = db.DB_PATH, include_drafts: bool = False
 ) -> dict:
@@ -733,6 +757,8 @@ def render_site(
         trim_blocks=True,
         lstrip_blocks=True,
     )
+    # cache-busting: 모든 템플릿에서 {{ asset_version }} 사용 (CSS·JS URL ?v=)
+    env.globals["asset_version"] = _asset_version()
     # eager_images: 미리보기(검토)는 즉시 로딩 — 운영자가 전체페이지 스크린샷·스크롤 없이도
     # 모든 상품 이미지를 한 번에 확인(세션 #20 재발방지: lazy+전체스크린샷 → 화면 밖 이미지 미로드 오인).
     # 공개 배포는 lazy 유지(외부 이미지 40+ 다발 요청 방지·CWV/LCP 보호).

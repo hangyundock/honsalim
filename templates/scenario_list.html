@@ -67,5 +67,5 @@
 {% endblock %}
 
 {% block footer_extra %}
-<script src="{{ asset_base | default('/static') }}/js/hub-filter.js" defer></script>
+<script src="{{ asset_base | default('/static') }}/js/hub-filter.js?v={{ asset_version | default('') }}" defer></script>
 {% endblock %}

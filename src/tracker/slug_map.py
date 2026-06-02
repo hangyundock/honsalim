@@ -24,6 +24,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from common.proc import resolve_argv
+
 
 @dataclass
 class SlugMapSyncResult:
@@ -163,7 +165,7 @@ def sync_slug_map(
 
     try:
         proc = subprocess.run(
-            cmd,
+            resolve_argv(cmd),
             cwd=str(Path(cwd).resolve()),
             capture_output=True,
             text=True,

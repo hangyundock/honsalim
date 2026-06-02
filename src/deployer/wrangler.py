@@ -15,6 +15,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from common.proc import resolve_argv
+
 
 @dataclass
 class WranglerResult:
@@ -76,7 +78,7 @@ def wrangler_deploy(
         )
 
     proc = subprocess.run(
-        cmd,
+        resolve_argv(cmd),
         cwd=cwd_str,
         capture_output=True,
         text=True,

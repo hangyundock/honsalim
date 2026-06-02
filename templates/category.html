@@ -3,9 +3,9 @@
 {% block title %}{{ category.guide_title or category.name + ' 고르는 법' }} | 혼살림{% endblock %}
 
 {% block head_extra %}
-  <link rel="stylesheet" href="{{ asset_base | default('/static') }}/css/category.css">
+  <link rel="stylesheet" href="{{ asset_base | default('/static') }}/css/category.css?v={{ asset_version | default('') }}">
   {# 전체 제품 정렬(추천/가격/할인)·티어 필터 인터랙션 — defer로 DOM 준비 후 실행 #}
-  <script defer src="{{ asset_base | default('/static') }}/js/category.js"></script>
+  <script defer src="{{ asset_base | default('/static') }}/js/category.js?v={{ asset_version | default('') }}"></script>
 {% endblock %}
 
 {# 추천 6선 비교 카드 (💰실속/⭐고급 공용). area = 데스크톱 그리드 배치(row/col) — 좌우 같은 행 정렬용 #}

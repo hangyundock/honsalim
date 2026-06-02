@@ -5,7 +5,7 @@
 
 {% block head_extra %}
   {# 기획전 배너 캐러셀 — defer, JS 없으면 첫 슬라이드만 표시(진행 향상) #}
-  <script defer src="{{ asset_base | default('/static') }}/js/home.js"></script>
+  <script defer src="{{ asset_base | default('/static') }}/js/home.js?v={{ asset_version | default('') }}"></script>
 {% endblock %}
 
 {% macro prod_card(p, rank=0, deal=False) %}

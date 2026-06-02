@@ -304,6 +304,15 @@ class TestCategoryPublishGate:
         assert (tmp_path / "site" / "categories" / "office-chair" / "index.html").exists()
         assert summary["categories"] == 1
 
+    def test_assets_cache_busting(self, built: dict) -> None:
+        # 세션 #21: CSS·JS 링크에 ?v=내용해시 — immutable 장기캐시가 새 디자인(흰바탕)을
+        # 옛 캐시(우드톤)로 가리던 문제 재발방지. 자산 내용이 바뀌면 ?v= 값이 달라진다.
+        home = (built["out"] / "index.html").read_text(encoding="utf-8")
+        assert ".css?v=" in home, "CSS 링크 cache-busting ?v= 누락"
+        assert ".js?v=" in home, "JS 링크 cache-busting ?v= 누락"
+        v = renderer._asset_version()
+        assert len(v) == 8 and all(c in "0123456789abcdef" for c in v)
+
 
 class TestCategoryInteraction:
     """전체 제품 정렬·티어 필터(JS) 배선 + 추천 카드 좌우 행 정렬(CSS) 재발 방지 가드 (세션 #19).

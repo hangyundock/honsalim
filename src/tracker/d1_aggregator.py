@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from common.proc import resolve_argv
+
 
 @dataclass
 class AggregateResult:
@@ -109,7 +111,7 @@ def aggregate(
 
     try:
         proc = subprocess.run(
-            cmd,
+            resolve_argv(cmd),
             cwd=cwd_str,
             capture_output=True,
             text=True,
