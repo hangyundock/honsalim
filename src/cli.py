@@ -1511,6 +1511,82 @@ def cmd_build(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_refresh_cycle(args: argparse.Namespace) -> int:
+    """무인 일일 새로고침·자가복원·빌드·배포 사이클 (A안·세션 #23). 기본 dry_run.
+
+    published 카테고리 가격·판매량 새로고침 → 가드레일 자가복원(미달 자동 비공개) →
+    빌드 → 변경분만 배포. dry_run은 현황·판정만(외부 영향 없음). --no-dry-run이 실제 사이클.
+    LLM 미사용(수집·휴리스틱·렌더) → 일일 비용 ~$0.
+    """
+    import sqlite3
+
+    from deployer import refresh_cycle as rc
+
+    if not args.dry_run and not args.no_refresh:
+        config.load_secrets()  # 알리 키(수집) — 라이브 새로고침 시
+    conn = db.connect(db.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        res = rc.run_refresh_cycle(
+            conn,
+            project_root=PROJECT_ROOT,
+            page_size=args.page_size,
+            refresh=not args.no_refresh,
+            auto_killswitch=not args.no_killswitch,
+            do_build=not args.no_build,
+            do_deploy=not args.no_deploy,
+            dry_run=args.dry_run,
+            verify_url=args.verify_url,
+        )
+    finally:
+        conn.close()
+
+    mode = "DRY(판정만·외부영향 없음)" if res.dry_run else "LIVE"
+    print(f"\n=== refresh-cycle [{mode}] ===")
+    print(f"공개 카테고리 {len(res.published)}개: {', '.join(res.published) or '(없음)'}")
+    if not args.no_refresh:
+        ok = sum(1 for r in res.refreshed if r.ok)
+        print(f"새로고침: 성공 {ok} / {len(res.refreshed)}")
+        for r in res.refreshed:
+            if r.ok:
+                print(
+                    f"     {OK} {r.slug}: 수신 {r.received} · 연결 {r.linked} · prune {r.removed_stale}"
+                )
+            else:
+                print(f"     {FAIL} {r.slug}: {r.error}")
+    print(f"가드레일 미달(사후감시): {len(res.flagged)}")
+    for f in res.flagged:
+        print(f"     {WARN} {f['slug']}: {'; '.join(f['reasons'])}")
+    if res.killswitched:
+        print(f"{WARN} 자가복원(자동 비공개): {', '.join(res.killswitched)}")
+    if res.built:
+        print(f"{OK} 빌드 완료 · /go/ 리다이렉트 {res.go_count}개")
+    print(f"산출물 변경: {'있음' if res.changed else '없음'}")
+    if res.deployed:
+        print(f"{OK} 배포 push 완료 (rc={res.push_rc}) — CI가 honsallim.com 반영")
+        if res.verify_status is not None:
+            print(f"     verify status={res.verify_status}")
+    for n in res.notes:
+        print(f"     · {n}")
+
+    # 무인 모니터링 — 사이클 다이제스트 저장 + 대시보드 갱신 (dry_run 포함 항상)
+    from datetime import datetime
+
+    from dashboard import render as dash_render
+
+    ran_at = datetime.now().astimezone().isoformat(timespec="seconds")
+    report_path = db.DB_PATH.parent / "refresh_cycle_last.json"
+    rc.write_cycle_report(res, report_path, ran_at)
+    dash_out = dash_render.render_dashboard(
+        output_path=db.DB_PATH.parent / "dashboard" / "index.html"
+    )
+    print(f"{OK} 모니터링 갱신 → 기록 {report_path.name} · 대시보드 {dash_out}")
+
+    rc_fail = any(not r.ok for r in res.refreshed)
+    deploy_fail = (not res.dry_run) and (not args.no_deploy) and res.changed and not res.deployed
+    return 1 if (rc_fail or deploy_fail) else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="honsalim",
@@ -1804,6 +1880,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="생성 후 브라우저 자동 열기",
     )
     p_dashboard.set_defaults(func=cmd_dashboard)
+
+    # 무인 일일 새로고침·자가복원·빌드·변경분 배포 사이클 (A안·세션 #23, 윈도우 스케줄러용)
+    p_refresh = sub.add_parser(
+        "refresh-cycle",
+        help="무인 일일 새로고침·자가복원·빌드·변경분 배포 (A안·세션 #23, 기본 dry_run)",
+    )
+    p_refresh.add_argument(
+        "--no-dry-run",
+        dest="dry_run",
+        action="store_false",
+        help="실제 사이클 (알리 수집·DB 쓰기·빌드·git push — 명시 승인/스케줄러)",
+    )
+    p_refresh.add_argument("--no-refresh", action="store_true", help="새로고침(재수집) 생략")
+    p_refresh.add_argument(
+        "--no-killswitch", action="store_true", help="가드레일 미달 자동 비공개 생략(보고만)"
+    )
+    p_refresh.add_argument("--no-build", action="store_true", help="빌드 생략")
+    p_refresh.add_argument("--no-deploy", action="store_true", help="배포 생략(빌드까지만)")
+    p_refresh.add_argument(
+        "--page-size", type=int, default=30, help="새로고침 티어당 조회 수 (기본 30)"
+    )
+    p_refresh.add_argument(
+        "--verify-url", type=str, default=None, help="배포 후 HEAD 검증 URL (선택)"
+    )
+    p_refresh.set_defaults(func=cmd_refresh_cycle, dry_run=True)
 
     return parser
 

@@ -22,8 +22,27 @@
   - 세션 #14 (2026-05-31 용어 일상화(내맘대로 세팅·라이프스타일)+사이트 大전환 기획(카테고리 비교·노써치형 DECISIONS O1~O9)+카테고리 프로토타입·알리 API 라이브검증·회귀 470→472)
   - 세션 #15–16 (2026-05-31 SEO 자동최적화 엔진·네이버 검색광고·전체제품 카탈로그·product_filter·디자인 大전환 1단계(우드톤→흰바탕 tokens 교체)·회귀 472→553 / 다음=#17)
   - 세션 #17 (2026-05-31 카테고리 자동등록 파이프라인 완성·사무용의자 구성표준·개념이미지(Imagen)·collect-category/build-category CLI·정형화 입증(책상)·회귀 553→569)
+  - 세션 #18 (2026-05-31 운영자 1클릭 승인 게이트(O21·build-category draft 고정)·doctor §10 64진입점·★카테고리 페이지 디자인 디버깅(글씨 흐림 진짜원인=backdrop-filter 제거)·회귀 569→590)
 
 ## 최근 5세션
+
+### 세션 #23 — 2026-06-03 (Opus 4.8 1M, ★무인 스케줄러 A안(refresh-cycle) 구축·가동 셋업 + 모니터링 대시보드 + 메인 체크아웃 정비 + 쿠팡 활성화 착수, 회귀 659→678)
+
+**시작 상황**: origin/main #22. 주인 "무인스케줄안 진행·승인 미리받고 끝까지". 모니터링 대시보드 + 쿠팡 가입 착수로 확대.
+
+**핵심 진척 [확정]**:
+1. **★refresh-cycle(A안·C10)**: `deployer/refresh_cycle.py`+CLI(기본 dry_run) — published 새로고침→가드레일 자가복원(fail-closed 자동 비공개)→빌드→**변경분만** push→CI 배포. LLM 미사용 ~$0/일. dry-run+라이브 자가복원 오프라인 실증. 래퍼 `scripts/run_refresh_cycle.ps1`(main·DB fail-safe).
+2. **★모니터링 대시보드(C12)**: "무인 사이클"+"공개 카테고리 건강(미달 ⚠+킬스위치)"+경고 배너. refresh-cycle이 매 실행 후 `data/refresh_cycle_last.json`+대시보드 자동 갱신. **바탕화면 아이콘 "혼살림 모니터링"**.
+3. **★Claude 예약작업(C11)**: `honsalim-refresh-cycle`(매일 11:00 KST·지터~10분). 윈도우 작업스케줄러 직접 등록은 안전가드 차단→Claude 예약작업이 대안(앱 열려있을 때).
+4. **★메인 체크아웃 정비**: D:\affiliate_hub가 #17+미커밋 DeepSeek 잔재+5월28일 DB 방치 → 잔재 `stash@{0}` 보관 → #22 ff → DB 재생성(~$2): **6 공개 + 2 보류**(laptop-stand·drying-rack, 가드레일 fail-closed). 낡은DB=`data/honsalim.db.bak_session23_may28`.
+5. **★쿠팡 활성화 착수**: 파트너스 가입(honsallim.com). 승인엔 라이브 페이지 쿠팡 고지+링크 스샷 필요. `disclosure.py` 이미 쿠팡 지원·`collector.coupang` 미구현. 쿠팡=메인 채널(§6)·시점 앞당김.
+6. 회귀 **659→678**(+19). 린트 클린.
+
+**무인·안전(§0)**: dry-run 우선·실패 격리·fail-closed 킬스위치·변경 감지 배포·사전조건 미충족 안전정지·예약작업 destructive git 금지·잔재 비파괴 보관.
+
+**잔존/다음(#24)**: **(0)#23 머지→스케줄러 가동 확인**(첫 배포 시 보류 2개 라이브에서 내려감). **(1)★★쿠팡 본격**(링크생성→승인 데모페이지→스샷→`collector.coupang` 구현). **(2)★★미결정 설계 — 알리+쿠팡 페이지 배치(주인 아직 못 들음·반드시 논의)**: 혼합 vs 분리·추천6선 섞기·가격비교·/go/ 쿠팡 분기. **(3)★성장**(측정 리뷰). (4)보류 2개 검토.
+
+---
 
 ### 세션 #22 — 2026-06-03 (Opus 4.8 1M, ★자율 게시 가드레일(E7→fail-closed)+살림3 합치기+8개 자동공개 라이브배포+측정인프라3종+/go/ Pages Function 수익경로 복구 / 개발 마무리→성장 전환, 회귀 641→659)
 
@@ -107,23 +126,3 @@
 **무인·안전(§0)**: 가짜 평점 금지(별점 없음→판매량만 정직표기)·저평가(<80%) 추천 제외·require_all 오염 차단·DeepSeek 출력 자가복원·AI 자동 published 차단. 전부 draft.
 
 **다음 세션(#20) 할 일**: 1) 카테고리 4개 검토→`approve-category`+`build --full`→배포 2) 노트북 '전화' 제외어 결정 3) office-chair 생성 4) 메인 미커밋 DeepSeek 임시본 정리 5)(이월) /go/·알리 whitelist·main-protect. ★DB gitignore→재생성 시 collect(판매량 채움) 먼저.
-
----
-
-### 세션 #18 — 2026-05-31 (Opus 4.8 1M, 운영자 승인 게이트 + doctor 보강 + ★카테고리 페이지 디자인 디버깅·정형화(글씨 흐림 진짜원인=backdrop-filter), 회귀 569→590)
-
-**시작 상황**: `/honsalim-start`(워크트리 beautiful-bose-63b4f9, HEAD=#17 `8710a5e`). 회귀 569. "다음 할 일 순서대로 진행" → #18 1순위 승인 게이트부터. 도중 디자인 작은 수정 요청이 카테고리 페이지 디자인 대거 디버깅으로 확대.
-
-**핵심 진척 [확정]** (※전부 **로컬·미배포**. honsalim.com은 #13 첫 글 유지):
-
-1. **운영자 1클릭 승인 게이트** (O21): `build-category`가 글 저장 시 **`status='draft'` 고정**(AI 자동 published 차단·E7, 재빌드 시 재승인 강제) · **`approve-category`/`unapprove-category` CLI** · `writer/category_state.py`(approve/unapprove/pending_approval+전이검증+부분DB 견고성) · renderer **`published`만 렌더**(+`include_drafts` 미리보기) · 대시보드 "카테고리 승인 대기" 섹션.
-2. **doctor 보강** (#18-3): §10 진입점 **64**(category_state·category_page_builder·concept_image·category_collect 등 6 추가, 64/64 OK).
-3. **★카테고리 페이지 디자인 디버깅·정형화** (O22): 글씨 흐림 **진짜 원인 = `backdrop-filter`**(헤더 유리효과 → Windows Chrome 텍스트 GPU 합성·ClearType off) **제거**가 근본 해결. + 본문 #111·폭 1080px·최소 14px·마크다운 `**`→strong·FAQ 구분·추천카드 장단점 그룹·폰트 NanumSquare Neo. 정형화 확인(desk→monitor-stand 자동 동일·공통 CSS).
-4. **#18 2순위 배포 진행**: 이 워크트리에 DB 재생성(desk·monitor `collect-category`+`build-category` --no-dry-run 라이브, 게이트 통과, **draft**). 디자인 확정. **승인+공개배포는 #19**.
-5. **회귀 569→590** (+21: category_state 9·renderer published게이트/마크다운·design_tokens 가드 3·cli 3 등). black·ruff·mypy 클린. 비용 ~$0.6.
-
-**무인·안전/진실성(§0)**: AI 자동 published 차단(E7) · 미승인 draft 완전 비공개 · 마크다운 XSS escape 후 변환 · 대시보드 부분DB 견고성 가드 · 디자인은 코드(공통)라 새 카테고리 자동 적용 + 재발방지 가드(색 대비·정렬·승인전이). 미리보기 캐시→강력새로고침/시크릿창.
-
-**잔존 미해결 (#19)**: ①**카테고리 페이지 추가 디자인 수정**(사용자 "이 페이지 수정할 부분 더 있다" — 연속 작업) ②#18 2순위 배포 완료(승인+공개) ③나머지 카테고리(의자 build·모니터암 신규) ④(이월) /go/·알리 whitelist·main-protect.
-
-**다음 세션 할 일**: 1) **카테고리 디자인 연속 수정**(DB 재생성→`build --preview`로 확인하며) 2) **승인(`approve-category`)+배포**(`build --full`→honsalim.com) 3) 나머지 카테고리. ★DB는 gitignore→재생성 필요(`collect-category`·`build-category` --no-dry-run, ~$0.6). 워크트리 실행=`PYTHONPATH=src python -m cli`.

@@ -3,14 +3,15 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #23 — 개발 거의 끝. **최우선 = 성장(트래픽·수익)**([[growth-first-priority]] 메모리). '완성/유지보수'와 구분. (상세 EVENTS #22)
+## ★ 다음 세션 #24 — (상세 EVENTS #23)
 
-- [x] ~~살림3 카테고리 합치기 · 알리 개별 deeplink(honsallim 247개) · ★자율 게시 가드레일(E7→fail-closed) · 8개 자동공개 · ★라이브 배포 · ★측정 인프라 3종(Cloudflare·GSC·네이버) · ★/go/ 수익경로(Pages Function) · office-chair 오염 자동적발·collect prune 근본수정~~ ✅ #22
-- [ ] **★성장 최우선(매 세션 선제 고민)**: ①측정 데이터 **1~2주 후 리뷰**(GSC·네이버·Cloudflare)→뜨는 키워드 더블다운·죽은 것 정리 ②토픽 집중(홈오피스 클러스터 심화: 키보드·마우스·데스크매트 등 인접) ③롱테일 검색어(본문·FAQ) ④양질 콘텐츠. 한국 제품추천 SEO 6~12개월 장기전.
-- [ ] (완성·저위험·성장 아님) **무인 스케줄러 A안**: published 새로고침(가격·판매량)→가드레일 monitor 자가복원→build→변경 시 배포. ★메인 체크아웃(`D:\affiliate_hub`)이 origin/main #22 pull 필요(스케줄러 실행처).
-- [ ] (선택) `docs/CATEGORIES.md` 전략 문서 · D1 클릭로깅 복원(Pages Function D1 바인딩) · 쿠팡(트래픽 후) · main-protect status check.
-- [ ] (관찰) Chrome lookalike 경고(honsalim↔honsallim) — 301+시간 해소.
-- 참고: ★코드·도메인·8카테고리·측정·/go/는 origin/main(#22) 배포 완료. **DB gitignore→재생성**(`db migrate`+`db seed`+`register-categories --all --no-dry-run --auto-publish`, ~$2). 워크트리=`PYTHONPATH=src python -m cli`. 공개=`build --full`(/go/ 함수도 재생성).
+- [x] ~~무인 스케줄러 A안(refresh-cycle: 새로고침→자가복원→빌드→변경분 배포) · 모니터링 대시보드(무인사이클+공개카테고리건강+경고배너+바탕화면 아이콘) · Claude 예약작업 등록(매일 11:00 KST) · 메인 체크아웃 정비(stash·#22 ff·DB재생성 6공개/2보류)~~ ✅ #23
+- [ ] **0. #23 머지 → 스케줄러 가동 확인**: #23이 origin/main에 올라야 예약작업이 refresh-cycle 가동. 머지 후 `refresh-cycle --dry-run`(또는 예약작업 Run now) 1회 점검. **첫 배포 시 보류 2개(laptop-stand·drying-rack) 라이브에서 내려감(fail-closed) — 검토 후 결정.**
+- [ ] **1. ★★쿠팡 본격 (주인 명시)**: ①가입 완료 ②쿠팡 링크 생성 ③**승인용 데모 페이지(쿠팡 고지+링크) honsallim.com 배포→스샷 업로드** ④승인 후 **`collector.coupang` 구현**으로 쿠팡 상품 수집. 쿠팡=메인(§6). ⚠본인·가족 구매 금지.
+- [ ] **2. ★★미결정 설계 — 알리+쿠팡 페이지 배치** (주인 아직 못 들음·반드시 논의·합의 후 구현): 혼합 vs 분리? 추천6선 섞기? 가격·배송 비교? /go/ 쿠팡 분기? [[design-research-first]] 조사 후 제안.
+- [ ] **3. ★성장**([[growth-first-priority]]): 측정 데이터 1~2주 후 리뷰→뜨는 키워드 더블다운. 홈오피스 토픽·롱테일.
+- [ ] (선택) `docs/CATEGORIES.md` · D1 클릭로깅 복원 · main-protect status check · Chrome lookalike(관찰).
+- 참고: **DB gitignore→재생성**(`register-categories --all --no-dry-run --auto-publish`, ~$2). 워크트리=`PYTHONPATH=src python -m cli`. ★메인=#22 동기화+DB재생성 완료(잔재 `stash@{0}`).
 
 ## 알리 통합 (D9)
 

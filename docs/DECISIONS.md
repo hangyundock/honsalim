@@ -42,6 +42,9 @@
 - **C7. 자동 게시 기본 시각**: 매일 11:00 KST (AutoBlog 09:00~10:30 시간대 충돌 회피, 사용자 조정 가능) — 세션 #2
 - **C8. 콘텐츠 발행 페이스**: 큐 기반 + 사용자 작성 역량 내 최대. 큐 있으면 매일 1편 발행, 큐 비면 자동 정지 + dashboard 알림 — 세션 #2
 - **C9. KPI 게시글 수 상향**: 12개월 100편 → **240편+** (매일 1편 가정 + 사용자 휴식·시즌 조정). 트래픽·수익 KPI는 그대로 유지 — 세션 #2
+- **C10. 무인 새로고침 사이클 (refresh-cycle, A안) [확정 #23]**: `deployer/refresh_cycle.py` + CLI `refresh-cycle`(기본 dry_run). 단계=①published 새로고침(collect_category·가격/판매량·LLM 미사용) ②가드레일 monitor 자가복원(미달 시 auto_killswitch=자동 unapprove·fail-closed) ③build(render+/go/) ④build/site·functions/go **변경 시에만** commit+push origin main→CI 배포. 일일 비용 ~$0. 매 실행 후 `data/refresh_cycle_last.json` 기록+대시보드 갱신. 안전=실패격리·사전조건(main·DB) 미충족 안전정지·destructive git 금지. 회귀 12 — 세션 #23
+- **C11. 무인 작업 등록 = Claude 예약작업 [확정 #23]**: 윈도우 작업 스케줄러 직접 등록은 **환경 안전가드(tima-safety-guard) 차단** → sanctioned 대안 **Claude 예약작업** `honsalim-refresh-cycle`(cron `0 11 * * *`·로컬 KST·지터 ~10분). 메인 체크아웃에서 `git pull --ff-only`→refresh-cycle→결과 요약. 한계=앱 열려있을 때만(닫히면 다음 실행 시 따라잡음). 완전 headless는 커밋된 `scripts/run_refresh_cycle.ps1`을 윈도우 작업스케줄러 수동 등록 — 세션 #23
+- **C12. 모니터링 대시보드 = 무인 허브 [확정 #23]**: `dashboard/render.py`에 "무인 사이클(최근 실행)"·"공개 카테고리 건강(미달 ⚠+킬스위치 명령)"·경고 배너 추가. 로컬 정적 HTML(`data/dashboard/index.html`·비공개·배포 X). 바탕화면 아이콘 "혼살림 모니터링"이 직접 염. refresh-cycle이 매 실행 후 자동 갱신. 회귀 7 — 세션 #23
 
 ## D. 어필리에이트·수익 [확정]
 

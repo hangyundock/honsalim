@@ -177,6 +177,99 @@ def test_count_validation_fails_24h_only_validator_rejected():
 
 
 # ──────────────────────────────────────────
+# 무인 모니터링 섹션 회귀 (세션 #23)
+# ──────────────────────────────────────────
+
+
+def test_load_last_cycle_missing_returns_none(tmp_path: Path):
+    assert dash_render.load_last_cycle(tmp_path / "nope.json") is None
+
+
+def test_load_last_cycle_corrupt_returns_none(tmp_path: Path):
+    p = tmp_path / "bad.json"
+    p.write_text("{not json", encoding="utf-8")
+    assert dash_render.load_last_cycle(p) is None
+
+
+def test_render_cycle_section_no_report():
+    html_str = dash_render.render_cycle_section(None)
+    assert "아직 실행 기록 없음" in html_str
+
+
+def test_render_cycle_section_shows_killswitch_and_deploy():
+    report = {
+        "ran_at": "2026-06-03T11:00:00+09:00",
+        "dry_run": False,
+        "published": ["a", "b"],
+        "refreshed": [{"slug": "a", "ok": False, "error": "API 실패"}],
+        "refresh_ok": 1,
+        "refresh_fail": 1,
+        "killswitched": ["b"],
+        "deployed": True,
+        "changed": True,
+        "verify_status": 200,
+    }
+    html_str = dash_render.render_cycle_section(report)
+    assert "2026-06-03T11:00:00+09:00" in html_str
+    assert "자가복원" in html_str and "b" in html_str
+    assert "새로고침 실패 a" in html_str
+    assert "배포됨" in html_str and "verify 200" in html_str
+
+
+def test_render_health_section_no_categories_table():
+    conn = _new_conn()  # categories 테이블 없음 (부분 DB)
+    html_str, flags = dash_render.render_health_section(conn)
+    assert html_str == "" and flags == 0
+
+
+def test_render_health_section_lists_published(tmp_path: Path):
+    from common import db
+
+    db_path = tmp_path / "t.db"
+    db.migrate(db_path=db_path)
+    db.seed(db_path=db_path)
+    conn = db.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    conn.execute("UPDATE categories SET status='published' WHERE slug='office-chair'")
+    conn.commit()
+    try:
+        html_str, flag_count = dash_render.render_health_section(conn)
+    finally:
+        conn.close()
+    assert "office-chair" in html_str
+    assert "공개 카테고리 건강" in html_str
+    assert flag_count >= 0  # 휴리스틱 미달 카운트(빈 카테고리면 1+)
+
+
+def test_render_dashboard_includes_monitoring_and_alert(tmp_path: Path):
+    conn = _new_conn()
+    _seed_drafts(conn, [(1, "validated", "x")])
+    report_p = tmp_path / "cycle.json"
+    report_p.write_text(
+        json.dumps(
+            {
+                "ran_at": "2026-06-03T11:00:00+09:00",
+                "dry_run": False,
+                "published": ["a"],
+                "refreshed": [],
+                "refresh_ok": 1,
+                "refresh_fail": 0,
+                "killswitched": ["a"],
+                "deployed": False,
+                "changed": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    out = tmp_path / "index.html"
+    dash_render.render_dashboard(conn=conn, output_path=out, cycle_report_path=report_p)
+    content = out.read_text(encoding="utf-8")
+    assert "무인 사이클" in content
+    assert '<div class="banner-amber">' in content  # 자가복원 경고 배너
+    assert "자가복원" in content
+
+
+# ──────────────────────────────────────────
 # approve 회귀
 # ──────────────────────────────────────────
 
