@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "_macros/components.html" import icon, breadcrumb %}
+
+{% block title %}{{ pillar.title }} | 혼살림{% endblock %}
+
+{% block main %}
+<section class="section">
+  <div class="wrap" style="max-width:900px">
+    {{ breadcrumb([{'label': '홈', 'url': '/'}, {'label': pillar.title}]) }}
+    <div class="eyebrow" style="margin-top:14px">홈오피스 가이드</div>
+    <h1 style="margin:8px 0 14px">{{ pillar.title }}</h1>
+    <p class="lead">{{ pillar.lead }}</p>
+
+    {# 데이터 인사이트(Information Gain) — 우리가 비교한 실데이터 규모 #}
+    <p class="muted" style="margin:4px 0 26px">혼살림이 비교한 홈오피스 카테고리 <b>{{ spokes | selectattr('available') | list | length }}개</b> · 제품 <b>{{ pillar_total }}개</b> · 판매 데이터 기준.</p>
+
+    {# 갖추는 순서 — 진짜 가치(왜 이 순서인지) #}
+    <h2 style="margin:24px 0 14px">무엇부터 — 갖추는 순서</h2>
+    <div style="display:flex; flex-direction:column; gap:14px">
+      {% for step in pillar.steps %}
+      <div style="border:1px solid #e7e7e7; border-radius:14px; padding:18px 20px">
+        <div style="display:flex; align-items:baseline; gap:10px">
+          <span style="font-size:1.4rem; font-weight:800; color:#1a7f55">{{ step.n }}</span>
+          <h3 style="margin:0; font-size:var(--fs-h3)">{{ step.title }}</h3>
+        </div>
+        <p style="margin:8px 0 12px">{{ step.why }}</p>
+        {% set sp = spokes | selectattr('slug', 'equalto', step.cat) | selectattr('available') | list | first %}
+        {% if sp %}<a class="btn btn-primary" href="{{ sp.url }}">{{ sp.name }} 비교 보기 {{ icon('arrow', 14) }}</a>{% endif %}
+        {% if step.cat2 %}
+          {% set sp2 = spokes | selectattr('slug', 'equalto', step.cat2) | selectattr('available') | list | first %}
+          {% if sp2 %} <a class="btn btn-ghost" href="{{ sp2.url }}">{{ sp2.name }} {{ icon('arrow', 14) }}</a>{% endif %}
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    {# 예산대별 조합 #}
+    <h2 style="margin:32px 0 14px">예산대별 조합</h2>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px">
+      {% for b in pillar.budgets %}
+      <div style="border:1px solid #e7e7e7; border-radius:14px; padding:18px; background:#fafafa">
+        <div style="font-weight:700">{{ b.tier }}</div>
+        <div class="muted" style="font-size:.9rem; margin:2px 0 8px">{{ b.range }}</div>
+        <p style="margin:0; font-size:.95rem">{{ b.desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    {# 카테고리 클러스터(스포크) — 허브-스포크 내부링크 #}
+    <h2 style="margin:32px 0 14px">홈오피스 카테고리 전체</h2>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px">
+      {% for s in spokes %}
+        {% if s.available %}
+        <a href="{{ s.url }}" style="display:block; border:1px solid #e7e7e7; border-radius:14px; padding:18px; text-decoration:none; color:inherit">
+          <div style="font-weight:700; margin-bottom:6px">{{ s.name }}</div>
+          <div class="muted" style="font-size:.9rem; margin-bottom:10px">{{ s.intro }}</div>
+          <div style="color:#1a7f55; font-weight:600; font-size:.9rem">제품 {{ s.count }}개 비교 →</div>
+        </a>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <div style="border-top:1px solid #e7e7e7; margin-top:30px; padding-top:18px">
+      <p class="muted" style="font-size:.85rem; line-height:1.6">
+        추천은 판매 데이터와 1인 가구 기준으로 정리합니다. <a href="/method/">추천 방법 자세히 →</a>
+        일부 링크는 제휴(어필리에이트) 링크로, 구매 시 일정 수수료를 받을 수 있으나 추천 내용에는 영향을 주지 않습니다.
+      </p>
+    </div>
+  </div>
+</section>
+{% endblock %}

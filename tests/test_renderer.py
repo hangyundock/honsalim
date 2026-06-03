@@ -297,6 +297,61 @@ class TestMethodPage:
         assert 'href="/method/"' in home  # 사이트 전역 푸터 신뢰 동선
 
 
+class TestPillarPage:
+    """홈오피스 필러(허브) — 토픽 클러스터 hub (세션 #24 T2). 공개 스포크 있을 때만 렌더.
+
+    단순 링크모음이 아닌 '갖추는 순서·예산'(진짜 가치) + 허브↔스포크 양방향 내부링크.
+    """
+
+    def _publish_office_chair(self, db_path: Path) -> None:
+        conn = db.connect(db_path)
+        try:
+            conn.execute(
+                "INSERT INTO products (source, source_product_id, name, currency, price_krw, "
+                "deeplink_url, deeplink_slug, affiliate_tag, created_at, updated_at, last_seen_at) "
+                "VALUES ('aliexpress','pl1','의자 상품','KRW',80000,"
+                "'https://s.click.aliexpress.com/pl1','ali-pl1','honsalim',"
+                "datetime('now'),datetime('now'),datetime('now'))"
+            )
+            pid = conn.execute("SELECT id FROM products WHERE source_product_id='pl1'").fetchone()[
+                0
+            ]
+            cid = conn.execute("SELECT id FROM categories WHERE slug='office-chair'").fetchone()[0]
+            conn.execute(
+                "INSERT INTO category_products (category_id, product_id, tier) VALUES (?,?,'budget')",
+                (cid, pid),
+            )
+            category_state.approve(conn, "office-chair")  # homeoffice 그룹 공개
+            conn.commit()
+        finally:
+            conn.close()
+
+    def test_pillar_rendered_with_spokes_and_backlink(self, tmp_path: Path) -> None:
+        db_path = tmp_path / "test.db"
+        db.migrate(db_path=db_path)
+        db.seed(db_path=db_path)
+        self._publish_office_chair(db_path)
+        out = tmp_path / "site"
+        renderer.render_site(out_dir=out, db_path=db_path)
+        path = out / "home-office" / "index.html"
+        assert path.exists(), "홈오피스 필러 미생성"
+        html = path.read_text(encoding="utf-8")
+        assert "갖추는 순서" in html  # 진짜 가치(순서)
+        assert "예산대별 조합" in html
+        assert "/categories/office-chair/" in html  # 허브→스포크 링크
+        assert "{{" not in html and "{%" not in html
+        # 스포크→허브 백링크(양방향)
+        cat = (out / "categories" / "office-chair" / "index.html").read_text(encoding="utf-8")
+        assert "/home-office/" in cat
+        # 색인 대상 → sitemap 포함
+        xml = (out / "sitemap.xml").read_text(encoding="utf-8")
+        assert "https://honsallim.com/home-office/" in xml
+
+    def test_pillar_skipped_when_no_published_spokes(self, built: dict) -> None:
+        # seed만(홈오피스 카테고리 draft) → 공개 스포크 0 → 빈 허브 방지 위해 미렌더
+        assert not (built["out"] / "home-office" / "index.html").exists()
+
+
 class TestRenderArticleDetail:
     """published article → 상세글 렌더 (산문 body_html + /go/ 제휴 상품 카드)."""
 
@@ -487,6 +542,10 @@ class TestCategoryInteraction:
         assert "49,000원" in html  # 실데이터 가격(가짜 아님)
         assert "베스트 책상" in html  # 판매량 1위 제품명
         assert "1,234" in html  # 실제 판매량 수치
+        assert "데이터 수집" in html  # 수집 날짜 표기(애매한 '최근' 대체·신뢰 신호, 세션 #24)
+        assert "알리 최근 판매량" not in html  # '최근'(시점 불명확) 라벨 제거
+        # 제품명·가격에도 링크(이미지·버튼 외) — 클릭 영역 확대(세션 #24)
+        assert html.count('href="/go/ali-ds1"') >= 4  # 이미지+이름+가격+버튼
 
     def test_pick_cards_row_alignment_css(self) -> None:
         css = self._CSS.read_text(encoding="utf-8")
