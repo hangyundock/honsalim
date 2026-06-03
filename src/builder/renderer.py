@@ -578,6 +578,66 @@ HOME_THEMES: list[dict] = [
     },
 ]
 
+# 단건 추천 리뷰 페이지(/reviews/<slug>/) — 운영자 큐레이션 상수(HOME_BANNERS와 동일 성격).
+# 쿠팡 파트너스 승인용 + 첫 쿠팡 추천. collector.coupang 구현(Phase 4) 전까지의 정식 interim:
+# DB 파이프라인이 아니라 운영자가 직접 큐레이션하므로 가짜 후기 금지(§0) — 사실·정보 위주로 기술.
+# review.html이 noindex + sitemap 제외(소프트 공개) — 알리+쿠팡 배치 설계(TODO) 합의 후 정식 노출 전환.
+REVIEW_PAGES: list[dict] = [
+    {
+        "slug": "honplanet-monitor-arm",
+        "crumb": "흠플래닛 모니터암",
+        "title": "흠플래닛 싱글 모니터암 — 책상 위를 비우는 가장 쉬운 방법",
+        "name": "흠플래닛 싱글 모니터암, 블랙, 1세트",
+        "price": "20,990원",
+        "orig": "33,400원",
+        "discount": "37%",
+        "note": "책상 가장자리에 고정하는 클램프형 싱글(모니터 1대) 모니터암 · 로켓배송",
+        "coupang_link": "https://link.coupang.com/a/ehtwmQRZAG",
+        "coupang_iframe": "https://coupa.ng/cndY1g",
+        "lead": (
+            "모니터를 책상에서 띄우면 그 아래 공간이 통째로 살아납니다. 좁은 원룸 책상, "
+            "재택 홈오피스에서 모니터암 하나로 자세와 공간을 한 번에 정리하는 방법을 정리했습니다."
+        ),
+        "body": [
+            {
+                "h": "모니터암, 왜 쓸까",
+                "p": [
+                    "모니터암은 모니터를 책상 위에 직접 올려두는 대신 팔(arm)로 띄워 잡아주는 거치대입니다. "
+                    "가장 큰 차이는 책상 위 공간입니다. 모니터 발이 차지하던 자리가 사라져 키보드·서류·간단한 "
+                    "작업 공간이 그대로 넓어집니다.",
+                ],
+                "ul": [
+                    "높이·거리·각도를 자유롭게 조절해 눈높이를 맞추기 쉽습니다 — 장시간 작업 시 목·어깨 부담을 줄이는 데 도움이 됩니다.",
+                    "모니터 받침대(고정 높이)보다 조절 범위가 넓어, 앉은키나 책상 높이가 제각각인 1인 가구에 유연합니다.",
+                    "모니터를 옆으로 밀거나 돌릴 수 있어, 책상을 작업·식사 등 다른 용도로 전환하기 편합니다.",
+                ],
+            },
+            {
+                "h": "이 제품은 어떤가요",
+                "p": [
+                    "흠플래닛 싱글 모니터암은 모니터 1대를 책상 가장자리에 클램프(집게)로 고정해 쓰는 가장 일반적인 "
+                    "형태입니다. 작성 시점 기준 정가 33,400원에서 37% 내린 20,990원이며, 로켓배송으로 빠르게 받을 수 있습니다.",
+                    "다만 모니터암은 내 모니터와의 호환이 중요합니다. 아래 항목은 구매 전 쿠팡 상품 페이지에서 "
+                    "본인 모니터 사양과 직접 대조해 확인하시길 권합니다.",
+                ],
+                "ul": [
+                    "VESA 규격(모니터 뒷면 나사 간격) 지원 여부와 크기",
+                    "지원 모니터 무게(내하중)와 화면 크기 범위",
+                    "책상 두께가 클램프 고정 범위 안에 드는지",
+                ],
+            },
+            {
+                "h": "이런 분께 맞습니다",
+                "ul": [
+                    "재택·홈오피스로 모니터 1대를 오래 들여다보는 분",
+                    "책상이 좁아 모니터 받침대만으로는 공간이 부족한 분",
+                    "모니터 높이·거리를 상황에 따라 자주 바꾸고 싶은 분",
+                ],
+            },
+        ],
+    }
+]
+
 HOME_CROSS_SQL = """
     SELECT p.id, p.name, p.price_krw, p.original_price_krw, p.discount_pct, p.sales_volume,
            p.image_url_external, p.deeplink_slug, cp.tier,
@@ -1008,6 +1068,22 @@ def render_site(
             ),
         )
     category_slugs = [pg["slug"] for pg in category_pages]
+
+    # 단건 추천 리뷰 (/reviews/<slug>/) — 운영자 큐레이션 상수(REVIEW_PAGES).
+    # noindex(review.html) + sitemap 제외(소프트 공개) — 색인·내부링크는 배치 설계 합의 후.
+    review_tmpl = env.get_template("review.html")
+    for rv in REVIEW_PAGES:
+        w(
+            f"reviews/{rv['slug']}/index.html",
+            review_tmpl.render(
+                active_nav="",
+                canonical_url=f"{SITE_ORIGIN}/reviews/{rv['slug']}/",
+                meta_title=f"{rv['title']} | 혼살림",
+                meta_description=rv["lead"][:150],
+                review=rv,
+                **common,
+            ),
+        )
 
     # sitemap.xml
     urls = (

@@ -217,6 +217,48 @@ class TestRenderSite:
         assert '"@type": "BreadcrumbList"' in per
 
 
+class TestReviewPages:
+    """단건 추천 리뷰(/reviews/<slug>/) — 쿠팡 파트너스 승인용 운영자 큐레이션 페이지 가드.
+
+    - 첫머리 대가성 고지(쿠팡 파트너스 + 수수료) 필수 — 공정위·쿠팡 파트너스 정책.
+    - 쿠팡 제휴 링크는 rel="sponsored nofollow" + 외부 새 탭.
+    - noindex + sitemap 제외(소프트 공개) — 알리+쿠팡 배치 설계 합의 전 색인·내부링크 보류.
+    REVIEW_PAGES는 모듈 상수라 seed만으로도 렌더됨 → built(seed) 픽스처로 검사.
+    """
+
+    def _html(self, built: dict) -> str:
+        path = built["out"] / "reviews" / "honplanet-monitor-arm" / "index.html"
+        assert path.exists(), "리뷰 페이지 index.html 미생성"
+        text: str = path.read_text(encoding="utf-8")
+        return text
+
+    def test_review_page_written(self, built: dict) -> None:
+        self._html(built)
+
+    def test_first_disclosure_present(self, built: dict) -> None:
+        html = self._html(built)
+        assert "쿠팡 파트너스" in html  # 제휴처명(쿠팡) — disclosure 게이트 기준
+        assert "수수료" in html  # 대가성
+        assert "대가성 안내" in html
+
+    def test_coupang_affiliate_link_with_rel(self, built: dict) -> None:
+        html = self._html(built)
+        assert "https://link.coupang.com/a/ehtwmQRZAG" in html
+        assert html.count("sponsored nofollow") >= 1  # 제휴 링크 표기(POLICY §6)
+        assert 'target="_blank"' in html
+
+    def test_noindex_and_not_in_sitemap(self, built: dict) -> None:
+        html = self._html(built)
+        assert 'content="noindex' in html  # 소프트 공개 — 검색 비색인
+        xml = (built["out"] / "sitemap.xml").read_text(encoding="utf-8")
+        assert "/reviews/honplanet-monitor-arm/" not in xml  # 색인 제외와 일관
+
+    def test_no_jinja_leftovers(self, built: dict) -> None:
+        html = self._html(built)
+        assert "{{" not in html and "{%" not in html
+        assert "&lt;svg" not in html  # 아이콘 SVG 미이스케이프
+
+
 class TestRenderArticleDetail:
     """published article → 상세글 렌더 (산문 body_html + /go/ 제휴 상품 카드)."""
 
