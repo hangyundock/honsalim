@@ -23,21 +23,24 @@
     <h1 style="margin:8px 0 16px">{{ review.title }}</h1>
     <p class="lead">{{ review.lead }}</p>
 
-    {# 제품 카드 — 쿠팡 공식 상품 배너(위젯) + 가격 + 구매 버튼 #}
-    <div style="display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; border:1px solid #e7e7e7; border-radius:16px; padding:22px; margin:24px 0; background:#fafafa">
-      <div style="flex:0 0 auto">
-        {# 쿠팡 공식 위젯(제휴사 제공 이미지 — About 이미지 정책 §03). 미표시 시 우측 버튼이 대체. #}
-        <iframe src="{{ review.coupang_iframe }}" width="120" height="240" frameborder="0" scrolling="no" loading="lazy" referrerpolicy="unsafe-url" title="{{ review.name }} 쿠팡 상품 배너" style="border:0; display:block; background:#f0f0f0"></iframe>
+    {# 아티클 히어로 — 모니터암 개념 이미지(우리 AI 일러스트, About 이미지 정책 §03).
+       실제 제품 사진이 아니라 카테고리 일러스트임을 캡션으로 명시(정직성 §0). 항상 표시(외부 의존 0). #}
+    <figure style="margin:24px 0 6px">
+      <img src="{{ (asset_base | default('/static')) }}{{ review.hero_image }}?v={{ asset_version | default('') }}"
+           alt="{{ review.hero_alt }}" width="1280" height="688" loading="eager"
+           style="display:block; width:100%; height:auto; border-radius:16px">
+      <figcaption class="muted" style="font-size:.8rem; margin-top:8px">{{ review.hero_caption }}</figcaption>
+    </figure>
+
+    {# 구매 박스 — 실제 제품 정보(이름·가격) + 쿠팡 제휴 링크 #}
+    <div style="border:1px solid #e7e7e7; border-radius:16px; padding:22px; margin:18px 0 4px; background:#fafafa">
+      <h2 style="font-size:var(--fs-h3); margin:0 0 10px">{{ review.name }}</h2>
+      <div style="margin:6px 0 14px; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap">
+        {% if review.discount %}<span style="color:#e0474c; font-weight:700">{{ review.discount }}</span><span style="text-decoration:line-through; color:#999">{{ review.orig }}</span>{% endif %}
+        <span style="font-size:1.5rem; font-weight:800">{{ review.price }}</span>
       </div>
-      <div style="flex:1 1 260px; min-width:260px">
-        <h2 style="font-size:var(--fs-h3); margin:0 0 10px">{{ review.name }}</h2>
-        <div style="margin:6px 0 14px; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap">
-          {% if review.discount %}<span style="color:#e0474c; font-weight:700">{{ review.discount }}</span><span style="text-decoration:line-through; color:#999">{{ review.orig }}</span>{% endif %}
-          <span style="font-size:1.5rem; font-weight:800">{{ review.price }}</span>
-        </div>
-        <p class="muted" style="margin:0 0 18px">{{ review.note }}</p>
-        <a class="btn btn-primary" href="{{ review.coupang_link }}" target="_blank" rel="sponsored nofollow noopener">쿠팡에서 보기 {{ icon('arrow', 16) }}</a>
-      </div>
+      <p class="muted" style="margin:0 0 18px">{{ review.note }}</p>
+      <a class="btn btn-primary" href="{{ review.coupang_link }}" target="_blank" rel="sponsored nofollow noopener">쿠팡에서 보기 {{ icon('arrow', 16) }}</a>
     </div>
 
     {# 본문 — 정직한 정보(직접 사용 후기 아님, §0 진실성) #}
