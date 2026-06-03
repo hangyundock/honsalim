@@ -449,8 +449,15 @@ def _load_category_pages(conn: sqlite3.Connection, include_drafts: bool = False)
         prices = [r["price_krw"] for r in prods if r["price_krw"]]
         vols = [((r["sales_volume"] or 0), r["name"]) for r in prods]
         top_vol, top_name = max(vols, key=lambda x: x[0]) if vols else (0, "")
+        collected_row = conn.execute(
+            "SELECT MAX(p.last_seen_at) FROM category_products cp "
+            "JOIN products p ON p.id = cp.product_id WHERE cp.category_id = ?",
+            (c["id"],),
+        ).fetchone()
+        collected = (collected_row[0] or "")[:10]  # YYYY-MM-DD (데이터 수집일·신뢰 신호)
         data_summary = {
             "count": len(prods),
+            "collected": collected,
             "price_range": (
                 f"{_price_krw(min(prices))} ~ {_price_krw(max(prices))}" if prices else ""
             ),
@@ -460,10 +467,17 @@ def _load_category_pages(conn: sqlite3.Connection, include_drafts: bool = False)
             "top_volume": f"{top_vol:,}" if top_vol > 0 else "",
         }
 
+        # 필러 백링크 — 같은 그룹에 필러 허브가 있으면 카테고리→필러 역링크(허브-스포크 완성, 세션 #24)
+        pillar_link = (
+            {"url": f"/{PILLAR_HOME_OFFICE['slug']}/", "title": PILLAR_HOME_OFFICE["title"]}
+            if c["group_slug"] == PILLAR_HOME_OFFICE["group_slug"]
+            else None
+        )
         pages.append(
             {
                 "slug": c["slug"],
                 "data_summary": data_summary,
+                "pillar_link": pillar_link,
                 "category": {
                     "name": c["name_ko"],
                     "intro": c["intro"] or "",
@@ -779,6 +793,86 @@ def _load_guides(conn: sqlite3.Connection, include_drafts: bool = False) -> list
     return out
 
 
+# 홈오피스 필러(허브) — 토픽 클러스터 hub (세션 #24 T2). 운영자 큐레이션(갖추는 순서·예산) +
+# 동적 스포크(DB의 homeoffice 그룹 공개 카테고리). 단순 링크모음이 아닌 '진짜 가치'(순서·예산·데이터)로
+# 얇은 콘텐츠 패널티 회피 + 토픽 권위 엔진. 살림 그룹은 클러스터가 얇아 보류(클러스터 충분해지면 추가).
+PILLAR_HOME_OFFICE: dict = {
+    "slug": "home-office",
+    "group_slug": "homeoffice",
+    "title": "재택 홈오피스 책상 환경 완전 가이드",
+    "lead": (
+        "재택·1인 작업실, 무엇부터 어떤 순서로 갖춰야 할까요? 예산이 빠듯할수록 "
+        "순서가 중요합니다. 오래 앉아 일하는 책상 위를, 자세와 공간을 함께 정리하는 길을 정리했어요."
+    ),
+    "steps": [
+        {
+            "n": "1",
+            "title": "의자 — 가장 먼저",
+            "cat": "office-chair",
+            "why": "하루 8시간 앉는다면 허리·목·자세에 가장 큰 영향을 줍니다. 예산이 빠듯해도 의자부터 챙기세요.",
+        },
+        {
+            "n": "2",
+            "title": "책상 — 공간의 기준",
+            "cat": "desk",
+            "why": "방 크기와 작업에 맞는 크기·높이를 고릅니다. 의자와의 높이 궁합이 자세를 좌우합니다.",
+        },
+        {
+            "n": "3",
+            "title": "모니터 높이 — 눈높이·목",
+            "cat": "monitor-arm",
+            "cat2": "monitor-stand",
+            "why": "모니터를 눈높이로 올리면 목 부담이 줄어요. 책상이 좁거나 자주 위치를 바꾸면 모니터암, 단순하게는 받침대.",
+        },
+    ],
+    "budgets": [
+        {
+            "tier": "💰 실속",
+            "range": "~30만원",
+            "desc": "기본 의자 + 접이식·소형 책상 + 모니터 받침대. 시작에 충분.",
+        },
+        {
+            "tier": "🪑 표준",
+            "range": "30~70만원",
+            "desc": "인체공학 의자 + 적당한 책상 + 모니터암. 오래 앉아도 편한 조합.",
+        },
+        {
+            "tier": "⭐ 본격",
+            "range": "70만원+",
+            "desc": "고급 의자 + 넓은 책상 + 듀얼 모니터암. 본격 1인 작업실.",
+        },
+    ],
+}
+
+
+def _load_pillar_spokes(
+    conn: sqlite3.Connection, group_slug: str, include_drafts: bool = False
+) -> tuple[list[dict], int]:
+    """필러 스포크 — 해당 그룹의 (공개) 카테고리 + 제품 수. 토픽 클러스터 허브-스포크 링크."""
+    rows = conn.execute(
+        "SELECT slug, name_ko, intro, concept_image, concept_image_alt, "
+        "(SELECT COUNT(*) FROM category_products WHERE category_id = categories.id) AS pc "
+        "FROM categories WHERE group_slug = ? AND (? OR status = 'published') "
+        "ORDER BY display_order, id",
+        (group_slug, 1 if include_drafts else 0),
+    ).fetchall()
+    spokes = [
+        {
+            "slug": r["slug"],
+            "name": r["name_ko"],
+            "intro": r["intro"] or "",
+            "url": f"/categories/{r['slug']}/",
+            "count": r["pc"],
+            "available": r["pc"] > 0,
+            "concept_image": r["concept_image"] or "",
+            "concept_image_alt": r["concept_image_alt"] or r["name_ko"],
+        }
+        for r in rows
+    ]
+    total = sum(s["count"] for s in spokes)
+    return spokes, total
+
+
 def _sitemap(urls: list[str]) -> str:
     items = "\n".join(f"  <url><loc>{SITE_ORIGIN}{u}</loc></url>" for u in urls)
     return (
@@ -832,6 +926,9 @@ def render_site(
         home_deals = _load_home_deals(conn, include_drafts)
         home_themes = _load_home_themes(conn, include_drafts)
         guides = _load_guides(conn, include_drafts)
+        pillar_spokes, pillar_total = _load_pillar_spokes(
+            conn, PILLAR_HOME_OFFICE["group_slug"], include_drafts
+        )
     finally:
         conn.close()
 
@@ -997,6 +1094,32 @@ def render_site(
         ),
     )
 
+    # 홈오피스 필러(허브) — 토픽 클러스터 hub (세션 #24 T2). 공개 스포크가 있을 때만 렌더.
+    pillar_rendered = any(s["available"] for s in pillar_spokes)
+    if pillar_rendered:
+        po = PILLAR_HOME_OFFICE
+        w(
+            f"{po['slug']}/index.html",
+            env.get_template("pillar.html").render(
+                active_nav="",
+                canonical_url=f"{SITE_ORIGIN}/{po['slug']}/",
+                meta_title=f"{po['title']} | 혼살림",
+                meta_description=po["lead"][:150],
+                schema_jsonld=jsonld.as_script_tags(
+                    [
+                        jsonld.build_breadcrumb_jsonld(
+                            [{"name": "홈", "url": "/"}, {"name": po["title"]}], SITE_ORIGIN
+                        ),
+                        org_ld,
+                    ]
+                ),
+                pillar=po,
+                spokes=pillar_spokes,
+                pillar_total=pillar_total,
+                **common,
+            ),
+        )
+
     # 404
     w("404.html", env.get_template("404.html").render(active_nav="", **common))
 
@@ -1102,6 +1225,7 @@ def render_site(
                 ),
                 category=pg["category"],
                 data_summary=pg["data_summary"],
+                pillar_link=pg["pillar_link"],
                 products=pg["products"],
                 picks_budget=pg["picks_budget"],
                 picks_premium=pg["picks_premium"],
@@ -1133,6 +1257,7 @@ def render_site(
     # sitemap.xml
     urls = (
         ["/", "/scenarios/", "/about/", "/method/", "/categories/", "/guides/"]
+        + ([f"/{PILLAR_HOME_OFFICE['slug']}/"] if pillar_rendered else [])
         + [f"/categories/{slug}/" for slug in category_slugs]
         + [f"/personas/{p['id']}/" for p in personas]
         + [f"/articles/{slug}/" for slug in article_slugs]

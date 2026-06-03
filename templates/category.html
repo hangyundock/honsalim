@@ -15,12 +15,12 @@
   <a class="timg" href="{{ p.url }}" rel="sponsored nofollow">
     {% if p.img_url %}<img loading="{{ 'eager' if eager_images else 'lazy' }}" decoding="async" src="{{ p.img_url }}" alt="{{ p.name }}" onerror="if(!this.dataset.r){this.dataset.r='1';this.src=this.src.split('?')[0]+'?r='+Date.now()}else{this.style.display='none'}">{% endif %}
   </a>
-  <div class="tnm">{{ p.name }}</div>
+  <div class="tnm"><a href="{{ p.url }}" rel="sponsored nofollow" style="color:inherit;text-decoration:none">{{ p.name }}</a></div>
   <div class="tpriceline">
-    <span class="tprice">{{ p.price }}</span>
+    <a href="{{ p.url }}" rel="sponsored nofollow" class="tprice" style="text-decoration:none">{{ p.price }}</a>
     {% if p.disc %}<span class="tsig">정가 <s>{{ p.orig }}</s> · <b class="off">{{ p.disc }}↓</b></span>{% endif %}
   </div>
-  {% if p.volume %}<div class="tvol">🔥 알리 최근 판매량 <b>{{ p.volume }}</b><span class="dim"> · 판매처 기준</span></div>{% endif %}
+  {% if p.volume %}<div class="tvol">🔥 알리 판매량 <b>{{ p.volume }}</b><span class="dim"> · 판매처 기준</span></div>{% endif %}
   {% if p.pros %}<div class="pc-group"><div class="pc-label pros">장점</div>
     <ul class="tpc">{% for x in p.pros %}<li class="pro">{{ x }}</li>{% endfor %}</ul></div>{% endif %}
   {% if p.cons %}<div class="pc-group"><div class="pc-label cons">단점</div>
@@ -70,7 +70,12 @@
 
   {# 데이터 요약 — 우리가 수집한 실데이터(판매량·가격)에서 도출. "데이터 기반 비교" 전면화(세션 #24). #}
   {% if data_summary.count %}
-  <div class="box"><div class="bt">📊 데이터로 본 {{ category.name }}</div><p>비교 제품 <b>{{ data_summary.count }}개</b>{% if data_summary.price_range %} · 가격대 <b>{{ data_summary.price_range }}</b>{% endif %}{% if data_summary.top_name %} · 가장 많이 팔린 제품 <b>{{ data_summary.top_name }}</b> (판매량 {{ data_summary.top_volume }}){% endif %}. <span class="dim">판매처가 공개한 실제 판매량·가격 기준이며, 수집 시점 기준이라 변동될 수 있어요.</span></p></div>
+  <div class="box"><div class="bt">📊 데이터로 본 {{ category.name }}</div><p>비교 제품 <b>{{ data_summary.count }}개</b>{% if data_summary.price_range %} · 가격대 <b>{{ data_summary.price_range }}</b>{% endif %}{% if data_summary.top_name %} · 가장 많이 팔린 제품 <b>{{ data_summary.top_name }}</b> (판매량 {{ data_summary.top_volume }}){% endif %}. <span class="dim">판매처가 표기한 판매량·가격 기준{% if data_summary.collected %} · 데이터 수집 {{ data_summary.collected }}{% endif %}이며, 가격은 변동될 수 있어요.</span></p></div>
+  {% endif %}
+
+  {% if pillar_link %}
+  {# 필러 백링크 — 허브-스포크 토픽 클러스터(세션 #24) #}
+  <p style="margin:12px 0 4px"><a href="{{ pillar_link.url }}" style="color:#1a7f55;font-weight:600;text-decoration:none">📂 {{ pillar_link.title }} 전체 보기 →</a></p>
   {% endif %}
 
   {% if category.has_guide %}
@@ -180,8 +185,8 @@
     <div class="card" data-tier="{{ p.tier }}" data-price="{{ p.price_num }}" data-disc="{{ p.disc_num }}" data-idx="{{ loop.index0 }}">
       <div class="badges"><span class="tier t-{{ p.tier }}">{{ p.tier_label }}</span></div>
       <a class="img" href="{{ p.url }}" rel="sponsored nofollow">{% if p.img_url %}<img loading="{{ 'eager' if eager_images else 'lazy' }}" decoding="async" src="{{ p.img_url }}" alt="{{ p.name }}" onerror="if(!this.dataset.r){this.dataset.r='1';this.src=this.src.split('?')[0]+'?r='+Date.now()}else{this.style.display='none'}">{% endif %}</a>
-      <div class="nm">{{ p.name }}</div>
-      <div class="price">{{ p.price }}</div>
+      <div class="nm"><a href="{{ p.url }}" rel="sponsored nofollow" style="color:inherit;text-decoration:none">{{ p.name }}</a></div>
+      <div class="price"><a href="{{ p.url }}" rel="sponsored nofollow" style="color:inherit;text-decoration:none">{{ p.price }}</a></div>
       {% if p.disc %}<span class="sig">정가 <s>{{ p.orig }}</s> · <b class="off">{{ p.disc }}↓</b></span>{% else %}<span class="sig nodisc">단일가</span>{% endif %}
       {% if p.volume %}<div class="vol">판매량 <b>{{ p.volume }}</b><span class="dim"> · 알리 기준</span></div>{% endif %}
       <div class="btns"><a class="btn primary" href="{{ p.url }}" rel="sponsored nofollow">최저가/구매 →</a></div>
