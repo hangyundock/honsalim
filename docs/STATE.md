@@ -7,11 +7,11 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#23: ★무인 스케줄러(refresh-cycle) + 모니터링 대시보드 + 쿠팡 활성화 착수**. refresh-cycle=published 새로고침→가드레일 자가복원(fail-closed)→빌드→변경분만 배포(LLM 미사용 ~$0/일), Claude 예약작업 매일 11:00 KST. 대시보드+바탕화면 아이콘 "혼살림 모니터링". 메인 #22 동기화+DB재생성(6 공개/2 보류). 회귀 **678**. ★다음=**(1)#23 머지 후 가동 (2)쿠팡 본격 (3)★미결정: 알리+쿠팡 페이지 배치 설계**. 상세 EVENTS #23 | 2026-06-03 #23 |
+| 진행 단계 | **#24: ★쿠팡 가입+승인 데모 + 멀티채널 배치설계(C안) + 무인 마케팅 정밀기획(T) + Tier 0 SEO 라이브**. 쿠팡 파트너스 가입 완료(승인 심사 대기·`/reviews/` 데모). 알리+쿠팡 배치=C안(채널별 최선·정성 기준·가격 위임·DECISIONS S). 무인 마케팅=SEO본진+Pinterest(DECISIONS T·버너양산 거부). Tier 0 라이브: `/method/`·카테고리 데이터요약·**홈오피스 필러 `/home-office/`**·핸즈온 미채택 정직화. 회귀 **690**. ★다음=**(1)쿠팡 승인→collector.coupang (2)Pinterest (3)필러 노출강화 (4)성장 측정**. 상세 EVENTS #24 | 2026-06-03 #24 |
 | 운영 모델 | 자동 게시 활성 + **무인 사이클(refresh-cycle·매일 11:00 KST 예약작업) — #23 머지 후 가동**. 자동 "승인" 금지(E7→가드레일) | #23 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·Secrets·main-protect)·Cloudflare(도메인·Pages·R2·D1)·Anthropic·INDEXNOW 키·secrets·Git push·pre-commit 9종·Dependabot (세부 archive) | #3 |
 | Phase 2 핵심 모듈 (#3~#5) | cli·common·validator·writer·collector·enricher·builder·deployer·tracker·workers (세부 BACKEND §2) + **#17: category_collect·category_page_builder·concept_image·category_writer** | #17 |
-| Phase 2 회귀 테스트 | **678 / 678 PASS** [확정 pytest, #23] — #23 +19 (refresh_cycle 12: published선택·새로고침 실패격리·fail-closed 킬스위치·변경분배포 + dashboard 모니터링 7: 사이클섹션·건강섹션·경고배너). #22 659. black·ruff·mypy 클린 | 2026-06-03 |
+| Phase 2 회귀 테스트 | **690 / 690 PASS** [확정 pytest, #24] — #24 +12 (리뷰페이지·method 페이지·카테고리 데이터요약/링크·홈오피스 필러 가드). #23 678. black·ruff·mypy 클린 | 2026-06-03 |
 | CLI 명령 (BACKEND §9) | **21개** — doctor·db·collect·collect-products·enrich·validate·approve·promote·unapprove·deploy·sync-slugmap·build(+`--preview`)·dashboard·collect-category·build-category·approve-category·unapprove-category(킬스위치)·register-categories(+`--auto-publish`)·auto-publish·category-status(+`--monitor`)·**refresh-cycle(#23: 무인 새로고침→자가복원→빌드→변경분 배포, 기본 dry_run, 매 실행 후 대시보드 갱신)** | #23 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD. 세부 DECISIONS J·O + EVENTS | #4~#16 |
 | doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **64개** + #19 **LLM 키 점검**(활성 모델 기준 OPENROUTER/ANTHROPIC). 64/64 OK | #19 |
@@ -19,7 +19,7 @@
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (docs/ 참조). 일관성 모순 0건 | #2 |
 | 메모리 시스템 | feedback 7건([[incremental-critical-review]]·[[autonomous-safe-system]] 등) + reference market_research + MEMORY.md | #12 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
-| 사이트 게시글 / 트래픽 / 수익 | **라이브=카테고리 8개**(honsallim.com·#22). **#23 메인 DB=6 공개/2 보류**(laptop-stand·drying-rack fail-closed)→스케줄러 첫 배포 시 보류 2개 내려감(검토). 측정(Cloudflare·GSC·네이버 1~2주 누적). 수익=/go/→302 알리·247개. **쿠팡 가입 착수**(승인 데모·collector.coupang 미구현) | #23 |
+| 사이트 게시글 / 트래픽 / 수익 | **라이브(#24)=카테고리 6 공개**(보류 2 자연 비공개) + **`/method/`(방법론·E-E-A-T)** + **`/home-office/` 필러**(토픽 허브) + **`/reviews/` 쿠팡 데모**(noindex). 각 카테고리 '데이터로 본 N' 요약+수집일+제품명/가격 링크. 측정(Cloudflare·GSC·네이버 1~2주 누적). 수익=/go/→302 알리·172개 + **쿠팡 가입완료·승인 대기**(collector.coupang 미구현) | #24 |
 
 ## 인프라
 
@@ -45,7 +45,7 @@
 | INDEXNOW_KEY | 영구 [확정 — 공개 키] | 회전 불요 |
 | GitHub PAT | 미발급 (Actions는 GITHUB_TOKEN 자동) [확정] | — |
 | AliExpress Portals | **완전 연결** [확정 #22]: honsallim 채널 + **`ALI_TRACKING_ID=honsallim`(ali.env·주인 직접)** → 수집 시 제품별 promotion_link 생성 → **247개 개별 deeplink**(#21 공통링크 한계 해소, affiliate_tag=honsallim 검증). `/go/`→302 알리 라이브 작동 | 2026-06-03 |
-| 쿠팡 파트너스 | 보류 | Phase 4 (콘텐츠 누적 후) 재가입 |
+| 쿠팡 파트너스 | **가입 완료·승인 심사 대기 [#24]** | honsallim.com 채널 등록 + 승인용 `/reviews/honplanet-monitor-arm/` 데모 배포·스샷 등록. 승인 후 `collector.coupang` 구현. 최종 정산엔 누적 15만원 조건 [관찰] |
 
 ## 보안 / 권한
 
@@ -58,16 +58,16 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 다음 세션 #24 — 상세 EVENTS #23.
-0. **#23 머지 → 스케줄러 가동 확인**: #23 코드가 origin/main에 올라가야 Claude 예약작업(매일 11:00 KST)이 refresh-cycle을 가동. 머지 직후 메인 체크아웃에서 `refresh-cycle --dry-run`(또는 예약작업 "Run now")으로 1회 점검. 첫 배포 시 보류 2개(laptop-stand·drying-rack)가 라이브에서 내려감(fail-closed) — 주인 검토 후 결정.
-1. **★★쿠팡 본격 진행 (주인 명시)**: 가입 완료 → 마이페이지 쿠팡 링크 생성 → **승인용 데모 페이지(쿠팡 고지+링크) honsallim.com 배포 → 스샷 업로드** → 승인 후 **`collector.coupang` 구현**(현재 stub)으로 쿠팡 상품 본격 수집. 쿠팡=메인 채널(§6). disclosure.py 이미 쿠팡 지원.
-2. **★★미결정 설계 — 알리+쿠팡 상품을 페이지에 어떻게 배치할지** (주인이 아직 못 들음·반드시 논의): 카테고리별 두 채널 혼합? 분리 표기? 추천 6선에 쿠팡/알리 섞기 vs 채널별 분리? 가격·배송 비교? /go/ 라우팅 쿠팡 분기? **설계 먼저 합의 후 구현**. [[design-research-first]] — 레퍼런스 조사 후 제안.
-3. **★성장**([[growth-first-priority]]): 측정 데이터(GSC·네이버·Cloudflare) 1~2주 후 리뷰→뜨는 키워드 더블다운. 홈오피스 토픽 심화·롱테일.
-4. (선택) `docs/CATEGORIES.md` 전략 문서 · D1 클릭로깅 복원 · Chrome lookalike(관찰).
-- ★**DB는 gitignore→재생성**(`db migrate`+`db seed`+`register-categories --all --no-dry-run --auto-publish`, ~$2). 워크트리=`PYTHONPATH=src python -m cli`. ★메인 체크아웃(D:\affiliate_hub)은 #23에서 #22로 동기화+DB 재생성 완료(6 공개/2 보류) — 잔재는 `stash@{0}`·낡은DB는 `data/honsalim.db.bak_session23_may28` 보관.
+### ★ 다음 세션 #25 — 상세 EVENTS #24.
+1. **★★쿠팡 승인 대기 → 승인 시 `collector.coupang` 구현**(현재 stub→쿠팡 상품 수집). 승인 메일/마이페이지 알림 확인. 쿠팡=메인 채널(§6). 최종 정산엔 누적 15만원 조건 [관찰].
+2. **★Tier 1 Pinterest** ([[growth-first-priority]]·DECISIONS T1): 개인정보처리방침 페이지 + Pinterest Standard API 승인 → 자동 핀(→리뷰페이지 유도·첫머리 고지·절제). 무인 마케팅 1순위 자동화 채널.
+3. **필러 노출 강화**: 홈/구매가이드 → `/home-office/` 눈에 띄는 링크 (현재 sitemap·카테고리 백링크만).
+4. **알리+쿠팡 배치 C안 구현** (DECISIONS S): 쿠팡 상품 생기고 1~2주 트래픽 데이터 후 확정.
+5. **#23 무인 스케줄러 가동 확인**(미검증) + 성장 측정 리뷰(GSC·네이버·Cloudflare).
+- ★**DB는 gitignore→재생성**(`db migrate`+`db seed`+`register-categories --all --no-dry-run --auto-publish`, ~$2). 워크트리=`PYTHONPATH=src python -m cli`. ★**배포=워크트리 브랜치 push → GitHub PR 병합**(하니스가 main 직접 push·PR 생성 차단 — 세션 #24 패턴). 엣지캐시 5분(배포 반영 지연).
 
-### 해소 (세션 #23) — 상세 EVENTS #23
-- ✅ **★무인 스케줄러(refresh-cycle)** · **★모니터링 대시보드**(+바탕화면 아이콘) · **★Claude 예약작업**(매일 11:00 KST) · 메인 체크아웃 정비(stash·#22 ff·DB재생성) · 쿠팡 가입 착수. 회귀 678.
+### 해소 (세션 #24) — 상세 EVENTS #24
+- ✅ 쿠팡 가입+승인 데모 배포 · 알리+쿠팡 배치설계(C안·DECISIONS S) · 무인 마케팅 정밀기획(DECISIONS T) · Tier 0 SEO(방법론 `/method/`·카테고리 데이터요약·홈오피스 필러 `/home-office/`) 라이브 · 핸즈온 미채택 정직화(method·about) · 보류 2개 자연 비공개(공개 6). 회귀 690.
 
 ### Phase 2 진척 가능 (검토 의존 큼)
 - `src/builder/manifest.py` 증분 빌드 (ARCH §7·DB §10) · `src/collector/coupang.py` (Phase 4)
