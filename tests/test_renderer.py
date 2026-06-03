@@ -247,6 +247,12 @@ class TestReviewPages:
         assert html.count("sponsored nofollow") >= 1  # 제휴 링크 표기(POLICY §6)
         assert 'target="_blank"' in html
 
+    def test_affiliate_link_shown_as_text(self, built: dict) -> None:
+        # 쿠팡 승인 심사 가시성 — 버튼뿐 아니라 link.coupang.com 주소를 글자로도 노출(쿠팡 예시 정합).
+        html = self._html(built)
+        assert "쿠팡 파트너스 링크:" in html
+        assert "link.coupang.com/a/ehtwmQRZAG" in html  # https:// 없는 표시용 텍스트
+
     def test_hero_image_present_no_blocked_iframe(self, built: dict) -> None:
         # 히어로 = 자체 개념 이미지(항상 표시). 추적차단에 막히는 쿠팡 iframe 위젯은 미사용.
         html = self._html(built)

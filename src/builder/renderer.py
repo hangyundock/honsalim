@@ -593,6 +593,8 @@ REVIEW_PAGES: list[dict] = [
         "discount": "37%",
         "note": "책상 가장자리에 고정하는 클램프형 싱글(모니터 1대) 모니터암 · 로켓배송",
         "coupang_link": "https://link.coupang.com/a/ehtwmQRZAG",
+        # 제휴 링크를 글자로도 노출(쿠팡 승인 심사 — 파트너스 링크 가시성). https:// 제외 표기.
+        "coupang_link_display": "link.coupang.com/a/ehtwmQRZAG",
         # 히어로 = 모니터암 개념 이미지(우리 AI 일러스트·비용 0). 쿠팡 상품 이미지는 직접 다운로드
         # 금지(저작권 회색지대, CLAUDE.md 함정 #3)이고 공식 iframe 위젯은 추적차단 브라우저에서
         # 미표시되어, 항상 보이는 자체 개념 이미지를 헤더로 사용(실제 제품 아님을 캡션 명시).

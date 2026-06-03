@@ -41,6 +41,11 @@
       </div>
       <p class="muted" style="margin:0 0 18px">{{ review.note }}</p>
       <a class="btn btn-primary" href="{{ review.coupang_link }}" target="_blank" rel="sponsored nofollow noopener">쿠팡에서 보기 {{ icon('arrow', 16) }}</a>
+      {# 제휴 링크 주소를 글자로도 노출 — 심사자가 link.coupang.com 파트너스 링크임을 한눈에 확인(쿠팡 예시 정합) #}
+      <div style="margin-top:14px; font-size:.92rem; color:#555">
+        쿠팡 파트너스 링크:
+        <a href="{{ review.coupang_link }}" target="_blank" rel="sponsored nofollow noopener" style="color:#1a7f55; word-break:break-all">{{ review.coupang_link_display }}</a>
+      </div>
     </div>
 
     {# 본문 — 정직한 정보(직접 사용 후기 아님, §0 진실성) #}
