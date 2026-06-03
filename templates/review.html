@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "_macros/components.html" import icon, breadcrumb %}
+
+{% block title %}{{ review.title }} | 혼살림{% endblock %}
+
+{# 승인용·소프트 공개 — 검색 비색인(알리+쿠팡 배치 설계 합의 전). 쿠팡 심사엔 영향 없음. #}
+{% block head_extra %}
+  <meta name="robots" content="noindex, follow">
+{% endblock %}
+
+{% block main %}
+<section class="section">
+  <div class="wrap" style="max-width:780px">
+    {{ breadcrumb([{'label': '홈', 'url': '/'}, {'label': '추천', 'url': '/categories/'}, {'label': review.crumb}]) }}
+
+    {# 첫머리 대가성 고지 — 공정위 + 쿠팡 파트너스 정책(쿠팡 파트너스·수수료 명시) #}
+    <div class="disclosure" style="margin:16px 0 24px">
+      <span class="ic">{{ icon('info', 18) }}</span>
+      <span><b>대가성 안내</b> · 이 글은 <b>쿠팡 파트너스</b> 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다. 추천 내용·순서는 수수료와 무관하며, 독자의 구매 가격에는 영향을 주지 않습니다.</span>
+    </div>
+
+    <div class="eyebrow">홈오피스 · 모니터암</div>
+    <h1 style="margin:8px 0 16px">{{ review.title }}</h1>
+    <p class="lead">{{ review.lead }}</p>
+
+    {# 제품 카드 — 쿠팡 공식 상품 배너(위젯) + 가격 + 구매 버튼 #}
+    <div style="display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; border:1px solid #e7e7e7; border-radius:16px; padding:22px; margin:24px 0; background:#fafafa">
+      <div style="flex:0 0 auto">
+        {# 쿠팡 공식 위젯(제휴사 제공 이미지 — About 이미지 정책 §03). 미표시 시 우측 버튼이 대체. #}
+        <iframe src="{{ review.coupang_iframe }}" width="120" height="240" frameborder="0" scrolling="no" loading="lazy" referrerpolicy="unsafe-url" title="{{ review.name }} 쿠팡 상품 배너" style="border:0; display:block; background:#f0f0f0"></iframe>
+      </div>
+      <div style="flex:1 1 260px; min-width:260px">
+        <h2 style="font-size:var(--fs-h3); margin:0 0 10px">{{ review.name }}</h2>
+        <div style="margin:6px 0 14px; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap">
+          {% if review.discount %}<span style="color:#e0474c; font-weight:700">{{ review.discount }}</span><span style="text-decoration:line-through; color:#999">{{ review.orig }}</span>{% endif %}
+          <span style="font-size:1.5rem; font-weight:800">{{ review.price }}</span>
+        </div>
+        <p class="muted" style="margin:0 0 18px">{{ review.note }}</p>
+        <a class="btn btn-primary" href="{{ review.coupang_link }}" target="_blank" rel="sponsored nofollow noopener">쿠팡에서 보기 {{ icon('arrow', 16) }}</a>
+      </div>
+    </div>
+
+    {# 본문 — 정직한 정보(직접 사용 후기 아님, §0 진실성) #}
+    {% for blk in review.body %}
+      {% if blk.h %}<h2 style="margin:30px 0 12px">{{ blk.h }}</h2>{% endif %}
+      {% for para in blk.p %}<p style="margin:0 0 13px">{{ para }}</p>{% endfor %}
+      {% if blk.ul %}<ul style="margin:0 0 13px; padding-left:20px">{% for li in blk.ul %}<li style="margin:5px 0">{{ li }}</li>{% endfor %}</ul>{% endif %}
+    {% endfor %}
+
+    {# 하단 재고지 + 구매 버튼 #}
+    <div style="border-top:1px solid #e7e7e7; margin-top:30px; padding-top:22px">
+      <a class="btn btn-primary" href="{{ review.coupang_link }}" target="_blank" rel="sponsored nofollow noopener">쿠팡에서 가격·재고 확인 {{ icon('arrow', 16) }}</a>
+      <p class="muted" style="font-size:.85rem; margin-top:16px; line-height:1.6">
+        * 가격·할인율·재고는 쿠팡에서 수시로 바뀌며, 위 정보는 작성 시점 기준입니다. 정확한 사양·호환·가격은 쿠팡 상품 페이지에서 확인하세요.
+        이 글은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.
+      </p>
+    </div>
+  </div>
+</section>
+{% endblock %}
