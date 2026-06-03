@@ -3,21 +3,20 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 시급 (다음 세션 #22) — #21 완료: 도메인 honsallim 이전·연결·301 · 알리 honsallim 채널 등록 · 미충전이미지 · 순차등록엔진(register-categories) · 홈 흰바탕 캐시. 남은 핵심 = **살림 카테고리 합치기 + 수익 연결**. (상세 EVENTS #21)
+## ★ 다음 세션 #23 — 개발 거의 끝. **최우선 = 성장(트래픽·수익)**([[growth-first-priority]] 메모리). '완성/유지보수'와 구분. (상세 EVENTS #22)
 
-- [x] ~~1번 미충전이미지(페르소나·about·시나리오, placeholder 0)·2번 순차등록엔진·홈 흰바탕캐시(cache-busting)·도메인 honsalim→honsallim 이전·연결·301·알리 honsallim 채널등록·OpenRouter 잘림 자가복원·Windows wrangler resolve_argv~~ ✅ #21
-- [ ] **★살림 카테고리 합치기**: `loving-herschel-0091c7` 갈래의 `sql/seeds/003_categories_living.sql` + `category_sources.yml` 살림3(**cutting-board 도마·drying-rack 빨래건조대·mini-dehumidifier 미니제습기**) git show로 추출 → `db seed` → `register-categories cutting-board drying-rack mini-dehumidifier --no-dry-run` → approve+build --full+push (~$1.5).
-- [ ] **★Tracking ID 연결**: 알리 honsallim 채널 Tracking ID → `D:\secrets\affiliate_hub\ali.env`(**주인 직접**) → 제품 재수집 시 개별 deeplink. 현재 `deeplink_url`은 공통 트래킹링크(모든 제품 동일).
-- [ ] **★/go/ 작동**: wrangler `deny` 룰(`.claude/settings.json`)로 Claude 배포 차단 → **주인이 deny 제거** 후 `PYTHONPATH=src python scripts/deploy_go_gateway.py`(D1 schema·sync-slugmap 191·Workers). 코드(slug_map UNION·resolve_argv) 준비됨.
-- [ ] (관찰) Chrome lookalike 경고(honsalim↔honsallim 1글자) — 301+시간·정상방문 학습으로 해소. 일반 방문자는 안 볼 가능성 큼.
-- [ ] (이월) 쿠팡(방문자·트래픽 후) · 무인 발행 스케줄러(매일 11시) · main-protect.
-- 참고: ★코드·도메인은 origin/main(#21) 배포 완료. **DB는 gitignore→재생성**(`db migrate`+`db seed`+`register-categories --all --no-dry-run` 또는 개별, ~$1.5). 워크트리=`PYTHONPATH=src python -m cli`. 미리보기=`build --preview`·공개=`build --full`.
+- [x] ~~살림3 카테고리 합치기 · 알리 개별 deeplink(honsallim 247개) · ★자율 게시 가드레일(E7→fail-closed) · 8개 자동공개 · ★라이브 배포 · ★측정 인프라 3종(Cloudflare·GSC·네이버) · ★/go/ 수익경로(Pages Function) · office-chair 오염 자동적발·collect prune 근본수정~~ ✅ #22
+- [ ] **★성장 최우선(매 세션 선제 고민)**: ①측정 데이터 **1~2주 후 리뷰**(GSC·네이버·Cloudflare)→뜨는 키워드 더블다운·죽은 것 정리 ②토픽 집중(홈오피스 클러스터 심화: 키보드·마우스·데스크매트 등 인접) ③롱테일 검색어(본문·FAQ) ④양질 콘텐츠. 한국 제품추천 SEO 6~12개월 장기전.
+- [ ] (완성·저위험·성장 아님) **무인 스케줄러 A안**: published 새로고침(가격·판매량)→가드레일 monitor 자가복원→build→변경 시 배포. ★메인 체크아웃(`D:\affiliate_hub`)이 origin/main #22 pull 필요(스케줄러 실행처).
+- [ ] (선택) `docs/CATEGORIES.md` 전략 문서 · D1 클릭로깅 복원(Pages Function D1 바인딩) · 쿠팡(트래픽 후) · main-protect status check.
+- [ ] (관찰) Chrome lookalike 경고(honsalim↔honsallim) — 301+시간 해소.
+- 참고: ★코드·도메인·8카테고리·측정·/go/는 origin/main(#22) 배포 완료. **DB gitignore→재생성**(`db migrate`+`db seed`+`register-categories --all --no-dry-run --auto-publish`, ~$2). 워크트리=`PYTHONPATH=src python -m cli`. 공개=`build --full`(/go/ 함수도 재생성).
 
 ## 알리 통합 (D9)
 
 - [x] ~~App Key/Secret·라이브검증(#11)·collect-products·C-1·enrich·4게이트(#12)·promote·상세글 렌더·라이브 게시(#13)~~ ✅
 - [x] ~~honsalim.com whitelist('ali' 자동검증 Submit 차단)~~ → **honsallim.com 채널 등록 완료** ✅ #21 (겹ㄹ 도메인으로 'ali' 차단 돌파, Portals 나의웹사이트·content>vertical sites·별도 승인 게이트 없음)
-- [ ] honsallim 채널 **Tracking ID → ali.env 연결 + 개별 deeplink** 생성 (#22) → /go/ 작동 시 수익 추적
+- [x] ~~honsallim 채널 **Tracking ID(`ALI_TRACKING_ID=honsallim`) → ali.env 연결 + 개별 deeplink 247개** + /go/ 수익경로(Pages Function·302 알리)~~ ✅ #22
 
 ## 시점 의존 잔존 (세션 #6~7)
 

@@ -21,8 +21,29 @@
   - 세션 #13 (2026-05-30 게시 경로 완성·★첫 글 honsalim.com 라이브 게시·무인 배포 파이프라인(방법A)·알리 whitelist 2채널 제출·회귀 436→470·1 commit e763e0f 배포 success)
   - 세션 #14 (2026-05-31 용어 일상화(내맘대로 세팅·라이프스타일)+사이트 大전환 기획(카테고리 비교·노써치형 DECISIONS O1~O9)+카테고리 프로토타입·알리 API 라이브검증·회귀 470→472)
   - 세션 #15–16 (2026-05-31 SEO 자동최적화 엔진·네이버 검색광고·전체제품 카탈로그·product_filter·디자인 大전환 1단계(우드톤→흰바탕 tokens 교체)·회귀 472→553 / 다음=#17)
+  - 세션 #17 (2026-05-31 카테고리 자동등록 파이프라인 완성·사무용의자 구성표준·개념이미지(Imagen)·collect-category/build-category CLI·정형화 입증(책상)·회귀 553→569)
 
 ## 최근 5세션
+
+### 세션 #22 — 2026-06-03 (Opus 4.8 1M, ★자율 게시 가드레일(E7→fail-closed)+살림3 합치기+8개 자동공개 라이브배포+측정인프라3종+/go/ Pages Function 수익경로 복구 / 개발 마무리→성장 전환, 회귀 641→659)
+
+**시작 상황**: 워크트리 infallible-greider, HEAD #21 `11f8b40`, 회귀 641. 살림 카테고리 합치기 착수 → 주인 "자동 가능한 건 승인 없이 자동화" 요구 → 자율 게시 가드레일 구축으로 확대 → 라이브 배포·측정·/go/까지.
+
+**핵심 진척 [확정]**:
+1. **살림3 합치기 + 알리 개별 deeplink(R5)**: loving-herschel의 seed003+sources 살림3(도마·빨래건조대·미니제습기) 적용(laptop-stand '전화' 제외 보존)·DB재생성(8)·재수집. `ALI_TRACKING_ID=honsallim`→**247개 개별 deeplink**(공통링크 해소).
+2. **★자율 게시 가드레일(R1·R2)**: E7(사람 게시승인)을 **fail-closed 가드레일+사후 킬스위치**로 개정. `category_guardrail`(5중 검사)·`auto_publish`·CLI 4종(auto-publish·register --auto-publish·category-status --monitor·킬스위치)·테스트 18. LLM 단일오탐 관용(2건+만 보류).
+3. **★자가복원 루프 실증 + 버그 근본수정(R3)**: 가드레일이 **수동검토 안 한 office-chair에서 진짜 오염(캠핑/외골격/화장 의자) 자동 적발** → exclude 보강 → 재수집. 발견: `category_collect`가 비관련 옛 추천을 안 지워 오염 영속 → **prune 근본수정**. 8개 전부 가드레일 통과 자동공개.
+4. **★라이브 배포**: build --full → push origin main → CI(build-and-deploy) **success** → honsallim.com 8개 카테고리 라이브(HTTP 200 검증).
+5. **★측정 인프라 3종(R6)**: ①Cloudflare Web Analytics(자동) ②GSC(DNS 자동인증+사이트맵 제출, fetch 비동기) ③네이버 서치어드바이저(meta 심고 배포+소유확인+사이트맵). honsallim 반영.
+6. **★/go/ 수익경로 복구(R4)**: 제품 클릭 404였음 → Worker(wrangler deny 차단) 대신 `functions/go/[[path]].js` **Pages Function**으로 정규 git push 배포. 라이브 검증: /go/→**302 알리**·미등록→홈·정적사이트/_headers 무영향. 247개 제품.
+7. **★개발 마무리→성장 전환(R6, 주인 명시)**: 매 세션 최우선=**성장**. 메모리 [[growth-first-priority]] 최우선 등재.
+8. 회귀 **641→659**(+18). 린트 클린. 배포 3커밋(#22·네이버·/go/). 비용 ~$2.
+
+**무인·안전(§0)**: 가드레일 fail-closed(미탐<오탐)·자가복원 루프(적발→수정→재수집→통과)·collect prune·킬스위치·monitor·/go/ 미등록→홈(봇차단).
+
+**다음 세션(#23+)**: ★**성장 최우선**([[growth-first-priority]]) — 측정 데이터 1~2주 후 리뷰(GSC/네이버/Cloudflare)→키워드 더블다운, 홈오피스 토픽 심화, 롱테일 콘텐츠. (완성·저위험) 무인 스케줄러 A안. (선택) CATEGORIES.md·D1 클릭로깅·쿠팡. ★DB gitignore→재생성(`register-categories --all --no-dry-run --auto-publish`). 워크트리=`PYTHONPATH=src python -m cli`.
+
+---
 
 ### 세션 #21 — 2026-06-02 (Opus 4.8 1M, ★도메인 honsalim→honsallim 이전·연결·301(알리 'ali' 차단 돌파) + 알리 채널 등록 + 미충전이미지·순차등록엔진·홈 흰바탕캐시 근본수정, 회귀 632→641)
 
@@ -106,25 +127,3 @@
 **잔존 미해결 (#19)**: ①**카테고리 페이지 추가 디자인 수정**(사용자 "이 페이지 수정할 부분 더 있다" — 연속 작업) ②#18 2순위 배포 완료(승인+공개) ③나머지 카테고리(의자 build·모니터암 신규) ④(이월) /go/·알리 whitelist·main-protect.
 
 **다음 세션 할 일**: 1) **카테고리 디자인 연속 수정**(DB 재생성→`build --preview`로 확인하며) 2) **승인(`approve-category`)+배포**(`build --full`→honsalim.com) 3) 나머지 카테고리. ★DB는 gitignore→재생성 필요(`collect-category`·`build-category` --no-dry-run, ~$0.6). 워크트리 실행=`PYTHONPATH=src python -m cli`.
-
----
-
-### 세션 #17 — 2026-05-31 (Opus 4.8 1M, ★카테고리 자동 등록 파이프라인 완성 + 사무용 의자 구성 표준 + 개념이미지(Imagen) + CLI + 정형화 입증(책상), 회귀 553→569)
-
-**시작 상황**: `/honsalim-start`(워크트리 sad-wilbur-47961d, HEAD=origin/main #15–16 `ec6c3e4`). 회귀 553. 사용자 "다음 작업 진행"→#17 카테고리 구조. 도중 **"오늘 카테고리 제품 하나씩 실제 등록 테스트"** 요청 → end-to-end 파이프라인 구축으로 전환. 사용자가 의자(시안 있음) 대신 **모니터 받침대**(시안 없음)로 진짜 자동 등록 검증 지시.
-
-**핵심 진척 [확정]** (※전부 **로컬·미배포**. honsalim.com은 #13 첫 글 유지):
-
-1. **카테고리 데이터 모델** (O16): `categories`·`category_products` 테이블(migration 002~005) + `products` 정가/할인 컬럼 + products_store 저장 정합. seed=의자·책상·모니터. **렌더러가 DB 읽음**.
-2. **카테고리 수집·정제·2티어** (O20): `collector/category_collect.py`+`category_sources.yml`. product_filter 관련성·부풀린할인 차단. 모니터 60→41·책상 59→28 정제.
-3. **글 자동 생성** (O17): `enricher/category_page_builder.build_and_save` — 가이드8요소·추천6선(+타입)·FAQ·제품명비교표 JSON → disclosure → **SEO+진실성 통합게이트 통과까지 재생성**(상한2, 1인칭 fail 자동 재생성=자가복원) → 저장. 추천6선=AI 큐레이션(점수 금지). 비교표 확인불가="—".
-4. **사무용 의자 구성 표준** (O18, 사용자): 공정위고지·타입선택기·신뢰박스2·**배너형 개념이미지**·타입표·체크리스트2열·추천2티어·한눈비교표·FAQ·전체카탈로그·**연관카테고리 크로스링크**. `category.html`·`categories_index.html`+`category.css`(.catpage 스코프).
-5. **개념 이미지** (O19, 사용자): Imagen 4 Fast(AutoBlog 이식·REST·$0.02). ★**이미지엔 텍스트 없이 + 문구·CTA는 CSS 오버레이**(AI 한글 깨짐 방지·**SEO 노출**·수정 용이). webp(Pillow ~37KB). `GOOGLE.env`.
-6. **CLI + 정형화 입증** (O20): `collect-category`·`build-category`. **책상 2명령 자동완성**(collect 59→28 → build 글+이미지+게이트 자동, 모니터와 동일 구조) — 정형화 라이브 입증.
-7. **회귀 553→569** (+16). black·ruff·mypy 클린. 비용 ~$0.6.
-
-**무인·안전/진실성(§0)**: 가짜 점수·평점 금지(추천=큐레이션) / 비교표 확인불가="—"(없는 스펙 금지) / 1인칭 fail 자동 재생성 / 부풀린할인 차단 / 이미지 텍스트 없이(SEO·정직) / 전부 로컬(배포 승인 후). **근본수정**: products_store 정가/할인 저장 · test fixture=마이그레이션 단일소스 · 전역 `.chk` 충돌(클래스 분리) · Jinja `group.items`/`c.values` 메서드 함정(키명 변경).
-
-**잔존 미해결 (#18)**: ①**운영자 검토·1클릭 승인 게이트**(§2-마·E7 — 현재 build-category가 published 바로 전이) ②**배포**([6][7], build/site 갱신) ③doctor 보강(category 모듈) ④나머지 카테고리(모니터암 신규·의자 글생성) ⑤(이월) /go/·알리 whitelist·main-protect.
-
-**다음 세션 할 일**: 1) **운영자 승인 게이트**(published→pending+1클릭 승인) 2) **배포**(build/site 갱신→honsalim.com) 3) doctor 보강·나머지 카테고리. ★워크트리 실행=`PYTHONPATH=src python -m cli`(honsalim 명령은 메인 가리킴).

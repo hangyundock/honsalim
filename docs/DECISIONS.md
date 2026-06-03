@@ -232,6 +232,15 @@
 - **Q6. 구매가이드 페이지 /guides/ [확정 #20]**: 상단 네비 구매가이드가 가리키던 `/guides/`가 페이지 없어 404(유일 깨진 링크) → 카테고리별 '고르는 법' 가이드를 모은 `/guides/` 인덱스 생성. 내부링크 167종 0 broken 확인. 무인 자동화 전 **사이트 골격(모든 링크·페이지)이 에러 없이 완성** 후 제품 등록 — 사용자 원칙(§0).
 - **Q7. 사업자 정보 미등록 시 숨김 [확정 #20, M2 갱신]**: 사업자등록 전(DECISIONS D4: 월10만원 누적 후)에는 footer·about·article에서 **빈 사업자번호·통신판매업·주소 필드를 조건부 숨김**("등록 진행 중" 과장 표기 제거 — 정직성 §0). 등록 후 실제 값 채우면 자동 재노출. 사이트 표기 이메일 = **dugi2020@naver.com**(BUSINESS_INFO·Organization JSON-LD 포함 전체).
 
+## R. 자율 게시 가드레일·수익경로·성장 전환 [확정] — 세션 #22 신규
+
+- **R1. E7 개정: 사람 게시승인 → fail-closed 가드레일 + 사후 킬스위치 [확정 #22, 주인 결정]**: E7("자동 승인 절대 금지")의 **문구**를 "자동 가드레일 + 사후 거부권"으로 교체(취지=Google Helpful/Scaled Content 패널티 회피는 유지). `writer/category_guardrail.check` 5중 fail-closed 검사 — ①글 존재 ②안전게이트(truth·disclosure·links) 재검증 ③추천6선 무결성(2개+·deeplink 고유·트래킹 일관·가격) ④관련성 휴리스틱(category_sources require/exclude 재적용, 추천=엄격·전체 오염율≤5%) ⑤추천6선 LLM 의미검수. **조금이라도 애매하면 보류(미탐<오탐)**, 통과만 `auto_publish`가 published 전이. 안전 핵심='무승인'이 아니라 **느린 발행(C8)+자동 가드레일+사후 킬스위치(`unapprove-category`)+`monitor` 재검수**. CLI: `auto-publish`·`register-categories --auto-publish`·`category-status --monitor`. 테스트 18.
+- **R2. LLM 의미검수 단일오탐 관용 [확정 #22, 라이브 보정]**: LLM(temperature 비결정·다기능 제품명 노이즈)을 hard 게이트로 쓰면 정당한 제품(반도체 미니제습기·브레드보드 도마)에 깨끗한 카테고리까지 막힘. → 키워드(명확) 게이트는 엄격 유지, **LLM(모호)은 추천6선 중 `_LLM_HOLD_THRESHOLD`(=2)건 이상 NO일 때만 보류**(체계적 오염=office-chair 6/6은 그대로 잡힘). 단일 NO는 기록만(monitor 가시화). LLM 호출/파싱 실패는 별도 fail-closed 보류.
+- **R3. 재수집 시 비관련 옛 추천도 prune [확정 #22, 근본수정]**: `category_collect`가 카탈로그(is_featured=0)만 비우고 추천(is_featured=1)은 보존하던 것(P4)을 보강 — **필터 강화로 이제 비관련이 된 옛 추천(relevant_ids에 없는 is_featured=1)도 삭제**. 안 그러면 옛 오염(캠핑의자)이 추천에 남아 select_featured(판매량순)가 다시 뽑아 오염 영속(office-chair 라이브 적발). 여전히 관련인 추천은 보존.
+- **R4. /go/ 어필리에이트 리다이렉트 = Cloudflare Pages Function [확정 #22]**: 별도 Worker(`wrangler deploy` — `.claude/settings.json` deny + 권한 자기수정 금지로 하네스 차단)·D1 대신 **`functions/go/[[path]].js` Pages Function**으로 `/go/<slug>`→알리 deeplink 302(미등록→홈). 정규 Pages 배포(git push → CI의 `wrangler pages deploy`가 `functions/` 자동 컴파일)로 함께 배포 — 권한·인프라 단순화. 알리 deeplink ~1065자라 `_redirects`(1000자 제한) 불가 → 함수에 맵 임베드(`builder.go_function`, build --full에서 published 상품 247개로 재생성). `/go/`만 가로채 정적 사이트·_headers 무영향(라이브 검증). **트레이드오프: D1 클릭 로깅 보류**(go_gateway.js Worker 코드 보존 — 추후 Pages Function D1 바인딩으로 복원).
+- **R5. 알리 개별 deeplink = honsallim 트래킹ID [확정 #22]**: 알리 Portals honsallim 채널 Tracking ID를 `ALI_TRACKING_ID`(ali.env·주인 직접)에 설정 → 수집 시 API가 제품별 promotion_link 생성. #21의 "공통 트래킹링크(모든 제품 동일)" 한계 해소 — 247개 개별 deeplink(공통 접두부+제품별 분기), affiliate_tag=honsallim 검증.
+- **R6. ★개발 마무리 → 성장 최우선 전환 [확정 #22, 주인 명시]**: 무인 가드레일·자동공개·측정 인프라·수익경로(/go/) 완비로 **개발 단계는 거의 끝**. **이제부터 매 세션 최우선 목표 = 성장(검색노출·트래픽·수익)**, '완성/유지보수'(스케줄러·자동화)와 구분. 매 세션 Claude가 선제적으로 성장안을 심도있게 제시(주인 매번 설명 불요). 레버=측정데이터 기반·토픽집중(홈오피스 심화)·롱테일·양질콘텐츠·인내. 메모리 [[growth-first-priority]] 최우선 등재. ※측정 인프라 셋업 완료(#22): Cloudflare Web Analytics·GSC(DNS인증+사이트맵)·네이버 서치어드바이저(meta+사이트맵).
+
 ## 폐기된 결정 (역사 참조용)
 
 | 폐기일 | 결정 | 폐기 사유 |
