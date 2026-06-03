@@ -247,6 +247,13 @@ class TestReviewPages:
         assert html.count("sponsored nofollow") >= 1  # 제휴 링크 표기(POLICY §6)
         assert 'target="_blank"' in html
 
+    def test_hero_image_present_no_blocked_iframe(self, built: dict) -> None:
+        # 히어로 = 자체 개념 이미지(항상 표시). 추적차단에 막히는 쿠팡 iframe 위젯은 미사용.
+        html = self._html(built)
+        assert "/static/images/concepts/monitor-arm.webp" in html
+        assert "개념 이미지" in html  # 실제 제품 아님을 캡션으로 명시(정직성 §0)
+        assert "coupa.ng" not in html  # 미표시되는 외부 iframe 배너 제거 확인
+
     def test_noindex_and_not_in_sitemap(self, built: dict) -> None:
         html = self._html(built)
         assert 'content="noindex' in html  # 소프트 공개 — 검색 비색인
