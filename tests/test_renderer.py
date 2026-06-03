@@ -272,6 +272,31 @@ class TestReviewPages:
         assert "&lt;svg" not in html  # 아이콘 SVG 미이스케이프
 
 
+class TestMethodPage:
+    """추천 방법(방법론) 페이지 — E-E-A-T·신뢰 신호(데이터 기반 비교 명문화, 세션 #24 T2).
+
+    2025.12 어필리에이트 패널티(손실군=소유·테스트 없는 Best 리스트) 회피 핵심:
+    우리 고유 데이터(판매량)를 '데이터 기반 비교'로 명문화 + 가짜 평점 안 만듦을 공개.
+    """
+
+    def test_method_page_written_and_in_sitemap(self, built: dict) -> None:
+        out: Path = built["out"]
+        path = out / "method" / "index.html"
+        assert path.exists(), "method 페이지 미생성"
+        html = path.read_text(encoding="utf-8")
+        assert "판매 데이터" in html or "판매량" in html  # 데이터 기반 포지셔닝
+        assert "가짜 평점" in html  # 정직성 명문화
+        assert "혼살다" in html  # 저자(E-E-A-T)
+        assert "{{" not in html and "{%" not in html
+        # noindex 아님(진짜 신뢰 콘텐츠) → sitemap 포함(리뷰 페이지와 대조)
+        xml = (out / "sitemap.xml").read_text(encoding="utf-8")
+        assert "https://honsallim.com/method/" in xml
+
+    def test_footer_links_to_method(self, built: dict) -> None:
+        home = (built["out"] / "index.html").read_text(encoding="utf-8")
+        assert 'href="/method/"' in home  # 사이트 전역 푸터 신뢰 동선
+
+
 class TestRenderArticleDetail:
     """published article → 상세글 렌더 (산문 body_html + /go/ 제휴 상품 카드)."""
 
@@ -356,8 +381,12 @@ class TestCategoryPublishGate:
         finally:
             conn.close()
         summary = renderer.render_site(out_dir=tmp_path / "site", db_path=db_path)
-        assert (tmp_path / "site" / "categories" / "office-chair" / "index.html").exists()
+        page = tmp_path / "site" / "categories" / "office-chair" / "index.html"
+        assert page.exists()
         assert summary["categories"] == 1
+        html = page.read_text(encoding="utf-8")
+        assert "업데이트 예정" not in html  # placeholder 제거(E-E-A-T 약화 신호, 세션 #24)
+        assert 'href="/method/"' in html  # 방법론 신뢰 동선 연결
 
     def test_assets_cache_busting(self, built: dict) -> None:
         # 세션 #21: CSS·JS 링크에 ?v=내용해시 — immutable 장기캐시가 새 디자인(흰바탕)을
@@ -421,6 +450,43 @@ class TestCategoryInteraction:
         assert "/static/js/category.js" in html, "category.js 미참조 — 인터랙션 비활성"
         # JS 자산이 실제 배포물에 복사됐는지 (static 복사 누락 회귀 방지)
         assert (out / "static" / "js" / "category.js").exists()
+
+    def test_data_summary_information_gain(self, tmp_path: Path) -> None:
+        # Information Gain(세션 #24 T2): 우리 수집 실데이터(판매량·가격)를 상단 요약으로 전면화.
+        # 가짜 없이 도출 — 2025.12 어필리 패널티(얇은 콘텐츠) 회피·데이터 기반 비교 포지셔닝.
+        db_path = tmp_path / "test.db"
+        db.migrate(db_path=db_path)
+        db.seed(db_path=db_path)
+        conn = db.connect(db_path)
+        try:
+            conn.execute(
+                "INSERT INTO products (source, source_product_id, name, currency, price_krw, "
+                "sales_volume, deeplink_url, deeplink_slug, affiliate_tag, "
+                "created_at, updated_at, last_seen_at) "
+                "VALUES ('aliexpress','ds1','베스트 책상','KRW',49000,1234,"
+                "'https://s.click.aliexpress.com/ds1','ali-ds1','honsalim',"
+                "datetime('now'),datetime('now'),datetime('now'))"
+            )
+            pid = conn.execute("SELECT id FROM products WHERE source_product_id='ds1'").fetchone()[
+                0
+            ]
+            cid = conn.execute("SELECT id FROM categories WHERE slug='desk'").fetchone()[0]
+            conn.execute(
+                "INSERT INTO category_products (category_id, product_id, tier) VALUES (?,?,'budget')",
+                (cid, pid),
+            )
+            category_state.approve(conn, "desk")
+            conn.commit()
+        finally:
+            conn.close()
+        out = tmp_path / "site"
+        renderer.render_site(out_dir=out, db_path=db_path)
+        html = (out / "categories" / "desk" / "index.html").read_text(encoding="utf-8")
+        assert "데이터로 본" in html  # 요약 박스 존재
+        assert "비교 제품 <b>1개</b>" in html
+        assert "49,000원" in html  # 실데이터 가격(가짜 아님)
+        assert "베스트 책상" in html  # 판매량 1위 제품명
+        assert "1,234" in html  # 실제 판매량 수치
 
     def test_pick_cards_row_alignment_css(self) -> None:
         css = self._CSS.read_text(encoding="utf-8")

@@ -444,9 +444,26 @@ def _load_category_pages(conn: sqlite3.Connection, include_drafts: bool = False)
             ).fetchall()
         ]
 
+        # 데이터 요약(Information Gain·세션 #24 T2) — 우리가 수집한 실데이터에서 도출(가짜 없음).
+        # "데이터 기반 비교" 포지셔닝을 상단에 전면화 → 2025.12 어필리 패널티(얇은 콘텐츠) 회피.
+        prices = [r["price_krw"] for r in prods if r["price_krw"]]
+        vols = [((r["sales_volume"] or 0), r["name"]) for r in prods]
+        top_vol, top_name = max(vols, key=lambda x: x[0]) if vols else (0, "")
+        data_summary = {
+            "count": len(prods),
+            "price_range": (
+                f"{_price_krw(min(prices))} ~ {_price_krw(max(prices))}" if prices else ""
+            ),
+            "top_name": (
+                (top_name[:28] + "…" if len(top_name) > 28 else top_name) if top_vol > 0 else ""
+            ),
+            "top_volume": f"{top_vol:,}" if top_vol > 0 else "",
+        }
+
         pages.append(
             {
                 "slug": c["slug"],
+                "data_summary": data_summary,
                 "category": {
                     "name": c["name_ko"],
                     "intro": c["intro"] or "",
@@ -960,6 +977,26 @@ def render_site(
         ),
     )
 
+    # 추천 방법(방법론) — E-E-A-T·신뢰 신호(데이터 기반 비교 명문화, 세션 #24 T2)
+    w(
+        "method/index.html",
+        env.get_template("method.html").render(
+            active_nav="",
+            canonical_url=f"{SITE_ORIGIN}/method/",
+            meta_title="혼살림은 이렇게 고릅니다 — 추천 방법·기준",
+            meta_description="혼살림은 광고가 아니라 실제 판매 데이터와 기준으로 1인 가구·홈오피스 제품을 비교합니다. 가짜 평점 없이, 투명하게.",
+            schema_jsonld=jsonld.as_script_tags(
+                [
+                    jsonld.build_breadcrumb_jsonld(
+                        [{"name": "홈", "url": "/"}, {"name": "추천 방법"}], SITE_ORIGIN
+                    ),
+                    org_ld,
+                ]
+            ),
+            **common,
+        ),
+    )
+
     # 404
     w("404.html", env.get_template("404.html").render(active_nav="", **common))
 
@@ -1064,6 +1101,7 @@ def render_site(
                     ]
                 ),
                 category=pg["category"],
+                data_summary=pg["data_summary"],
                 products=pg["products"],
                 picks_budget=pg["picks_budget"],
                 picks_premium=pg["picks_premium"],
@@ -1094,7 +1132,7 @@ def render_site(
 
     # sitemap.xml
     urls = (
-        ["/", "/scenarios/", "/about/", "/categories/", "/guides/"]
+        ["/", "/scenarios/", "/about/", "/method/", "/categories/", "/guides/"]
         + [f"/categories/{slug}/" for slug in category_slugs]
         + [f"/personas/{p['id']}/" for p in personas]
         + [f"/articles/{slug}/" for slug in article_slugs]
