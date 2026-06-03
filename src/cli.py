@@ -1160,6 +1160,19 @@ def cmd_register_categories(args: argparse.Namespace) -> int:
                         f"     {OK} 저장(draft) 게이트={bres.get('overall_pass')} "
                         f"SEO={bres.get('seo_passed')} 이미지={bres.get('concept_image') or '—'}"
                     )
+                    if args.auto_publish and not args.dry_run:
+                        from writer import auto_publish as _ap
+
+                        ar = _ap.auto_publish_one(conn, slug, client, use_llm=True)
+                        if ar["published"]:
+                            summary[-1] = (slug, "OK(published)")
+                            print(f"     {OK} 가드레일 통과 → 자동 공개(published)")
+                        else:
+                            summary[-1] = (slug, "보류(draft)")
+                            print(
+                                f"     {WARN} 가드레일 보류 — draft 유지: "
+                                f"{'; '.join(ar['reasons'][:2])}"
+                            )
                 else:
                     summary.append((slug, "게이트미통과"))
                     print(f"     {WARN} 게이트 미통과 — 저장 안 됨: {bres.get('gates')}")
@@ -1213,6 +1226,97 @@ def cmd_unapprove_category(args: argparse.Namespace) -> int:
         return 2
     finally:
         conn.close()
+
+
+def cmd_auto_publish(args: argparse.Namespace) -> int:
+    """가드레일 통과 카테고리 자동 공개 (E7→가드레일·세션 #22). 보류는 draft 유지·사유 보고.
+
+    기본 dry_run(판정만). --no-dry-run으로 실제 공개 + 추천6선 LLM 의미 검수(비용 소액).
+    fail-closed: 조금이라도 애매하면 공개하지 않고 draft로 둔다(미탐<오탐).
+    """
+    import os
+    import sqlite3
+
+    from enricher.claude_client import ClaudeClient
+    from writer import auto_publish, category_state
+
+    apply = not args.dry_run
+    use_llm = not args.no_llm
+    if apply or use_llm:
+        config.load_secrets()  # OpenRouter(LLM 검수)·ali 키
+    client = ClaudeClient(api_key=os.environ.get("ANTHROPIC_API_KEY", "") or "dry-run")
+    conn = db.connect(db.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        if args.all:
+            slugs = [r["slug"] for r in category_state.pending_approval(conn)]
+        else:
+            slugs = list(args.slugs)
+        if not slugs:
+            print(f"{WARN} 대상 없음 — slug 지정 또는 --all(글 있는 draft 전체)")
+            return 0
+        results = auto_publish.auto_publish(conn, slugs, client, use_llm=use_llm, apply=apply)
+    finally:
+        conn.close()
+
+    print("\n=== 자동 게시 판정 ===")
+    pub = held = 0
+    for r in results:
+        if r["passed"]:
+            pub += 1
+            print(f"  {OK} {r['slug']}: {'공개' if r['published'] else '통과(판정만)'}")
+        else:
+            held += 1
+            print(f"  {WARN} {r['slug']}: 보류 — {'; '.join(r['reasons'])}")
+    mode = "공개" if apply else "DRY(판정만·공개 안 함)"
+    print(
+        f"\n[{mode}] 통과 {pub} · 보류 {held} / {len(results)} — 보류는 draft 유지(킬스위치 불필요)"
+    )
+    return 0 if held == 0 else 1
+
+
+def cmd_category_status(args: argparse.Namespace) -> int:
+    """카테고리 게시 현황 다이제스트 (무인 사후 감시·세션 #22) — 폰으로 10초 훑기용.
+
+    각 카테고리 status·추천수·전체수·글 유무. --monitor면 published를 휴리스틱 재검수해
+    '지금 가드레일 미달'(킬스위치 후보)을 표시한다(자동 비공개 안 함·보고만).
+    """
+    import sqlite3
+
+    from writer import auto_publish
+
+    conn = db.connect(db.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            "SELECT c.slug, c.name_ko, c.status, c.guide_generated_at, "
+            "(SELECT COUNT(*) FROM category_products WHERE category_id=c.id) AS total, "
+            "(SELECT COUNT(*) FROM category_products WHERE category_id=c.id AND is_featured=1) "
+            "AS feat FROM categories c ORDER BY c.display_order, c.id"
+        ).fetchall()
+        print("=== 카테고리 현황 ===")
+        for r in rows:
+            g = "글O" if r["guide_generated_at"] else "글X"
+            print(
+                f"  {r['status']:<9} {r['slug']:<18} 추천{r['feat']} 전체{r['total']:>3} {g}  "
+                f"{r['name_ko']}"
+            )
+        pub = sum(1 for r in rows if r["status"] == "published")
+        print(f"  → published {pub} / {len(rows)}")
+        if args.monitor:
+            flags = auto_publish.monitor(conn, use_llm=False)
+            print("\n=== 사후 감시(published 재검수·휴리스틱) ===")
+            if not flags:
+                print(f"  {OK} 미달 없음 — 전부 가드레일 통과 상태")
+            else:
+                for f in flags:
+                    print(
+                        f"  {WARN} {f['slug']}: {'; '.join(f['reasons'])} "
+                        f"→ 킬스위치: unapprove-category {f['slug']}"
+                    )
+    finally:
+        conn.close()
+    return 0
 
 
 def cmd_unapprove(args: argparse.Namespace) -> int:
@@ -1537,6 +1641,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_register.add_argument(
         "--max-attempts", type=int, default=2, help="게이트 재생성 상한 (기본 2)"
     )
+    p_register.add_argument(
+        "--auto-publish",
+        action="store_true",
+        help="생성 후 가드레일 통과 시 자동 공개(E7→가드레일·세션 #22). 보류는 draft 유지",
+    )
     p_register.set_defaults(func=cmd_register_categories, dry_run=True)
 
     # 카테고리 공개 승인 게이트 (세션 #18) — AI 자동승인 금지(§2-마·E7), 사용자 1클릭만 공개
@@ -1547,10 +1656,40 @@ def build_parser() -> argparse.ArgumentParser:
     p_approve_cat.set_defaults(func=cmd_approve_category)
 
     p_unapprove_cat = sub.add_parser(
-        "unapprove-category", help="published 카테고리 → draft (공개 취소·비공개)"
+        "unapprove-category", help="published 카테고리 → draft (공개 취소·비공개·킬스위치)"
     )
     p_unapprove_cat.add_argument("slug", type=str, help="categories.slug")
     p_unapprove_cat.set_defaults(func=cmd_unapprove_category)
+
+    # 자동 게시 가드레일 (세션 #22) — E7(사람 승인)을 fail-closed 가드레일로 대체
+    p_auto_pub = sub.add_parser(
+        "auto-publish",
+        help="가드레일 통과 카테고리 자동 공개(보류는 draft 유지·세션 #22). 기본 dry_run",
+    )
+    p_auto_pub.add_argument("slugs", nargs="*", help="categories.slug 목록 (없으면 --all)")
+    p_auto_pub.add_argument("--all", action="store_true", help="글 있는 draft 전체 대상")
+    p_auto_pub.add_argument(
+        "--no-dry-run",
+        dest="dry_run",
+        action="store_false",
+        help="실제 공개 + LLM 의미 검수(비용 소액) — 명시 승인 후",
+    )
+    p_auto_pub.add_argument(
+        "--no-llm", action="store_true", help="LLM 의미검수 생략(휴리스틱만 — 오프라인·테스트)"
+    )
+    p_auto_pub.set_defaults(func=cmd_auto_publish, dry_run=True)
+
+    # 카테고리 현황 다이제스트 + 사후 감시 (세션 #22) — 무인 오버사이트
+    p_cat_status = sub.add_parser(
+        "category-status",
+        help="카테고리 게시 현황 + (--monitor) published 재검수 킬스위치 후보 표시",
+    )
+    p_cat_status.add_argument(
+        "--monitor",
+        action="store_true",
+        help="published 카테고리 휴리스틱 재검수 — 지금 가드레일 미달 건 표시",
+    )
+    p_cat_status.set_defaults(func=cmd_category_status)
 
     p_unapprove = sub.add_parser("unapprove", help="approved draft → validated 회귀")
     p_unapprove.add_argument("--draft", type=int, required=True, help="draft id")

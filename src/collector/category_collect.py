@@ -180,9 +180,18 @@ def collect_category(
 
     products_store.upsert_products(conn, all_rows)
 
+    # 이번 수집에서 관련(필터 통과)으로 확인된 제품 id 집합 — 정합화 기준.
+    relevant_ids: set[int] = set()
+    for r in all_rows:
+        prow = conn.execute(
+            "SELECT id FROM products WHERE source = ? AND source_product_id = ?",
+            (r.get("source"), r.get("source_product_id")),
+        ).fetchone()
+        if prow is not None:
+            relevant_ids.add(int(prow[0]))
+
     # 정합화(세션 #19): 카탈로그(is_featured=0) 연결을 먼저 비우고 이번 수집분으로 재구성한다.
-    # → 필터를 강화해 재수집하면 옛 오염 상품이 자동 제거(재수집 idempotent). 추천 6선(is_featured=1)은
-    #   build-category가 관리하므로 보존(아래 INSERT의 ON CONFLICT는 is_featured를 건드리지 않음).
+    # → 필터를 강화해 재수집하면 옛 오염 상품이 자동 제거(재수집 idempotent).
     prev_catalog = conn.execute(
         "SELECT COUNT(*) FROM category_products WHERE category_id = ? AND is_featured = 0",
         (result.category_id,),
@@ -191,6 +200,21 @@ def collect_category(
         "DELETE FROM category_products WHERE category_id = ? AND is_featured = 0",
         (result.category_id,),
     )
+    # ★세션 #22 근본수정: 이제 비관련이 된 옛 추천(is_featured=1)도 제거. 안 그러면 필터를 강화해도
+    #   옛 오염 추천이 남아 build의 select_featured(판매량순)가 그놈을 다시 뽑아 오염이 영속된다.
+    #   여전히 관련인 추천(product_id ∈ relevant_ids)은 보존 — build가 6선을 재확정하기 전 안전.
+    featured_rows = conn.execute(
+        "SELECT product_id FROM category_products WHERE category_id = ? AND is_featured = 1",
+        (result.category_id,),
+    ).fetchall()
+    stale_featured = [
+        (result.category_id, int(fr[0])) for fr in featured_rows if int(fr[0]) not in relevant_ids
+    ]
+    if stale_featured:
+        conn.executemany(
+            "DELETE FROM category_products WHERE category_id = ? AND product_id = ?",
+            stale_featured,
+        )
 
     order = 0
     seen: set[int] = set()
