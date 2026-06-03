@@ -1490,6 +1490,20 @@ def cmd_build(args: argparse.Namespace) -> int:
                 "시나리오 카드 링크(/articles/<slug>/)는 콘텐츠 게시(Phase 3~4) 후 활성"
             )
 
+        # 공개 빌드는 /go/ 리다이렉트 Pages Function도 재생성(published 상품 맵). 미리보기는 생략.
+        if args.full:
+            import sqlite3 as _sqlite3
+
+            from builder import go_function
+
+            _conn = db.connect(db.DB_PATH)
+            _conn.row_factory = _sqlite3.Row
+            try:
+                gres = go_function.generate_go_function(_conn, PROJECT_ROOT)
+            finally:
+                _conn.close()
+            print(f"{OK} /go/ Pages Function 생성 → {gres['count']}개 제품 리다이렉트")
+
     if args.save_empty and not manifest_path.exists():
         manifest_mod.save(manifest_path, manifest)
         print(f"{OK} 빈 manifest 저장 → {manifest_path}")
