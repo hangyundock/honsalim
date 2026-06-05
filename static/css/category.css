@@ -235,3 +235,22 @@
 .catpage .rel-go { font-size: 14px; color: var(--accent); font-weight: 700; margin-top: 10px; }
 .catpage .rel-card.soon { opacity: .65; }
 .catpage .rel-card .soon-badge { display: inline-block; font-size: 10.5px; font-weight: 800; color: var(--meta); background: #fff; border: 1px solid var(--border); border-radius: 5px; padding: 1px 7px; margin-left: 6px; vertical-align: middle; }
+
+/* 쿠팡 로켓배송 추천 (채널별 최선·세션 #24) — 실제 제품 이미지 그리드(전환↑)·브랜드 그린(광고 톤 회피) */
+.catpage .cpx-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin: 10px 0 4px; }
+.catpage .cpx { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: #fff; display: flex; flex-direction: column; box-shadow: var(--shadow-card); }
+/* 이미지 영역 — 쿠팡 공식 이미지 hotlink(흰 배경에 contain). 깨지면(.noimg) 배지만 남는 옅은 박스 */
+.catpage .cpx-img { position: relative; display: block; aspect-ratio: 1 / 1; background: #f6f7f9; border-radius: 9px; overflow: hidden; margin-bottom: 10px; }
+.catpage .cpx-img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+/* 광고차단 등으로 이미지가 막히면(.noimg) 빈 칸 대신 로켓배송 톤 박스로 — 깨진 느낌 방지(세션 #24) */
+.catpage .cpx-img.noimg { aspect-ratio: auto; min-height: 66px; background: #eaf5f0; display: flex; align-items: center; justify-content: center; }
+.catpage .cpx-tag { position: absolute; top: 8px; left: 8px; z-index: 1; font-size: 11px; font-weight: 800; color: var(--accent-ink); background: #eaf5f0; border: 1px solid #cfe9df; border-radius: 999px; padding: 2px 9px; }
+.catpage .cpx-img.noimg .cpx-tag { position: static; font-size: 12.5px; background: transparent; border: 0; }
+.catpage .cpx-nm a { font-size: 13.5px; font-weight: 700; color: var(--text); line-height: 1.4; text-decoration: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.8em; }
+.catpage .cpx-note { font-size: 12px; color: var(--meta); margin-top: 4px; line-height: 1.5; }
+.catpage .cpx-priceline { margin: 8px 0 11px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.catpage .cpx-price { font-size: 16px; font-weight: 800; color: var(--text); text-decoration: none; }
+.catpage .cpx-sig { font-size: 11.5px; color: var(--meta); }
+.catpage .cpx-sig .off { color: #c0392b; }
+.catpage .cpx-btns { margin-top: auto; }
+.catpage .cpx-btns .btn { display: block; }

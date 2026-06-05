@@ -1,0 +1,106 @@
+# 쿠팡 파트너스 수동 상품 (API 미사용 — 최종승인 전 부트스트랩, collector.coupang).
+#
+# 쿠팡 Open API는 최종승인(누적 판매 15만원) 후에야 열린다 [확정 — 쿠팡 FAQ].
+# 승인 전에는 운영자가 파트너스 '링크 생성'으로 만든 딥링크를 여기에 기록하고,
+# `collect-coupang`이 products(source='coupang') + category_products로 적재한다.
+#
+# 규칙(§0 진실성·안전):
+#  - 가짜 후기·평점·판매량 금지 → 쿠팡은 알리 같은 sales_volume/evaluate_rate 신호가 없으므로 비움.
+#  - 가격은 '확인 시점' 기준(변동 가능). 숫자 박제 금지 — 렌더러가 변동 안내를 함께 표기.
+#  - 이미지(image_url): 쿠팡 '링크 생성 → 상품 링크 → 블로그용(a 태그) HTML'이 제공하는 공식 이미지
+#    URL만 넣는다(임베드 정식 사용). 쿠팡 상품 페이지에서 다운로드·스크랩은 금지(§9 함정3).
+#    비우면 카드는 텍스트로 표시(이미지 깨져도 graceful degrade).
+#  - category 는 categories.slug 와 일치해야 한다(db seed 필요).
+#  - coupang_url 은 파트너스 딥링크(link.coupang.com/a/<코드>). 코드가 source_product_id·slug(cp-<코드>)가 된다.
+
+products:
+  # 모니터암 — 쿠팡 '상품 링크 → 블로그용 태그' 11종(세션 #24). image_url = 쿠팡 제공 공식 이미지.
+  - category: monitor-arm
+    name: "헤미션 고중량 싱글 모니터암 인체공학 홀/클램프 겸용 ARM-001, 화이트"
+    coupang_url: https://link.coupang.com/a/ekZev7OxMG
+    image_url: https://image12.coupangcdn.com/image/affiliate/banner/add5c7b0fde5dae3e37f9192463099c9@2x.jpg
+    display_order: 0
+
+  - category: monitor-arm
+    name: "마운트뷰 LUX 싱글 모니터암 27~32인치, 화이트"
+    coupang_url: https://link.coupang.com/a/ekZgjQXp48
+    image_url: https://img5c.coupangcdn.com/image/affiliate/banner/2896eb2b7ad4140319295a25edc464f3@2x.jpg
+    display_order: 1
+
+  - category: monitor-arm
+    name: "엘디엘마운트 싱글 모니터암 APL-FLEX FIT BV1, 블랙"
+    coupang_url: https://link.coupang.com/a/ekZjGwBYK4
+    image_url: https://img5c.coupangcdn.com/image/affiliate/banner/1f7397ab4d8889a468c50f9c8e24e759@2x.jpg
+    display_order: 2
+
+  - category: monitor-arm
+    name: "호밍사이 싱글 모니터암 회전식 17~32인치(1~10kg), 블랙"
+    coupang_url: https://link.coupang.com/a/ekZmM3tlIa
+    image_url: https://image1.coupangcdn.com/image/affiliate/banner/feca87bd2bd227a3439be02dbdab82e2@2x.jpg
+    display_order: 3
+
+  - category: monitor-arm
+    name: "엘디엘마운트 듀얼 모니터암 3단 관절 APL-C024, 블랙"
+    coupang_url: https://link.coupang.com/a/ekZnTjRfkO
+    image_url: https://img3c.coupangcdn.com/image/affiliate/banner/4ac243c3a441aaca262bf4e127b3e4f0@2x.jpg
+    display_order: 4
+
+  - category: monitor-arm
+    name: "위드멍 노트북 듀얼 모니터암(노트북 거치 겸용)"
+    coupang_url: https://link.coupang.com/a/ekZpfXGleS
+    image_url: https://image11.coupangcdn.com/image/affiliate/banner/4b409ea4b853eefb4b981db87601b312@2x.jpg
+    display_order: 5
+
+  - category: monitor-arm
+    name: "이지마운트 모니터 거치대 높이조절 피벗 벽밀착 CMC1032, 블랙"
+    coupang_url: https://link.coupang.com/a/ekZrd7UMKq
+    image_url: https://img2a.coupangcdn.com/image/affiliate/banner/9fd1a5cfb3dd7fa9a840dc967a55f261@2x.jpg
+    display_order: 6
+
+  - category: monitor-arm
+    name: "에임엑스 벡터 듀얼 모니터암, 화이트"
+    coupang_url: https://link.coupang.com/a/ekZs04wfNQ
+    image_url: https://image3.coupangcdn.com/image/affiliate/banner/512ed2e59e46a83ed4ee689b074465ad@2x.jpg
+    display_order: 7
+
+  - category: monitor-arm
+    name: "카멜마운트 고든 슬림형 싱글 모니터암 GDA2, 화이트"
+    coupang_url: https://link.coupang.com/a/ekZurqFjZA
+    image_url: https://image9.coupangcdn.com/image/affiliate/banner/2df900732f6fb81e500b00159b04122d@2x.jpg
+    display_order: 8
+
+  - category: monitor-arm
+    name: "마운트뷰 LUX 싱글 모니터암 27~32인치, 블랙"
+    coupang_url: https://link.coupang.com/a/ekZvdNhN48
+    image_url: https://image1.coupangcdn.com/image/affiliate/banner/7805c62857e1e28087f8f13d1b094fa1@2x.jpg
+    display_order: 9
+
+  - category: monitor-arm
+    name: "노스바유 고중량 듀얼 모니터암 NB F195A, 블랙"
+    coupang_url: https://link.coupang.com/a/ekZw6k37EO
+    image_url: https://img1c.coupangcdn.com/image/affiliate/banner/f044df87740c846bed10a1262bd6fd41@2x.jpg
+    display_order: 10
+
+  - category: monitor-arm
+    name: "홈플래닛 싱글 모니터암, 블랙"
+    coupang_url: https://link.coupang.com/a/ek0qZySBt6
+    image_url: https://img2c.coupangcdn.com/image/affiliate/banner/301f8e6151b6b5f506a6989ac599f163@2x.jpg
+    display_order: 11
+
+  - category: monitor-arm
+    name: "마운트뷰 싱글 모니터암 MV-G10 PLUS 2세대, 블랙"
+    coupang_url: https://link.coupang.com/a/ek0sys0bXE
+    image_url: https://image9.coupangcdn.com/image/affiliate/banner/fe627b565af7589d67f51de04b56ad60@2x.jpg
+    display_order: 12
+
+  - category: monitor-arm
+    name: "지마운트 싱글 모니터암 AG-01"
+    coupang_url: https://link.coupang.com/a/ek0tPz1yvd
+    image_url: https://image6.coupangcdn.com/image/affiliate/banner/58c7f14ad68ba285a339ac1d018f4dfb@2x.jpg
+    display_order: 13
+
+  - category: monitor-arm
+    name: "엘디엘마운트 상하 듀얼 모니터암 APL-C02V, 블랙"
+    coupang_url: https://link.coupang.com/a/ek0vwvVHLU
+    image_url: https://img4a.coupangcdn.com/image/affiliate/banner/b148c49241e575cb94da01f703cea041@2x.jpg
+    display_order: 14

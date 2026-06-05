@@ -777,3 +777,111 @@ class TestNoAiJargonTerms:
 
     def test_article_page_has_no_banned_terms(self, built_with_article: dict) -> None:
         _assert_no_banned_terms(built_with_article["out"])
+
+
+class TestCoupangChannel:
+    """쿠팡 로켓배송 채널 통합 (세션 #24) — 채널별 최선·고지 채널인식·알리 섹션 분리(§0·DECISIONS S1·S2)."""
+
+    def _render(self, tmp_path: Path) -> str:
+        from collector import coupang
+
+        db_path = tmp_path / "test.db"
+        db.migrate(db_path=db_path)
+        db.seed(db_path=db_path)
+        conn = db.connect(db_path)
+        try:
+            # 알리 추천 상품 1개(monitor-arm) — 이미지 있음
+            conn.execute(
+                "INSERT INTO products (source, source_product_id, name, currency, price_krw, "
+                "image_url_external, deeplink_url, deeplink_slug, affiliate_tag, sales_volume, "
+                "created_at, updated_at, last_seen_at) "
+                "VALUES ('aliexpress','ma1','모니터암 알리 상품','KRW',25000,"
+                "'https://ae-pic-a1.aliexpress-media.com/kf/x.jpg',"
+                "'https://s.click.aliexpress.com/ma1','ali-ma1','honsalim',100,"
+                "datetime('now'),datetime('now'),datetime('now'))"
+            )
+            pid = conn.execute("SELECT id FROM products WHERE source_product_id='ma1'").fetchone()[
+                0
+            ]
+            cid = conn.execute("SELECT id FROM categories WHERE slug='monitor-arm'").fetchone()[0]
+            conn.execute(
+                "INSERT INTO category_products (category_id, product_id, tier, is_featured) "
+                "VALUES (?,?,'budget',1)",
+                (cid, pid),
+            )
+            # 쿠팡 수동 상품 적재·연결 (실제 yml 흠플래닛 모니터암)
+            coupang.collect_coupang(conn, "monitor-arm", dry_run=False)
+            category_state.approve(conn, "monitor-arm")
+            conn.commit()
+        finally:
+            conn.close()
+        out = tmp_path / "site"
+        renderer.render_site(out_dir=out, db_path=db_path)
+        return (out / "categories" / "monitor-arm" / "index.html").read_text(encoding="utf-8")
+
+    def test_coupang_section_rendered(self, tmp_path: Path) -> None:
+        html = self._render(tmp_path)
+        assert "쿠팡 로켓배송으로 빠르게 받기" in html
+        assert "⚡ 로켓배송" in html
+        # yml 첫 상품(헤미션)의 딥링크 → /go/ 라우팅 + 상품명
+        assert "/go/cp-ekZev7OxMG" in html
+        assert "헤미션" in html
+
+    def test_disclosure_mentions_both_channels(self, tmp_path: Path) -> None:
+        # 쿠팡 상품이 있는 페이지는 상단 고지에 쿠팡 파트너스도 명시(공정위 정확성)
+        html = self._render(tmp_path)
+        assert "쿠팡 파트너스 및 AliExpress" in html
+
+    def test_ali_catalog_excludes_coupang(self, tmp_path: Path) -> None:
+        # 전체 제품 카탈로그는 알리 전용(쿠팡은 별도 섹션) → 카운트 1(알리만)
+        html = self._render(tmp_path)
+        assert "전체 <b>1</b>개" in html
+        assert "/go/ali-ma1" in html  # 알리 상품은 카탈로그/추천에 존재
+
+    def test_coupang_image_rendered(self, tmp_path: Path) -> None:
+        # 쿠팡 공식 이미지 URL이 있으면 카드에 <img>로 렌더(이미지 그리드·전환↑, 세션 #24)
+        coup_img = "https://ads-partners.coupang.com/banners/zzz.jpg?w=200"
+        db_path = tmp_path / "test.db"
+        db.migrate(db_path=db_path)
+        db.seed(db_path=db_path)
+        conn = db.connect(db_path)
+        try:
+            # 알리 상품(페이지 렌더 조건) + 쿠팡 상품(이미지 있음)
+            conn.execute(
+                "INSERT INTO products (source, source_product_id, name, currency, price_krw, "
+                "deeplink_url, deeplink_slug, affiliate_tag, sales_volume, "
+                "created_at, updated_at, last_seen_at) VALUES "
+                "('aliexpress','mx1','모니터암 알리','KRW',25000,"
+                "'https://s.click.aliexpress.com/mx1','ali-mx1','honsalim',50,"
+                "datetime('now'),datetime('now'),datetime('now'))"
+            )
+            conn.execute(
+                "INSERT INTO products (source, source_product_id, name, currency, price_krw, "
+                "image_url_external, deeplink_url, deeplink_slug, affiliate_tag, "
+                "created_at, updated_at, last_seen_at) VALUES "
+                "('coupang','CPX1','쿠팡 모니터암','KRW',19900,?,"
+                "'https://link.coupang.com/a/CPX1','cp-CPX1','AF4831369',"
+                "datetime('now'),datetime('now'),datetime('now'))",
+                (coup_img,),
+            )
+            cid = conn.execute("SELECT id FROM categories WHERE slug='monitor-arm'").fetchone()[0]
+            for spid, tier, feat in (("mx1", "budget", 1), ("CPX1", None, 0)):
+                pid = conn.execute(
+                    "SELECT id FROM products WHERE source_product_id=?", (spid,)
+                ).fetchone()[0]
+                conn.execute(
+                    "INSERT INTO category_products (category_id, product_id, tier, is_featured) "
+                    "VALUES (?,?,?,?)",
+                    (cid, pid, tier, feat),
+                )
+            category_state.approve(conn, "monitor-arm")
+            conn.commit()
+        finally:
+            conn.close()
+        out = tmp_path / "site"
+        renderer.render_site(out_dir=out, db_path=db_path)
+        html = (out / "categories" / "monitor-arm" / "index.html").read_text(encoding="utf-8")
+        # 쿠팡 카드에 공식 이미지가 <img src=...>로 들어감 + onerror graceful 숨김
+        assert f'src="{coup_img}"' in html
+        assert "cpx-img" in html
+        assert "onerror=" in html  # 깨질 때 숨김(프라이버시 브라우저 대비)

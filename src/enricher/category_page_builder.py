@@ -52,10 +52,13 @@ _SAVE_GUIDE_SQL = """
     WHERE id = ?
 """
 
+# ★세션 #24 가드: 6선 리셋은 **알리 채널 한정**. 쿠팡 수동 적재분(source='coupang')은 별도
+#   채널이라 알리 재빌드가 pick_reason(쿠팡 노트) 등을 지우면 안 됨 → source='aliexpress'만.
 _RESET_FEATURED_SQL = """
     UPDATE category_products
     SET is_featured = 0, pros_json = NULL, cons_json = NULL, pick_reason = NULL, pick_type = NULL
     WHERE category_id = ?
+      AND product_id IN (SELECT id FROM products WHERE source = 'aliexpress')
 """
 
 _SET_PICK_SQL = """
@@ -63,6 +66,22 @@ _SET_PICK_SQL = """
     SET is_featured = 1, tier = ?, pros_json = ?, cons_json = ?, pick_reason = ?, pick_type = ?
     WHERE category_id = ? AND product_id = (SELECT id FROM products WHERE deeplink_slug = ?)
 """
+
+
+def _page_sources(conn: sqlite3.Connection, category_id: int) -> set[str]:
+    """첫머리 고지용 제휴처 집합 — 카테고리에 쿠팡 상품이 연결돼 있으면 'coupang' 추가(세션 #24).
+
+    카테고리 페이지는 알리 카탈로그가 기본이라 'aliexpress'는 항상 포함. 쿠팡 수동 적재분
+    (collector.coupang)이 연결돼 있으면 첫머리에 '쿠팡 파트너스'도 명시(공정위 정확성·disclosure 게이트).
+    """
+    srcs = {"aliexpress"}
+    if conn.execute(
+        "SELECT 1 FROM category_products cp JOIN products p ON p.id = cp.product_id "
+        "WHERE cp.category_id = ? AND p.source = 'coupang' LIMIT 1",
+        (category_id,),
+    ).fetchone():
+        srcs.add("coupang")
+    return srcs
 
 
 def load_products(conn: sqlite3.Connection, category_id: int) -> list[dict[str, Any]]:
@@ -266,7 +285,7 @@ def build_and_save(
             continue
         last_parse_error = None
         prose = _prose(parsed, primary)
-        guide_md = article_writer.apply_disclosure(prose, sources={"aliexpress"})
+        guide_md = article_writer.apply_disclosure(prose, sources=_page_sources(conn, category_id))
         safe_ok, gates = _run_gates(guide_md)  # truth·disclosure·links
         if primary:
             seo_ok, seo_rep = check_seo(

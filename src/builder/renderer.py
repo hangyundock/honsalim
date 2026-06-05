@@ -294,12 +294,14 @@ def _load_article_pages(conn: sqlite3.Connection) -> list[dict]:
     return pages
 
 
+# 알리 채널 전용(source='aliexpress') — 전체 제품 카탈로그·데이터 요약은 판매량/할인 신호가 있는
+# 알리만. 쿠팡(수동·신호 없음)은 별도 '쿠팡 로켓배송' 섹션으로 분리(채널별 최선, DECISIONS S1·S2).
 CATEGORY_CATALOG_SQL = """
     SELECT p.name, p.price_krw, p.original_price_krw, p.discount_pct, p.sales_volume,
            p.image_url_external, p.deeplink_slug, cp.tier, cp.display_order
     FROM category_products cp
     JOIN products p ON p.id = cp.product_id
-    WHERE cp.category_id = ?
+    WHERE cp.category_id = ? AND p.source = 'aliexpress'
     ORDER BY CASE cp.tier WHEN 'budget' THEN 0 WHEN 'premium' THEN 1 ELSE 2 END,
              cp.display_order, p.id
 """
@@ -341,10 +343,42 @@ CATEGORY_PICKS_SQL = """
            cp.pros_json, cp.cons_json, cp.pick_reason, cp.pick_type, cp.display_order
     FROM category_products cp
     JOIN products p ON p.id = cp.product_id
-    WHERE cp.category_id = ? AND cp.is_featured = 1
+    WHERE cp.category_id = ? AND cp.is_featured = 1 AND p.source = 'aliexpress'
     ORDER BY CASE cp.tier WHEN 'budget' THEN 0 WHEN 'premium' THEN 1 ELSE 2 END,
              p.sales_volume DESC, cp.display_order, p.id
 """
+
+# 쿠팡 로켓배송 추천 — 채널별 최선(DECISIONS S1·S2). 쿠팡은 판매량·평점 신호가 없어 별도 섹션으로,
+# '빠른배송' 정성 기준으로 제시. 가격은 확인 시점 기준(변동 안내). 쿠팡 이미지 미사용(§9 함정3).
+CATEGORY_COUPANG_SQL = """
+    SELECT p.name, p.price_krw, p.original_price_krw, p.discount_pct,
+           p.image_url_external, p.deeplink_slug, cp.pick_reason, cp.display_order
+    FROM category_products cp
+    JOIN products p ON p.id = cp.product_id
+    WHERE cp.category_id = ? AND p.source = 'coupang'
+    ORDER BY cp.display_order, p.id
+"""
+
+
+def _coupang_item(row: sqlite3.Row) -> dict:
+    """쿠팡 로켓배송 추천 카드 컨텍스트 — 실제 제품 이미지 그리드(전환↑, 세션 #24).
+
+    이미지는 쿠팡 링크생성기가 제공한 공식 URL을 hotlink(§9: 다운로드 금지·임베드 정식). 깨지면
+    onerror로 숨겨 텍스트로 graceful degrade. 가격은 확인 시점 기준이라 변동 안내를 함께 둔다(S2).
+    """
+    disc = product_filter.trusted_discount(row["discount_pct"])
+    orig = row["original_price_krw"]
+    show = disc is not None and bool(orig)
+    return {
+        "name": row["name"],
+        "price": _price_krw(row["price_krw"]),
+        "orig": _price_krw(orig) if show else "",
+        "disc": f"{disc}%" if show else "",
+        "note": row["pick_reason"] or "",
+        "img_url": row["image_url_external"] or "",
+        "url": f"/go/{row['deeplink_slug']}",
+        "slug": row["deeplink_slug"],
+    }
 
 
 def _pick_item(row: sqlite3.Row) -> dict:
@@ -404,6 +438,9 @@ def _load_category_pages(conn: sqlite3.Connection, include_drafts: bool = False)
         if not prods:
             continue
         picks = [_pick_item(r) for r in conn.execute(CATEGORY_PICKS_SQL, (c["id"],)).fetchall()]
+        coupang_picks = [
+            _coupang_item(r) for r in conn.execute(CATEGORY_COUPANG_SQL, (c["id"],)).fetchall()
+        ]
         faq = json.loads(c["faq_json"]) if c["faq_json"] else []
         content = json.loads(c["content_json"]) if c["content_json"] else {}
         has_guide = bool(content.get("lead"))
@@ -506,6 +543,8 @@ def _load_category_pages(conn: sqlite3.Connection, include_drafts: bool = False)
                 "picks_budget": [p for p in picks if p["tier"] == "budget"],
                 "picks_premium": [p for p in picks if p["tier"] == "premium"],
                 "has_picks": bool(picks),
+                "coupang_picks": coupang_picks,
+                "has_coupang": bool(coupang_picks),
                 "compare": compare,
                 "has_compare": bool(compare["rows"] and compare["cols"]),
                 "related": related,
@@ -1230,6 +1269,8 @@ def render_site(
                 picks_budget=pg["picks_budget"],
                 picks_premium=pg["picks_premium"],
                 has_picks=pg["has_picks"],
+                coupang_picks=pg["coupang_picks"],
+                has_coupang=pg["has_coupang"],
                 compare=pg["compare"],
                 has_compare=pg["has_compare"],
                 related=pg["related"],

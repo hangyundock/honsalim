@@ -41,10 +41,10 @@
 <div class="wrap catpage">
   <div class="crumb">홈 › 카테고리 › {{ category.name }}</div>
 
-  {# 공정위 고지 — 최상단 (2024.12 개정) #}
+  {# 공정위 고지 — 최상단 (2024.12 개정). 채널 인식: 쿠팡 상품이 있으면 쿠팡 파트너스도 명시(정확성) #}
   <div class="disc">
     <span>ⓘ</span>
-    <span><b>대가성 안내</b> · 이 페이지에는 AliExpress 어필리에이트 활동의 일환으로 일정 수수료를 제공받습니다. (구매자에게 추가 비용은 발생하지 않습니다.)</span>
+    <span><b>대가성 안내</b> · 이 페이지에는 {% if has_coupang %}쿠팡 파트너스 및 AliExpress{% else %}AliExpress{% endif %} 어필리에이트 활동의 일환으로 일정 수수료를 제공받습니다. (구매자에게 추가 비용은 발생하지 않습니다.)</span>
   </div>
 
   {# 타입 선택기 — 추천 6선 썸네일 + 전체 보기 #}
@@ -130,6 +130,29 @@
     {% for p in picks_budget %}{{ pick_card(p, (loop.index + 1) ~ ' / 1') }}{% endfor %}
     <div class="tier-label premium" style="grid-area: 1 / 2">⭐ 고급형</div>
     {% for p in picks_premium %}{{ pick_card(p, (loop.index + 1) ~ ' / 2') }}{% endfor %}
+  </div>
+  {% endif %}
+
+  {% if has_coupang %}
+  {# ===== 쿠팡 로켓배송 추천 — 채널별 최선(DECISIONS S1·S2). 배너 아님: 우리 카드 스타일·브랜드 그린 ===== #}
+  <div class="sechead" id="coupang"><div class="eb">또 다른 채널 · 빠른배송</div><h2>쿠팡 로켓배송으로 빠르게 받기</h2></div>
+  <p class="tier-intro">알리는 <b>최저가</b>, 쿠팡은 <b>빠른배송</b>이 강점입니다. 급하게 필요하면 아래 쿠팡 로켓배송도 함께 비교해 보세요. <span class="dim">가격은 확인 시점 기준이라 변동될 수 있어요 — 구매 전 쿠팡에서 최종가를 확인하세요.</span></p>
+  <div class="cpx-row">
+    {% for p in coupang_picks %}
+    <div class="cpx">
+      <a class="cpx-img{% if not p.img_url %} noimg{% endif %}" href="{{ p.url }}" rel="sponsored nofollow">
+        <span class="cpx-tag">⚡ 로켓배송</span>
+        {% if p.img_url %}<img loading="{{ 'eager' if eager_images else 'lazy' }}" decoding="async" src="{{ p.img_url }}" alt="{{ p.name }}" onerror="this.closest('.cpx-img').classList.add('noimg');this.style.display='none'">{% endif %}
+      </a>
+      <div class="cpx-nm"><a href="{{ p.url }}" rel="sponsored nofollow">{{ p.name }}</a></div>
+      {% if p.note %}<div class="cpx-note">{{ p.note }}</div>{% endif %}
+      <div class="cpx-priceline">
+        {% if p.price %}<a href="{{ p.url }}" rel="sponsored nofollow" class="cpx-price">{{ p.price }}</a>{% endif %}
+        {% if p.disc %}<span class="cpx-sig">정가 <s>{{ p.orig }}</s> · <b class="off">{{ p.disc }}↓</b></span>{% endif %}
+      </div>
+      <div class="cpx-btns"><a class="btn primary" href="{{ p.url }}" rel="sponsored nofollow">쿠팡에서 보기 →</a></div>
+    </div>
+    {% endfor %}
   </div>
   {% endif %}
 

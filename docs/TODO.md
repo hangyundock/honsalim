@@ -3,13 +3,12 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #24 — (상세 EVENTS #23)
+## ★ 다음 세션 #26 — (상세 EVENTS #25)
 
-- [x] ~~무인 스케줄러 A안(refresh-cycle: 새로고침→자가복원→빌드→변경분 배포) · 모니터링 대시보드(무인사이클+공개카테고리건강+경고배너+바탕화면 아이콘) · Claude 예약작업 등록(매일 11:00 KST) · 메인 체크아웃 정비(stash·#22 ff·DB재생성 6공개/2보류)~~ ✅ #23
-- [ ] **0. #23 머지 → 스케줄러 가동 확인**: #23이 origin/main에 올라야 예약작업이 refresh-cycle 가동. 머지 후 `refresh-cycle --dry-run`(또는 예약작업 Run now) 1회 점검. **첫 배포 시 보류 2개(laptop-stand·drying-rack) 라이브에서 내려감(fail-closed) — 검토 후 결정.**
-- [ ] **1. ★★쿠팡 본격 (주인 명시)**: ①가입 완료 ②쿠팡 링크 생성 ③**승인용 데모 페이지(쿠팡 고지+링크) honsallim.com 배포→스샷 업로드** ④승인 후 **`collector.coupang` 구현**으로 쿠팡 상품 수집. 쿠팡=메인(§6). ⚠본인·가족 구매 금지.
-- [x] ~~**2. 알리+쿠팡 페이지 배치 설계**~~ → **방향 합의(C안) [확정 #24 · DECISIONS S1·S2]**: "채널별 최선 추천 + 정성 기준(빠른배송 쿠팡/최저가 알리) + 가격 위임(숫자 박제 금지·갱신일)". 가격비교형(A안)=표시광고법 위험으로 탈락. **구현은 `collector.coupang`(쿠팡 상품 0) + 1~2주 트래픽 데이터 후 확정**.
-- [ ] **3. ★성장 = 무인 마케팅 로드맵**([[growth-first-priority]] · 방향 [확정 #24 DECISIONS T1·T2]):
+- [x] ~~쿠팡 채널 통합 부트스트랩(`collector.coupang`+CLI·이미지 그리드·채널인식 고지·알리 가드·`/go/`)·모니터암 15개 라이브검증·회귀 710~~ ✅ #25
+- [ ] **1. ★광고 배치 구현 (#25 합의·DECISIONS U4)**: **메인 첫 화면 쿠팡 배너(주인 원안)** + 카테고리 **결정지점(추천·비교 직후)** 배치. 근거=위치>형태. **효과=쿠팡 수익 리포트**(별도 클릭 측정 시스템 ❌ 과잉·[[assist-not-overstep]]). ★구현 전 "이 코드 이렇게 바꾼다" 먼저 짧게 보고.
+- [ ] **2. 쿠팡 상품 추가 (수동)**: 다른 카테고리 = 주인이 '블로그용 HTML' 붙여주면 `coupang_products.yml`+`collect-coupang`. ⚠브라우저 자동화 정책 차단(재시도 금지·U3). 쿠팡 API는 **판매금액 15만원→최종승인** 후(U2, 내 수익금 아님). ⚠본인·가족 구매 금지.
+- [ ] **3. ★성장이 진짜 병목 (정직하게·희망고문 금지)**([[growth-first-priority]] · DECISIONS T2):
   - **Tier 0 (지금·진행중)**: 사이트 SEO 품질 강화 — ①"데이터 기반 비교" 포지셔닝(알리 판매량=Information Gain) ②방법론·저자 E-E-A-T 페이지 ③토픽 클러스터+내부링크 ④소수 품목 주인 실경험. (2025.12 어필리에이트 패널티군 회피)
   - **Tier 1 (병렬·승인 1~4주)**: Pinterest 자동 핀(개인정보처리방침+Standard API 승인→핀→리뷰페이지·첫머리 고지)
   - **Tier 2/3**: Threads 공짜 보조 → 쇼츠(차별화)·네이버블로그 연계
@@ -17,11 +16,7 @@
 - [ ] (선택) `docs/CATEGORIES.md` · D1 클릭로깅 복원 · main-protect status check · Chrome lookalike(관찰).
 - 참고: **DB gitignore→재생성**(`register-categories --all --no-dry-run --auto-publish`, ~$2). 워크트리=`PYTHONPATH=src python -m cli`. ★메인=#22 동기화+DB재생성 완료(잔재 `stash@{0}`).
 
-## 알리 통합 (D9)
-
-- [x] ~~App Key/Secret·라이브검증(#11)·collect-products·C-1·enrich·4게이트(#12)·promote·상세글 렌더·라이브 게시(#13)~~ ✅
-- [x] ~~honsalim.com whitelist('ali' 자동검증 Submit 차단)~~ → **honsallim.com 채널 등록 완료** ✅ #21 (겹ㄹ 도메인으로 'ali' 차단 돌파, Portals 나의웹사이트·content>vertical sites·별도 승인 게이트 없음)
-- [x] ~~honsallim 채널 **Tracking ID(`ALI_TRACKING_ID=honsallim`) → ali.env 연결 + 개별 deeplink 247개** + /go/ 수익경로(Pages Function·302 알리)~~ ✅ #22
+> 알리 통합(App Key·collect·enrich·게이트·promote·게시·honsallim 채널·Tracking ID·247 deeplink·/go/) = #11~#22 완료 ✅ (상세 STATE/EVENTS).
 
 ## 시점 의존 잔존 (세션 #6~7)
 

@@ -260,6 +260,7 @@ def _check_phase2_modules() -> bool:
         ("collector.naver_searchad", "fetch_related_keywords"),
         ("collector.product_filter", "is_relevant"),
         ("collector.category_collect", "collect_category"),
+        ("collector.coupang", "collect_coupang"),
         ("collector.keyword_research", "research_keywords"),
         ("collector.keyword_research", "build_entry"),
         ("collector.seo_keywords", "gate_config"),
@@ -1037,6 +1038,43 @@ def cmd_collect_category(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_collect_coupang(args: argparse.Namespace) -> int:
+    """쿠팡 수동 상품(coupang_products.yml) 적재·연결 (세션 #24). 기본 dry_run.
+
+    쿠팡 Open API는 최종승인(15만원) 후에야 열리므로, 승인 전에는 운영자가 '링크 생성'으로
+    만든 딥링크를 yml에 기록하고 products(source='coupang')+category_products로 적재한다.
+    """
+    import sqlite3
+
+    from collector import coupang
+
+    conn = db.connect(db.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        res = coupang.collect_coupang(conn, args.slug, dry_run=args.dry_run)
+    finally:
+        conn.close()
+
+    mode = "dry_run" if args.dry_run else "live"
+    print(f"{OK} collect-coupang {(args.slug or 'ALL')!r} ({mode})")
+    for s in res.specs:
+        print(f"     [{s.category}] {s.name} → cp-{s.code}")
+    if not res.specs:
+        print("     [NOTE] coupang_products.yml에 해당 상품 없음")
+    if args.dry_run:
+        print("     [DRY] DB 쓰기 없음 — 적재는 --no-dry-run")
+    else:
+        print(
+            f"{OK} 적재 {res.upserted} · 연결 {res.linked}"
+            + (f" · 정합화 제거 {res.pruned}" if res.pruned else "")
+        )
+        if res.skipped_no_category:
+            print(
+                f"     [skip] categories 미존재(db seed 필요): {', '.join(res.skipped_no_category)}"
+            )
+    return 0
+
+
 def cmd_build_category(args: argparse.Namespace) -> int:
     """카테고리 콘텐츠(가이드·추천6선·FAQ·비교표·개념이미지) 생성·게이트·저장 (세션 #17).
 
@@ -1694,6 +1732,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="실제 API 호출 + DB 연결 (쿼터 소모 — 명시 승인 후)",
     )
     p_collect_cat.set_defaults(func=cmd_collect_category, dry_run=True)
+
+    # 쿠팡 수동 상품 적재 (세션 #24) — API 미사용 부트스트랩(최종승인 전)
+    p_collect_coupang = sub.add_parser(
+        "collect-coupang", help="쿠팡 수동 상품(coupang_products.yml) 적재·연결 (기본 dry_run)"
+    )
+    p_collect_coupang.add_argument(
+        "slug", nargs="?", default=None, help="categories.slug (생략 시 전체)"
+    )
+    p_collect_coupang.add_argument(
+        "--no-dry-run", dest="dry_run", action="store_false", help="실제 DB 적재 (수동 입력 — 안전)"
+    )
+    p_collect_coupang.set_defaults(func=cmd_collect_coupang, dry_run=True)
 
     # 카테고리 콘텐츠·이미지 생성 (세션 #17)
     p_build_cat = sub.add_parser(

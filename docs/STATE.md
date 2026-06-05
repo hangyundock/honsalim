@@ -7,19 +7,19 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#23: ★무인 스케줄러(refresh-cycle) + 모니터링 대시보드 + 쿠팡 활성화 착수**. refresh-cycle=published 새로고침→가드레일 자가복원(fail-closed)→빌드→변경분만 배포(LLM 미사용 ~$0/일), Claude 예약작업 매일 11:00 KST. 대시보드+바탕화면 아이콘 "혼살림 모니터링". 메인 #22 동기화+DB재생성(6 공개/2 보류). 회귀 **678**. ★다음=**(1)#23 머지 후 가동 (2)쿠팡 본격 (3)★미결정: 알리+쿠팡 페이지 배치 설계**. 상세 EVENTS #23 | 2026-06-03 #23 |
+| 진행 단계 | **#25: ★쿠팡 채널 통합(`collector.coupang` 수동 부트스트랩) + 모니터암 이미지 그리드 라이브검증**. 쿠팡 '블로그용 HTML'→`coupang_products.yml`→적재(prune)→알리와 분리된 "쿠팡 로켓배송" 이미지 그리드(채널별 최선·S1)·채널인식 고지·`/go/` 작동·알리 가드(source 한정). 모니터암 쿠팡 **15개 이미지 라이브검증**. 회귀 **710**. ★다음=**광고 배치 구현(메인 첫화면 쿠팡 배너[주인 원안]+카테고리 결정지점), 효과=쿠팡 수익리포트(측정 시스템 안 만듦)**. ⚠쿠팡 API는 최종승인(**판매금액 15만원**, 수익금 아님) 후·브라우저 자동화는 정책 차단(수동 유지). 상세 EVENTS #25·DECISIONS U | 2026-06-06 #25 |
 | 운영 모델 | 자동 게시 활성 + **무인 사이클(refresh-cycle·매일 11:00 KST 예약작업) — #23 머지 후 가동**. 자동 "승인" 금지(E7→가드레일) | #23 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·Secrets·main-protect)·Cloudflare(도메인·Pages·R2·D1)·Anthropic·INDEXNOW 키·secrets·Git push·pre-commit 9종·Dependabot (세부 archive) | #3 |
 | Phase 2 핵심 모듈 (#3~#5) | cli·common·validator·writer·collector·enricher·builder·deployer·tracker·workers (세부 BACKEND §2) + **#17: category_collect·category_page_builder·concept_image·category_writer** | #17 |
-| Phase 2 회귀 테스트 | **678 / 678 PASS** [확정 pytest, #23] — #23 +19 (refresh_cycle 12: published선택·새로고침 실패격리·fail-closed 킬스위치·변경분배포 + dashboard 모니터링 7: 사이클섹션·건강섹션·경고배너). #22 659. black·ruff·mypy 클린 | 2026-06-03 |
-| CLI 명령 (BACKEND §9) | **21개** — doctor·db·collect·collect-products·enrich·validate·approve·promote·unapprove·deploy·sync-slugmap·build(+`--preview`)·dashboard·collect-category·build-category·approve-category·unapprove-category(킬스위치)·register-categories(+`--auto-publish`)·auto-publish·category-status(+`--monitor`)·**refresh-cycle(#23: 무인 새로고침→자가복원→빌드→변경분 배포, 기본 dry_run, 매 실행 후 대시보드 갱신)** | #23 |
+| Phase 2 회귀 테스트 | **710 / 710 PASS** [확정 pytest, #25] — #25 +32 (coupang collect: 딥링크파싱·yml·매핑·적재·정합화prune·알리가드 + renderer 쿠팡 그리드·이미지·고지). #23 678. black·ruff·mypy 클린 | 2026-06-06 |
+| CLI 명령 (BACKEND §9) | **22개** — …(21개)… refresh-cycle(#23) + **collect-coupang(#25: coupang_products.yml→products(source='coupang')+category_products 적재·정합화 prune, 기본 dry_run)** | #25 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD. 세부 DECISIONS J·O + EVENTS | #4~#16 |
-| doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **64개** + #19 **LLM 키 점검**(활성 모델 기준 OPENROUTER/ANTHROPIC). 64/64 OK | #19 |
+| doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **65개**(#25 +collector.coupang.collect_coupang) + #19 **LLM 키 점검**. 65/65 OK | #25 |
 | DB 초기화 | `data/honsalim.db` **v6** + categories(**5**: 의자·책상·모니터받침대·**노트북거치대·모니터암**)·category_products + products 정가/할인·**판매량(sales_volume)/만족도(evaluate_rate)** 컬럼 (migration 002~**006**, #19) + personas 3·scenarios 10. ※DB는 gitignore — 다음 워크트리는 `collect-category`·`build-category`로 재생성 | #19 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (docs/ 참조). 일관성 모순 0건 | #2 |
-| 메모리 시스템 | feedback 7건([[incremental-critical-review]]·[[autonomous-safe-system]] 등) + reference market_research + MEMORY.md | #12 |
+| 메모리 시스템 | feedback **8건**(#25 신규 [[assist-not-overstep]]: 월권·희망고문·과잉설계 금지 + [[no-speculation]] 보강) + reference market_research + MEMORY.md | #25 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
-| 사이트 게시글 / 트래픽 / 수익 | **라이브=카테고리 8개**(honsallim.com·#22). **#23 메인 DB=6 공개/2 보류**(laptop-stand·drying-rack fail-closed)→스케줄러 첫 배포 시 보류 2개 내려감(검토). 측정(Cloudflare·GSC·네이버 1~2주 누적). 수익=/go/→302 알리·247개. **쿠팡 가입 착수**(승인 데모·collector.coupang 미구현) | #23 |
+| 사이트 게시글 / 트래픽 / 수익 | **라이브=카테고리 8개**(honsallim.com). 측정(Cloudflare·GSC·네이버 누적). 수익=/go/→302 알리·247개. **쿠팡 채널 통합 코드 완료(#25)·미배포** — 모니터암 쿠팡 15개 이미지 그리드 로컬검증. ⚠**현실: 신규 도메인=검색노출 거의 0, 트래픽이 진짜 병목**(신규 어필리 6~12개월 인내·대부분 실패). 다음=광고 배치+성장 | #25 |
 
 ## 인프라
 
@@ -58,19 +58,18 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 다음 세션 #24 — 상세 EVENTS #23.
-0. **#23 머지 → 스케줄러 가동 확인**: #23 코드가 origin/main에 올라가야 Claude 예약작업(매일 11:00 KST)이 refresh-cycle을 가동. 머지 직후 메인 체크아웃에서 `refresh-cycle --dry-run`(또는 예약작업 "Run now")으로 1회 점검. 첫 배포 시 보류 2개(laptop-stand·drying-rack)가 라이브에서 내려감(fail-closed) — 주인 검토 후 결정.
-1. **★★쿠팡 본격 진행 (주인 명시)**: 가입 완료 → 마이페이지 쿠팡 링크 생성 → **승인용 데모 페이지(쿠팡 고지+링크) honsallim.com 배포 → 스샷 업로드** → 승인 후 **`collector.coupang` 구현**(현재 stub)으로 쿠팡 상품 본격 수집. 쿠팡=메인 채널(§6). disclosure.py 이미 쿠팡 지원.
-2. **★★미결정 설계 — 알리+쿠팡 상품을 페이지에 어떻게 배치할지** (주인이 아직 못 들음·반드시 논의): 카테고리별 두 채널 혼합? 분리 표기? 추천 6선에 쿠팡/알리 섞기 vs 채널별 분리? 가격·배송 비교? /go/ 라우팅 쿠팡 분기? **설계 먼저 합의 후 구현**. [[design-research-first]] — 레퍼런스 조사 후 제안.
-3. **★성장**([[growth-first-priority]]): 측정 데이터(GSC·네이버·Cloudflare) 1~2주 후 리뷰→뜨는 키워드 더블다운. 홈오피스 토픽 심화·롱테일.
-4. (선택) `docs/CATEGORIES.md` 전략 문서 · D1 클릭로깅 복원 · Chrome lookalike(관찰).
-- ★**DB는 gitignore→재생성**(`db migrate`+`db seed`+`register-categories --all --no-dry-run --auto-publish`, ~$2). 워크트리=`PYTHONPATH=src python -m cli`. ★메인 체크아웃(D:\affiliate_hub)은 #23에서 #22로 동기화+DB 재생성 완료(6 공개/2 보류) — 잔재는 `stash@{0}`·낡은DB는 `data/honsalim.db.bak_session23_may28` 보관.
+### ★ 다음 세션 #26 — 상세 EVENTS #25.
+1. **★광고 배치 구현 (#25 합의·DECISIONS U4)**: **메인 첫 화면 쿠팡 배너(주인 원안)** + 카테고리 **결정지점(추천·비교 직후)** 배치. 근거=위치>형태(ATF 고가치). **효과 검증=쿠팡 수익 리포트**(별도 클릭 측정 시스템 만들지 말 것·과잉). 구현 전 "이 코드 이렇게 바꾼다" 먼저 짧게 보고 후 진행.
+2. **★성장이 진짜 병목 ([[growth-first-priority]])**: 신규 도메인=검색노출 거의 0. 트래픽 없으면 쿠팡 수익도 0(15만원 승인도 멈춤). Tier0 SEO 품질·롱테일·토픽클러스터(DECISIONS T2)부터. **현실적·정직하게**(희망고문 금지·[[assist-not-overstep]]).
+3. **쿠팡 상품 추가 (수동 부트스트랩)**: 다른 카테고리에 쿠팡 상품 넣으려면 주인이 '블로그용 HTML' 붙여주면 처리(`coupang_products.yml` 추가→`collect-coupang`). ⚠브라우저 자동화는 정책 차단(재시도 금지·U3). 쿠팡 API는 판매 15만원→최종승인 후(U2).
+4. (보류) 알리+쿠팡 배치 최종형은 1~2주 트래픽 데이터 후 확정(S2 게이팅).
+- ★**DB는 gitignore→재생성**(`db migrate`+`db seed`+`register-categories --all --no-dry-run --auto-publish`+`collect-coupang --all --no-dry-run`, ~$2). 워크트리=`PYTHONPATH=src python -m cli`. ★이번 워크트리 브랜치=`claude/beautiful-neumann-eabaa8`(PR로 main 머지 필요).
 
-### 해소 (세션 #23) — 상세 EVENTS #23
-- ✅ **★무인 스케줄러(refresh-cycle)** · **★모니터링 대시보드**(+바탕화면 아이콘) · **★Claude 예약작업**(매일 11:00 KST) · 메인 체크아웃 정비(stash·#22 ff·DB재생성) · 쿠팡 가입 착수. 회귀 678.
+### 해소 (세션 #25) — 상세 EVENTS #25
+- ✅ **★쿠팡 채널 통합**(`collector.coupang`+CLI·이미지 그리드·채널인식 고지·알리 가드·`/go/`) · 모니터암 15개 라이브검증 · 최종승인 문턱 확인(판매 15만원) · 브라우저 자동화 시도→정책 차단 확인 · ★메모리 신규([[assist-not-overstep]]). 회귀 710.
 
 ### Phase 2 진척 가능 (검토 의존 큼)
-- `src/builder/manifest.py` 증분 빌드 (ARCH §7·DB §10) · `src/collector/coupang.py` (Phase 4)
+- `src/builder/manifest.py` 증분 빌드 (ARCH §7·DB §10) · `src/collector/coupang.py` **API판(현재는 수동 부트스트랩만 구현·#25)은 최종승인 후**
 - (이전 해소분 #7·#9·#10·#12는 EVENTS archive 참조)
 
 ### Phase 1 잔존 (작음)
