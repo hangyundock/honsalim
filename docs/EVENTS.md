@@ -6,6 +6,8 @@
 
 ## ARCHIVE 인덱스 (옛 세션 한 줄 요약)
 
+- [EVENTS_202606.md](archive/EVENTS_202606.md):
+  - 세션 #19 (2026-06-01 DeepSeek v4-pro 전면전환·카테고리 디자인 마무리·관련성 필터 require_all 근본수정·판매량 기준 추천 6선·신규 2카테고리·회귀 590→623)
 - [EVENTS_202605.md](archive/EVENTS_202605.md):
   - 세션 #1 (2026-05-27 프로젝트 신규 셋업·정밀 조사·5파일 시스템·슬래시 명령 등록)
   - 세션 #2 (2026-05-27~28 Phase 0 설계 12/12 + Phase 1 외부 작업: GitHub·Cloudflare·도메인·R2·D1·Git push)
@@ -25,6 +27,24 @@
   - 세션 #18 (2026-05-31 운영자 1클릭 승인 게이트(O21·build-category draft 고정)·doctor §10 64진입점·★카테고리 페이지 디자인 디버깅(글씨 흐림 진짜원인=backdrop-filter 제거)·회귀 569→590)
 
 ## 최근 5세션
+
+### 세션 #24 — 2026-06-03~06 (Opus 4.8 1M, ★Tier0 SEO 품질강화 + 쿠팡 승인용 리뷰페이지 + 멀티채널·무인마케팅 전략 확정(DECISIONS S·T) / 스케줄러 수동전환 + subprocess UTF-8 근본수정, 회귀 678→693)
+
+**시작 상황**: #24는 06-03 brave-babbage 워크트리(PR #5~9 머지)에서 EVENTS/STATE 미갱신 채 종료(미닫힘) → 06-06 예약 refresh-cycle 자동실행으로 재개, 주인 **스케줄러 수동전환 지시**로 마감. 06-03·06-06 작업을 #24로 함께 닫음.
+
+**핵심 진척 [확정]**:
+1. **(06-03) 멀티채널 전략 — DECISIONS S1·S2** (상세는 DECISIONS): C안(채널별 최선 추천+정성 기준), 가격비교형(A안) 표시광고법 위험 탈락, 게이팅=collector.coupang+데이터 후.
+2. **(06-03) 무인 마케팅 전략 — DECISIONS T1·T2** (상세는 DECISIONS): 소수 정식계정+공식API(양산·버너 금지), SEO=본진·Pinterest=최우선, 알리 판매량=Information Gain 반전무기, Tier0→3 로드맵.
+3. **(06-03) 쿠팡 승인용 `/reviews/` + Tier0 실행**: 흠플래닛 모니터암 리뷰페이지+쿠팡 제휴링크 글자노출(위젯 미표시 실측→텍스트). + Tier0 SEO 품질강화·홈오피스 필러(토픽허브)·카테고리 UX.
+4. **(06-06) ★무인 refresh-cycle 첫 라이브 실행 — 자가복원 실증**: 예약작업 자동실행 → 공개 6개 새로고침 **6/6 성공**, **`mini-dehumidifier` 가드레일 미달(추천 1개<2)→자가복원 자동 비공개(fail-closed 정상작동)** → 공개 6→5, 빌드·push·verify **200**.
+5. **(06-06) ★subprocess UTF-8 디코딩 크래시 근본수정**: 사이클 중 백그라운드 리더스레드 `UnicodeDecodeError`(한글 Windows cp949가 git/wrangler UTF-8 출력 디코딩 실패·비치명이나 잠재결함). `common.proc.run_text` 헬퍼(utf-8 강제=재발방지 가드)+6개 호출부 통일. 회귀 3종(실제 한글출력 무크래시 실증) **678→693**. push 03a3dbb.
+6. **(06-06) ★스케줄러 수동전환(주인 지시)**: Claude 예약작업 `honsalim-refresh-cycle` **비활성화**(C11 폐기). 이후 refresh-cycle은 **주인 직접 지시로만 수동 실행**. 작업 폴더 삭제는 주인이 직접.
+
+**무인·안전(§0)**: 자가복원 fail-closed **첫 라이브 실증**(mini-dehumidifier)·인코딩 크래시 근본수정+재발방지 가드·실패격리. 단 **스케줄러 수동전환으로 '완전 무인 자동배포'는 보류 — 주인 통제 우선**(§0과 균형: 주인 결정 존중).
+
+**잔존/다음(#25)**: ①`mini-dehumidifier` 추천 1개 원인 점검(현재 라이브 비공개) ②**★★쿠팡 본격**(`collector.coupang` 구현·승인 절차) ③멀티채널 배치 구현(데이터 후·S1) ④**★성장** Tier0 지속+측정(GSC·네이버·Cloudflare) 리뷰. ★DB gitignore→재생성. refresh-cycle 수동(C13)=`PYTHONPATH=src python -m cli refresh-cycle --no-dry-run`.
+
+---
 
 ### 세션 #23 — 2026-06-03 (Opus 4.8 1M, ★무인 스케줄러 A안(refresh-cycle) 구축·가동 셋업 + 모니터링 대시보드 + 메인 체크아웃 정비 + 쿠팡 활성화 착수, 회귀 659→678)
 
@@ -109,20 +129,4 @@
 
 ---
 
-### 세션 #19 — 2026-06-01 (Opus 4.8 1M, ★DeepSeek v4-pro 전면 전환 + 카테고리 디자인 마무리 + 관련성 필터 근본수정 + ★판매량 기준 추천 6선 + 신규 2카테고리, 회귀 590→623)
-
-**시작 상황**: `/honsalim-start`(워크트리 determined-bouman, HEAD #18). 회귀 590. 카테고리 페이지 추가 디자인 수정 요청으로 시작 → 도중 "AI를 DeepSeek로 바꿨다"(옆 AutoBlog #99가 메인에 미커밋 드롭인) 확인·전면 전환 → 추천 선정 기준(판매량) 개선까지 확대.
-
-**핵심 진척 [확정]** (※전부 로컬·미배포. honsalim.com은 #13 첫 글 유지):
-
-1. **카테고리 디자인 마무리**: 추천 카드 좌우 **행 정렬**(grid stretch·버튼 하단 고정 — 장단점 개수 달라도 아래단 일치) · 전체제품 **정렬(추천/가격/할인)·티어 필터 JS 작동**(`static/js/category.js`+data 속성, 기존엔 버튼만 있고 무동작) · 조건 버튼 **손가락 커서**(cursor:pointer). 브라우저 eval 측정으로 검증.
-2. **★DeepSeek v4-pro 전면 전환**: 본문생성 Sonnet→`deepseek/deepseek-v4-pro`. `claude_client.build_llm_client` 모델 라우팅(claude→Anthropic SDK, 그 외→OpenRouter REST), 응답을 Anthropic 형태로 감싸 파싱·게이트 무수정. meta_extractor 통일·config ANTHROPIC 필수키 제거·doctor LLM 키 점검. 키=`D:\secrets\.env` OPENROUTER_API_KEY. 라이브 검증. 이미지는 Imagen 유지.
-3. **DeepSeek 출력 변동 안정화**: 과밀(5.02%)·JSON 깨짐·"무조건" 단정표현 → 파서 후행콤마 관용+파싱실패 자가복원 + SEO 지시문 강화(통째반복 금지·밀도 3%·단정표현 금지). 결과 3%대 안정(노트북만 3.52% 수용).
-4. **★관련성 필터 근본수정**: laptop-stand 상위 캠핑 테이블 오염 — 원인=`require_any`(OR, "노트북"만 있으면 통과). `require_all`('타입+대상' 동시) 도입→구조적 탈락 + 재수집 정합화(옛 오염 제거) + 과도 제외어 보정.
-5. **★추천 6선 판매량 기준 선정**: "판매량·평점 기준" 요청 → 라이브 확인(`lastest_volume` 제공·`evaluate_rate` %만·별점 없음). migration 006 + 수집기 추출 + `select_featured`(판매량순·만족도 80% 하한·**항상 6개**·저평가 뒤로·부족분 0판매로) + 렌더러 판매량 정직표기. AI는 설명만. 89%대 보존·20%/66.7% 제외 검증.
-6. **신규 2 + 기존 2 재빌드**: 노트북거치대·모니터암 신규 + 모니터받침대·책상 재빌드 → 4개 전부 판매량 기준 6선·draft. office-chair 제품 0(미생성).
-7. **회귀 590→623** (+33). black·ruff·mypy 클린. CLAUDE.md §6 DeepSeek 갱신. 비용 ~$1.
-
-**무인·안전(§0)**: 가짜 평점 금지(별점 없음→판매량만 정직표기)·저평가(<80%) 추천 제외·require_all 오염 차단·DeepSeek 출력 자가복원·AI 자동 published 차단. 전부 draft.
-
-**다음 세션(#20) 할 일**: 1) 카테고리 4개 검토→`approve-category`+`build --full`→배포 2) 노트북 '전화' 제외어 결정 3) office-chair 생성 4) 메인 미커밋 DeepSeek 임시본 정리 5)(이월) /go/·알리 whitelist·main-protect. ★DB gitignore→재생성 시 collect(판매량 채움) 먼저.
+> (세션 #19는 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
