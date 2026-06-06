@@ -10,7 +10,7 @@ D1 쓰기는 외부 영향 — dry_run=True 기본(d1_aggregator와 동일). 라
 wrangler d1 execute + 사용자 명시 승인 후 (CLAUDE.md §2-라 / DECISIONS H4).
 """
 
-# ruff: noqa: S603, S608
+# ruff: noqa: S608
 # S603 사유: subprocess wrangler 호출 — 인자 list, shell injection 위험 없음.
 # S608 사유: D1는 wrangler d1 execute --command 문자열 SQL만 지원(파라미터 바인딩 불가).
 #   값은 모두 _sql_str로 escape — SQLite 문자열 리터럴은 작은따옴표 doubling이 완전한 escape
@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from common.proc import resolve_argv
+from common.proc import resolve_argv, run_text
 
 
 @dataclass
@@ -164,7 +164,7 @@ def sync_slug_map(
         )
 
     try:
-        proc = subprocess.run(
+        proc = run_text(
             resolve_argv(cmd),
             cwd=str(Path(cwd).resolve()),
             capture_output=True,

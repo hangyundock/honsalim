@@ -1,4 +1,3 @@
-# ruff: noqa: S603, S607
 # 사유: subprocess git 호출은 인자 list로만 사용 — shell injection 위험 없음.
 #       git은 PATH 검색(deployer 책임). 경로 인자는 코드 상수(build/site·functions/go)만.
 """deployer.refresh_cycle — 무인 일일 새로고침·자가복원·배포 사이클 (세션 #23, A안).
@@ -28,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from collector import category_collect
+from common.proc import run_text
 from deployer.git_push import git_push
 from deployer.verify import verify_deploy
 from writer import auto_publish, category_state
@@ -87,7 +87,7 @@ def _published_slugs(conn: Any) -> list[str]:
 
 def _git(args: list[str], *, cwd: Path, timeout: int = 60) -> subprocess.CompletedProcess[str]:
     """git 서브프로세스 실행(인자 list — shell injection 없음). 호출자가 returncode 점검."""
-    return subprocess.run(
+    return run_text(
         ["git", *args],
         cwd=str(cwd),
         capture_output=True,

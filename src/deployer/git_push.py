@@ -6,14 +6,14 @@ dry_run=True 기본 — 실제 push는 사용자 명시 승인 후만.
 commit 메시지 패턴 H5: `[YYYY-MM-DD #N] <한 줄>`
 """
 
-# ruff: noqa: S603
 # 사유: subprocess git 호출 — 인자 list로만 사용, shell injection 위험 없음.
 
 from __future__ import annotations
 
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+
+from common.proc import run_text
 
 
 @dataclass
@@ -72,7 +72,7 @@ def git_push(
             cwd=cwd_str,
         )
 
-    proc = subprocess.run(
+    proc = run_text(
         cmd,
         cwd=cwd_str,
         capture_output=True,

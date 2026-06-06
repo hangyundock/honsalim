@@ -1,4 +1,3 @@
-# ruff: noqa: S607
 # 사유: subprocess 호출은 git 등 PATH 검색 도구 인자 list로만 사용.
 # shell injection 위험 없음. 도구 가용성 확인이 본 파일 책임.
 """혼살림 CLI 진입점.
@@ -44,6 +43,7 @@ if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
 
 from common import config, db, size_caps  # noqa: E402
+from common.proc import run_text  # noqa: E402
 
 PROJECT_ROOT = _THIS_DIR.parent
 
@@ -180,7 +180,7 @@ def _check_db_state() -> bool:
 def _check_git_repo() -> bool:
     # git을 PATH에서 찾아 인자는 list로 전달 — shell injection 위험 없음
     try:
-        out = subprocess.run(
+        out = run_text(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
             cwd=PROJECT_ROOT,
             capture_output=True,

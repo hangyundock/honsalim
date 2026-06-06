@@ -6,16 +6,14 @@
 dry_run=True 기본 — 실제 배포는 사용자 명시 승인 후만.
 """
 
-# ruff: noqa: S603
 # 사유: subprocess wrangler 호출 — 인자 list로만 사용.
 
 from __future__ import annotations
 
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from common.proc import resolve_argv
+from common.proc import resolve_argv, run_text
 
 
 @dataclass
@@ -77,7 +75,7 @@ def wrangler_deploy(
             cwd=cwd_str,
         )
 
-    proc = subprocess.run(
+    proc = run_text(
         resolve_argv(cmd),
         cwd=cwd_str,
         capture_output=True,
