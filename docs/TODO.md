@@ -3,9 +3,11 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #25 — (상세 EVENTS #24)
+## ★ 다음 세션 #26 — (상세 EVENTS #25)
 
-- [x] ~~Tier0 SEO 품질강화·쿠팡 승인용 `/reviews/`·멀티채널/무인마케팅 전략(S·T)·refresh-cycle 첫 라이브(자가복원 실증)·subprocess UTF-8 근본수정(693)·스케줄러 수동전환(C11→C13)~~ ✅ #24
+- [x] ~~#25 ★운영 대시보드 전면 구축(A~F): 설정 외부화·키워드 큐(007)·PyQt5 GUI·글 생성·1클릭 승인·예약 발행(E7·기본OFF)·쿠팡 수동·설정창·바탕화면 아이콘·회귀 773~~ ✅ #25
+- [x] ~~#24 Tier0 SEO·쿠팡 `/reviews/`·멀티채널/무인마케팅(S·T)·refresh-cycle 라이브·subprocess UTF-8·스케줄러 수동전환~~ ✅ #24
+- [ ] **★대시보드 실전화 (#25 후속)**: (a)라이브 첫 글 생성 1회(DeepSeek 비용·품질 확인) (b)바탕화면 아이콘 main 재지정(워크트리→`D:\affiliate_hub`) (c)설정 일부(쿠팡 모드/임계·llm_model·seo·jitter) 코드 연결.
 - [ ] **0. `mini-dehumidifier` 점검**: 추천 1개(<2)로 가드레일 자가복원→라이브 비공개. 추천 풀 부족 원인 확인 후 복원/보강 결정.
 - [ ] **1. ★★쿠팡 본격 (주인 명시)**: ①가입 완료 ②`/reviews/` 승인용 페이지 활용 ③승인 후 **`collector.coupang` 구현**으로 쿠팡 상품 수집. 쿠팡=메인(§6). ⚠본인·가족 구매 금지.
 - [ ] **2. 멀티채널 배치 구현 (DECISIONS S1·S2)**: 방향=C안(채널별 최선 추천+정성 기준) 확정. 게이팅=`collector.coupang` + 1~2주 트래픽 데이터 후 최종 배치. 가격비교형(A안) 금지.
@@ -15,12 +17,6 @@
   - 공통: 소셜 첫머리 고지 자동삽입·정식계정·측정→더블다운. ❌양산/버너. 새 사이트 6~12개월 인내.
 - [ ] (선택) `docs/CATEGORIES.md` · D1 클릭로깅 복원 · main-protect status check · Chrome lookalike(관찰).
 - 참고: **DB gitignore→재생성**(`register-categories --all --no-dry-run --auto-publish`, ~$2). 워크트리=`PYTHONPATH=src python -m cli`. ★메인=#22 동기화+DB재생성 완료(잔재 `stash@{0}`).
-
-## 알리 통합 (D9)
-
-- [x] ~~App Key/Secret·라이브검증(#11)·collect-products·C-1·enrich·4게이트(#12)·promote·상세글 렌더·라이브 게시(#13)~~ ✅
-- [x] ~~honsalim.com whitelist('ali' 자동검증 Submit 차단)~~ → **honsallim.com 채널 등록 완료** ✅ #21 (겹ㄹ 도메인으로 'ali' 차단 돌파, Portals 나의웹사이트·content>vertical sites·별도 승인 게이트 없음)
-- [x] ~~honsallim 채널 **Tracking ID(`ALI_TRACKING_ID=honsallim`) → ali.env 연결 + 개별 deeplink 247개** + /go/ 수익경로(Pages Function·302 알리)~~ ✅ #22
 
 ## 시점 의존 잔존 (세션 #6~7)
 

@@ -42,7 +42,7 @@ _THIS_DIR = Path(__file__).resolve().parent
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
 
-from common import config, db, size_caps  # noqa: E402
+from common import config, db, settings, size_caps  # noqa: E402
 from common.proc import run_text  # noqa: E402
 
 PROJECT_ROOT = _THIS_DIR.parent
@@ -1587,6 +1587,344 @@ def cmd_refresh_cycle(args: argparse.Namespace) -> int:
     return 1 if (rc_fail or deploy_fail) else 0
 
 
+# ─── 키워드 발행 큐 명령 (세션 #25) — 운영 대시보드 ──────────────────────
+
+
+def _set_keyword_status(keyword_id: int, status: str, reason: str | None = None) -> None:
+    """별도 연결로 키워드 상태 설정 (메인 conn이 닫힌 뒤 호출해도 안전)."""
+    from writer import keyword_queue as kq
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        kq.set_status(conn, keyword_id, status, reason)
+    finally:
+        conn.close()
+
+
+def cmd_keyword_add(args: argparse.Namespace) -> int:
+    """키워드를 발행 큐에 추가 (status=pending). 운영 대시보드 '대기 키워드'."""
+    from writer import keyword_queue as kq
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        kid = kq.add_keyword(
+            conn,
+            args.keyword,
+            slug=args.slug,
+            channel=args.channel,
+            budget_min_krw=args.budget_min,
+            budget_max_krw=args.budget_max,
+            notes=args.note,
+            score=args.score,
+        )
+    except ValueError as e:
+        print(f"{FAIL} {e}")
+        return 2
+    finally:
+        conn.close()
+    print(f"{OK} 키워드 #{kid} 추가: {args.keyword!r} (채널={args.channel}, status=pending)")
+    return 0
+
+
+def _gather_keyword_candidates(
+    conn: sqlite3.Connection, kw: dict[str, Any], page_size: int
+) -> tuple[list[dict[str, Any]], str]:
+    """키워드 상품 후보 확보. 수동 target_products 우선, 없으면 채널 ali 수집.
+
+    반환: (candidates, note). 후보는 enrich 프롬프트의 {{products}} + promote 연결 소스.
+    """
+    from collector import products_store
+
+    def _cands(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [
+            {
+                "source": p.get("source"),
+                "source_product_id": p.get("source_product_id"),
+                "deeplink_slug": p.get("deeplink_slug"),
+                "name": p.get("name"),
+                "price_krw": p.get("price_krw"),
+            }
+            for p in items
+        ]
+
+    tp = kw.get("target_products")
+    if tp:
+        try:
+            items = json.loads(tp)
+        except (json.JSONDecodeError, TypeError):
+            items = []
+        if isinstance(items, list) and items:
+            up = products_store.upsert_products(conn, items)
+            return (
+                _cands(items),
+                f"수동 미리선택 {len(items)}개 "
+                f"(적재 신규 {up.inserted}·갱신 {up.updated}·스킵 {up.skipped})",
+            )
+
+    if kw["channel"] in ("ali", "both"):
+        import time as _time
+
+        from collector import aliexpress as ali
+
+        config.load_secrets()
+        res = ali.query_products(
+            kw["keyword"],
+            timestamp=int(_time.time() * 1000),
+            dry_run=False,
+            page_size=page_size,
+        )
+        if res.products:
+            products_store.upsert_products(conn, res.products)
+        return _cands(res.products), f"ali 수집 {len(res.products)}개 (검색어 {kw['keyword']!r})"
+
+    return [], "상품 없음 — 쿠팡 단독 채널은 수동 미리선택(target_products)이 필요합니다"
+
+
+def cmd_keyword_generate(args: argparse.Namespace) -> int:
+    """키워드 → 시나리오 파생 → 상품 확보 → draft → enrich → validate. 기본 dry_run.
+
+    라이브(--no-dry-run)는 본문 생성 LLM 비용 발생. 결과는 '검토 대기(drafted)'까지만 —
+    E7 인간 승인 게이트 유지(자동 발행 안 함). 승인·발행은 대시보드/별도 명령.
+    """
+    from writer import article_writer
+    from writer import keyword_queue as kq
+
+    conn = db.connect(db.DB_PATH)
+    draft_id: int
+    try:
+        kw = kq.get_keyword(conn, args.id)
+        if kw is None:
+            print(f"{FAIL} keyword id={args.id} 없음")
+            return 2
+        mode = "dry_run" if args.dry_run else "live"
+        print(f"{OK} 키워드 #{args.id} {kw['keyword']!r} 채널={kw['channel']} ({mode})")
+
+        if args.dry_run:
+            tp_n = 0
+            if kw.get("target_products"):
+                try:
+                    parsed = json.loads(kw["target_products"])
+                    tp_n = len(parsed) if isinstance(parsed, list) else 0
+                except (json.JSONDecodeError, TypeError):
+                    tp_n = 0
+            print(
+                "     [DRY] 시나리오 파생→상품 확보→draft→enrich→validate (실제 쓰기·API·비용 없음)"
+            )
+            print(
+                f"     수동 미리선택 {tp_n}개 · ali 수집 "
+                f"{'예' if kw['channel'] in ('ali', 'both') else '아니오'}"
+            )
+            return 0
+
+        persona_slug = settings.get("default_keyword_persona")
+        scenario_id = kq.ensure_scenario_for_keyword(
+            conn, args.id, default_persona_slug=persona_slug
+        )
+        srow = conn.execute("SELECT slug FROM scenarios WHERE id = ?", (scenario_id,)).fetchone()
+        print(f"     시나리오 #{scenario_id} ({srow[0]})")
+        kq.set_status(conn, args.id, "generating", "generate 시작")
+        try:
+            candidates, note = _gather_keyword_candidates(conn, kw, args.page_size)
+        except Exception as e:  # 상품 확보 실패는 키워드 상태에 기록하고 종료
+            kq.set_status(conn, args.id, "failed", f"상품 확보 실패: {e}")
+            print(f"{FAIL} 상품 확보 실패: {e}")
+            return 3
+        print(f"     {note}")
+        draft_id = article_writer.record_scenario_candidates(
+            conn, scenario_id, candidates, working_title=kw["keyword"]
+        )
+        kq.link_draft(conn, args.id, draft_id)
+        print(f"{OK} draft #{draft_id} 생성 · 후보 {len(candidates)}개")
+    finally:
+        conn.close()
+
+    # enrich + validate (각 명령이 자체 연결) — 기존 발행 기계 재사용
+    rc = cmd_enrich(argparse.Namespace(draft=draft_id, dry_run=False))
+    if rc != 0:
+        _set_keyword_status(args.id, "failed", f"enrich rc={rc}")
+        print(f"{FAIL} enrich 실패 (rc={rc})")
+        return rc
+    rc = cmd_validate(argparse.Namespace(draft=draft_id))
+    if rc == 0:
+        _set_keyword_status(args.id, "drafted", "검토 대기")
+        print(f"{OK} 키워드 #{args.id} → drafted. 대시보드에서 미리보기→1클릭 승인→발행 (E7)")
+        return 0
+    if rc == 1:
+        _set_keyword_status(args.id, "drafted", "검증 rejected — 검토 필요")
+        print(f"{WARN} 검증 실패(rejected) — 대시보드에서 검토 필요")
+        return 0
+    _set_keyword_status(args.id, "failed", f"validate rc={rc}")
+    return rc
+
+
+def cmd_keyword_list(args: argparse.Namespace) -> int:
+    """키워드 큐 목록 출력 (status 필터 선택)."""
+    from dashboard import queries
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        rows = queries.list_keywords(conn, status=args.status)
+    finally:
+        conn.close()
+    if not rows:
+        print(f"{WARN} 키워드 없음" + (f" (status={args.status})" if args.status else ""))
+        return 0
+    print(f"{OK} 키워드 {len(rows)}건:")
+    for r in rows:
+        print(
+            f"  #{r['id']:>3} [{r['status']:<10}] {r['channel']:<7} "
+            f"{r['keyword']}  (slug={r['slug']})"
+        )
+    return 0
+
+
+def cmd_reject(args: argparse.Namespace) -> int:
+    """draft → rejected (대시보드 반려). approved면 먼저 승인취소 후 반려."""
+    from writer import state_machine
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        try:
+            cur = state_machine.current_status(conn, args.draft)
+        except ValueError as e:
+            print(f"{FAIL} {e}")
+            return 2
+        reason = "cli reject" + (f" — {args.note}" if args.note else "")
+        try:
+            if cur == "approved":
+                state_machine.transition(conn, args.draft, "validated", reason="reject: 승인취소")
+            state_machine.transition(conn, args.draft, "rejected", reason=reason)
+        except state_machine.IllegalStateError as e:
+            print(f"{FAIL} 반려 불가 (현재 {cur}): {e}")
+            return 2
+        print(f"{OK} draft {args.draft} → rejected")
+        return 0
+    finally:
+        conn.close()
+
+
+def cmd_coupang_add(args: argparse.Namespace) -> int:
+    """쿠팡 수동 상품을 키워드 미리선택(target_products)에 추가 (공식 딥링크·텍스트, 세션 #25).
+
+    쿠팡 15만원 전 수동 단계 — CDN 이미지 미사용(함정 #3). 추가된 상품은 글 생성 후보로 쓰인다.
+    """
+    from collector import coupang_manual
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        try:
+            product = coupang_manual.build_manual_product(
+                args.name,
+                args.url,
+                price_krw=args.price,
+                widget_html=args.widget,
+                affiliate_tag=settings.get("coupang_tag"),
+            )
+            n = coupang_manual.add_to_keyword(conn, args.keyword_id, product)
+        except ValueError as e:
+            print(f"{FAIL} {e}")
+            return 2
+    finally:
+        conn.close()
+    print(f"{OK} 쿠팡 상품 {args.name!r} → 키워드 #{args.keyword_id} 미리선택 (총 {n}개)")
+    return 0
+
+
+# ─── 예약 발행 (세션 #25) — 승인된 큐 자동/수동 발행 + 스케줄러 ──────────
+
+
+def cmd_publish_queue(args: argparse.Namespace) -> int:
+    """승인된 큐에서 N편 발행 (promote → build --full → deploy). 예약 스케줄러 + 수동 발행 공용.
+
+    E7 준수: status='approved'(사람이 1클릭 승인한) draft만 발행 — 자동 '승인'은 하지 않는다.
+    기본 dry_run. 라이브(--no-dry-run)는 실제 게시·git push(외부 영향). 메인 체크아웃에서 실행.
+    """
+    count = args.count if args.count is not None else int(settings.get("publish_per_day", 1) or 1)
+    conn = db.connect(db.DB_PATH)
+    try:
+        rows = conn.execute(
+            "SELECT id, working_title FROM drafts WHERE status='approved' "
+            "ORDER BY updated_at, id LIMIT ?",
+            (count,),
+        ).fetchall()
+    finally:
+        conn.close()
+    if not rows:
+        print(f"{WARN} 승인된(발행 대기) 글이 없습니다 — 발행할 항목 없음")
+        return 0
+    mode = "dry_run" if args.dry_run else "live"
+    print(f"{OK} 발행 대상 {len(rows)}편 (상한 {count}, {mode}):")
+    for r in rows:
+        print(f"     #{r[0]} {r[1] or ''}")
+    if args.dry_run:
+        print("     [DRY] 실제 promote·build·deploy 없음 — 라이브는 --no-dry-run")
+        return 0
+
+    promoted = 0
+    for r in rows:
+        rc = cmd_promote(argparse.Namespace(draft=r[0], note="예약/수동 발행"))
+        if rc == 0:
+            promoted += 1
+        else:
+            print(f"{WARN} draft #{r[0]} promote 실패 (rc={rc}) — 건너뜀")
+    if promoted == 0:
+        print(f"{FAIL} promote된 글 없음 — 빌드·배포 생략")
+        return 1
+
+    rc = cmd_build(argparse.Namespace(manifest=None, full=True, preview=False, save_empty=False))
+    if rc != 0:
+        print(f"{FAIL} 빌드 실패 (rc={rc})")
+        return rc
+    if args.no_deploy:
+        print(f"{OK} {promoted}편 게시·빌드 완료 (배포 생략 — --no-deploy)")
+        return 0
+
+    rc = cmd_deploy(
+        argparse.Namespace(
+            dry_run=False,
+            skip_push=False,
+            skip_wrangler=True,
+            verify_url=settings.get("verify_url"),
+            remote="origin",
+            branch="main",
+            build_dir="build/site",
+            project="honsalim",
+        )
+    )
+    if rc == 0:
+        print(f"{OK} {promoted}편 발행·배포 완료 — CI가 honsallim.com 반영")
+    return rc
+
+
+def cmd_schedule(args: argparse.Namespace) -> int:
+    """예약 발행 작업 관리 (Windows schtasks): show | set [--time HH:MM] | off.
+
+    기본 OFF(#24 수동전환 취지) — 주인이 명시적으로 set 할 때만 등록.
+    """
+    from deployer import scheduler
+
+    if args.schedule_action == "show":
+        t = scheduler.query_scheduled_time()
+        if t:
+            print(f"{OK} 예약 발행 등록됨 — 매일 {t[0]:02d}:{t[1]:02d}")
+        else:
+            print(f"{WARN} 예약 발행 미등록 (수동 발행만)")
+        return 0
+    if args.schedule_action == "off":
+        ok, msg = scheduler.delete_task()
+        print(f"{OK if ok else FAIL} {msg}")
+        return 0 if ok else 1
+    # set
+    time_hhmm = args.time or str(settings.get("schedule_time", "11:00"))
+    ok, msg = scheduler.create_or_update(time_hhmm)
+    print(f"{OK if ok else FAIL} {msg}")
+    if ok:
+        cfg = settings.load()
+        cfg["schedule_time"] = time_hhmm
+        settings.save(cfg)
+    return 0 if ok else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="honsalim",
@@ -1905,6 +2243,78 @@ def build_parser() -> argparse.ArgumentParser:
         "--verify-url", type=str, default=None, help="배포 후 HEAD 검증 URL (선택)"
     )
     p_refresh.set_defaults(func=cmd_refresh_cycle, dry_run=True)
+
+    # ─── 키워드 발행 큐 (세션 #25) — 운영 대시보드 ───
+    p_kw_add = sub.add_parser("keyword-add", help="키워드를 발행 큐에 추가 (status=pending)")
+    p_kw_add.add_argument("keyword", type=str, help="키워드/주제 (예: '자취생 전자레인지 추천')")
+    p_kw_add.add_argument(
+        "--channel", choices=["ali", "coupang", "both"], default="ali", help="제휴 채널"
+    )
+    p_kw_add.add_argument("--slug", type=str, default=None, help="식별 slug (기본 자동 생성)")
+    p_kw_add.add_argument("--budget-min", type=int, default=None, help="예산 하한 KRW")
+    p_kw_add.add_argument("--budget-max", type=int, default=None, help="예산 상한 KRW")
+    p_kw_add.add_argument("--note", type=str, default=None, help="운영자 메모")
+    p_kw_add.add_argument("--score", type=float, default=0.0, help="정렬 우선순위 점수")
+    p_kw_add.set_defaults(func=cmd_keyword_add)
+
+    p_kw_gen = sub.add_parser(
+        "keyword-generate",
+        help="키워드 → 글 생성(시나리오 파생·상품·enrich·validate). 기본 dry_run",
+    )
+    p_kw_gen.add_argument("--id", type=int, required=True, help="keyword_queue id")
+    p_kw_gen.add_argument("--page-size", type=int, default=20, help="ali 수집 페이지 크기")
+    p_kw_gen.add_argument(
+        "--no-dry-run",
+        dest="dry_run",
+        action="store_false",
+        help="실제 수집·LLM 본문 생성(비용·쿼터) — 명시 승인 후",
+    )
+    p_kw_gen.set_defaults(func=cmd_keyword_generate, dry_run=True)
+
+    p_kw_list = sub.add_parser("keyword-list", help="키워드 큐 목록 (status 필터 선택)")
+    p_kw_list.add_argument("--status", type=str, default=None, help="status 필터 (예: pending)")
+    p_kw_list.set_defaults(func=cmd_keyword_list)
+
+    p_reject = sub.add_parser("reject", help="draft → rejected (반려)")
+    p_reject.add_argument("--draft", type=int, required=True, help="draft id")
+    p_reject.add_argument("--note", type=str, default=None, help="반려 사유")
+    p_reject.set_defaults(func=cmd_reject)
+
+    p_cp_add = sub.add_parser(
+        "coupang-add", help="쿠팡 수동 상품을 키워드 미리선택에 추가 (공식 딥링크·텍스트)"
+    )
+    p_cp_add.add_argument("--keyword-id", type=int, required=True, help="keyword_queue id")
+    p_cp_add.add_argument("--name", type=str, required=True, help="상품명")
+    p_cp_add.add_argument("--url", type=str, required=True, help="쿠팡 파트너스 딥링크")
+    p_cp_add.add_argument("--price", type=int, default=None, help="가격 KRW (선택)")
+    p_cp_add.add_argument("--widget", type=str, default=None, help="공식 위젯 HTML (선택)")
+    p_cp_add.set_defaults(func=cmd_coupang_add)
+
+    # ─── 예약 발행 (세션 #25) ───
+    p_pubq = sub.add_parser(
+        "publish-queue",
+        help="승인된 큐에서 N편 발행(promote→build→deploy). 예약/수동 공용. 기본 dry_run",
+    )
+    p_pubq.add_argument(
+        "--count", type=int, default=None, help="발행 편수 (기본 config publish_per_day)"
+    )
+    p_pubq.add_argument("--no-deploy", action="store_true", help="배포(git push) 생략 — 빌드까지만")
+    p_pubq.add_argument(
+        "--no-dry-run",
+        dest="dry_run",
+        action="store_false",
+        help="실제 게시·빌드·배포(외부 영향) — 명시 승인/스케줄러",
+    )
+    p_pubq.set_defaults(func=cmd_publish_queue, dry_run=True)
+
+    p_sched = sub.add_parser("schedule", help="예약 발행 작업 관리 (Windows schtasks)")
+    p_sched.add_argument(
+        "schedule_action", choices=["show", "set", "off"], help="show: 현황 · set: 등록 · off: 해제"
+    )
+    p_sched.add_argument(
+        "--time", type=str, default=None, help="set 시각 HH:MM (기본 config schedule_time)"
+    )
+    p_sched.set_defaults(func=cmd_schedule)
 
     return parser
 

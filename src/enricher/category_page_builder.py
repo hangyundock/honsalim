@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from collector import product_filter, seo_keywords
+from common import settings
 from enricher import category_writer
 from validator import disclosure as disc_gate
 from validator import links as links_gate
@@ -86,7 +87,9 @@ def load_products(conn: sqlite3.Connection, category_id: int) -> list[dict[str, 
     return out
 
 
-def select_featured(products: list[dict[str, Any]], per_tier: int = 3) -> list[dict[str, Any]]:
+def select_featured(
+    products: list[dict[str, Any]], per_tier: int | None = None
+) -> list[dict[str, Any]]:
     """추천 6선 자동 선정 (세션 #19) — 투명·재현 규칙. AI는 선정에 관여하지 않는다.
 
     티어(실속/고급)별로 **항상 per_tier개를 채우되**, 정렬 우선순위로 품질을 반영한다:
@@ -100,6 +103,11 @@ def select_featured(products: list[dict[str, Any]], per_tier: int = 3) -> list[d
     본다(부당 제외 방지). 하한 90%는 89%대 베스트셀러를 떨궈 80%로 보정(세션 #19 실측).
     """
 
+    # 미지정 시 설정값(설정창에서 편집) → 기존 기본값. 명시 인자가 있으면 그대로(호출자·테스트 우선).
+    if per_tier is None:
+        per_tier = int(settings.get("featured_per_tier", 3) or 3)
+    floor = float(settings.get("satisfaction_floor", _SATISFACTION_FLOOR) or _SATISFACTION_FLOOR)
+
     def _vol(p: dict[str, Any]) -> int:
         return int(p.get("volume") or 0)
 
@@ -107,9 +115,9 @@ def select_featured(products: list[dict[str, Any]], per_tier: int = 3) -> list[d
         return product_filter.trusted_discount(p.get("discount_pct")) or 0
 
     def _is_poor(p: dict[str, Any]) -> bool:
-        # 명백한 저평가: 만족도가 '있고'(0/None=피드백 없음 제외) 0<rate<80. 이런 제품만 뒤로 민다.
+        # 명백한 저평가: 만족도가 '있고'(0/None=피드백 없음 제외) 0<rate<floor. 이런 제품만 뒤로 민다.
         r = p.get("rate")
-        return r is not None and 0 < float(r) < _SATISFACTION_FLOOR
+        return r is not None and 0 < float(r) < floor
 
     chosen: list[dict[str, Any]] = []
     for tier in ("budget", "premium"):

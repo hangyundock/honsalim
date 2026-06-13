@@ -39,6 +39,11 @@ dev = [
   "types-requests",
   "types-PyYAML",
 ]
+# 운영 대시보드 GUI (세션 #25) — 데스크톱 전용. CI(Linux)·빌드는 미설치(런타임 선택).
+# Windows 시스템 Python에 이미 설치됨(AutoBlog 공유) — 환경 변경 불요.
+gui = [
+  "PyQt5>=5.15",
+]
 
 [project.scripts]
 # BACKEND §9 CLI 명령 11개 (DECISIONS K4 — flat layout 정합, 세션 #5)
@@ -114,8 +119,14 @@ mypy_path = "src"
 explicit_package_bases = true
 
 [[tool.mypy.overrides]]
-module = ["anthropic.*", "jinja2.*", "markdown.*"]
+module = ["anthropic.*", "jinja2.*", "markdown.*", "PyQt5.*"]
 ignore_missing_imports = true
+
+# dashboard.app은 PyQt5 GUI 셸(데스크톱 진입점) — PyQt5 enum 스코핑/Optional 반환 스텁 마찰이
+# 많고 로직이 없다. scripts/ 제외와 동일 취지로 타입검사 면제(로직은 dashboard.queries에서 검사).
+[[tool.mypy.overrides]]
+module = ["dashboard.app"]
+ignore_errors = true
 
 # ─── Pytest [관찰] ─────────────────────────────────────
 [tool.pytest.ini_options]
