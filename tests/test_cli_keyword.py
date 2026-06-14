@@ -145,3 +145,58 @@ class TestParserRegistration:
             if isinstance(action, argparse._SubParsersAction):
                 names |= set(action.choices)
         assert {"keyword-add", "keyword-generate", "keyword-list", "reject"} <= names
+
+
+class TestGatherCandidatesHybrid:
+    """Phase A — 쿠팡(수동) + 알리(데이터) 결합 후보 (세션 #28)."""
+
+    def test_coupang_only_channel_no_ali(self, migrated_db: Path) -> None:
+        from collector import coupang_manual as cm
+        from writer import keyword_queue as kq
+
+        conn = db.connect(migrated_db)
+        kid = kq.add_keyword(conn, "무선청소기", channel="coupang")
+        cm.add_to_keyword(
+            conn, kid, cm.build_manual_product("쿠팡청소기", "https://link.coupang.com/a/X")
+        )
+        kw = kq.get_keyword(conn, kid)
+        conn.close()
+        assert kw is not None
+        cands, _ = cli._gather_keyword_candidates(db.connect(migrated_db), kw, 20)
+        assert [c["source"] for c in cands] == ["coupang"]  # 쿠팡 단독 — 알리 호출 없음
+
+    def test_combines_coupang_and_ali(
+        self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from types import SimpleNamespace
+
+        import collector.aliexpress as ali
+        from collector import coupang_manual as cm
+        from common import config as cfg
+        from writer import keyword_queue as kq
+
+        ali_prod = {
+            "source": "aliexpress",
+            "source_product_id": "A1",
+            "name": "알리 청소기",
+            "deeplink_url": "https://s.click.ali/A1",
+            "deeplink_slug": "ali-A1",
+            "affiliate_tag": "honsallim",
+            "price_krw": 19900,
+        }
+        monkeypatch.setattr(
+            ali, "query_products", lambda *a, **k: SimpleNamespace(products=[ali_prod])
+        )
+        monkeypatch.setattr(cfg, "load_secrets", lambda: None)
+
+        conn = db.connect(migrated_db)
+        kid = kq.add_keyword(conn, "무선청소기", channel="both")
+        cm.add_to_keyword(
+            conn, kid, cm.build_manual_product("쿠팡청소기", "https://link.coupang.com/a/X")
+        )
+        kw = kq.get_keyword(conn, kid)
+        conn.close()
+        assert kw is not None
+        cands, _ = cli._gather_keyword_candidates(db.connect(migrated_db), kw, 20)
+        sources = {c["source"] for c in cands}
+        assert sources == {"coupang", "aliexpress"}  # 결합(하이브리드)

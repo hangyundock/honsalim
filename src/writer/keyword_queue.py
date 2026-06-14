@@ -94,6 +94,26 @@ def add_keyword(
     return int(cur.lastrowid or 0)
 
 
+def get_or_create(
+    conn: sqlite3.Connection, keyword: str, *, channel: str = "both", score: float = 0.0
+) -> int:
+    """키워드 텍스트로 pending 키워드를 찾고 없으면 새로 추가 (세션 #28 — 원팝업 생성용).
+
+    '쿠팡 배너 입력 → 글 생성' 팝업이 키워드를 손으로 고르지 않고도 동작하도록: 같은 텍스트의
+    pending 키워드가 있으면 재사용(중복 방지), 없으면 add_keyword로 생성. 반환: keyword_queue id.
+    """
+    keyword = (keyword or "").strip()
+    if not keyword:
+        raise ValueError("keyword가 비어 있습니다")
+    row = conn.execute(
+        "SELECT id FROM keyword_queue WHERE keyword = ? AND status = 'pending' ORDER BY id LIMIT 1",
+        (keyword,),
+    ).fetchone()
+    if row:
+        return int(row[0])
+    return add_keyword(conn, keyword, channel=channel, score=score)
+
+
 def set_status(
     conn: sqlite3.Connection, keyword_id: int, status: str, reason: str | None = None
 ) -> None:
