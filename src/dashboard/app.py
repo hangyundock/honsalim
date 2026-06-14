@@ -168,13 +168,22 @@ class CoupangProductDialog(QDialog):
     쿠팡 첨부 + 알리 데이터 결합 하이브리드 글을 한 번에 생성. 배너 이미지는 hotlink(함정#3 무관).
     """
 
-    def __init__(self, prefill_keyword: str = "", parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        prefill_keyword: str = "",
+        parent: QWidget | None = None,
+        *,
+        attach_mode: bool = False,
+    ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("쿠팡 배너 → 글 생성")
+        self.attach_mode = attach_mode
+        self.setWindowTitle("쿠팡 배너 첨부(저장)" if attach_mode else "쿠팡 배너 → 글 생성")
         self.resize(560, 420)
         form = QFormLayout(self)
         self.keyword = QLineEdit(prefill_keyword)
         self.keyword.setPlaceholderText("글 주제 키워드 (예: 무선청소기) — 자동 채움·수정 가능")
+        if attach_mode:
+            self.keyword.setReadOnly(True)  # 선택한 대기 키워드에 저장 (대상 고정)
         self.banner = QTextEdit()
         self.banner.setPlaceholderText(
             "쿠팡 파트너스 '블로그용 배너' HTML 붙여넣기 — <a><img></a> "
@@ -193,7 +202,10 @@ class CoupangProductDialog(QDialog):
         form.addRow("파트너스 URL", self.url)
         form.addRow("가격(원)", self.price)
         note = QLabel(
-            "✅ 배너 이미지가 글에 표시됩니다(hotlink·다운로드 아님). '이 키워드로 글 생성'을 누르면 "
+            "💾 이 키워드에 쿠팡 배너를 저장만 합니다(생성 안 함·비용 없음). 키워드는 '대기'로 유지되고, "
+            "스케줄러(auto-cycle) 또는 '글 생성' 시 이 쿠팡으로 하이브리드(쿠팡+알리) 글이 만들어집니다."
+            if attach_mode
+            else "✅ 배너 이미지가 글에 표시됩니다(hotlink·다운로드 아님). '이 키워드로 글 생성'을 누르면 "
             "쿠팡 + 알리 데이터를 합친 글이 만들어지고 검토 대기로 들어갑니다 "
             "(LLM 비용 발생·자동 발행 안 함)."
         )
@@ -203,7 +215,7 @@ class CoupangProductDialog(QDialog):
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         ok_btn = buttons.button(QDialogButtonBox.Ok)
         if ok_btn is not None:
-            ok_btn.setText("이 키워드로 글 생성")
+            ok_btn.setText("이 키워드에 저장" if attach_mode else "이 키워드로 글 생성")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
@@ -423,6 +435,7 @@ class DashboardWindow(QMainWindow):
                 [
                     ("🎯 추천 키워드", self._on_recommend),
                     ("🆕 키워드 추가", self._on_add_keyword),
+                    ("🛒 쿠팡 첨부(저장)", self._on_coupang_attach),
                     ("🛒 쿠팡 배너→글 생성", self._on_coupang_generate),
                     ("✨ 글 생성", self._on_generate),
                 ],
@@ -818,6 +831,66 @@ class DashboardWindow(QMainWindow):
             import cli
 
             return cli.cmd_keyword_generate(argparse.Namespace(id=kid, page_size=20, dry_run=False))
+
+        self.run_task(task)
+
+    def _on_coupang_attach(self) -> None:
+        """선택한 대기 키워드에 쿠팡 배너를 저장만 (생성 안 함·pending 유지·세션 #29 naver_blog 흐름).
+
+        스케줄러(auto-cycle)나 '글 생성' 시 이 저장된 쿠팡으로 하이브리드(쿠팡+알리) 글이 만들어진다.
+        """
+        row = self.tab_keywords.currentRow()
+        if row < 0:
+            QMessageBox.information(
+                self, "키워드 선택", "쿠팡을 저장할 대기 키워드를 먼저 선택하세요."
+            )
+            return
+        kid_item = self.tab_keywords.item(row, 0)
+        kw_item = self.tab_keywords.item(row, 1)
+        if kid_item is None or kw_item is None:
+            return
+        try:
+            kid = int(kid_item.text())
+        except ValueError:
+            return
+        keyword = kw_item.text()
+        dlg = CoupangProductDialog(keyword, self, attach_mode=True)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+        v = dlg.values()
+        if not v["banner"] and not (v["name"] and v["url"]):
+            QMessageBox.warning(
+                self, "입력 필요", "쿠팡 배너 HTML을 붙여넣거나 상품명 + 파트너스 URL을 입력하세요."
+            )
+            return
+
+        def task() -> int:
+            from collector import coupang_manual
+
+            conn = db.connect(db.DB_PATH)
+            try:
+                prods = coupang_manual.products_from_banners(
+                    v["banner"],
+                    name=v["name"],
+                    url=v["url"],
+                    price_krw=v["price"],
+                    affiliate_tag=settings.get("coupang_tag"),
+                )
+                if not prods:
+                    print("[쿠팡] 첨부할 상품 없음 — 배너 또는 상품명+URL 확인")
+                    return 1
+                for p in prods:
+                    coupang_manual.add_to_keyword(conn, kid, p)
+                # 쿠팡+알리 하이브리드 대상으로 (저장 후 생성 시 알리도 결합)
+                conn.execute("UPDATE keyword_queue SET channel='both' WHERE id=?", (kid,))
+                conn.commit()
+                print(
+                    f"[쿠팡] {len(prods)}개 저장 → 키워드 #{kid} {keyword!r} "
+                    "(대기 유지 · 생성은 스케줄러/'글 생성' 시)"
+                )
+            finally:
+                conn.close()
+            return 0
 
         self.run_task(task)
 
