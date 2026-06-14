@@ -5,7 +5,10 @@
 
 ## ★ 다음 세션 #30 — (상세 EVENTS #29) · 라이브 테스트가 적발한 2대 문제 최우선
 
-- [ ] **★A. 키워드 경로 알리 검색 근본수정 (최우선)**: `_gather_keyword_candidates`가 `ali.query_products(한글 키워드)` → "컴퓨터의자"에 폰케이스·티셔츠·가방 등 무관상품만 옴(가드가 다 거름→글 thin·쿠팡만). **키워드→카테고리 매핑 → 그 카테고리의 영어 tier 검색어**(`category_sources.yml` tiers.q "office chair" 등)로 알리 검색하게 수정 → 하이브리드에 알리 데이터 복원. (카테고리 경로는 이미 영어라 정상=라이브 5카테고리 멀쩡)
+- [ ] **★A. 키워드 경로 알리 검색 근본수정 (최우선)** — **규칙: 알리 검색 쿼리 = 영어**(알리 영어중심 인덱스 / 한글 쿼리는 매칭실패→"한국 인기" 잡동사니 폰케이스·티셔츠). 현재 `cli._gather_keyword_candidates`가 `ali.query_products(kw["keyword"]=한글)` → 무관상품 → 가드가 다 거름 → 글 thin(쿠팡만). **카테고리 경로는 이미 영어라 정상**(라이브 5카테고리 멀쩡).
+  - **구현**: ① `keyword_relevance.resolve_category(키워드)` → slug ② `category_collect.load_sources()[slug].tiers`의 **영어 `q`**(+ min/max 가격)로 `ali.query_products` 검색(`category_collect.collect_category`와 동일 패턴·여러 티어) ③ 기존 적합성 필터 적용 → 쿠팡과 결합. 부품 다 있음(resolve_category·load_sources)·배선만.
+  - **언어 규칙**: 알리 쿼리=영어 / 네이버 검색량·키워드연구·글 본문·SEO=한글 / 적합성 필터는 **알리가 돌려준 한글 상품명**에 적용(알리가 제목은 한글로 줌).
+  - **fallback**: 카테고리 **미매핑 키워드**(office-chair 등 밖) = 알리 건너뛰고 쿠팡만 또는 보류(fail-closed 자동승인은 이미 미매핑 보류). **한계**: 키워드→글은 **정의된 카테고리 안**에서만 알리 정상 → 새 주제는 `category_sources.yml`에 카테고리(영어 q+제외어) 먼저 추가해야 함("아무 키워드나 완벽한 글" 아님).
 - [ ] **★B. 대시보드 진행/완료 표시**: 생성 1~2분 무표시 → 끝난지 모름(주인 반복지적). 작업 시작·진행중·완료 신호(상태 라벨/타이틀/버튼 비활성 등) 추가.
 - [ ] **A·B 후 첫 라이브 글**: 게이밍의자(#3·쿠팡 첨부됨) `✨ 글 생성` → 제대로된 하이브리드(쿠팡+알리) → 미리보기 → 승인 → 발행. thin draft #3(컴퓨터의자) 반려.
 - [ ] **DECISIONS/CLAUDE.md B-i 기록**: auto_mode 토글(기본 OFF)·fail-closed 자동승인·발행후 안전망·E7 보정(구글정책 정정=AI/자동 아닌 **저가치 양산**만 페널티). critical-review 지적 문서 정합.
