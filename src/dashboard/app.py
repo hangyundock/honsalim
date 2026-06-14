@@ -201,6 +201,74 @@ class CoupangProductDialog(QDialog):
 
 
 # ─────────────────────────────────────────────────────────────
+# 추천 키워드 선택 창 (세션 #26)
+# ─────────────────────────────────────────────────────────────
+class RecommendDialog(QDialog):
+    """추천 키워드 목록에서 선택 — 한 행 선택 추가 또는 1순위 자동 추가.
+
+    추천 생성(네이버 조회)은 부모의 백그라운드 작업에서 끝낸 뒤 결과만 넘겨받는다(UI 비프리징).
+    """
+
+    def __init__(self, recs: list[dict[str, Any]], parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("추천 키워드 — 선택")
+        self.resize(640, 480)
+        self.recs = recs
+        self._choice: dict[str, Any] | None = None
+        lay = QVBoxLayout(self)
+        info = QLabel(
+            "검색량순 추천입니다. 한 행을 선택해 추가하거나, '1순위 자동 추가'를 누르세요.\n"
+            "(월검색량=네이버 실데이터 · '캐시'=검색량 미상 보조키워드)"
+        )
+        info.setStyleSheet("color:#555;")
+        info.setWordWrap(True)
+        lay.addWidget(info)
+        self.table = _read_only_table(["키워드", "월검색량", "경쟁도", "씨앗", "출처"])
+        self.table.setRowCount(len(recs))
+        for i, r in enumerate(recs):
+            vol = f"{r['volume']:,}" if r.get("volume") is not None else "—"
+            src = "네이버" if r.get("source") == "naver" else "캐시"
+            self.table.setItem(i, 0, _cell(str(r.get("keyword") or "")))
+            self.table.setItem(i, 1, _cell(vol))
+            self.table.setItem(i, 2, _cell(str(r.get("competition") or "")))
+            self.table.setItem(i, 3, _cell(str(r.get("seed") or "")))
+            self.table.setItem(i, 4, _cell(src))
+        if recs:
+            self.table.selectRow(0)
+        lay.addWidget(self.table, 1)
+        bar = QHBoxLayout()
+        b_sel = QPushButton("✅ 선택한 키워드 추가")
+        b_sel.clicked.connect(self._choose_selected)
+        b_top = QPushButton("⭐ 1순위 자동 추가")
+        b_top.clicked.connect(self._choose_top)
+        b_cancel = QPushButton("취소")
+        b_cancel.clicked.connect(self.reject)
+        bar.addWidget(b_sel)
+        bar.addWidget(b_top)
+        bar.addStretch(1)
+        bar.addWidget(b_cancel)
+        lay.addLayout(bar)
+
+    def _choose_selected(self) -> None:
+        idx = self.table.currentRow()
+        if idx < 0 or idx >= len(self.recs):
+            QMessageBox.information(
+                self, "선택 필요", "키워드를 한 행 선택하거나 '1순위 자동 추가'를 누르세요."
+            )
+            return
+        self._choice = self.recs[idx]
+        self.accept()
+
+    def _choose_top(self) -> None:
+        if self.recs:
+            self._choice = self.recs[0]
+        self.accept()
+
+    def chosen(self) -> dict[str, Any] | None:
+        return self._choice
+
+
+# ─────────────────────────────────────────────────────────────
 # 설정 편집 창 (Phase F)
 # ─────────────────────────────────────────────────────────────
 class SettingsDialog(QDialog):
@@ -328,6 +396,20 @@ class DashboardWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.tab_queue = _read_only_table(["ID", "상태", "키워드/제목", "생성일"])
         self.tab_keywords = _read_only_table(["ID", "키워드", "채널", "상태", "점수", "미리선택"])
+        # 메뉴 순서 = 운영 작업 순서 (세션 #26): 키워드(추천·추가·생성) → 발행 큐(검토·승인·발행)
+        # → 카테고리·모니터링 → 설정. 시작점인 '키워드'가 맨 왼쪽.
+        self.tabs.addTab(
+            self._panel(
+                self.tab_keywords,
+                [
+                    ("🎯 추천 키워드", self._on_recommend),
+                    ("🆕 키워드 추가", self._on_add_keyword),
+                    ("🛒 쿠팡 상품 추가", self._on_coupang_add),
+                    ("✨ 글 생성(선택)", self._on_generate),
+                ],
+            ),
+            "키워드",
+        )
         self.tabs.addTab(
             self._panel(
                 self.tab_queue,
@@ -339,17 +421,6 @@ class DashboardWindow(QMainWindow):
                 ],
             ),
             "발행 큐 (글)",
-        )
-        self.tabs.addTab(
-            self._panel(
-                self.tab_keywords,
-                [
-                    ("🆕 키워드 추가", self._on_add_keyword),
-                    ("🛒 쿠팡 상품 추가", self._on_coupang_add),
-                    ("✨ 글 생성(선택)", self._on_generate),
-                ],
-            ),
-            "키워드",
         )
         self.tabs.addTab(self._build_monitor_tab(), "카테고리·모니터링")
         self.tabs.addTab(self._build_settings_tab(), "설정")
@@ -566,6 +637,69 @@ class DashboardWindow(QMainWindow):
             return int(id_item.text()) if id_item else None
         except ValueError:
             return None
+
+    def _on_recommend(self) -> None:
+        """추천 키워드 생성 → 선택 창 → 큐 추가. 정의된 선정 방식(keyword_research)을 SEO 씨앗에 적용."""
+        seed, ok = QInputDialog.getText(
+            self, "추천 키워드", "추천 주제어 (비우면 기존 카테고리 기반 자동 추천):"
+        )
+        if not ok:
+            return
+        custom = seed.strip() or None
+
+        def task() -> list[dict[str, Any]]:
+            from common import config
+            from writer import keyword_recommender as kr
+
+            config.load_secrets()  # 네이버 검색광고 키
+            print("[추천] 네이버 연관검색어 조회 중…")
+            conn = db.connect(db.DB_PATH)
+            try:
+                recs = kr.recommend(conn, custom_seed=custom, limit=30, live=True)
+            finally:
+                conn.close()
+            print(f"[추천] 후보 {len(recs)}건")
+            return recs
+
+        self.run_task(task, on_done=self._after_recommend)
+
+    def _after_recommend(self, ok: bool, result: Any) -> None:
+        if not ok:
+            return  # 오류는 run_task가 이미 로그/경고
+        if not isinstance(result, list) or not result:
+            QMessageBox.information(
+                self,
+                "추천 없음",
+                "추천 키워드가 없습니다. 주제어를 바꾸거나 네이버 키를 확인하세요.",
+            )
+            return
+        dlg = RecommendDialog(result, self)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+        rec = dlg.chosen()
+        if not rec:
+            return
+        kw = str(rec["keyword"])
+        channel = str(rec.get("channel") or "ali")
+        vol = int(rec.get("volume") or 0)
+        note = f"추천(검색량 {vol}·씨앗 {rec.get('seed')})"
+
+        def add_task() -> int:
+            import cli
+
+            return cli.cmd_keyword_add(
+                argparse.Namespace(
+                    keyword=kw,
+                    channel=channel,
+                    slug=None,
+                    budget_min=None,
+                    budget_max=None,
+                    note=note,
+                    score=float(vol),
+                )
+            )
+
+        self.run_task(add_task)
 
     def _on_add_keyword(self) -> None:
         text, ok = QInputDialog.getText(

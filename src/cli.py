@@ -263,6 +263,7 @@ def _check_phase2_modules() -> bool:
         ("collector.keyword_research", "research_keywords"),
         ("collector.keyword_research", "build_entry"),
         ("collector.seo_keywords", "gate_config"),
+        ("writer.keyword_recommender", "recommend"),
         ("builder", "build_article_jsonld"),
         ("builder", "build_itemlist_jsonld"),
         ("builder", "build_product_jsonld"),
@@ -1626,6 +1627,49 @@ def cmd_keyword_add(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_keyword_recommend(args: argparse.Namespace) -> int:
+    """추천 키워드 생성(검색량순) — 정의된 선정 방식(keyword_research)을 SEO 씨앗에 적용.
+
+    네이버 실 월검색량(읽기 전용·무료). 씨앗별 실패 시 캐시 보조키워드로 자가복원.
+    --add-top로 1순위를 큐에 추가(status=pending) — '선택 없으면 자동 세팅' 헤드리스 대응.
+    """
+    from writer import keyword_queue as kq
+    from writer import keyword_recommender as kr
+
+    config.load_secrets()  # 네이버 검색광고 키 (live 조회)
+    conn = db.connect(db.DB_PATH)
+    try:
+        recs = kr.recommend(
+            conn,
+            custom_seed=args.seed,
+            limit=args.limit,
+            channel=args.channel,
+            live=not args.no_live,
+        )
+        if not recs:
+            print(f"{WARN} 추천 키워드 없음 — 씨앗(seo_keywords.yml)·네이버 키·네트워크 확인")
+            return 0
+        print(f"{OK} 추천 키워드 {len(recs)}건 (검색량순):")
+        for i, r in enumerate(recs, 1):
+            vol = f"{r['volume']:,}" if r["volume"] is not None else "—"
+            src = "네이버" if r["source"] == "naver" else "캐시"
+            print(
+                f"  {i:>2}. {r['keyword']}  (월검색 {vol} · {r['competition']} · {src} · 씨앗 {r['seed']})"
+            )
+        if args.add_top:
+            top = recs[0]
+            kid = kq.add_keyword(
+                conn, top["keyword"], channel=top["channel"], score=float(top["volume"] or 0)
+            )
+            print(
+                f"{OK} 1순위 {top['keyword']!r} → 키워드 #{kid} 추가 "
+                f"(채널 {top['channel']}, status=pending)"
+            )
+        return 0
+    finally:
+        conn.close()
+
+
 def _gather_keyword_candidates(
     conn: sqlite3.Connection, kw: dict[str, Any], page_size: int
 ) -> tuple[list[dict[str, Any]], str]:
@@ -2274,6 +2318,25 @@ def build_parser() -> argparse.ArgumentParser:
     p_kw_list = sub.add_parser("keyword-list", help="키워드 큐 목록 (status 필터 선택)")
     p_kw_list.add_argument("--status", type=str, default=None, help="status 필터 (예: pending)")
     p_kw_list.set_defaults(func=cmd_keyword_list)
+
+    p_kw_rec = sub.add_parser(
+        "keyword-recommend",
+        help="추천 키워드 생성 (네이버 연관검색어→필터→검색량순). --add-top로 1순위 큐 추가",
+    )
+    p_kw_rec.add_argument(
+        "--seed", type=str, default=None, help="임의 주제 씨앗 (미지정 시 SEO 카테고리 씨앗 전부)"
+    )
+    p_kw_rec.add_argument("--limit", type=int, default=20, help="추천 개수 상한")
+    p_kw_rec.add_argument(
+        "--channel", choices=["ali", "coupang", "both"], default="ali", help="--add-top 시 채널"
+    )
+    p_kw_rec.add_argument(
+        "--no-live", action="store_true", help="네이버 미조회 (캐시 보조키워드만·네트워크 0)"
+    )
+    p_kw_rec.add_argument(
+        "--add-top", action="store_true", help="1순위를 큐에 추가 (status=pending)"
+    )
+    p_kw_rec.set_defaults(func=cmd_keyword_recommend)
 
     p_reject = sub.add_parser("reject", help="draft → rejected (반려)")
     p_reject.add_argument("--draft", type=int, required=True, help="draft id")

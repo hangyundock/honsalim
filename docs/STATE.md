@@ -7,14 +7,14 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#25: ★운영 대시보드 전면 구축(PyQt5)** — 키워드 큐(migration 007)·글 생성·1클릭 승인·예약 발행(schtasks·E7 준수)·쿠팡 수동 등록(공식 위젯/텍스트)·설정창 + 바탕화면 아이콘. 회귀 **773**(+80). ★다음(#26)=**(1)대시보드 라이브 첫 글 생성 확인(DeepSeek 비용·품질) (2)아이콘 main 재지정 (3)★원래 #25 미완: mini-dehumidifier 점검·쿠팡 본격·성장 Tier0+측정**. 상세 EVENTS #25 | 2026-06-14 #25 |
+| 진행 단계 | **#26: ★추천 키워드 생성 기능 + 대시보드 메뉴 순서 재정렬 + off-target 근본수정** — `keyword_recommender`(네이버 연관검색어→정의된 필터→검색량순·자가복원·중복제외) + 🎯 추천 키워드 GUI(선택/1순위 자동) + CLI `keyword-recommend` + 노트북거치대 exclude_terms. 회귀 **782**(+9). ★다음(#27)=머지+대시보드 재시작→추천→첫 글 생성·off-target curation·#25 잔존(아이콘·쿠팡·성장). 상세 EVENTS #26 | 2026-06-14 #26 |
 | 운영 모델 | 자동 게시 활성(콘텐츠 큐). **refresh-cycle = 수동 운영(주인 직접 지시) — C13 [확정 #24], Claude 예약작업 비활성화**. 자동 "승인" 금지(E7→가드레일) | #24 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·Secrets·main-protect)·Cloudflare(도메인·Pages·R2·D1)·Anthropic·INDEXNOW 키·secrets·Git push·pre-commit 9종·Dependabot (세부 archive) | #3 |
 | Phase 2 핵심 모듈 (#3~#5) | cli·common·validator·writer·collector·enricher·builder·deployer·tracker·workers (세부 BACKEND §2) + **#17: category_collect·category_page_builder·concept_image·category_writer** | #17 |
-| Phase 2 회귀 테스트 | **773 / 773 PASS** [확정 pytest, #25] — #25 +80 (운영 대시보드: settings·migration007·keyword_queue·dashboard queries/app smoke·cli keyword·publish_queue·scheduler·coupang_manual). #24 693. black·ruff·mypy 클린 | 2026-06-14 |
-| CLI 명령 (BACKEND §9) | **28개** — doctor·db·collect·collect-products·enrich·validate·approve·promote·unapprove·deploy·sync-slugmap·build(+`--preview`)·dashboard·collect-category·build-category·approve-category·unapprove-category(킬스위치)·register-categories(+`--auto-publish`)·auto-publish·category-status(+`--monitor`)·**refresh-cycle(#23)** · **#25 운영 대시보드: keyword-add·keyword-generate·keyword-list·reject·coupang-add·publish-queue·schedule** | #25 |
+| Phase 2 회귀 테스트 | **782 / 782 PASS** [확정 pytest, #26] — #26 +9 (keyword_recommender: 검색량순·중복제외·자가복원·custom seed·자동 1순위). #25 773(운영 대시보드). black·ruff·mypy 클린 | 2026-06-14 |
+| CLI 명령 (BACKEND §9) | **29개** — doctor·db·collect·collect-products·enrich·validate·approve·promote·unapprove·deploy·sync-slugmap·build(+`--preview`)·dashboard·collect-category·build-category·approve-category·unapprove-category(킬스위치)·register-categories(+`--auto-publish`)·auto-publish·category-status(+`--monitor`)·**refresh-cycle(#23)** · **#25 운영 대시보드: keyword-add·keyword-generate·keyword-list·reject·coupang-add·publish-queue·schedule** · **#26: keyword-recommend(추천 키워드·--add-top)** | #26 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD. 세부 DECISIONS J·O + EVENTS | #4~#16 |
-| doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **64개** + #19 **LLM 키 점검**(활성 모델 기준 OPENROUTER/ANTHROPIC). 64/64 OK | #19 |
+| doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **65개** + #19 **LLM 키 점검**(활성 모델 기준 OPENROUTER/ANTHROPIC). 65/65 OK [#26 +keyword_recommender.recommend] | #26 |
 | DB 초기화 | `data/honsalim.db` **v7** + categories(**5**)·category_products + products 정가/할인·판매량/만족도 + **keyword_queue(발행 큐·migration 007·drafts.keyword_id, #25)** (migration 002~**007**) + personas 3·scenarios 10. ※DB는 gitignore — 다음 워크트리는 `db migrate`+`db seed`(+`collect-category`)로 재생성 | #25 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (docs/ 참조). 일관성 모순 0건 | #2 |
 | 메모리 시스템 | feedback 7건([[incremental-critical-review]]·[[autonomous-safe-system]] 등) + reference market_research + MEMORY.md | #12 |
@@ -58,28 +58,27 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 다음 세션 #26 — 상세 EVENTS #25.
-0. **운영 대시보드 실전화**: (a) **라이브 첫 글 생성 1회**(DeepSeek 비용·품질 확인 — 구조/라우팅만 검증) (b) **바탕화면 아이콘 main 재지정**(현재 워크트리→`D:\affiliate_hub`, 머지 후) (c) 설정 일부(쿠팡 모드/임계·llm_model·seo_max_attempts·jitter) 코드 연결.
+### ★ 다음 세션 #27 — 상세 EVENTS #26.
+0. **머지 + 대시보드 재시작 → 추천→첫 글 생성**: #26 추천 키워드 기능은 워크트리에만 있음 → 머지·메인 업데이트·대시보드 재시작 후 🎯 추천→선택(또는 1순위 자동)→✨ 글 생성(**DeepSeek 비용·품질 1회 확인** = 원래 (A) 목표). + 바탕화면 아이콘 main 재지정 + 설정 일부(쿠팡 모드/임계·llm_model·seo·jitter) 코드 연결.
+0b. **off-target 씨앗 curation**: `노트북 거치대`는 #26에 폰·태블릿·자전거 제외 완료. 남은 `책·모니터 거치대`(편집 판단)·`받침대`(발받침 모호) 등 다른 씨앗 exclude_terms 보강(자동 1순위 안전성).
 1. **`mini-dehumidifier` 점검**: 추천 1개(<2)로 가드레일 자가복원→라이브 비공개. 추천 풀 부족 원인 확인 후 복원/보강.
 2. **★★쿠팡 본격 (주인 명시)**: 이제 **대시보드 수동 등록**(coupang-add·공식 위젯/텍스트)으로 즉시 시작 가능 → 누적 15만원 후 `collector.coupang`(API) 구현. 쿠팡=메인(§6).
 3. **멀티채널 배치 구현 (DECISIONS S1·S2)**: C안. 게이팅=쿠팡 + 1~2주 트래픽 데이터 후.
 4. **★성장 Tier0 지속 (DECISIONS T1·T2 · [[growth-first-priority]])**: 측정(GSC·네이버·Cloudflare) 리뷰→더블다운. Tier1 Pinterest.
 - ★**DB는 gitignore→재생성**(`db migrate`+`db seed`+`register-categories --all --no-dry-run --auto-publish`, ~$2). refresh-cycle·대시보드 발행/배포는 **main 체크아웃**에서(C13 수동).
 
-### 해소 (세션 #25) — 상세 EVENTS #25
-- ✅ **운영 대시보드 전면 구축(A~F)**: 설정 외부화 + 키워드 큐(migration 007) + PyQt5 GUI(키워드/글/모니터링/설정) + 키워드 글 생성·1클릭 승인·예약 발행(schtasks·E7·기본 OFF) + 쿠팡 수동 등록(공식 위젯/텍스트) + 설정창 + 바탕화면 아이콘. 회귀 693→773.
+### 해소 (세션 #26) — 상세 EVENTS #26
+- ✅ **추천 키워드 생성 기능**: `keyword_recommender`(정의된 keyword_research 방식+SEO 씨앗·검색량순·중복제외·자가복원·custom seed) + 🎯 추천 키워드 GUI(선택/1순위 자동) + CLI `keyword-recommend` + 메뉴 순서 재정렬(키워드 맨 앞) + 노트북거치대 off-target exclude_terms. 회귀 773→782.
 
-### 해소 (세션 #24) — 상세 EVENTS #24
-- ✅ **멀티채널·무인마케팅 전략 확정(DECISIONS S·T)** · **쿠팡 승인용 `/reviews/`** · **Tier0 SEO 품질강화·필러** · **refresh-cycle 첫 라이브(자가복원 실증)** · **subprocess UTF-8 근본수정(run_text·회귀 693)** · **스케줄러 수동전환(C11 폐기→C13)**.
+### 해소 (세션 #25) — 상세 EVENTS #25
+- ✅ **운영 대시보드 전면 구축(A~F)**: 설정 외부화·키워드 큐(007)·PyQt5 GUI·글 생성·1클릭 승인·예약 발행(E7·기본OFF)·쿠팡 수동·설정창·바탕화면 아이콘. 회귀 693→773.
 
 ### Phase 2 진척 가능 (검토 의존 큼)
 - `src/builder/manifest.py` 증분 빌드 (ARCH §7·DB §10) · `src/collector/coupang.py` (Phase 4)
-- (이전 해소분 #7·#9·#10·#12는 EVENTS archive 참조)
 
 ### Phase 1 잔존 (작음)
 - Actions status check Branch Protection 추가 (Phase 2 안정 후)
 - BitLocker 활성 (사용자 결정)
-- (완료) 알리 Tracking ID·App Key/Secret 발급·ali.env 저장·라이브 검증 — 2026-05-30
 
 ### 보류
 - AdSense 신청 (Phase 6, 2026-12)
