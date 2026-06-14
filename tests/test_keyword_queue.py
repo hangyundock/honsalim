@@ -164,6 +164,30 @@ class TestEnsureScenario:
             kq.ensure_scenario_for_keyword(conn, kid)
 
 
+class TestGetOrCreate:
+    def test_creates_when_absent(self) -> None:
+        conn = _db()
+        kid = kq.get_or_create(conn, "무선청소기", channel="both")
+        assert kid > 0
+        row = conn.execute(
+            "SELECT keyword, channel FROM keyword_queue WHERE id = ?", (kid,)
+        ).fetchone()
+        assert row[0] == "무선청소기"
+        assert row[1] == "both"
+
+    def test_reuses_pending(self) -> None:
+        conn = _db()
+        a = kq.add_keyword(conn, "무선청소기", channel="ali")
+        b = kq.get_or_create(conn, "무선청소기")
+        assert a == b  # 같은 텍스트 pending 재사용(중복 생성 안 함)
+        assert conn.execute("SELECT COUNT(*) FROM keyword_queue").fetchone()[0] == 1
+
+    def test_empty_raises(self) -> None:
+        conn = _db()
+        with raises(ValueError):
+            kq.get_or_create(conn, "  ")
+
+
 if __name__ == "__main__":
     if pytest is not None:
         pytest.main([__file__, "-v"])

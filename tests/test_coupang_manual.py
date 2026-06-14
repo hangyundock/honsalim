@@ -211,3 +211,34 @@ class TestCmdCoupangAddBanner:
         items = json.loads(raw)
         assert items[0]["image_url_external"] == "https://image.coupangcdn.com/img/abc.jpg"
         assert items[0]["name"] == "쿠팡 무선청소기"
+
+
+_BANNER2 = (
+    '<a href="https://link.coupang.com/a/FGHIJ"><img '
+    'src="https://image.coupangcdn.com/img/def.jpg" alt="쿠팡 선풍기"></a>'
+)
+
+
+class TestMultiBanner:
+    def test_parse_multiple(self) -> None:
+        assert len(cm.parse_banners(_BANNER + "\n" + _BANNER2)) == 2
+
+    def test_dedup_same_link(self) -> None:
+        assert len(cm.parse_banners(_BANNER + _BANNER)) == 1  # 같은 href 중복 제거
+
+    def test_products_from_banners(self) -> None:
+        prods = cm.products_from_banners(_BANNER + "\n" + _BANNER2)
+        assert len(prods) == 2
+        imgs = {p["image_url_external"] for p in prods}
+        assert imgs == {
+            "https://image.coupangcdn.com/img/abc.jpg",
+            "https://image.coupangcdn.com/img/def.jpg",
+        }
+
+    def test_products_text_fallback(self) -> None:
+        prods = cm.products_from_banners(None, name="선풍기", url="https://link.coupang.com/a/T")
+        assert len(prods) == 1
+        assert prods[0]["image_url_external"] is None
+
+    def test_products_empty_when_nothing(self) -> None:
+        assert cm.products_from_banners(None) == []

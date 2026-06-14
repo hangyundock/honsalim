@@ -162,41 +162,48 @@ def _cell(text: str, status: str | None = None) -> QTableWidgetItem:
 # 쿠팡 수동 상품 입력 폼 (Phase E)
 # ─────────────────────────────────────────────────────────────
 class CoupangProductDialog(QDialog):
-    """쿠팡 파트너스 '공식 배너' 붙여넣기 폼 — 배너에서 이미지·링크·상품명 자동 추출(세션 #28).
+    """쿠팡 공식 배너 → '이 키워드로 글 생성' 원팝업 (세션 #28 PartB, naver_blog식).
 
-    공식 배너 이미지는 hotlink(다운로드 아님·함정#3 무관)라 글에 상품 이미지로 표시된다.
-    배너 없이 URL만 넣으면 텍스트 링크(하위호환).
+    키워드(주제)는 자동 채움(수정 가능). 배너(여러 개 가능)에서 이미지·링크·상품명 자동 추출 →
+    쿠팡 첨부 + 알리 데이터 결합 하이브리드 글을 한 번에 생성. 배너 이미지는 hotlink(함정#3 무관).
     """
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, prefill_keyword: str = "", parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("쿠팡 상품 추가 (공식 배너)")
-        self.resize(540, 360)
+        self.setWindowTitle("쿠팡 배너 → 글 생성")
+        self.resize(560, 420)
         form = QFormLayout(self)
+        self.keyword = QLineEdit(prefill_keyword)
+        self.keyword.setPlaceholderText("글 주제 키워드 (예: 무선청소기) — 자동 채움·수정 가능")
         self.banner = QTextEdit()
         self.banner.setPlaceholderText(
             "쿠팡 파트너스 '블로그용 배너' HTML 붙여넣기 — <a><img></a> "
-            "(이미지·링크·상품명 자동 추출)"
+            "(여러 개면 줄바꿈 · 이미지·링크·상품명 자동 추출)"
         )
-        self.banner.setMaximumHeight(96)
+        self.banner.setMaximumHeight(110)
         self.name = QLineEdit()
         self.name.setPlaceholderText("비우면 배너 상품명(alt) 사용")
         self.url = QLineEdit()
-        self.url.setPlaceholderText("비우면 배너 링크 사용 (배너 없으면 필수)")
+        self.url.setPlaceholderText("비우면 배너 링크 사용")
         self.price = QLineEdit()
         self.price.setPlaceholderText("숫자만 (선택)")
+        form.addRow("키워드(주제)", self.keyword)
         form.addRow("공식 배너 HTML", self.banner)
         form.addRow("상품명", self.name)
         form.addRow("파트너스 URL", self.url)
         form.addRow("가격(원)", self.price)
         note = QLabel(
-            "✅ 공식 배너를 붙여넣으면 상품 이미지가 글에 표시됩니다 "
-            "(hotlink·다운로드 아님·함정#3 무관). 배너 없이 URL만 넣으면 텍스트 링크."
+            "✅ 배너 이미지가 글에 표시됩니다(hotlink·다운로드 아님). '이 키워드로 글 생성'을 누르면 "
+            "쿠팡 + 알리 데이터를 합친 글이 만들어지고 검토 대기로 들어갑니다 "
+            "(LLM 비용 발생·자동 발행 안 함)."
         )
         note.setStyleSheet("color:#1b5e20;font-size:11px;")
         note.setWordWrap(True)
         form.addRow(note)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        ok_btn = buttons.button(QDialogButtonBox.Ok)
+        if ok_btn is not None:
+            ok_btn.setText("이 키워드로 글 생성")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
@@ -204,6 +211,7 @@ class CoupangProductDialog(QDialog):
     def values(self) -> dict[str, Any]:
         price_text = self.price.text().strip()
         return {
+            "keyword": self.keyword.text().strip(),
             "name": self.name.text().strip(),
             "url": self.url.text().strip(),
             "price": int(price_text) if price_text.isdigit() else None,
@@ -415,7 +423,7 @@ class DashboardWindow(QMainWindow):
                 [
                     ("🎯 추천 키워드", self._on_recommend),
                     ("🆕 키워드 추가", self._on_add_keyword),
-                    ("🛒 쿠팡 상품 추가", self._on_coupang_add),
+                    ("🛒 쿠팡 배너→글 생성", self._on_coupang_generate),
                     ("✨ 글 생성", self._on_generate),
                 ],
             ),
@@ -813,37 +821,50 @@ class DashboardWindow(QMainWindow):
 
         self.run_task(task)
 
-    def _on_coupang_add(self) -> None:
-        kid = self._selected_id(self.tab_keywords)
-        if kid is None:
-            QMessageBox.information(
-                self, "선택 필요", "키워드 탭에서 상품을 추가할 키워드를 먼저 선택하세요."
-            )
-            return
-        dlg = CoupangProductDialog(self)
+    def _on_coupang_generate(self) -> None:
+        """쿠팡 배너 붙여넣기 → 그 키워드로 하이브리드 글 생성 (원팝업·세션 #28 PartB)."""
+        prefill = ""
+        row = self.tab_keywords.currentRow()
+        if row >= 0:
+            item = self.tab_keywords.item(row, 1)  # 키워드 컬럼
+            if item is not None:
+                prefill = item.text()
+        dlg = CoupangProductDialog(prefill, self)
         if dlg.exec_() != QDialog.Accepted:
             return
         v = dlg.values()
+        if not v["keyword"]:
+            QMessageBox.warning(self, "입력 필요", "키워드(주제)를 입력하세요.")
+            return
         if not v["banner"] and not (v["name"] and v["url"]):
             QMessageBox.warning(
-                self,
-                "입력 필요",
-                "공식 배너 HTML을 붙여넣거나, 상품명 + 파트너스 URL을 입력하세요.",
+                self, "입력 필요", "쿠팡 배너 HTML을 붙여넣거나 상품명 + 파트너스 URL을 입력하세요."
             )
             return
 
         def task() -> int:
             import cli
+            from collector import coupang_manual
+            from common import config
+            from writer import keyword_queue as kq
 
-            return cli.cmd_coupang_add(
-                argparse.Namespace(
-                    keyword_id=kid,
+            config.load_secrets()  # 알리 데이터 결합(+네이버)
+            conn = db.connect(db.DB_PATH)
+            try:
+                kid = kq.get_or_create(conn, v["keyword"], channel="both")
+                prods = coupang_manual.products_from_banners(
+                    v["banner"],
                     name=v["name"],
                     url=v["url"],
-                    price=v["price"],
-                    banner=v["banner"],
+                    price_krw=v["price"],
+                    affiliate_tag=settings.get("coupang_tag"),
                 )
-            )
+                for p in prods:
+                    coupang_manual.add_to_keyword(conn, kid, p)
+                print(f"[쿠팡] {len(prods)}개 첨부 → 키워드 #{kid} {v['keyword']!r}")
+            finally:
+                conn.close()
+            return cli.cmd_keyword_generate(argparse.Namespace(id=kid, page_size=20, dry_run=False))
 
         self.run_task(task)
 

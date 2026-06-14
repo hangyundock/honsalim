@@ -42,6 +42,64 @@ def parse_banner(banner_html: str | None) -> dict[str, str | None]:
     }
 
 
+_BANNER_RE = re.compile(r"<a\b[^>]*>\s*<img\b[^>]*>\s*</a>", re.I | re.S)
+
+
+def parse_banners(blob: str | None) -> list[str]:
+    """붙여넣은 텍스트에서 쿠팡 배너(<a><img></a>)를 순서대로 추출 (여러 개·같은 링크 중복 제거)."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for m in _BANNER_RE.finditer(blob or ""):
+        banner = m.group(0).strip()
+        href = _A_HREF_RE.search(banner)
+        key = href.group(1) if href else banner
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(banner)
+    return out
+
+
+def products_from_banners(
+    banner_html: str | None,
+    *,
+    name: str | None = None,
+    url: str | None = None,
+    price_krw: int | None = None,
+    affiliate_tag: str | None = None,
+) -> list[dict[str, Any]]:
+    """배너 붙여넣기(여러 개 가능) → products dict 목록 (세션 #28 PartB '이 키워드로 글 생성'용).
+
+    배너 1개면 name/url 보정 허용, 여러 개면 각 배너에서 추출. 배너 없고 name+url만 있으면 텍스트 1건.
+    """
+    banners = parse_banners(banner_html)
+    out: list[dict[str, Any]] = []
+    if len(banners) == 1:
+        out.append(
+            build_manual_product(
+                name or "",
+                url or "",
+                banner_html=banners[0],
+                price_krw=price_krw,
+                affiliate_tag=affiliate_tag,
+            )
+        )
+    elif banners:
+        for banner in banners:
+            out.append(
+                build_manual_product(
+                    "", "", banner_html=banner, price_krw=price_krw, affiliate_tag=affiliate_tag
+                )
+            )
+    elif (name or "").strip() and (url or "").strip():
+        out.append(
+            build_manual_product(
+                name or "", url or "", price_krw=price_krw, affiliate_tag=affiliate_tag
+            )
+        )
+    return out
+
+
 def build_manual_product(
     name: str,
     partners_url: str,
