@@ -31,24 +31,8 @@
 - BitLocker (사용자 결정 — "프로그램 완성도 우선·추후 일괄")
 - 쿠팡 파트너스 재가입 — Phase 4 출시 후
 
-## Phase 2: 핵심 시스템 — 남음
-
-> 완료 항목은 STATE.md "Phase 2 핵심 모듈 18개" + "회귀 342/342" + "CLI 10/11" 행 참조.
-
-- [x] ~~CLI dashboard 명령~~ ✅ 세션 #9 완료 (G3 결정으로 Claude Design 미사용, stub HTML)
-- [ ] `collector.coupang` (쿠팡 가입 후·Phase 4)
-- [ ] `builder.renderer/pages/sitemap/assets` (Jinja2 + DESIGN 시안)
-- [ ] `dashboard.render/approve` (디자인 시안 Phase 3 의존)
-- [ ] `python -m honsalim build --full` 성공 (Phase 2 종착)
-
-## Phase 3: 디자인·콘텐츠 (2026-07)
-
-- [ ] Claude Design 시안 3~5종 (사용자 claude.ai/design)
-- [ ] 시안 1개 선정 + DESIGN.md 토큰 미세 조정
-- [x] ~~Jinja2 템플릿 5종 + partials~~ ✅ 2026-05-30 (base·home·scenario_list·article·persona_hub·about + header/footer + _macros/components). 잔여: Critical CSS·Pretendard preload·JSON-LD 매크로 (정식 빌더 시)
-- [ ] AI 이미지 생성 (페르소나별 2~3장, Imagen 4 Fast)
-- [ ] 시즌 신학기·홈오피스 시나리오 5편 작성 (#5~#10)
-- [ ] 진실성 게이트 통과 + 사용자 1클릭 승인 + 시범 1편 로컬 미리보기·배포
+## Phase 2~3: 핵심 시스템·디자인 — 대부분 완료 (상세 STATE)
+- 빌더·렌더러·템플릿·디자인·대시보드·발행경로 완료(사이트 라이브). 잔여: `collector.coupang`(15만원 후) · AI 이미지(Imagen·페르소나별) · 시즌 시나리오 작성.
 
 ## Phase 4: 첫 출시 (2026-07 말~08)
 
