@@ -609,10 +609,13 @@ def cmd_enrich(args: argparse.Namespace) -> int:
             # 아니라 글이 실제 추천한 상품만 truth 가격 검증을 받아야 정확 (id는 식별용).
             declared = meta.get("featured_products")
             slug_set = {str(s).strip() for s in declared} if isinstance(declared, list) else set()
+            # 운영자가 고른 쿠팡(수동)은 LLM 선언과 무관하게 항상 featured — 의도적 선택·수익원
+            # (세션 #28 PartA). 알리는 LLM이 데이터 기반으로 선별(featured_products 선언분만).
             featured = [
                 {**c, "id": c.get("source_product_id")}
                 for c in products
                 if c.get("deeplink_slug") in slug_set
+                or str(c.get("source") or "").lower() == "coupang"
             ]
             if products and not featured:
                 print(
@@ -1673,8 +1676,10 @@ def cmd_keyword_recommend(args: argparse.Namespace) -> int:
 def _gather_keyword_candidates(
     conn: sqlite3.Connection, kw: dict[str, Any], page_size: int
 ) -> tuple[list[dict[str, Any]], str]:
-    """키워드 상품 후보 확보. 수동 target_products 우선, 없으면 채널 ali 수집.
+    """키워드 상품 후보 확보 — **수동 미리선택(쿠팡 등) + 알리 자동수집을 결합**(하이브리드).
 
+    쿠팡(수동·이미지·수익) + 알리(판매량·가격 데이터=구글 Information Gain)를 한 글에 함께 담아
+    구글 어필리에이트 페널티를 피하면서 쿠팡 수익도 확보(DECISIONS S1 멀티채널·세션 #28 PartA).
     반환: (candidates, note). 후보는 enrich 프롬프트의 {{products}} + promote 연결 소스.
     """
     from collector import products_store
@@ -1691,6 +1696,10 @@ def _gather_keyword_candidates(
             for p in items
         ]
 
+    candidates: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    # (1) 수동 미리선택(쿠팡 등) — 운영자가 고른 것, 항상 포함
     tp = kw.get("target_products")
     if tp:
         try:
@@ -1699,12 +1708,12 @@ def _gather_keyword_candidates(
             items = []
         if isinstance(items, list) and items:
             up = products_store.upsert_products(conn, items)
-            return (
-                _cands(items),
-                f"수동 미리선택 {len(items)}개 "
-                f"(적재 신규 {up.inserted}·갱신 {up.updated}·스킵 {up.skipped})",
+            candidates.extend(_cands(items))
+            notes.append(
+                f"수동 미리선택 {len(items)}개(신규 {up.inserted}·갱신 {up.updated}·스킵 {up.skipped})"
             )
 
+    # (2) 알리 자동수집(판매량·가격 데이터=Information Gain) — 채널 ali/both
     if kw["channel"] in ("ali", "both"):
         import time as _time
 
@@ -1719,9 +1728,12 @@ def _gather_keyword_candidates(
         )
         if res.products:
             products_store.upsert_products(conn, res.products)
-        return _cands(res.products), f"ali 수집 {len(res.products)}개 (검색어 {kw['keyword']!r})"
+        candidates.extend(_cands(res.products))
+        notes.append(f"ali 수집 {len(res.products)}개")
 
-    return [], "상품 없음 — 쿠팡 단독 채널은 수동 미리선택(target_products)이 필요합니다"
+    if not candidates:
+        return [], "상품 없음 — 쿠팡 단독 채널은 수동 미리선택(target_products)이 필요합니다"
+    return candidates, " · ".join(notes)
 
 
 def cmd_keyword_generate(args: argparse.Namespace) -> int:
