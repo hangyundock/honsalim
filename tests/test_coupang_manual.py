@@ -133,3 +133,81 @@ class TestCmdCoupangAdd:
             argparse.Namespace(keyword_id=1, name="  ", url="https://x", price=None, widget=None)
         )
         assert rc == 2
+
+
+# 쿠팡 공식 배너 HTML 샘플 (세션 #28 — 이미지 hotlink 도입)
+_BANNER = (
+    '<a href="https://link.coupang.com/a/ABCDE" target="_blank">'
+    '<img src="https://image.coupangcdn.com/img/abc.jpg" alt="쿠팡 무선청소기"></a>'
+)
+
+
+class TestParseBanner:
+    def test_extracts_href_src_alt(self) -> None:
+        p = cm.parse_banner(_BANNER)
+        assert p["deeplink_url"] == "https://link.coupang.com/a/ABCDE"
+        assert p["image_url"] == "https://image.coupangcdn.com/img/abc.jpg"
+        assert p["name"] == "쿠팡 무선청소기"
+
+    def test_empty_returns_none(self) -> None:
+        assert cm.parse_banner("") == {"deeplink_url": None, "image_url": None, "name": None}
+
+
+class TestBuildFromBanner:
+    def test_image_and_fields_from_banner(self) -> None:
+        p = cm.build_manual_product("", "", banner_html=_BANNER)
+        assert p["image_url_external"] == "https://image.coupangcdn.com/img/abc.jpg"
+        assert p["deeplink_url"] == "https://link.coupang.com/a/ABCDE"
+        assert p["name"] == "쿠팡 무선청소기"
+        assert p["source"] == "coupang"
+
+    def test_explicit_overrides_banner_but_keeps_image(self) -> None:
+        p = cm.build_manual_product(
+            "내가지정", "https://link.coupang.com/a/OVR", banner_html=_BANNER
+        )
+        assert p["name"] == "내가지정"
+        assert p["deeplink_url"] == "https://link.coupang.com/a/OVR"
+        assert p["image_url_external"] == "https://image.coupangcdn.com/img/abc.jpg"
+
+    def test_text_only_no_image(self) -> None:
+        p = cm.build_manual_product("선풍기", "https://link.coupang.com/a/T")
+        assert p["image_url_external"] is None
+
+    def test_upsert_persists_image(self) -> None:
+        from collector import products_store
+
+        conn = _mem_db()
+        p = cm.build_manual_product("", "", banner_html=_BANNER)
+        products_store.upsert_products(conn, [p])
+        row = conn.execute(
+            "SELECT image_url_external FROM products WHERE source='coupang'"
+        ).fetchone()
+        assert row[0] == "https://image.coupangcdn.com/img/abc.jpg"
+
+
+class TestCmdCoupangAddBanner:
+    @pytest.fixture()
+    def migrated_db(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+        p = tmp_path / "honsalim.db"
+        conn = sqlite3.connect(str(p))
+        _apply_migrations(conn)
+        conn.close()
+        monkeypatch.setattr(db, "DB_PATH", p)
+        return p
+
+    def test_add_with_banner_sets_image(self, migrated_db: Path) -> None:
+        conn = db.connect(migrated_db)
+        kid = kq.add_keyword(conn, "청소기", channel="coupang")
+        conn.close()
+        rc = cli.cmd_coupang_add(
+            argparse.Namespace(keyword_id=kid, name="", url="", price=None, banner=_BANNER)
+        )
+        assert rc == 0
+        conn = db.connect(migrated_db)
+        raw = conn.execute(
+            "SELECT target_products FROM keyword_queue WHERE id=?", (kid,)
+        ).fetchone()[0]
+        conn.close()
+        items = json.loads(raw)
+        assert items[0]["image_url_external"] == "https://image.coupangcdn.com/img/abc.jpg"
+        assert items[0]["name"] == "쿠팡 무선청소기"

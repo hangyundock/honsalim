@@ -1861,7 +1861,8 @@ def cmd_coupang_add(args: argparse.Namespace) -> int:
                 args.name,
                 args.url,
                 price_krw=args.price,
-                widget_html=args.widget,
+                widget_html=getattr(args, "widget", None),
+                banner_html=getattr(args, "banner", None),
                 affiliate_tag=settings.get("coupang_tag"),
             )
             n = coupang_manual.add_to_keyword(conn, args.keyword_id, product)
@@ -1870,7 +1871,7 @@ def cmd_coupang_add(args: argparse.Namespace) -> int:
             return 2
     finally:
         conn.close()
-    print(f"{OK} 쿠팡 상품 {args.name!r} → 키워드 #{args.keyword_id} 미리선택 (총 {n}개)")
+    print(f"{OK} 쿠팡 상품 {product['name']!r} → 키워드 #{args.keyword_id} 미리선택 (총 {n}개)")
     return 0
 
 
@@ -2344,13 +2345,22 @@ def build_parser() -> argparse.ArgumentParser:
     p_reject.set_defaults(func=cmd_reject)
 
     p_cp_add = sub.add_parser(
-        "coupang-add", help="쿠팡 수동 상품을 키워드 미리선택에 추가 (공식 딥링크·텍스트)"
+        "coupang-add",
+        help="쿠팡 수동 상품을 키워드 미리선택에 추가 (공식 배너→이미지·링크·상품명 자동)",
     )
     p_cp_add.add_argument("--keyword-id", type=int, required=True, help="keyword_queue id")
-    p_cp_add.add_argument("--name", type=str, required=True, help="상품명")
-    p_cp_add.add_argument("--url", type=str, required=True, help="쿠팡 파트너스 딥링크")
+    p_cp_add.add_argument(
+        "--banner",
+        type=str,
+        default=None,
+        help="쿠팡 공식 배너 HTML(<a><img>) — 이미지·링크·상품명 자동 추출",
+    )
+    p_cp_add.add_argument("--name", type=str, default="", help="상품명 (배너 alt 있으면 생략 가능)")
+    p_cp_add.add_argument(
+        "--url", type=str, default="", help="쿠팡 파트너스 딥링크 (배너 href 있으면 생략 가능)"
+    )
     p_cp_add.add_argument("--price", type=int, default=None, help="가격 KRW (선택)")
-    p_cp_add.add_argument("--widget", type=str, default=None, help="공식 위젯 HTML (선택)")
+    p_cp_add.add_argument("--widget", type=str, default=None, help="공식 위젯 HTML (선택·보관)")
     p_cp_add.set_defaults(func=cmd_coupang_add)
 
     # ─── 예약 발행 (세션 #25) ───

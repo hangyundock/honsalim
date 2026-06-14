@@ -173,6 +173,32 @@ class TestAutoPick:
         conn = _db()
         assert kr.auto_pick_keyword(conn, seeds=[], live=False) is None
 
+    def test_target_products_keyword_prioritized(self) -> None:
+        # 미리선택(쿠팡)이 세팅된 키워드는 검색량 높은 알리 키워드보다 우선 (Part2)
+        from collector import coupang_manual as cm
+
+        conn = _db()
+        kq.add_keyword(conn, "고검색알리", channel="ali", score=99999.0)
+        kid = kq.add_keyword(conn, "쿠팡세팅", channel="coupang", score=0.0)
+        cm.add_to_keyword(
+            conn, kid, cm.build_manual_product("쿠팡상품", "https://link.coupang.com/a/Z")
+        )
+        picked = kr.auto_pick_keyword(conn, seeds=SEED, fetch=_fetch)
+        assert picked is not None
+        assert picked["keyword"] == "쿠팡세팅"  # target_products 있는 키워드 우선
+        assert picked["source"] == "queue"
+
+    def test_display_lists_target_products_first(self) -> None:
+        from collector import coupang_manual as cm
+        from dashboard import queries
+
+        conn = _db()
+        kq.add_keyword(conn, "고검색", channel="ali", score=99999.0)
+        kid = kq.add_keyword(conn, "쿠팡세팅", channel="coupang", score=0.0)
+        cm.add_to_keyword(conn, kid, cm.build_manual_product("P", "https://link.coupang.com/a/Z"))
+        rows = queries.list_keywords(conn, status="pending")
+        assert rows[0]["keyword"] == "쿠팡세팅"  # 미리선택 있는 것 맨 위 (자동 선정과 일치)
+
 
 if __name__ == "__main__":
     import pytest

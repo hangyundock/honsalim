@@ -162,27 +162,38 @@ def _cell(text: str, status: str | None = None) -> QTableWidgetItem:
 # 쿠팡 수동 상품 입력 폼 (Phase E)
 # ─────────────────────────────────────────────────────────────
 class CoupangProductDialog(QDialog):
-    """쿠팡 파트너스 딥링크/위젯 수동 입력 폼. CDN 이미지 미사용(함정 #3)."""
+    """쿠팡 파트너스 '공식 배너' 붙여넣기 폼 — 배너에서 이미지·링크·상품명 자동 추출(세션 #28).
+
+    공식 배너 이미지는 hotlink(다운로드 아님·함정#3 무관)라 글에 상품 이미지로 표시된다.
+    배너 없이 URL만 넣으면 텍스트 링크(하위호환).
+    """
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("쿠팡 상품 추가 (수동)")
-        self.resize(460, 280)
+        self.setWindowTitle("쿠팡 상품 추가 (공식 배너)")
+        self.resize(540, 360)
         form = QFormLayout(self)
+        self.banner = QTextEdit()
+        self.banner.setPlaceholderText(
+            "쿠팡 파트너스 '블로그용 배너' HTML 붙여넣기 — <a><img></a> "
+            "(이미지·링크·상품명 자동 추출)"
+        )
+        self.banner.setMaximumHeight(96)
         self.name = QLineEdit()
+        self.name.setPlaceholderText("비우면 배너 상품명(alt) 사용")
         self.url = QLineEdit()
-        self.url.setPlaceholderText("쿠팡 파트너스 딥링크 (필수)")
+        self.url.setPlaceholderText("비우면 배너 링크 사용 (배너 없으면 필수)")
         self.price = QLineEdit()
         self.price.setPlaceholderText("숫자만 (선택)")
-        self.widget = QTextEdit()
-        self.widget.setPlaceholderText("공식 위젯 HTML (선택)")
-        self.widget.setMaximumHeight(70)
-        form.addRow("상품명*", self.name)
-        form.addRow("파트너스 URL*", self.url)
+        form.addRow("공식 배너 HTML", self.banner)
+        form.addRow("상품명", self.name)
+        form.addRow("파트너스 URL", self.url)
         form.addRow("가격(원)", self.price)
-        form.addRow("위젯 HTML", self.widget)
-        note = QLabel("⚠ 쿠팡 상품 이미지(CDN) 다운로드 금지 — 공식 위젯/텍스트만 (함정 #3)")
-        note.setStyleSheet("color:#a50e0e;font-size:11px;")
+        note = QLabel(
+            "✅ 공식 배너를 붙여넣으면 상품 이미지가 글에 표시됩니다 "
+            "(hotlink·다운로드 아님·함정#3 무관). 배너 없이 URL만 넣으면 텍스트 링크."
+        )
+        note.setStyleSheet("color:#1b5e20;font-size:11px;")
         note.setWordWrap(True)
         form.addRow(note)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -196,7 +207,7 @@ class CoupangProductDialog(QDialog):
             "name": self.name.text().strip(),
             "url": self.url.text().strip(),
             "price": int(price_text) if price_text.isdigit() else None,
-            "widget": self.widget.toPlainText().strip() or None,
+            "banner": self.banner.toPlainText().strip() or None,
         }
 
 
@@ -813,8 +824,12 @@ class DashboardWindow(QMainWindow):
         if dlg.exec_() != QDialog.Accepted:
             return
         v = dlg.values()
-        if not v["name"] or not v["url"]:
-            QMessageBox.warning(self, "입력 필요", "상품명과 파트너스 URL은 필수입니다.")
+        if not v["banner"] and not (v["name"] and v["url"]):
+            QMessageBox.warning(
+                self,
+                "입력 필요",
+                "공식 배너 HTML을 붙여넣거나, 상품명 + 파트너스 URL을 입력하세요.",
+            )
             return
 
         def task() -> int:
@@ -826,7 +841,7 @@ class DashboardWindow(QMainWindow):
                     name=v["name"],
                     url=v["url"],
                     price=v["price"],
-                    widget=v["widget"],
+                    banner=v["banner"],
                 )
             )
 

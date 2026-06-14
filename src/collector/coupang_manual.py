@@ -12,10 +12,34 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 from typing import Any
 
 DEFAULT_COUPANG_TAG = "coupang-partners"
+
+# 쿠팡 공식 '블로그용 배너' HTML(<a href><img src alt></a>) 파싱 — 딥링크·이미지·상품명 추출
+_A_HREF_RE = re.compile(r'<a\b[^>]*\bhref=["\']([^"\']+)["\']', re.I)
+_IMG_SRC_RE = re.compile(r'<img\b[^>]*\bsrc=["\']([^"\']+)["\']', re.I)
+_IMG_ALT_RE = re.compile(r'<img\b[^>]*\balt=["\']([^"\']+)["\']', re.I)
+
+
+def parse_banner(banner_html: str | None) -> dict[str, str | None]:
+    """쿠팡 공식 배너 HTML에서 딥링크(href)·이미지URL(img src)·상품명(img alt) 추출.
+
+    예: <a href="https://link.coupang.com/a/XXXX"><img src="https://image.coupangcdn.com/...jpg"
+        alt="상품명"></a>
+    각 값 없으면 None. 이미지는 **hotlink**(다운로드 아님·쿠팡 공식 임베드)이라 함정#3과 무관.
+    """
+    html = banner_html or ""
+    href = _A_HREF_RE.search(html)
+    src = _IMG_SRC_RE.search(html)
+    alt = _IMG_ALT_RE.search(html)
+    return {
+        "deeplink_url": href.group(1).strip() if href else None,
+        "image_url": src.group(1).strip() if src else None,
+        "name": alt.group(1).strip() if alt else None,
+    }
 
 
 def build_manual_product(
@@ -24,20 +48,26 @@ def build_manual_product(
     *,
     price_krw: int | None = None,
     widget_html: str | None = None,
+    banner_html: str | None = None,
+    image_url: str | None = None,
     affiliate_tag: str | None = None,
     source_product_id: str | None = None,
 ) -> dict[str, Any]:
     """수동 입력 필드 → products 호환 dict (source='coupang').
 
-    partners_url: 쿠팡 파트너스 딥링크(필수). widget_html: 공식 위젯 코드(선택, 보관용).
+    공식 배너 HTML(``banner_html``)을 주면 딥링크·이미지·상품명을 자동 추출해 명시 인자를 보충한다.
+    ``image_url_external``은 쿠팡 공식 배너 이미지의 **hotlink**(다운로드 아님·함정#3 무관) — 채워지면
+    알리 상품과 동일하게 글 카드에 이미지로 렌더된다. 배너/이미지 없으면 텍스트 링크로만 동작(하위호환).
     deeplink_slug는 coupang-<hash>로 결정적 생성(중복 안전).
     """
-    name = (name or "").strip()
-    partners_url = (partners_url or "").strip()
+    parsed = parse_banner(banner_html) if banner_html else {}
+    name = (name or parsed.get("name") or "").strip()
+    partners_url = (partners_url or parsed.get("deeplink_url") or "").strip()
+    image_url_external = (image_url or parsed.get("image_url") or "").strip() or None
     if not name:
-        raise ValueError("상품명이 비어 있습니다")
+        raise ValueError("상품명이 비어 있습니다 (배너 alt로도 못 채움)")
     if not partners_url:
-        raise ValueError("쿠팡 파트너스 딥링크(URL)가 비어 있습니다")
+        raise ValueError("쿠팡 파트너스 딥링크(URL)가 비어 있습니다 (배너 href로도 못 채움)")
     spid = (source_product_id or "").strip() or hashlib.sha1(  # noqa: S324 (식별용·비보안)
         partners_url.encode("utf-8")
     ).hexdigest()[:12]
@@ -46,11 +76,12 @@ def build_manual_product(
         "source_product_id": spid,
         "name": name,
         "price_krw": price_krw,
+        "image_url_external": image_url_external,
         "deeplink_url": partners_url,
         "deeplink_slug": f"coupang-{spid}",
         "affiliate_tag": (affiliate_tag or DEFAULT_COUPANG_TAG),
         "availability": "unknown",
-        "widget_html": widget_html or None,
+        "widget_html": widget_html or banner_html or None,
     }
 
 

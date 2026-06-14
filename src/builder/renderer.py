@@ -235,7 +235,7 @@ ARTICLE_DETAIL_SQL = """
 """
 
 ARTICLE_PRODUCTS_SQL = """
-    SELECT pr.name, pr.price_krw, pr.deeplink_slug, pr.category_path
+    SELECT pr.name, pr.price_krw, pr.deeplink_slug, pr.category_path, pr.image_url_external
     FROM article_products ap
     JOIN products pr ON pr.id = ap.product_id
     WHERE ap.article_id = ?
@@ -251,8 +251,8 @@ def _load_article_pages(conn: sqlite3.Connection) -> list[dict]:
     """published articles → 상세글 렌더 컨텍스트 (산문 본문 + /go/ 제휴 상품 카드).
 
     article.html 계약에 맞춘 dict: article(메타·body_html·페르소나/시즌/예산 칩) +
-    products(이름·가격·/go/ 링크). 이미지는 우드톤 placeholder(§9 외부 이미지
-    저작권 회색지대 회피 — 실제 대표 이미지는 Phase 3 AI 생성).
+    products(이름·가격·/go/ 링크·이미지). 상품 이미지는 image_url_external(알리·쿠팡 공식배너
+    hotlink — 카테고리와 동일) 사용, 없으면 우드톤 fallback (세션 #28 쿠팡 이미지 B 결정).
     """
     rows = conn.execute(ARTICLE_DETAIL_SQL).fetchall()
     pages: list[dict] = []
@@ -263,7 +263,9 @@ def _load_article_pages(conn: sqlite3.Connection) -> list[dict]:
                 "name": pr["name"],
                 "price": _price_krw(pr["price_krw"]),
                 "url": f"/go/{pr['deeplink_slug']}",
-                "img": WOOD[i % len(WOOD)],
+                "img": WOOD[i % len(WOOD)],  # img_url 없을 때 우드톤 fallback 색
+                "img_url": pr["image_url_external"]
+                or "",  # 실제 상품 이미지(알리/쿠팡 공식배너 hotlink)
                 "cat": pr["category_path"] or "",
                 "tag": "",  # 필수/추천/선택 등급 데이터 없음(v1) — 본문이 설명 담당
                 "why": "",  # recommendation_note 미사용(v1)
