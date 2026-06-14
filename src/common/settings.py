@@ -25,6 +25,9 @@ DEFAULTS: dict[str, Any] = {
     "publish_per_day": 1,  # 하루 자동 발행 편수 (승인된 큐에서)
     "schedule_time": "11:00",  # 예약 발행 시각 KST (DECISIONS C7 — AutoBlog와 30분+ 간격)
     "schedule_jitter_min": 10,  # 발행 지터(분) — 자연스러운 패턴
+    # ★B-i 완전 무인 자동 사이클(생성→자동승인→발행→사후모니터). 기본 OFF = 사람 게이트(E7) 유지.
+    # 켜면 auto-cycle이 동작 — 자동 승인은 fail-closed(적합성 검증 가능+featured 적합만, 세션 #29).
+    "auto_mode": False,
     # ── 추천/품질 ──
     "featured_per_tier": 3,  # 티어별 추천 수 (실속+고급 = 총 6). category_page_builder 정합
     "satisfaction_floor": 80.0,  # 알리 긍정 피드백율 하한 % (006 신호 필터)

@@ -246,6 +246,7 @@ def _check_phase2_modules() -> bool:
         ("writer.article_state", "republish"),
         ("writer.article_guardrail", "check"),
         ("writer.article_guardrail", "monitor"),
+        ("writer.auto_approve", "auto_approve"),
         ("enricher.claude_client", "ClaudeClient"),
         ("enricher.meta_extractor", "MetaExtractor"),
         ("enricher.retry", "retry_with_backoff"),
@@ -2023,6 +2024,99 @@ def cmd_publish_queue(args: argparse.Namespace) -> int:
     return rc
 
 
+def _deploy_ns() -> argparse.Namespace:
+    """publish/auto-cycle 공용 배포 인자 (git push main → CI가 Cloudflare Pages 반영)."""
+    return argparse.Namespace(
+        dry_run=False,
+        skip_push=False,
+        skip_wrangler=True,
+        verify_url=settings.get("verify_url"),
+        remote="origin",
+        branch="main",
+        build_dir="build/site",
+        project="honsalim",
+    )
+
+
+def cmd_auto_cycle(args: argparse.Namespace) -> int:
+    """★무인 자동 사이클 (B-i·세션 #29): auto_mode ON일 때만 — 사후모니터→생성→자동승인→발행.
+
+    auto_mode OFF(기본)면 즉시 중단 — 사람 게이트(E7) 유지. 자동 승인은 fail-closed(적합성 검증
+    가능 + featured 적합만). 기본 dry_run. 라이브(--no-dry-run)는 LLM 비용·게시·배포. 메인 체크아웃.
+    """
+    from writer import article_guardrail
+    from writer import auto_approve as aa
+
+    if not settings.get("auto_mode", False):
+        print(f"{WARN} auto_mode OFF — 자동 사이클 중단 (설정에서 켜야 동작·사람 게이트 E7 유지)")
+        return 0
+    count = args.count if args.count is not None else int(settings.get("publish_per_day", 1) or 1)
+    live = not args.dry_run
+    print(f"{OK} 자동 사이클 ({'live' if live else 'dry_run'}, 상한 {count})")
+
+    # 1. 사후 모니터 — 기존 published 중 문제글 자동 비공개(fail-closed)
+    conn = db.connect(db.DB_PATH)
+    try:
+        mr = article_guardrail.monitor(conn, auto_unpublish=live)
+    finally:
+        conn.close()
+    if mr["failed"]:
+        print(
+            f"     사후 모니터 — 미달 {len(mr['failed'])}편 · 자동 비공개 {len(mr['unpublished'])}편"
+        )
+
+    # 2. 대기 키워드 N개 생성 (DeepSeek 비용 — count 상한)
+    conn = db.connect(db.DB_PATH)
+    try:
+        pending = conn.execute(
+            "SELECT id FROM keyword_queue WHERE status='pending' "
+            "ORDER BY score DESC, priority DESC, id LIMIT ?",
+            (count,),
+        ).fetchall()
+    finally:
+        conn.close()
+    print(f"     대기 키워드 {len(pending)}개 생성")
+    if live:
+        for kr in pending:
+            cmd_keyword_generate(argparse.Namespace(id=int(kr[0]), page_size=20, dry_run=False))
+
+    # 3. 자동 승인 (fail-closed — 적합성 검증 가능 + featured 적합만, 나머지 보류)
+    conn = db.connect(db.DB_PATH)
+    try:
+        ar = aa.auto_approve(conn, apply=live)
+    finally:
+        conn.close()
+    print(f"     자동 승인 {len(ar['approved'])}편 · 보류 {len(ar['held'])}편")
+    for h in ar["held"][:5]:
+        print(f"       보류 #{h['draft']}: {h['reason']}")
+
+    if not live:
+        print("     [DRY] 발행·배포 생략 — 라이브는 --no-dry-run")
+        return 0
+
+    # 4. 발행 — 승인된(이번 자동승인 + 기존 대기) 글이 있으면 publish-queue(promote+build+deploy).
+    #    발행 대상 없고 비공개만 있으면 재빌드로 반영. ※이번 회차 ar뿐 아니라 DB 전체 approved 기준.
+    conn = db.connect(db.DB_PATH)
+    try:
+        approved_n = int(
+            conn.execute("SELECT COUNT(*) FROM drafts WHERE status='approved'").fetchone()[0]
+        )
+    finally:
+        conn.close()
+    if approved_n:
+        return cmd_publish_queue(
+            argparse.Namespace(count=count, dry_run=False, no_deploy=args.no_deploy)
+        )
+    if mr["unpublished"] and not args.no_deploy:
+        print("     발행 대상 없음 — 비공개 반영 위해 재빌드·배포")
+        rc = cmd_build(
+            argparse.Namespace(manifest=None, full=True, preview=False, save_empty=False)
+        )
+        return rc if rc != 0 else cmd_deploy(_deploy_ns())
+    print("     발행/비공개 변경 없음 — 빌드 생략")
+    return 0
+
+
 def cmd_schedule(args: argparse.Namespace) -> int:
     """예약 발행 작업 관리 (Windows schtasks): show | set [--time HH:MM] | off.
 
@@ -2484,6 +2578,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="실제 게시·빌드·배포(외부 영향) — 명시 승인/스케줄러",
     )
     p_pubq.set_defaults(func=cmd_publish_queue, dry_run=True)
+
+    p_autocyc = sub.add_parser(
+        "auto-cycle",
+        help="★무인 자동 사이클(B-i): 사후모니터→생성→자동승인→발행. auto_mode ON일 때만. 기본 dry_run",
+    )
+    p_autocyc.add_argument(
+        "--count", type=int, default=None, help="생성·발행 상한 (기본 config publish_per_day)"
+    )
+    p_autocyc.add_argument("--no-deploy", action="store_true", help="배포 생략 — 빌드까지만")
+    p_autocyc.add_argument(
+        "--no-dry-run",
+        dest="dry_run",
+        action="store_false",
+        help="실제 LLM·게시·배포(외부 영향) — 스케줄러/명시 승인",
+    )
+    p_autocyc.set_defaults(func=cmd_auto_cycle, dry_run=True)
 
     p_sched = sub.add_parser("schedule", help="예약 발행 작업 관리 (Windows schtasks)")
     p_sched.add_argument(
