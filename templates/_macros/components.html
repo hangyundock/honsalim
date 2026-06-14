@@ -115,7 +115,7 @@
 {# ---- 상품 카드 (/go/ 게이트웨이 예정, 제휴 링크 rel 표기) ---- #}
 {% macro product_card(p) -%}
 <div class="p-card s-card">
-  {{ image_block(p.img, p.cat, '') }}
+  {{ image_block(p.img, p.cat, '', img_url=p.img_url | default('')) }}
   <div class="body">
     <div class="p-top">
       <span class="p-tag t-{{ p.tag }}">{{ p.tag }}</span>
