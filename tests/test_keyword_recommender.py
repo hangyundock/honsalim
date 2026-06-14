@@ -127,6 +127,41 @@ class TestRecommend:
         assert kr.top_recommendation(conn, seeds=[], live=False) is None
 
 
+class TestAutoPick:
+    def test_uses_pending_first(self) -> None:
+        conn = _db()
+        kq.add_keyword(conn, "기존키워드", channel="ali", score=100.0)
+        picked = kr.auto_pick_keyword(conn, seeds=SEED, fetch=_fetch)
+        assert picked is not None
+        assert picked["source"] == "queue"
+        assert picked["keyword"] == "기존키워드"
+
+    def test_pending_priority_by_score(self) -> None:
+        conn = _db()
+        kq.add_keyword(conn, "낮은점수", channel="ali", score=10.0)
+        kq.add_keyword(conn, "높은점수", channel="ali", score=9999.0)
+        picked = kr.auto_pick_keyword(conn, seeds=SEED, fetch=_fetch)
+        assert picked is not None
+        assert picked["keyword"] == "높은점수"  # score 내림차순
+
+    def test_recommends_and_adds_when_empty(self) -> None:
+        conn = _db()
+        picked = kr.auto_pick_keyword(conn, seeds=SEED, fetch=_fetch)
+        assert picked is not None
+        assert picked["source"] == "recommend"
+        assert picked["keyword"] == "게이밍의자"  # 검색량 1위
+        # 큐에 실제로 추가됐는지(이후 generate가 쓸 수 있게)
+        row = conn.execute(
+            "SELECT keyword, status FROM keyword_queue WHERE id = ?", (picked["keyword_id"],)
+        ).fetchone()
+        assert row[0] == "게이밍의자"
+        assert row[1] == "pending"
+
+    def test_none_when_no_recommendations(self) -> None:
+        conn = _db()
+        assert kr.auto_pick_keyword(conn, seeds=[], live=False) is None
+
+
 if __name__ == "__main__":
     import pytest
 
