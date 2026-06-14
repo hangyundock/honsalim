@@ -242,6 +242,8 @@ def _check_phase2_modules() -> bool:
         ("writer.category_state", "approve"),
         ("writer.category_state", "unapprove"),
         ("writer.category_state", "pending_approval"),
+        ("writer.article_state", "unpublish"),
+        ("writer.article_state", "republish"),
         ("enricher.claude_client", "ClaudeClient"),
         ("enricher.meta_extractor", "MetaExtractor"),
         ("enricher.retry", "retry_with_backoff"),
@@ -1233,6 +1235,40 @@ def cmd_unapprove_category(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def cmd_unpublish_article(args: argparse.Namespace) -> int:
+    """published 글 → unpublished (라이브 비공개·발행후 안전망·세션 #29). 재빌드·배포는 별도."""
+    from writer import article_state
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        res = article_state.unpublish(conn, args.slug, reason=args.note or "")
+        print(f"{OK} 글 {res['slug']!r}({res['title']}) → unpublished (비공개)")
+        print("     ※ 라이브 반영은 build --full + deploy 필요")
+        return 0
+    except article_state.ArticleStateError as e:
+        print(f"{FAIL} {e}")
+        return 2
+    finally:
+        conn.close()
+
+
+def cmd_republish_article(args: argparse.Namespace) -> int:
+    """unpublished/archived 글 → published (재공개·세션 #29). 재빌드·배포는 별도."""
+    from writer import article_state
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        res = article_state.republish(conn, args.slug)
+        print(f"{OK} 글 {res['slug']!r}({res['title']}) → published (재공개)")
+        print("     ※ 라이브 반영은 build --full + deploy 필요")
+        return 0
+    except article_state.ArticleStateError as e:
+        print(f"{FAIL} {e}")
+        return 2
+    finally:
+        conn.close()
+
+
 def cmd_auto_publish(args: argparse.Namespace) -> int:
     """가드레일 통과 카테고리 자동 공개 (E7→가드레일·세션 #22). 보류는 draft 유지·사유 보고.
 
@@ -2156,6 +2192,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_unapprove_cat.add_argument("slug", type=str, help="categories.slug")
     p_unapprove_cat.set_defaults(func=cmd_unapprove_category)
+
+    # 발행후 안전망 (세션 #29) — 발행된 글을 라이브에서 내리기/되돌리기 (B 자동발행 대비)
+    p_unpub_art = sub.add_parser(
+        "unpublish-article", help="published 글 → unpublished (라이브 비공개·발행후 안전망)"
+    )
+    p_unpub_art.add_argument("slug", type=str, help="articles.slug")
+    p_unpub_art.add_argument("--note", type=str, default=None, help="비공개 사유")
+    p_unpub_art.set_defaults(func=cmd_unpublish_article)
+
+    p_repub_art = sub.add_parser(
+        "republish-article", help="unpublished/archived 글 → published (재공개)"
+    )
+    p_repub_art.add_argument("slug", type=str, help="articles.slug")
+    p_repub_art.set_defaults(func=cmd_republish_article)
 
     # 자동 게시 가드레일 (세션 #22) — E7(사람 승인)을 fail-closed 가드레일로 대체
     p_auto_pub = sub.add_parser(
