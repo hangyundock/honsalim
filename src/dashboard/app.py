@@ -405,7 +405,7 @@ class DashboardWindow(QMainWindow):
                     ("🎯 추천 키워드", self._on_recommend),
                     ("🆕 키워드 추가", self._on_add_keyword),
                     ("🛒 쿠팡 상품 추가", self._on_coupang_add),
-                    ("✨ 글 생성(선택)", self._on_generate),
+                    ("✨ 글 생성", self._on_generate),
                 ],
             ),
             "키워드",
@@ -733,16 +733,47 @@ class DashboardWindow(QMainWindow):
         self.run_task(task)
 
     def _on_generate(self) -> None:
+        """글 생성. 줄을 선택했으면 그 키워드, 아니면 자동 선정(대기 큐 우선→없으면 추천·추가)."""
         kid = self._selected_id(self.tab_keywords)
-        if kid is None:
+        if kid is not None:
+            self._confirm_and_generate(kid, label=f"키워드 #{kid}")
+            return
+
+        # 선택 없음 → 키워드 자동 선정 (정의된 방식). 네트워크 가능 → 백그라운드.
+        def task() -> dict[str, Any] | None:
+            from common import config
+            from writer import keyword_recommender as kr
+
+            config.load_secrets()  # 추천 시 네이버 키
+            print("[자동] 키워드 선정 중 (대기 큐 우선 · 없으면 추천)…")
+            conn = db.connect(db.DB_PATH)
+            try:
+                return kr.auto_pick_keyword(conn, live=True)
+            finally:
+                conn.close()
+
+        self.run_task(task, on_done=self._after_auto_pick)
+
+    def _after_auto_pick(self, ok: bool, result: Any) -> None:
+        if not ok:
+            return  # 오류는 run_task가 로그/경고
+        if not isinstance(result, dict) or not result.get("keyword_id"):
             QMessageBox.information(
-                self, "선택 필요", "키워드 탭에서 생성할 키워드를 먼저 선택하세요."
+                self,
+                "키워드 없음",
+                "자동 선정할 키워드가 없습니다. '🎯 추천 키워드'로 추가하거나 '🆕 키워드 추가'를 쓰세요.",
             )
             return
+        src = "대기 큐" if result.get("source") == "queue" else "자동 추천"
+        self._confirm_and_generate(
+            int(result["keyword_id"]), label=f"{src} 키워드 '{result.get('keyword')}'"
+        )
+
+    def _confirm_and_generate(self, kid: int, *, label: str) -> None:
         resp = QMessageBox.question(
             self,
             "글 생성",
-            f"키워드 #{kid}로 실제 글을 생성할까요?\n\n"
+            f"{label}(으)로 실제 글을 생성할까요?\n\n"
             "· 본문 생성 LLM 비용이 발생합니다.\n"
             "· 결과는 '검토 대기' 상태로 들어가며 자동 발행되지 않습니다(E7).",
             QMessageBox.Yes | QMessageBox.No,
