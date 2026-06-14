@@ -9,6 +9,7 @@
 - [EVENTS_202606.md](archive/EVENTS_202606.md):
   - 세션 #19 (2026-06-01 DeepSeek v4-pro 전면전환·카테고리 디자인 마무리·관련성 필터 require_all 근본수정·판매량 기준 추천 6선·신규 2카테고리·회귀 590→623)
   - 세션 #20 (2026-06-02 카테고리 4개 라이브 배포·홈 카테고리우선 大리디자인·배포 wrangler/산출물청소/HTML캐시 버그 4종 근본수정·회귀 623→632)
+  - 세션 #21 (2026-06-02 도메인 honsalim→honsallim 이전·연결·301(알리 'ali' 차단 돌파)+알리 채널 등록+미충전이미지·순차등록엔진·홈 흰바탕캐시 근본수정·회귀 632→641)
 - [EVENTS_202605.md](archive/EVENTS_202605.md):
   - 세션 #1 (2026-05-27 프로젝트 신규 셋업·정밀 조사·5파일 시스템·슬래시 명령 등록)
   - 세션 #2 (2026-05-27~28 Phase 0 설계 12/12 + Phase 1 외부 작업: GitHub·Cloudflare·도메인·R2·D1·Git push)
@@ -28,6 +29,25 @@
   - 세션 #18 (2026-05-31 운영자 1클릭 승인 게이트(O21·build-category draft 고정)·doctor §10 64진입점·★카테고리 페이지 디자인 디버깅(글씨 흐림 진짜원인=backdrop-filter 제거)·회귀 569→590)
 
 ## 최근 5세션
+
+### 세션 #26 — 2026-06-14 (Opus 4.8 1M, ★추천 키워드 생성 기능 + 대시보드 메뉴 순서 재정렬 + 노트북거치대 off-target 근본수정, 회귀 773→782)
+
+**시작 상황**: origin/main #25(PR #10 머지). 떠 있는 운영 대시보드(메인 체크아웃)에서 "(A) 라이브 첫 글 생성"을 시작하려다, 주인이 **키워드를 수동 선정하지 말고 추천 키워드를 생성·목록으로 보여주고 선택(선택 없으면 자동 1순위)** + **탭 순서를 실행 우선순위대로** 요청. "키워드 선정 방식은 이미 정의돼 있음" 명시.
+
+**핵심 진척 [확정]** (전부 로컬·미배포·비용 거의 0 — 추천은 네이버 읽기전용 무료, LLM 비용은 글 생성 때만):
+1. **"정의된 방식" 확정(조사)**: `collector.keyword_research`(네이버 연관검색어→핵심어/브랜드/거래성/검색량≥2000/대상부적합 필터→검색량순) + 씨앗=`seo_keywords.yml` 카테고리 대표키워드. 네이버 검색광고 키 3종 존재 확인.
+2. **추천 엔진** `writer/keyword_recommender.py`(PyQt 비의존·테스트 가능): 정의된 방식을 SEO 씨앗에 적용→검색량순 추천. 큐/시나리오에 이미 있는 주제 중복 제외. 네이버 실패 시 캐시 보조키워드로 자가복원(§0). custom_seed로 임의 주제 확장. 회귀 9건.
+3. **CLI `keyword-recommend`**(--seed·--limit·--no-live·--add-top) + doctor 진입점(64→65). 오프라인·**네이버 라이브 검증**(컴퓨터의자 32,000·게이밍의자 29,400 등 실검색량 정렬).
+4. **대시보드 GUI**: 🎯 추천 키워드 버튼 + `RecommendDialog`(검색량·경쟁도·씨앗·출처 표시, 행 선택 추가 / ⭐ 1순위 자동 추가) + custom seed 입력. 추천 조회 백그라운드(UI 비프리징). 오프스크린 구성 검증.
+5. **메뉴 순서 재정렬(요청)**: 키워드 → 발행 큐(글) → 카테고리·모니터링 → 설정 (작업 시작점이 맨 왼쪽).
+6. **off-target 근본수정**: 라이브 검증서 `노트북 거치대` 씨앗(핵심어 '거치대' 광범위)이 핸드폰·자전거·태블릿·갤럭시탭 거치대 혼입 적발 → `seo_keywords.yml` laptop-stand에 `exclude_terms`(폰·태블릿·테블릿(철자변형)·아이패드·갤럭시탭·자전거·오토바이·차량) 추가→재검증서 제거 확인(노트북받침대 등 온타겟 유지). ★남은 `책·모니터 거치대`는 편집 판단 사안이라 미적용(주인 결정용·#27).
+7. 회귀 **773→782**(+9). ruff·black·mypy 클린. CLI 28→**29**.
+
+**무인·안전(§0)**: 추천=네이버 읽기전용(무료·게시 아님). 자가복원(네이버 실패→캐시). 중복 제외. 기존 add_keyword 재사용(articles 스키마 무손상). off-target 근본수정+재발방지 가드(exclude_terms).
+
+**잔존/다음(#27)**: ①**머지+대시보드 재시작 필요**(현재 워크트리 → 라이브 대시보드 미반영). ②재시작 후 **추천→첫 글 생성**(원래 (A) 목표·DeepSeek 비용·품질 1회 확인). ③off-target 씨앗 추가 curation(책·모니터 거치대 등 판단 사안·받침대 발받침 모호). ④#25 잔존: 아이콘 main 재지정·mini-dehumidifier 점검·★★쿠팡 본격·★성장 Tier0+측정.
+
+---
 
 ### 세션 #25 — 2026-06-14 (Opus 4.8 1M, ★운영 대시보드 전면 구축 — PyQt5 GUI(키워드 큐·글 생성·승인·발행·예약·쿠팡 수동·설정창) + 마이그레이션 007, 회귀 693→773)
 
@@ -104,26 +124,4 @@
 
 ---
 
-### 세션 #21 — 2026-06-02 (Opus 4.8 1M, ★도메인 honsalim→honsallim 이전·연결·301(알리 'ali' 차단 돌파) + 알리 채널 등록 + 미충전이미지·순차등록엔진·홈 흰바탕캐시 근본수정, 회귀 632→641)
-
-**시작 상황**: `/honsalim-start`(워크트리 trusting-lamarr, HEAD #20 `a34955d`). 회귀 632. 사용자 "1·2·3 순서대로·승인 미리받고 끝까지" → 미충전이미지·제품등록·/go/ 착수. 도중 홈 흰바탕 안보임(캐시)·★honsallim 도메인 미반영(loving-herschel 갈래에만 존재) 발견 → 도메인 이전·연결·알리등록까지 확대.
-
-**핵심 진척 [확정]**:
-1. **1번 미충전 이미지**(라이브): 페르소나 3장(`scripts/gen_persona_images.py`)·about 히어로(기존 about.webp)·시나리오 카드=소속 페르소나 이미지 재사용(비용0). `image_block` `img_url` 지원(하위호환). build-category **이미지 있으면 재사용**(#20 보존·비용절감). 단색 placeholder **0**.
-2. **2번 순차등록 엔진**(라이브): `register-categories [slugs|--all]` — 순차 collect→build·실패격리·draft(E7). office-chair 등록(카테고리 5). **근본수정**: ①OpenRouter 응답 잘림(JSONDecodeError) 자가복원(claude_client resp.json 재시도 + build_and_save가 RuntimeError도 재생성) ②Windows wrangler.cmd subprocess 미해석(FileNotFoundError) → `common/proc.resolve_argv`(실행시 shutil.which, command필드 불변→테스트 0영향).
-3. **★홈 흰바탕=CSS 캐시** 근본수정: tokens/pages.css는 흰바탕 최신(배포 정상)인데 `immutable`+버전없는 파일명 → 옛 우드톤 CSS가 브라우저 캐시에 박힘. renderer `asset_version`(static CSS·JS 내용해시)을 모든 링크 `?v=` 부착(cache-busting). 일반 새로고침으로 새 디자인 받음.
-4. **★도메인 honsalim.com → honsallim.com 이전·연결·301**(알리 'ali' 차단 돌파): 알리가 'ali' 포함 url(honsa**li**m) 영구차단 → 'll' honsa**ll**im.com. 코드·테스트 치환(인프라명 honsalim-clicks·Pages명·DB 보존)+validator 허용도메인 신·구 둘다. Cloudflare Pages 커스텀도메인·SSL Active + **Page Rule 301**(honsalim.com/* → https://honsallim.com/$1 경로보존, 라이브검증). sitemap·canonical honsallim.
-5. **★알리 채널 honsallim 등록** [확정]: Portals "나의 웹사이트"에 honsallim.com 채널(Non-network·content>vertical sites·Korea·영어 desc) **등록완료**(별도 승인게이트 없음). 이전 honsalim.com은 Submit 자체 차단이었음 → 'ali' 돌파.
-6. 회귀 **632→641**. black·ruff·mypy 클린. 비용 ~$1(수집·빌드)+페르소나 3장. origin/main 배포 3회(#21·#21-2 cache-busting·#21-3 도메인).
-
-**★중요 — 갈라진 작업 갈래 인지**: honsallim 도메인 이전·**살림 카테고리**는 `loving-herschel-0091c7` 브랜치 #20에 있었으나 **origin/main 미머지**(내 베이스=zealous #20 `a34955d`)라 인수인계 STATE에 없었음. 도메인은 이번에 origin/main 직접 적용 완료. **살림 카테고리(cutting-board 도마·drying-rack 빨래건조대·mini-dehumidifier 미니제습기) = seed `003_categories_living.sql` + category_sources.yml 3개 = loving-herschel에만 존재** → #22에 합쳐야(register-categories 엔진으로 데이터 생성).
-
-**무인·안전(§0)**: 이미지 재사용(가짜·퇴행 방지)·실패격리(무인 안전)·자가복원(잘림·일시 API)·cache-busting(변경 반영 보장)·도메인 301(SEO 중복 정리)·알리 honest disclosure description.
-
-**잔존 미해결 (#22)**: ①**살림 카테고리 합치기**(loving-herschel seed003·sources 살림3개 → `db seed` → `register-categories cutting-board drying-rack mini-dehumidifier --no-dry-run` → approve+build --full+push, 비용~$1.5) ②**Tracking ID 연결**(honsallim 채널 tracking ID → `ali.env` 주인직접 → 개별 deeplink; 현 deeplink는 공통 트래킹링크) ③**/go/ 작동**(deny 룰: 주인이 `.claude/settings.json` wrangler deny 제거 후 `scripts/deploy_go_gateway.py` 또는 Actions. slug_map 191·D1 schema·resolve_argv 준비됨) ④Chrome lookalike 경고(301+시간 해소·관찰) ⑤쿠팡(방문자 후).
-
-**다음 세션 할 일**: 1)**살림 카테고리 합치기**(register-categories로) 2)Tracking ID 연결+개별 deeplink 3)/go/ 작동(주인 deny 해제 후). ★DB gitignore→재생성(`db migrate`+`db seed`+카테고리 collect/build). 워크트리 실행=`PYTHONPATH=src python -m cli`.
-
----
-
-> (세션 #19·#20은 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
+> (세션 #19·#20·#21은 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
