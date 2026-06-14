@@ -144,6 +144,18 @@ class TestAutoPick:
         assert picked is not None
         assert picked["keyword"] == "높은점수"  # score 내림차순
 
+    def test_auto_pick_matches_display_top(self) -> None:
+        # 자동 선정 = 대시보드 목록 맨 위 행과 동일해야 함(정렬 일치)
+        from dashboard import queries
+
+        conn = _db()
+        for name, sc in [("에이", 100.0), ("비이", 5000.0), ("씨이", 300.0)]:
+            kq.add_keyword(conn, name, channel="ali", score=sc)
+        display_top = queries.list_keywords(conn, status="pending")[0]["keyword"]
+        picked = kr.auto_pick_keyword(conn, seeds=SEED, fetch=_fetch)
+        assert picked is not None
+        assert picked["keyword"] == display_top == "비이"  # 최고 score = 맨 위
+
     def test_recommends_and_adds_when_empty(self) -> None:
         conn = _db()
         picked = kr.auto_pick_keyword(conn, seeds=SEED, fetch=_fetch)

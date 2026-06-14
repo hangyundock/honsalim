@@ -638,6 +638,19 @@ class DashboardWindow(QMainWindow):
         except ValueError:
             return None
 
+    def _selected_or_top(self, table: QTableWidget) -> int | None:
+        """선택된 행 id, 없으면 맨 위(0행) id — '쓸데없는 선택 클릭' 제거. 표가 비면 None."""
+        did = self._selected_id(table)
+        if did is not None:
+            return did
+        if table.rowCount() <= 0:
+            return None
+        item = table.item(0, 0)
+        try:
+            return int(item.text()) if item else None
+        except ValueError:
+            return None
+
     def _on_recommend(self) -> None:
         """추천 키워드 생성 → 선택 창 → 큐 추가. 정의된 선정 방식(keyword_research)을 SEO 씨앗에 적용."""
         seed, ok = QInputDialog.getText(
@@ -839,9 +852,9 @@ class DashboardWindow(QMainWindow):
         self.run_task(task)
 
     def _on_approve(self) -> None:
-        did = self._selected_id(self.tab_queue)
+        did = self._selected_or_top(self.tab_queue)  # 선택 없으면 맨 위 글
         if did is None:
-            QMessageBox.information(self, "선택 필요", "발행 큐에서 승인할 글을 선택하세요.")
+            QMessageBox.information(self, "글 없음", "발행 큐에 승인할 글이 없습니다.")
             return
 
         def task() -> int:
@@ -852,9 +865,9 @@ class DashboardWindow(QMainWindow):
         self.run_task(task)
 
     def _on_reject(self) -> None:
-        did = self._selected_id(self.tab_queue)
+        did = self._selected_or_top(self.tab_queue)  # 선택 없으면 맨 위 글
         if did is None:
-            QMessageBox.information(self, "선택 필요", "발행 큐에서 반려할 글을 선택하세요.")
+            QMessageBox.information(self, "글 없음", "발행 큐에 반려할 글이 없습니다.")
             return
         if (
             QMessageBox.question(

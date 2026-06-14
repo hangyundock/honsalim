@@ -173,14 +173,16 @@ def auto_pick_keyword(
 ) -> dict[str, Any] | None:
     """글 생성용 키워드 **자동 선정** (운영자 무개입 — '글 생성' 한 번에 키워드까지).
 
-    1) status='pending' 키워드가 있으면 우선순위(priority·score·id)순 1건 **재사용**(이미 큐에 있는 것 낭비 없음).
+    1) status='pending' 키워드가 있으면 **맨 위 1건 재사용**(이미 큐에 있는 것 낭비 없음).
+       정렬은 대시보드 목록(dashboard.queries.list_keywords)과 **동일**(score DESC, priority DESC, id)
+       — '화면 맨 위 키워드'가 그대로 자동 선정되도록.
     2) 없으면 **정의된 방식**(seo_keywords.yml 씨앗 + keyword_research)으로 top 추천 → 큐에 추가
        (score=월검색량) → 그 키워드.
     반환: {keyword_id, keyword, source: "queue"|"recommend"} 또는 None(추천도 없음).
     """
     row = conn.execute(
         "SELECT id, keyword FROM keyword_queue WHERE status = 'pending' "
-        "ORDER BY priority DESC, score DESC, id LIMIT 1"
+        "ORDER BY score DESC, priority DESC, id LIMIT 1"
     ).fetchone()
     if row:
         return {"keyword_id": int(row[0]), "keyword": str(row[1]), "source": "queue"}
