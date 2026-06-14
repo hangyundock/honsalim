@@ -244,6 +244,8 @@ def _check_phase2_modules() -> bool:
         ("writer.category_state", "pending_approval"),
         ("writer.article_state", "unpublish"),
         ("writer.article_state", "republish"),
+        ("writer.article_guardrail", "check"),
+        ("writer.article_guardrail", "monitor"),
         ("enricher.claude_client", "ClaudeClient"),
         ("enricher.meta_extractor", "MetaExtractor"),
         ("enricher.retry", "retry_with_backoff"),
@@ -1269,6 +1271,27 @@ def cmd_republish_article(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def cmd_monitor_articles(args: argparse.Namespace) -> int:
+    """published 글 사후 점검(무결성·적합성·세션 #29). --auto-unpublish면 미달 글 자동 비공개.
+
+    기본 보고만(fail-closed 자동 비공개는 플래그). 자동 비공개 후 라이브 반영은 build+deploy 별도.
+    """
+    from writer import article_guardrail
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        res = article_guardrail.monitor(conn, auto_unpublish=args.auto_unpublish)
+    finally:
+        conn.close()
+    print(f"{OK} 글 사후 점검 — 검사 {res['checked']}편 · 미달 {len(res['failed'])}편")
+    for f in res["failed"]:
+        print(f"     {WARN} {f['slug']}: {'; '.join(f['reasons'])}")
+    if res["unpublished"]:
+        print(f"{OK} 자동 비공개 {len(res['unpublished'])}편: {', '.join(res['unpublished'])}")
+        print("     ※ 라이브 반영은 build --full + deploy 필요")
+    return 0
+
+
 def cmd_auto_publish(args: argparse.Namespace) -> int:
     """가드레일 통과 카테고리 자동 공개 (E7→가드레일·세션 #22). 보류는 draft 유지·사유 보고.
 
@@ -2206,6 +2229,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_repub_art.add_argument("slug", type=str, help="articles.slug")
     p_repub_art.set_defaults(func=cmd_republish_article)
+
+    p_mon_art = sub.add_parser(
+        "monitor-articles",
+        help="published 글 사후 점검(무결성·적합성). --auto-unpublish로 미달 글 자동 비공개",
+    )
+    p_mon_art.add_argument(
+        "--auto-unpublish", action="store_true", help="미달 글 자동 비공개(fail-closed)"
+    )
+    p_mon_art.set_defaults(func=cmd_monitor_articles)
 
     # 자동 게시 가드레일 (세션 #22) — E7(사람 승인)을 fail-closed 가드레일로 대체
     p_auto_pub = sub.add_parser(
