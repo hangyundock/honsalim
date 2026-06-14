@@ -869,6 +869,9 @@ class DashboardWindow(QMainWindow):
         self.run_task(task)
 
     def _on_preview(self) -> None:
+        # 선택(없으면 맨 위) 발행 큐 글 → 빌드 후 그 글 상세로 바로 이동 (검토 동선·§2-마, 세션 #29)
+        did = self._selected_or_top(self.tab_queue)
+
         def task() -> int:
             import webbrowser
 
@@ -877,12 +880,27 @@ class DashboardWindow(QMainWindow):
             rc = cli.cmd_build(
                 argparse.Namespace(manifest=None, full=False, preview=True, save_empty=False)
             )
-            idx = db.PROJECT_ROOT / "build" / "preview" / "index.html"
-            if idx.exists():
-                webbrowser.open(idx.as_uri())
-                print(f"[OK] 미리보기 열기: {idx}")
+            preview = db.PROJECT_ROOT / "build" / "preview"
+            target = preview / "index.html"
+            if did is not None:  # 선택한 글의 상세 페이지로 직접 이동(없으면 홈)
+                conn = db.connect(db.DB_PATH)
+                try:
+                    srow = conn.execute(
+                        "SELECT s.slug FROM drafts d JOIN scenarios s ON s.id = d.scenario_id "
+                        "WHERE d.id = ?",
+                        (did,),
+                    ).fetchone()
+                finally:
+                    conn.close()
+                if srow is not None:
+                    art = preview / "articles" / str(srow[0]) / "index.html"
+                    if art.exists():
+                        target = art
+            if target.exists():
+                webbrowser.open(target.as_uri())
+                print(f"[OK] 미리보기 열기: {target}")
             else:
-                print(f"[WARN] 미리보기 파일 없음: {idx} (먼저 글을 생성하세요)")
+                print(f"[WARN] 미리보기 파일 없음: {target} (먼저 글을 생성하세요)")
             return rc
 
         self.run_task(task)

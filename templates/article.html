@@ -6,6 +6,13 @@
 {% block main %}
 <div class="article">
   <div class="wrap art-wrap">
+    {# 검토용 미리보기 배너 — 검토 대기 draft에만 표시(§2-마). 공개 배포(published)엔 없음. #}
+    {% if article.is_draft %}
+    <div class="draft-flag" style="background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:12px 16px;margin:18px 0 4px;color:#7a5b00;font-size:14px;line-height:1.55">
+      🔍 <b>검토용 미리보기</b> — 아직 발행되지 않은 글입니다. 승인하면 이 내용 그대로 게시됩니다.
+      <span style="opacity:.8">(이 안내는 공개 사이트에는 나타나지 않습니다.)</span>
+    </div>
+    {% endif %}
     {{ breadcrumb([
         {'label': '홈', 'url': '/'},
         {'label': '내맘대로 세팅', 'url': '/scenarios/'},

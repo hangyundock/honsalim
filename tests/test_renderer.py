@@ -390,6 +390,114 @@ class TestRenderArticleDetail:
         assert html.count('rel="canonical"') == 1
 
 
+@pytest.fixture()
+def built_with_draft(tmp_path: Path) -> dict:
+    """seed + 검토 대기(validated) 시나리오 draft 1편(쿠팡 이미지 + 알리 상품) → 미리보기·공개 둘 다 렌더.
+
+    키워드→글 파이프라인이 만든 draft를 발행 전에 미리보기로 검토하는 경로(§2-마, 세션 #29).
+    본문·메타·featured 상품은 enriched_payload(promote와 동일 소스)에 채운다.
+    """
+    db_path = tmp_path / "test.db"
+    db.migrate(db_path=db_path)
+    db.seed(db_path=db_path)
+    conn = db.connect(db_path)
+    try:
+        srow = conn.execute("SELECT id, slug FROM scenarios ORDER BY id LIMIT 1").fetchone()
+        scenario_id, slug = srow[0], srow[1]
+        # 하이브리드 결합 화면 검증용: 쿠팡 공식배너 이미지(hotlink) + 알리(판매량) 상품
+        conn.execute(
+            "INSERT INTO products (source, source_product_id, name, currency, price_krw, "
+            "image_url_external, deeplink_url, deeplink_slug, affiliate_tag, "
+            "created_at, updated_at, last_seen_at) "
+            "VALUES ('coupang','cpx','쿠팡 의자','KRW',59000,?,"
+            "'https://link.coupang.com/a/CP','coupang-cpx','coupang-partners',"
+            "datetime('now'),datetime('now'),datetime('now'))",
+            ("https://image.coupangcdn.com/chair.jpg",),
+        )
+        conn.execute(
+            "INSERT INTO products (source, source_product_id, name, currency, price_krw, "
+            "sales_volume, deeplink_url, deeplink_slug, affiliate_tag, "
+            "created_at, updated_at, last_seen_at) "
+            "VALUES ('aliexpress','alx','알리 의자','KRW',42000,1500,"
+            "'https://s.click.aliexpress.com/alx','ali-alx','honsalim',"
+            "datetime('now'),datetime('now'),datetime('now'))"
+        )
+        did = article_writer.create_draft(conn, scenario_id=scenario_id)
+        transition(conn, did, "enriched")
+        schema = build_article_jsonld(
+            meta={"title": "컴퓨터의자 하이브리드", "meta_description": "쿠팡+알리 비교"},
+            scenario={"slug": slug},
+            site_base_url="https://honsallim.com",
+            image_url="https://honsallim.com/static/img/og-default.png",
+            published_at="2026-06-14",
+        )
+        article_writer.save_enriched(
+            conn,
+            did,
+            {
+                "body_md": _ARTICLE_BODY,
+                "title": "컴퓨터의자 하이브리드",
+                "summary": "쿠팡 이미지 + 알리 판매량",
+                "meta_description": "쿠팡+알리 비교",
+                "schema_jsonld": schema,
+                "products": [
+                    {"source": "coupang", "source_product_id": "cpx"},
+                    {"source": "aliexpress", "source_product_id": "alx"},
+                ],
+            },
+        )
+        transition(conn, did, "validated")  # 검토 대기
+    finally:
+        conn.close()
+
+    preview = tmp_path / "preview"
+    site = tmp_path / "site"
+    renderer.render_site(out_dir=preview, db_path=db_path, include_drafts=True)
+    summary = renderer.render_site(out_dir=site, db_path=db_path, include_drafts=False)
+    return {"preview": preview, "site": site, "summary": summary, "slug": slug}
+
+
+class TestRenderDraftArticlePreview:
+    """검토 대기 시나리오 draft 미리보기 (세션 #29) — §2-마 인간 검토 게이트 핵심.
+
+    버그(세션 #28→#29 라이브 테스트가 적발): _load_article_pages가 published만 렌더해
+    키워드→글 파이프라인이 만든 draft를 승인 전에 미리보기로 볼 수 없었다(게이트 무력화).
+    근본 수정: include_drafts=True면 validated draft도 발행 후와 동일 화면으로 렌더.
+    """
+
+    def _preview_html(self, built: dict) -> str:
+        path = built["preview"] / "articles" / built["slug"] / "index.html"
+        assert path.exists(), "검토 대기 draft 상세글이 미리보기에 미생성"
+        text: str = path.read_text(encoding="utf-8")
+        return text
+
+    def test_draft_rendered_with_review_banner(self, built_with_draft: dict) -> None:
+        html = self._preview_html(built_with_draft)
+        assert "컴퓨터의자 하이브리드" in html  # draft 제목
+        assert "검토용 미리보기" in html  # 검토 배너(공개엔 없음)
+        assert "{{" not in html and "{%" not in html  # Jinja 미전개 잔재 없음
+
+    def test_hybrid_products_shown_with_coupang_image(self, built_with_draft: dict) -> None:
+        # 핵심: 쿠팡 공식배너 이미지(hotlink) + 알리 상품이 발행 후처럼 /go/ 카드로 표시
+        html = self._preview_html(built_with_draft)
+        assert "https://image.coupangcdn.com/chair.jpg" in html  # 쿠팡 이미지 hotlink
+        assert "/go/coupang-cpx" in html  # 쿠팡 제휴 링크
+        assert "/go/ali-alx" in html  # 알리 제휴 링크
+        assert "쿠팡 의자" in html and "알리 의자" in html
+
+    def test_draft_absent_from_public_build(self, built_with_draft: dict) -> None:
+        # 공개 배포(include_drafts=False)엔 draft 글이 없어야 함 (E7·AI 자동 게시 금지)
+        assert not (
+            built_with_draft["site"] / "articles" / built_with_draft["slug"] / "index.html"
+        ).exists()
+        assert built_with_draft["summary"]["articles_published"] == 0
+
+    def test_draft_excluded_from_sitemap(self, built_with_draft: dict) -> None:
+        # draft slug가 (미리보기) sitemap에도 새면 안 됨 — 미발행 글 색인 위험 방지
+        xml = (built_with_draft["preview"] / "sitemap.xml").read_text(encoding="utf-8")
+        assert f"/articles/{built_with_draft['slug']}/" not in xml
+
+
 class TestCategoryPublishGate:
     """draft 카테고리는 렌더 제외, published만 공개 — 승인 게이트(세션 #18·§2-마·E7)."""
 

@@ -242,58 +242,190 @@ ARTICLE_PRODUCTS_SQL = """
     ORDER BY ap.display_order, ap.product_id
 """
 
+# 검토 대기(validated) 시나리오 draft — 미리보기 전용(§2-마 인간 검토 게이트, 세션 #29).
+# 본문·메타·featured 상품은 drafts.enriched_payload(JSON)에 있다(promote와 동일 소스).
+DRAFT_ARTICLE_SQL = """
+    SELECT d.id, d.enriched_payload,
+           s.slug AS scenario_slug, s.season_peak, s.budget_min_krw, s.budget_max_krw,
+           p.slug AS persona_slug, p.title_ko AS persona_title
+    FROM drafts d
+    JOIN scenarios s ON s.id = d.scenario_id
+    JOIN personas p ON p.id = s.persona_id
+    WHERE d.status = 'validated' AND d.enriched_payload IS NOT NULL
+    ORDER BY d.id DESC
+"""
+
 
 def _price_krw(value: int | None) -> str:
     return f"{value:,}원" if value else ""
 
 
-def _load_article_pages(conn: sqlite3.Connection) -> list[dict]:
+def _article_product_cards(prods: list) -> list[dict]:
+    """products 행 목록 → article.html 상품카드 컨텍스트 (published·draft 공용).
+
+    img_url=image_url_external(알리/쿠팡 공식배너 hotlink — 카테고리와 동일), 없으면 우드톤 fallback.
+    """
+    return [
+        {
+            "name": pr["name"],
+            "price": _price_krw(pr["price_krw"]),
+            "url": f"/go/{pr['deeplink_slug']}",
+            "img": WOOD[i % len(WOOD)],  # img_url 없을 때 우드톤 fallback 색
+            "img_url": pr["image_url_external"]
+            or "",  # 실제 상품 이미지(알리/쿠팡 공식배너 hotlink)
+            "cat": pr["category_path"] or "",
+            "tag": "",  # 필수/추천/선택 등급 데이터 없음(v1) — 본문이 설명 담당
+            "why": "",  # recommendation_note 미사용(v1)
+        }
+        for i, pr in enumerate(prods)
+    ]
+
+
+def _article_page_ctx(
+    *,
+    slug: str,
+    title: str,
+    summary: str,
+    meta_description: str,
+    schema_raw: str | None,
+    body_html: str,
+    persona_slug: str,
+    persona_title: str,
+    season_peak: str | None,
+    budget_min: int | None,
+    budget_max: int | None,
+    products: list[dict],
+    is_draft: bool = False,
+) -> dict:
+    """article.html 렌더 컨텍스트 (published·draft 공용). is_draft=True면 검토용 배너 표시."""
+    return {
+        "slug": slug,
+        "title": title,
+        "meta_description": meta_description,
+        "schema_raw": schema_raw,
+        "is_draft": is_draft,  # sitemap·게시수 제외 플래그 (공개 산출물 아님)
+        "article": {
+            "slug": slug,
+            "title": title,
+            "summary": summary,
+            "desc": meta_description,
+            "body_html": body_html,
+            "persona": persona_slug,
+            "persona_name": persona_title,
+            "persona_icon": PERSONA_ICON.get(persona_slug, ""),
+            "season": season_peak or "",
+            "budget": _budget_display(budget_min, budget_max),
+            "is_draft": is_draft,
+        },
+        "products": products,
+    }
+
+
+def _load_article_pages(conn: sqlite3.Connection, include_drafts: bool = False) -> list[dict]:
     """published articles → 상세글 렌더 컨텍스트 (산문 본문 + /go/ 제휴 상품 카드).
 
-    article.html 계약에 맞춘 dict: article(메타·body_html·페르소나/시즌/예산 칩) +
-    products(이름·가격·/go/ 링크·이미지). 상품 이미지는 image_url_external(알리·쿠팡 공식배너
-    hotlink — 카테고리와 동일) 사용, 없으면 우드톤 fallback (세션 #28 쿠팡 이미지 B 결정).
+    include_drafts=True(미리보기·검토용·§2-마)면 검토 대기(validated) 시나리오 draft도 함께
+    렌더 → 운영자가 승인 전에 발행 후와 동일한 화면(쿠팡 이미지+알리 데이터)을 본다. 공개
+    배포(기본)는 published만. 상품 이미지는 image_url_external(알리·쿠팡 공식배너 hotlink) 사용.
     """
-    rows = conn.execute(ARTICLE_DETAIL_SQL).fetchall()
     pages: list[dict] = []
-    for row in rows:
+    seen_slugs: set[str] = set()
+    for row in conn.execute(ARTICLE_DETAIL_SQL).fetchall():
         prods = conn.execute(ARTICLE_PRODUCTS_SQL, (row["id"],)).fetchall()
-        products = [
-            {
-                "name": pr["name"],
-                "price": _price_krw(pr["price_krw"]),
-                "url": f"/go/{pr['deeplink_slug']}",
-                "img": WOOD[i % len(WOOD)],  # img_url 없을 때 우드톤 fallback 색
-                "img_url": pr["image_url_external"]
-                or "",  # 실제 상품 이미지(알리/쿠팡 공식배너 hotlink)
-                "cat": pr["category_path"] or "",
-                "tag": "",  # 필수/추천/선택 등급 데이터 없음(v1) — 본문이 설명 담당
-                "why": "",  # recommendation_note 미사용(v1)
-            }
-            for i, pr in enumerate(prods)
-        ]
         pages.append(
-            {
-                "slug": row["slug"],
-                "title": row["title"],
-                "meta_description": row["meta_description"],
-                "schema_raw": row["schema_jsonld"],
-                "article": {
-                    "slug": row["slug"],
-                    "title": row["title"],
-                    "summary": row["summary"],
-                    "desc": row["meta_description"],
-                    "body_html": row["body_html"],
-                    "persona": row["persona_slug"],
-                    "persona_name": row["persona_title"],
-                    "persona_icon": PERSONA_ICON.get(row["persona_slug"], ""),
-                    "season": row["season_peak"] or "",
-                    "budget": _budget_display(row["budget_min_krw"], row["budget_max_krw"]),
-                },
-                "products": products,
-            }
+            _article_page_ctx(
+                slug=row["slug"],
+                title=row["title"],
+                summary=row["summary"],
+                meta_description=row["meta_description"],
+                schema_raw=row["schema_jsonld"],
+                body_html=row["body_html"],
+                persona_slug=row["persona_slug"],
+                persona_title=row["persona_title"],
+                season_peak=row["season_peak"],
+                budget_min=row["budget_min_krw"],
+                budget_max=row["budget_max_krw"],
+                products=_article_product_cards(prods),
+            )
         )
+        seen_slugs.add(row["slug"])
+    if include_drafts:
+        pages.extend(_load_draft_article_pages(conn, seen_slugs))
     return pages
+
+
+def _load_draft_article_pages(conn: sqlite3.Connection, seen_slugs: set[str]) -> list[dict]:
+    """검토 대기(validated) 시나리오 draft → 상세글 컨텍스트 (미리보기 전용·§2-마 검토 게이트).
+
+    본문·메타·featured 상품은 drafts.enriched_payload(JSON)에 있다(promote와 동일 소스).
+    body_md→HTML 변환도 promote와 동일(검증 본문 무변형 — validated 본문 = published 본문).
+    같은 slug published 글이 있으면 published 우선(미리보기에서 라이브 글을 draft로 덮지 않음).
+    draft 글은 sitemap·게시수에서 제외되고 build/preview에만 생성된다(공개 배포 산출물 아님).
+    """
+    import markdown as md_lib  # promote(cmd_promote)와 동일 (BACKEND §10-1)
+
+    pages: list[dict] = []
+    for row in conn.execute(DRAFT_ARTICLE_SQL).fetchall():
+        slug = row["scenario_slug"]
+        if slug in seen_slugs:
+            continue  # published 우선
+        try:
+            ep = json.loads(row["enriched_payload"])
+        except (json.JSONDecodeError, TypeError):
+            continue
+        body_md = ep.get("body_md")
+        if not body_md or not ep.get("title"):
+            continue  # 본문/메타 없는 draft(dry_run 등)는 미리보기 제외
+        pages.append(
+            _article_page_ctx(
+                slug=slug,
+                title=ep["title"],
+                summary=ep.get("summary") or "",
+                meta_description=ep.get("meta_description") or "",
+                schema_raw=ep.get("schema_jsonld"),
+                body_html=md_lib.markdown(body_md, extensions=["extra", "sane_lists"]),
+                persona_slug=row["persona_slug"],
+                persona_title=row["persona_title"],
+                season_peak=row["season_peak"],
+                budget_min=row["budget_min_krw"],
+                budget_max=row["budget_max_krw"],
+                products=_article_product_cards(
+                    _draft_product_rows(conn, ep.get("products") or [])
+                ),
+                is_draft=True,
+            )
+        )
+        seen_slugs.add(slug)
+    return pages
+
+
+def _draft_product_rows(conn: sqlite3.Connection, featured: list[dict]) -> list:
+    """featured(enriched_payload['products']) → products 테이블 행 (이미지·가격·링크).
+
+    promote의 link_article_products와 동일하게 (source_product_id[, source])로 products를 조회 —
+    발행 후 article_products 경로와 같은 데이터(같은 화면). products에 없는 항목은 건너뜀.
+    """
+    rows: list = []
+    for f in featured:
+        spid = f.get("source_product_id")
+        if not spid:
+            continue
+        src = f.get("source")
+        if src:
+            pr = conn.execute(
+                "SELECT name, price_krw, deeplink_slug, category_path, image_url_external "
+                "FROM products WHERE source_product_id = ? AND source = ? LIMIT 1",
+                (str(spid), str(src)),
+            ).fetchone()
+        else:
+            pr = conn.execute(
+                "SELECT name, price_krw, deeplink_slug, category_path, image_url_external "
+                "FROM products WHERE source_product_id = ? LIMIT 1",
+                (str(spid),),
+            ).fetchone()
+        if pr is not None:
+            rows.append(pr)
+    return rows
 
 
 CATEGORY_CATALOG_SQL = """
@@ -920,7 +1052,7 @@ def render_site(
     try:
         scenarios = _load_scenarios(conn)
         personas = _load_personas(conn)
-        article_pages = _load_article_pages(conn)
+        article_pages = _load_article_pages(conn, include_drafts)
         category_pages = _load_category_pages(conn, include_drafts)
         category_groups = _load_categories_index(conn, include_drafts)
         home_categories = _load_home_categories(conn, include_drafts)
@@ -1155,7 +1287,8 @@ def render_site(
                 **common,
             ),
         )
-    article_slugs = [pg["slug"] for pg in article_pages]
+    # sitemap·게시수는 published만 — draft 미리보기 글은 제외(공개 색인·카운트 누출 방지, 세션 #29)
+    article_slugs = [pg["slug"] for pg in article_pages if not pg.get("is_draft")]
 
     # 카테고리 인덱스 (/categories/) — 그룹별 카드, 미수집 카테고리는 '준비 중'
     w(
