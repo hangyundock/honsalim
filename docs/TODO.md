@@ -3,18 +3,17 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #30 — (상세 EVENTS #29) · 라이브 테스트가 적발한 2대 문제 최우선
+## ★ 다음 세션 #31 — (상세 EVENTS #30 / docs/ARTICLE_LAYOUT_TIER2.md)
 
-- [ ] **★A. 키워드 경로 알리 검색 근본수정 (최우선)** — **규칙: 알리 검색 쿼리 = 영어**(알리 영어중심 인덱스 / 한글 쿼리는 매칭실패→"한국 인기" 잡동사니 폰케이스·티셔츠). 현재 `cli._gather_keyword_candidates`가 `ali.query_products(kw["keyword"]=한글)` → 무관상품 → 가드가 다 거름 → 글 thin(쿠팡만). **카테고리 경로는 이미 영어라 정상**(라이브 5카테고리 멀쩡).
-  - **구현**: ① `keyword_relevance.resolve_category(키워드)` → slug ② `category_collect.load_sources()[slug].tiers`의 **영어 `q`**(+ min/max 가격)로 `ali.query_products` 검색(`category_collect.collect_category`와 동일 패턴·여러 티어) ③ 기존 적합성 필터 적용 → 쿠팡과 결합. 부품 다 있음(resolve_category·load_sources)·배선만.
-  - **언어 규칙**: 알리 쿼리=영어 / 네이버 검색량·키워드연구·글 본문·SEO=한글 / 적합성 필터는 **알리가 돌려준 한글 상품명**에 적용(알리가 제목은 한글로 줌).
-  - **fallback**: 카테고리 **미매핑 키워드**(office-chair 등 밖) = 알리 건너뛰고 쿠팡만 또는 보류(fail-closed 자동승인은 이미 미매핑 보류). **한계**: 키워드→글은 **정의된 카테고리 안**에서만 알리 정상 → 새 주제는 `category_sources.yml`에 카테고리(영어 q+제외어) 먼저 추가해야 함("아무 키워드나 완벽한 글" 아님).
-- [ ] **★B. 대시보드 진행/완료 표시**: 생성 1~2분 무표시 → 끝난지 모름(주인 반복지적). 작업 시작·진행중·완료 신호(상태 라벨/타이틀/버튼 비활성 등) 추가.
-- [ ] **A·B 후 첫 라이브 글**: 게이밍의자(#3·쿠팡 첨부됨) `✨ 글 생성` → 제대로된 하이브리드(쿠팡+알리) → 미리보기 → 승인 → 발행. thin draft #3(컴퓨터의자) 반려.
-- [ ] **DECISIONS/CLAUDE.md B-i 기록**: auto_mode 토글(기본 OFF)·fail-closed 자동승인·발행후 안전망·E7 보정(구글정책 정정=AI/자동 아닌 **저가치 양산**만 페널티). critical-review 지적 문서 정합.
-- [ ] **B 켜기 (주인 결정)**: `auto_mode` ON + `run_auto_cycle.ps1` schtask 등록(C13 주인 통제). 그러면 대기키워드(+쿠팡 첨부분)로 매일 자동 생성·승인·발행·사후모니터.
-- (이월) PartC 키워드 틈점수 · `mini-dehumidifier` 점검 · off-target 씨앗 curation · 쿠팡 본격(15만원 후) · 멀티채널(S1) · 성장 Tier0([[growth-first-priority]]·트래픽이 진짜 병목·6~12개월 인내).
-- 참고: 워크트리=`PYTHONPATH=src python -m cli` · DB gitignore→재생성(`db migrate`+`db seed`+`register-categories --all --no-dry-run`). 발행/배포=main 체크아웃. **main 직접머지=`git push origin HEAD:main`(이미 allow·gh 불필요)**.
+- [ ] **★글 레이아웃 Tier2 구현 (최우선)** — 글을 "독서(텍스트벽)"→"쇼핑(스캔)"으로. 전체 블루프린트·근거·구현필드=**docs/ARTICLE_LAYOUT_TIER2.md**.
+  - **구조**: ⚡빠른 결론 박스 → 🏆큐레이션 픽 카드(역할배지·소스배지·장단점) → 본문 체크포인트 박스 → 📊한눈에 비교표(1위 강조) → 💰예산대별 표 → 🤝신뢰 박스 → ❓FAQ 아코디언.
+  - **(A) LLM enrich 구조화 출력**: `quick_verdict`·`picks[]`(역할·장단점·이런분께)·`checkpoints[]`·`budget_tiers[]`(+기존 faqs). graceful fallback. **(B) 템플릿**: 카테고리 시각 컴포넌트 재사용 + 빠른결론 박스 신규.
+  - ★**목업 먼저 확정** → 구현 → 미리보기 HTTP 검증 → 배포. ★**중복콘텐츠 회피**(글=시나리오 큐레이션·카테고리=전체, 의도 분리). 별점 금지·판매량=신뢰.
+  - Tier1(#30)에서 renderer 데이터플러밍(source·할인·판매량·본문분할·소스분리)·`product_card` 매크로 완료→**재사용**(article.html 레이아웃만 교체).
+- [ ] **★발행 build/site 자동커밋 버그 근본수정** — `cmd_publish_queue`/`cmd_deploy`가 build/site 커밋 안 함→클릭만으론 글 404(수동 커밋해야 라이브). 자동 커밋 단계 추가(무인 치명).
+- [ ] **미리보기 file://→HTTP 서빙** — 미리보기 버튼이 절대경로 CSS/이미지를 file://로 못 띄움(무스타일·이미지 안보임). 로컬 HTTP 서빙으로 충실한 미리보기.
+- (이월) PartC 키워드 틈점수 · off-target 씨앗 curation · `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장 Tier0([[growth-first-priority]]·트래픽이 진짜 병목).
+- 참고: 워크트리=`PYTHONPATH=src python -m cli` · DB gitignore→재생성(`db migrate`+`db seed`+`register-categories --all --no-dry-run`). 발행/배포=main 체크아웃. **main직접머지=`git push origin HEAD:main`**.
 
 ## 시점 의존 잔존 (세션 #6~7)
 

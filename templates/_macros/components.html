@@ -118,14 +118,19 @@
   {{ image_block(p.img, p.cat, '', img_url=p.img_url | default('')) }}
   <div class="body">
     <div class="p-top">
-      <span class="p-tag t-{{ p.tag }}">{{ p.tag }}</span>
-      <span class="p-cat">{{ p.cat }}</span>
+      {% if p.source == 'coupang' %}<span class="p-src src-cp">쿠팡</span>
+      {% elif p.source %}<span class="p-src src-ali">알리</span>{% endif %}
+      {% if p.cat %}<span class="p-cat">{{ p.cat }}</span>{% endif %}
     </div>
     <h3 class="title" style="font-size:var(--fs-h3)">{{ p.name }}</h3>
-    <p class="desc">{{ p.why }}</p>
-    <div class="p-foot">
+    {% if p.why %}<p class="desc">{{ p.why }}</p>{% endif %}
+    <div class="p-priceline">
       <span class="price">{{ p.price }}</span>
-      <a class="btn btn-ghost p-buy" href="{{ p.url | default('#') }}" rel="sponsored nofollow">추천 보기 {{ icon('arrow', 14) }}</a>
+      {% if p.disc %}<span class="p-sig">정가 <s>{{ p.orig }}</s> · <b class="off">{{ p.disc }}↓</b></span>{% endif %}
+    </div>
+    {% if p.volume %}<div class="p-vol">알리 판매량 <b>{{ p.volume }}</b> · 판매처 기준</div>{% endif %}
+    <div class="p-foot">
+      <a class="btn btn-ghost p-buy" href="{{ p.url | default('#') }}" rel="sponsored nofollow">{{ '구매하기' if p.source == 'coupang' else '최저가/구매' }} {{ icon('arrow', 14) }}</a>
     </div>
   </div>
 </div>

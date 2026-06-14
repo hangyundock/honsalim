@@ -7,11 +7,11 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#29: ★B-i 무인 자동발행 전체 + naver_blog 흐름 GUI 완성** — 미리보기 버그수정(검토 대기 draft 렌더)·적합성 가드(`keyword_relevance`·한글키워드→카테고리 영어필터)·발행후 안전망(`article_state`/`article_guardrail` 자동비공개)·fail-closed 자동승인(`auto_approve`)·`auto-cycle`·**`auto_mode` 토글 기본 OFF**·`🛒 쿠팡 첨부(저장)` 버튼. PR 자동머지 확립(main 직접 push). **6커밋 전부 main 머지·CI green·라이브 200**. 회귀 **846**. ★**라이브 테스트가 2대 문제 적발**: **(A)키워드 경로 알리 검색=한글→쓰레기 결과→글이 thin(쿠팡만)** — 근본수정 필요(매핑 카테고리 영어 tier 검색어). **(B)진행/완료 표시 없음**. ★다음(#30)=A·B 수정→게이밍의자(#3·쿠팡 첨부됨) 재생성→첫 라이브 글. 상세 EVENTS #29 | 2026-06-15 #29 |
+| 진행 단계 | **#30: A 키워드 알리 영어검색 근본수정 + doctor 게이트 복구 + B 진행표시 + ★첫 라이브 글 발행 + 발행버그 적발 + 글 레이아웃 Tier1·★Tier2 종합 재설계** — A(`_gather_keyword_candidates`→`category_collect.search_tiers` 영어 티어, 미매핑 fail-closed)·doctor(`_load_module_from_path` sys.modules→exit 0)·B(`run_task` 진행바·상태·버튼). **첫 라이브 글=honsallim.com/articles/kw-e3d08a2c/(200·하이브리드 10상품)**. main 머지 3471248·7cb0168. 회귀 **851**. ★**적발: ①발행 build/site 커밋 버그(클릭만으론 404) ②file:// 미리보기 무스타일 ③글이 "텍스트벽=독서"→Tier2 블루프린트 확정(docs/ARTICLE_LAYOUT_TIER2.md)**. ★다음(#31)=글 레이아웃 Tier2 구현·발행버그 수정·미리보기 HTTP. 상세 EVENTS #30 | 2026-06-15 #30 |
 | 운영 모델 | 자동 게시 활성(콘텐츠 큐). **refresh-cycle = 수동 운영(주인 직접 지시) — C13 [확정 #24], Claude 예약작업 비활성화**. 자동 "승인" 금지(E7→가드레일) | #24 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·Secrets·main-protect)·Cloudflare(도메인·Pages·R2·D1)·Anthropic·INDEXNOW 키·secrets·Git push·pre-commit 9종·Dependabot (세부 archive) | #3 |
 | Phase 2 핵심 모듈 (#3~#5) | cli·common·validator·writer·collector·enricher·builder·deployer·tracker·workers (세부 BACKEND §2) + **#17: category_collect·category_page_builder·concept_image·category_writer** | #17 |
-| Phase 2 회귀 테스트 | **846 / 846 PASS** [확정 pytest, #29] — #29 +40(미리보기 draft·적합성 가드·발행후 안전망·자동승인·auto-cycle) · #28 +19(쿠팡 하이브리드). black·ruff·mypy 클린 | 2026-06-15 |
+| Phase 2 회귀 테스트 | **851 / 851 PASS** [확정 pytest, #30] — #30 +5(A search_tiers·doctor 로더·B 진행표시) · #29 +40(미리보기 draft·적합성 가드·발행후 안전망). black·ruff·mypy 클린 | 2026-06-15 |
 | CLI 명령 (BACKEND §9) | **29개** — doctor·db·collect·collect-products·enrich·validate·approve·promote·unapprove·deploy·sync-slugmap·build(+`--preview`)·dashboard·collect-category·build-category·approve-category·unapprove-category(킬스위치)·register-categories(+`--auto-publish`)·auto-publish·category-status(+`--monitor`)·**refresh-cycle(#23)** · **#25 운영 대시보드: keyword-add·keyword-generate·keyword-list·reject·coupang-add·publish-queue·schedule** · **#26: keyword-recommend** · **#29: unpublish-article·republish-article·monitor-articles(발행후 안전망)·auto-cycle(무인 사이클·auto_mode ON일 때)** = **33개** | #29 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD. 세부 DECISIONS J·O + EVENTS | #4~#16 |
 | doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **71개** + #19 LLM 키 점검. 71/71 OK [#29 +keyword_relevance·article_state×2·article_guardrail×2·auto_approve] | #29 |
@@ -19,7 +19,7 @@
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (docs/ 참조). 일관성 모순 0건 | #2 |
 | 메모리 시스템 | feedback 7건([[incremental-critical-review]]·[[autonomous-safe-system]] 등) + reference market_research + MEMORY.md | #12 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
-| 사이트 게시글 / 트래픽 / 수익 | **라이브 공개 카테고리=5개**(honsallim.com·#24 refresh-cycle 배포). **`mini-dehumidifier`는 가드레일 미달(추천 1개<2)로 자가복원 자동 비공개** — #25 원인 점검 대상. + 쿠팡 승인용 `/reviews/` 리뷰페이지(흠플래닛 모니터암). 측정(Cloudflare·GSC·네이버 누적). 수익=/go/→302 알리. **#29 라이브 사이트 200 정상 확인**(접속불가=주인 로컬·honsallim 더블L). **#29 첫 하이브리드 생성 실행** — draft #2·#3(컴퓨터의자)·검토 대기. ★단 **키워드 경로 알리 검색이 한글이라 무관상품만 와서 가드가 다 거름→글 thin(쿠팡만)·#30 근본수정 대상**. naver_blog GUI 흐름 완성(키워드+쿠팡 첨부→스케줄 발행). collector.coupang(API)=15만원 후 | #29 |
+| 사이트 게시글 / 트래픽 / 수익 | **라이브 공개 카테고리=5개** + **★첫 정식 글 1편=게이밍의자(honsallim.com/articles/kw-e3d08a2c/·#30·하이브리드 쿠팡1+알리)**. 글=새내기자취생 페르소나에서 링크(카테고리 페이지엔 안 나옴=정상·글≠카테고리). + 쿠팡 승인용 `/reviews/`. ★**현 라이브 글 레이아웃=구버전(텍스트벽)→#31 Tier2로 갱신 예정**(docs/ARTICLE_LAYOUT_TIER2.md). 측정(Cloudflare·GSC·네이버 누적). 수익=/go/→302 알리. `mini-dehumidifier` 가드레일 미달 자동비공개(점검 이월). collector.coupang(API)=15만원 후 | #30 |
 
 ## 인프라
 
@@ -58,19 +58,12 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 다음 세션 #29 — 상세 EVENTS #28. (#28 하이브리드 머지·반영됨·메인 7777c47)
-0. **★라이브 테스트 (최우선·이번 세션 미실행)**: 대시보드 재시작 → `🛒 쿠팡 배너→글 생성`(키워드 + 쿠팡 공식배너 `<a><img>`) → 미리보기로 **쿠팡(이미지) + 알리(판매량 데이터) 결합** 확인 (DeepSeek 비용·품질 1회). 알리 단독 빠른 글은 `✨ 글 생성`.
-1. **PartC 키워드 '틈 점수'**: naver_blog `keyword_scorer` 차용(검색량/문서수/경쟁도→저경쟁 롱테일 우선·신규 사이트 구글 랭킹). 단 네이버 신호=구글 근사치(정직 보정). recommender 점수에 반영.
-2. **PartD 자동 발행 ON**: 스케줄러(이미 구현·기본 OFF) 켜서 승인된 글 매일 자동 발행.
-3. **off-target 씨앗 curation**: 책·모니터 거치대(편집 판단)·받침대(발받침 모호) exclude_terms 보강.
-4. **mini-dehumidifier 점검 + ★성장 Tier0**(측정 리뷰·[[growth-first-priority]]) + 바탕화면 아이콘 main 재지정.
-- ★DB gitignore→재생성(`db migrate`+`db seed`). 발행/배포는 main 체크아웃(C13 수동). 워크트리=`PYTHONPATH=src python -m cli`.
-
-### 해소 (세션 #28) — 상세 EVENTS #28
-- ✅ **쿠팡 하이브리드 글**(naver_blog UX + 구글 무기, DECISIONS C16): Part1 배너 이미지(image_url_external·article 카드 hotlink) · Part2 쿠팡 우선 정렬 · PartA 알리+쿠팡 결합(쿠팡 항상 featured) · PartB 원팝업 `🛒 쿠팡 배너→글 생성`(키워드 자동·멀티배너·하이브리드 생성). 회귀 782→806. ★라이브 생성 미실행.
-
-### 해소 (세션 #27) — 상세 EVENTS #27
-- ✅ **글 생성 자동 키워드 선정**(`auto_pick_keyword`·표시 맨위=자동선정) + 발행큐 승인/반려 맨위 자동. 회귀 782→787.
+### ★ 다음 세션 #31 — 상세 EVENTS #30 / docs/ARTICLE_LAYOUT_TIER2.md
+1. **★글 레이아웃 Tier2 구현 (최우선)**: 글을 "독서(텍스트벽)"→"쇼핑(스캔)"으로 — 빠른결론박스·큐레이션 픽카드·비교표·체크박스·예산표·FAQ아코디언. LLM 구조화 출력 + 템플릿 시각 컴포넌트(카테고리 재사용). **목업 먼저 확정**. ★중복콘텐츠 회피(글=시나리오 큐레이션, 카테고리=전체 카탈로그·의도 분리). 전체 스펙=**docs/ARTICLE_LAYOUT_TIER2.md**.
+2. **★발행 build/site 자동커밋 버그**: `cmd_publish_queue`/`cmd_deploy`가 build/site 커밋 안 함→클릭만으론 404. 자동 커밋 단계 추가(무인 치명).
+3. **미리보기 file://→HTTP 서빙**: 미리보기 버튼이 절대경로 CSS/이미지를 file://로 못 띄움(무스타일). 로컬 HTTP 서빙으로 개선.
+4. (이월) PartC 키워드 틈점수 · off-target 씨앗 curation · mini-dehumidifier 점검 · ★성장 Tier0([[growth-first-priority]]).
+- ★DB gitignore→재생성(`db migrate`+`db seed`). 발행/배포=main 체크아웃(C13). 워크트리=`PYTHONPATH=src python -m cli`. main직접머지=`git push origin HEAD:main`.
 
 ### Phase 2 진척 가능 (검토 의존 큼)
 - `src/builder/manifest.py` 증분 빌드 (ARCH §7·DB §10) · `src/collector/coupang.py` (Phase 4)

@@ -13,6 +13,7 @@
   - 세션 #22 (2026-06-03 자율 게시 가드레일(E7→fail-closed)+살림3 합치기+8개 자동공개 라이브배포+측정인프라3종+/go/ Pages Function 수익경로 복구·개발 마무리→성장 전환·회귀 641→659)
   - 세션 #23 (2026-06-03 무인 스케줄러 A안(refresh-cycle) 구축+모니터링 대시보드+메인 체크아웃 정비+쿠팡 활성화 착수·회귀 659→678)
   - 세션 #24 (2026-06-03~06 Tier0 SEO 품질강화+쿠팡 승인용 /reviews/+멀티채널·무인마케팅 전략(DECISIONS S·T)+스케줄러 수동전환+subprocess UTF-8 근본수정·회귀 678→693)
+  - 세션 #25 (2026-06-14 ★운영 대시보드 전면 구축 PyQt5 GUI(키워드 큐·글생성·승인·발행·예약·쿠팡 수동·설정)+마이그레이션 007 keyword_queue·DB v7·회귀 693→773)
 - [EVENTS_202605.md](archive/EVENTS_202605.md):
   - 세션 #1 (2026-05-27 프로젝트 신규 셋업·정밀 조사·5파일 시스템·슬래시 명령 등록)
   - 세션 #2 (2026-05-27~28 Phase 0 설계 12/12 + Phase 1 외부 작업: GitHub·Cloudflare·도메인·R2·D1·Git push)
@@ -32,6 +33,28 @@
   - 세션 #18 (2026-05-31 운영자 1클릭 승인 게이트(O21·build-category draft 고정)·doctor §10 64진입점·★카테고리 페이지 디자인 디버깅(글씨 흐림 진짜원인=backdrop-filter 제거)·회귀 569→590)
 
 ## 최근 5세션
+
+### 세션 #30 — 2026-06-15 (Opus 4.8 1M, A 키워드 알리 영어검색 근본수정 + doctor 게이트 복구 + B 진행표시 + ★첫 라이브 글 발행 + 발행버그 적발 + 글 레이아웃 Tier1·Tier2 종합 재설계, 회귀 846→851, main 머지 3471248·7cb0168)
+
+**시작 상황**: #29 연속. 라이브 테스트가 적발한 2문제(A 키워드 알리검색 한글→쓰레기 / B 진행표시) 수정 착수.
+
+**핵심 [확정]** (A·B·doctor 전부 main 머지·라이브 검증):
+1. **★A 키워드 알리검색 근본수정**: `cli._gather_keyword_candidates`가 한글 키워드 직접검색(알리 영어인덱스 매칭실패→폰케이스·티셔츠) 대신 `keyword_relevance.resolve_category`→`category_collect.search_tiers`(카테고리 **영어 티어** "office chair"…)로 검색 + 키워드-적합성 필터. 미매핑=fail-closed 건너뜀. **라이브 검증: 게이밍의자→하이브리드 13개(쿠팡1+알리12 전부 의자)·thin 해소**. 커밋 3471248.
+2. **doctor 게이트 근본수정**: `_check_tests_loadable`가 `module_from_spec` 후 `sys.modules` 미등록 exec→모듈레벨 @dataclass 로드실패(false-FAIL·test_refresh_cycle). `_load_module_from_path`(exec 전 등록+원복)로 수정→**doctor exit 0 복구**. (pytest가 미리 올려 가렸던 버그·실증 재현).
+3. **B 대시보드 진행표시**: `run_task` 중앙에 진행바·상태라벨·버튼비활성·타이틀(`_set_busy`/`_set_done`, 14작업 label). '생성 1~2분 무표시' 해소. 라이브 검증됨.
+4. 회귀 **846→851**. black·ruff·mypy 클린.
+
+**★첫 라이브 글 발행 [확정]**: 옵션A(워크트리 검증→main 실발행). 게이밍의자 main 생성(B 진행표시 확인)→승인→발행→**honsallim.com/articles/kw-e3d08a2c/ 라이브(200·스타일·이미지·하이브리드 10상품)**. 새내기자취생 페르소나 페이지서 링크(글=카테고리 아님, 카테고리 페이지엔 안 나옴이 정상).
+
+**★발행 build/site 커밋 버그 적발 [확정]**: `cmd_publish_queue`/`cmd_deploy`가 build/site를 **커밋 안 함**→`git push`만→새 글이 CI에 안 감(404). 수동 build/site 커밋(7cb0168)으로 배포 완성. → **다음 근본수정 필요**(클릭만으론 발행 안 됨=무인 치명).
+
+**★file:// 미리보기 한계 [확정]**: 절대경로 CSS(`/static/`)·이미지가 file://에서 안 뜸→무스타일·이미지 안보임. **로컬 HTTP 서버**로 검증(라이브는 정상). 미리보기 버튼 HTTP 서빙 개선 필요(별도).
+
+**글 레이아웃**: Tier1(쿠팡 픽+알리 데이터 카드 본문삽입·renderer 데이터플러밍) 구현·미리보기 검증(워크트리·미배포). 단 주인 "여전히 텍스트벽=독서" 지적→**★Tier2 종합 재설계**: SEO·소비자행동·시각설계 **3관점 병렬 리서치**(NN/g·Baymard·Google) 수렴→**블루프린트 확정**(빠른결론박스·큐레이션 픽카드·비교표·체크박스·예산표·FAQ아코디언·판매량proof·★중복회피=의도분리). 전체 스펙=**docs/ARTICLE_LAYOUT_TIER2.md**.
+
+**잔존/다음(#31)**: ①**★글 레이아웃 Tier2 구현**(ARTICLE_LAYOUT_TIER2.md: LLM 구조화 출력 + 템플릿 시각 컴포넌트. 목업 먼저 확정) ②**★발행 build/site 자동커밋 근본수정**(cmd_publish_queue/cmd_deploy) ③file:// 미리보기→HTTP 서빙 개선 ④(이월) PartC 키워드 틈점수·mini-dehumidifier·성장 Tier0. ★워크트리=`PYTHONPATH=src python -m cli`·DB gitignore·발행=main 체크아웃·main직접머지=`git push origin HEAD:main`.
+
+---
 
 ### 세션 #29 — 2026-06-14~15 (Opus 4.8 1M, ★B-i 무인 자동발행 전체 + naver_blog 흐름 GUI 완성 + 미리보기 버그수정 + PR 자동머지·구글정책 정정, 회귀 806→846, 6커밋 전부 main 머지·CI green)
 
@@ -93,40 +116,16 @@
 
 ### 세션 #26 — 2026-06-14 (Opus 4.8 1M, ★추천 키워드 생성 기능 + 대시보드 메뉴 순서 재정렬 + 노트북거치대 off-target 근본수정, 회귀 773→782)
 
-**시작 상황**: origin/main #25(PR #10 머지). 떠 있는 운영 대시보드(메인 체크아웃)에서 "(A) 라이브 첫 글 생성"을 시작하려다, 주인이 **키워드를 수동 선정하지 말고 추천 키워드를 생성·목록으로 보여주고 선택(선택 없으면 자동 1순위)** + **탭 순서를 실행 우선순위대로** 요청. "키워드 선정 방식은 이미 정의돼 있음" 명시.
+**시작 상황**: origin/main #25. 주인이 키워드 수동선정 대신 **추천 키워드 생성·목록·선택(없으면 자동 1순위)** + 탭 순서 실행 우선순위 요청("선정 방식은 이미 정의됨").
 
-**핵심 진척 [확정]** (전부 로컬·미배포·비용 거의 0 — 추천은 네이버 읽기전용 무료, LLM 비용은 글 생성 때만):
-1. **"정의된 방식" 확정(조사)**: `collector.keyword_research`(네이버 연관검색어→핵심어/브랜드/거래성/검색량≥2000/대상부적합 필터→검색량순) + 씨앗=`seo_keywords.yml` 카테고리 대표키워드. 네이버 검색광고 키 3종 존재 확인.
-2. **추천 엔진** `writer/keyword_recommender.py`(PyQt 비의존·테스트 가능): 정의된 방식을 SEO 씨앗에 적용→검색량순 추천. 큐/시나리오에 이미 있는 주제 중복 제외. 네이버 실패 시 캐시 보조키워드로 자가복원(§0). custom_seed로 임의 주제 확장. 회귀 9건.
-3. **CLI `keyword-recommend`**(--seed·--limit·--no-live·--add-top) + doctor 진입점(64→65). 오프라인·**네이버 라이브 검증**(컴퓨터의자 32,000·게이밍의자 29,400 등 실검색량 정렬).
-4. **대시보드 GUI**: 🎯 추천 키워드 버튼 + `RecommendDialog`(검색량·경쟁도·씨앗·출처 표시, 행 선택 추가 / ⭐ 1순위 자동 추가) + custom seed 입력. 추천 조회 백그라운드(UI 비프리징). 오프스크린 구성 검증.
-5. **메뉴 순서 재정렬(요청)**: 키워드 → 발행 큐(글) → 카테고리·모니터링 → 설정 (작업 시작점이 맨 왼쪽).
-6. **off-target 근본수정**: 라이브 검증서 `노트북 거치대` 씨앗(핵심어 '거치대' 광범위)이 핸드폰·자전거·태블릿·갤럭시탭 거치대 혼입 적발 → `seo_keywords.yml` laptop-stand에 `exclude_terms`(폰·태블릿·테블릿(철자변형)·아이패드·갤럭시탭·자전거·오토바이·차량) 추가→재검증서 제거 확인(노트북받침대 등 온타겟 유지). ★남은 `책·모니터 거치대`는 편집 판단 사안이라 미적용(주인 결정용·#27).
-7. 회귀 **773→782**(+9). ruff·black·mypy 클린. CLI 28→**29**.
+**핵심 [확정]** (로컬·미배포·비용≈0):
+1. **추천 엔진** `writer/keyword_recommender.py`: "정의된 방식"(`keyword_research` 네이버 연관검색어→핵심어/거래성/검색량≥2000 필터→검색량순)을 SEO 씨앗에 적용. 큐/시나리오 중복 제외·네이버 실패→캐시 자가복원. CLI `keyword-recommend`(doctor 64→65) + 대시보드 🎯 버튼·`RecommendDialog`. 네이버 라이브 검증(컴퓨터의자 32,000 등).
+2. **메뉴 순서 재정렬**: 키워드→발행큐→카테고리·모니터링→설정.
+3. **off-target 근본수정**: 라이브서 `노트북 거치대`에 폰·태블릿·자전거 거치대 혼입→`seo_keywords.yml` laptop-stand `exclude_terms` 추가·재검증. (책·모니터 거치대는 편집 판단·미적용)
+4. 회귀 **773→782**. 린트 클린. CLI 28→**29**.
 
-**무인·안전(§0)**: 추천=네이버 읽기전용(무료·게시 아님). 자가복원(네이버 실패→캐시). 중복 제외. 기존 add_keyword 재사용(articles 스키마 무손상). off-target 근본수정+재발방지 가드(exclude_terms).
-
-**잔존/다음(#27)**: ①**머지+대시보드 재시작 필요**(현재 워크트리 → 라이브 대시보드 미반영). ②재시작 후 **추천→첫 글 생성**(원래 (A) 목표·DeepSeek 비용·품질 1회 확인). ③off-target 씨앗 추가 curation(책·모니터 거치대 등 판단 사안·받침대 발받침 모호). ④#25 잔존: 아이콘 main 재지정·mini-dehumidifier 점검·★★쿠팡 본격·★성장 Tier0+측정.
+**잔존/다음(#27)**: 머지+대시보드 재시작→추천→첫 글 생성. off-target 씨앗 추가 curation. 쿠팡 본격·성장 Tier0.
 
 ---
 
-### 세션 #25 — 2026-06-14 (Opus 4.8 1M, ★운영 대시보드 전면 구축 — PyQt5 GUI(키워드 큐·글 생성·승인·발행·예약·쿠팡 수동·설정창) + 마이그레이션 007, 회귀 693→773)
-
-**시작 상황**: origin/main #24. 주인이 AutoBlog 데스크톱 대시보드(PyQt5)를 보여주며 "혼살림에도 (알리+쿠팡이라 업그레이드된) 운영 대시보드 — 실제 발행·모니터링·대기키워드·키워드별 제품 미리입력·스케줄러 발행"을 요청. 선승인 3건(①글 발행 스트림+모니터링 ②1클릭 승인 게이트 유지 ③쿠팡 공식위젯·텍스트) 받고 6단계(A~F)로 진행.
-
-**핵심 진척 [확정]** (전부 로컬·미배포·비용 $0 — 인프라/GUI):
-1. **(A) 설정 외부화 + 키워드 DB**: `common/settings.py`(config.json·견고성=깨지면 기본값) + 마이그레이션 **007** `keyword_queue`(채널 ali/coupang/both·상태·target_products JSON·persona/budget) + `drafts.keyword_id`. DB v6→**v7**.
-2. **(B) PyQt5 대시보드**: `dashboard/app.py`(GUI 셸) + `dashboard/queries.py`(읽기 로직·테스트 가능). 통계카드·4탭(발행큐/키워드/모니터링/설정)·실시간 로그(AutoBlog QThread+stdout 가로채기 패턴). 로직/GUI 분리 → CI(PyQt 미설치) 안전. 오프스크린 스모크 테스트.
-3. **(C) 키워드→시나리오 자동 브리지**: `writer/keyword_queue.py` — 키워드에서 시나리오 자동 파생해 기존 drafts→articles 발행 기계 재사용(★articles 스키마 무손상=라이브 무위험). CLI `keyword-add/generate/list`·`reject`. enrich은 DeepSeek/OpenRouter 라우팅 코드 검증(라이브 첫 생성은 미실행).
-4. **(D) 예약 발행**: `publish-queue`(승인된 큐 N편 promote→build→deploy·**E7 준수=승인된 것만**) + `deployer/scheduler.py`(schtasks query/create/delete) + `schedule` 명령 + `run_publish_queue.ps1`. **기본 OFF**(C13 수동전환 취지·주인이 켤 때만).
-5. **(E) 쿠팡 수동 등록**: `collector/coupang_manual.py` + `coupang-add` — 공식 파트너스 딥링크/위젯·텍스트(★함정#3 CDN 이미지 다운로드 금지). target_products에 적재→글 생성 후보. 15만원 후 API 모드.
-6. **(F) 설정창 + 런처**: `SettingsDialog`(발행편수·예약시각·추천수·쿠팡모드/임계/태그·검증URL 등 편집) + `featured_per_tier`·`satisfaction_floor` 카테고리 빌더 연결(미지정 시 설정→기존 기본, 동작 불변) + 바탕화면 런처(`launch_dashboard.vbs`·`run_dashboard.ps1`) + **바탕화면 아이콘**(OneDrive 리디렉션 대응 양쪽 생성).
-7. 회귀 **693→773**(+80). black·ruff·mypy 클린. CLI 22→**28** 명령.
-
-**무인·안전(§0)**: E7 인간 승인 게이트 유지(자동 발행=승인된 큐만, 자동 '승인' 없음)·함정#3 준수·C13 수동전환 취지(예약 기본 OFF)·키워드→시나리오 브리지로 라이브 articles 무손상·발행/배포는 메인 체크아웃 한정(워크트리는 안전 정지)·설정 견고성·schtasks는 대시보드(주인 권한)에서 실행.
-
-**잔존/다음(#26)**: ①**대시보드 라이브 첫 글 생성**(DeepSeek 비용·품질 1회 확인 — 구조/라우팅만 검증됨) ②**바탕화면 아이콘 main 재지정**(현재 워크트리 가리킴 → 머지 후 `D:\affiliate_hub`) ③설정 일부(쿠팡 모드/임계·llm_model·seo_max_attempts·jitter) 코드 연결 ④★**원래 #25 미완**: mini-dehumidifier 점검·쿠팡 본격(API 15만원 후)·★성장 Tier0+측정. 대시보드가 이 작업들(키워드 발행·쿠팡 수동)의 실행 도구가 됨.
-
----
-
-> (세션 #19~#24는 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
+> (세션 #19~#25는 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)

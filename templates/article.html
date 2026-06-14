@@ -3,6 +3,24 @@
 
 {% block title %}{{ article.title }} | 혼살림{% endblock %}
 
+{% block head_extra %}
+<style>
+  .art-zone{margin:34px 0 6px}
+  .art-zone h2{margin:0 0 3px}
+  .art-zone-sub{font-size:13px;color:#999;margin:0 0 14px}
+  .p-src{font-size:11px;font-weight:600;border-radius:4px;padding:2px 7px;margin-right:4px}
+  .src-cp{background:#fdeee0;color:#9a5b13}
+  .src-ali{background:#e7f3ec;color:#177a52}
+  .p-priceline{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;margin-top:4px}
+  .p-sig{font-size:12px;color:#8a8a8a}
+  .p-sig .off{color:#c0392b;font-weight:600}
+  .p-vol{font-size:12px;color:#7a7a7a;margin-top:4px}
+  .p-card .p-foot{margin-top:10px}
+  .p-card .p-buy{width:100%;justify-content:center}
+  .art-data-note{font-size:13px;color:#8a8a8a;line-height:1.65;margin:12px 0 0;padding:10px 12px;background:#f7f9f7;border-radius:8px}
+</style>
+{% endblock %}
+
 {% block main %}
 <div class="article">
   <div class="wrap art-wrap">
@@ -25,23 +43,39 @@
       {% if article.budget %}<span class="chip ghost">{{ icon('won', 13) }} {{ article.budget }}</span>{% endif %}
     </div>
 
-    {# 본문 — 검증된 body_md → HTML. 첫머리 대가성 고지·제목(H1)·섹션·푸터 고지를
-       모두 포함한 완결 산문 (content_hash 무결: validated 본문 = published 본문). #}
-    <article class="art-body">{{ article.body_html | safe }}</article>
+    {# 본문 도입 (H1 + 첫머리 대가성 고지 + 리드). 세션 #30: 본문을 3분할해 상품을 흐름에 삽입한다.
+       콘텐츠 자체는 무손상(content_hash 무결·SEO 보존) — 위치만 분할. #}
+    <article class="art-body">{{ article.intro_html | safe }}</article>
 
-    {# 추천 상품 — 본문은 상품을 '설명', 이 카드가 클릭 가능한 /go/ 제휴 링크를 제공.
-       (POLICY §6 rel="sponsored nofollow" — product_card 매크로에 내장) #}
-    {% if products %}
-    <div class="art-sec">
-      <div class="art-sec-head">
-        <h2>추천 상품 <span class="sub" style="font-weight:600;font-size:16px">{{ products | length }}개</span></h2>
-        <p class="sub">아래 “추천 보기”는 제휴(어필리에이트) 링크로 연결됩니다. 가격·재고는 변동될 수 있습니다.</p>
-      </div>
+    {# 쿠팡 추천 픽 — 도입 다음·상단(구글: 상품을 상단에)·이미지 중심·개수 가변(네이버식).
+       운영자 큐레이션(수익·이미지). 데이터 순위가 아니라 '추천 픽'으로 정직 표기(§0). #}
+    {% if coupang_products %}
+    <div class="art-zone">
+      <h2>추천 픽 · 바로 구매</h2>
+      <div class="art-zone-sub">운영자가 고른 제품 · “구매하기”는 제휴(어필리에이트) 링크입니다.</div>
       <div class="grid-3 art-products">
-        {% for p in products %}{{ product_card(p) }}{% endfor %}
+        {% for p in coupang_products %}{{ product_card(p) }}{% endfor %}
       </div>
     </div>
     {% endif %}
+
+    {# 본문 (추천 섹션 前: 체크포인트 등 — 가치 콘텐츠로 체류·SEO) #}
+    {% if article.pre_html %}<article class="art-body">{{ article.pre_html | safe }}</article>{% endif %}
+
+    {# 알리 데이터 비교 — 가격·할인·판매량 = Information Gain(구글 SEO 핵심). 단순 사진 나열 아님. #}
+    {% if ali_products %}
+    <div class="art-zone">
+      <h2>데이터로 고른 추천</h2>
+      <div class="art-zone-sub">판매처의 실제 가격·할인·판매량 기준 · 가짜 평점 없음</div>
+      <div class="grid-3 art-products">
+        {% for p in ali_products %}{{ product_card(p) }}{% endfor %}
+      </div>
+      <p class="art-data-note">위 “최저가/구매”는 제휴(어필리에이트) 링크로 연결됩니다. 판매량·가격·할인은 판매처가 표기한 수집 시점 기준이며, 가짜 평점은 만들지 않습니다. 가격·재고는 변동될 수 있습니다.</p>
+    </div>
+    {% endif %}
+
+    {# 본문 (추천 섹션~: 예산대별 고르는 법·예산 분배·FAQ) #}
+    {% if article.rec_html %}<article class="art-body">{{ article.rec_html | safe }}</article>{% endif %}
 
     {# 풀 고지 + 사업자 정보 #}
     <div class="art-legal">

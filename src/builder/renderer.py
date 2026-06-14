@@ -235,7 +235,8 @@ ARTICLE_DETAIL_SQL = """
 """
 
 ARTICLE_PRODUCTS_SQL = """
-    SELECT pr.name, pr.price_krw, pr.deeplink_slug, pr.category_path, pr.image_url_external
+    SELECT pr.name, pr.price_krw, pr.deeplink_slug, pr.category_path, pr.image_url_external,
+           pr.source, pr.original_price_krw, pr.discount_pct, pr.sales_volume
     FROM article_products ap
     JOIN products pr ON pr.id = ap.product_id
     WHERE ap.article_id = ?
@@ -264,21 +265,51 @@ def _article_product_cards(prods: list) -> list[dict]:
     """products 행 목록 → article.html 상품카드 컨텍스트 (published·draft 공용).
 
     img_url=image_url_external(알리/쿠팡 공식배너 hotlink — 카테고리와 동일), 없으면 우드톤 fallback.
+    source(쿠팡/알리)·할인(부풀린 할인은 trusted_discount가 차단)·판매량을 함께 담아 글 카드가
+    쿠팡(이미지·구매)/알리(데이터=Information Gain)로 차등 렌더되게 한다 (세션 #30 글 레이아웃).
     """
-    return [
-        {
-            "name": pr["name"],
-            "price": _price_krw(pr["price_krw"]),
-            "url": f"/go/{pr['deeplink_slug']}",
-            "img": WOOD[i % len(WOOD)],  # img_url 없을 때 우드톤 fallback 색
-            "img_url": pr["image_url_external"]
-            or "",  # 실제 상품 이미지(알리/쿠팡 공식배너 hotlink)
-            "cat": pr["category_path"] or "",
-            "tag": "",  # 필수/추천/선택 등급 데이터 없음(v1) — 본문이 설명 담당
-            "why": "",  # recommendation_note 미사용(v1)
-        }
-        for i, pr in enumerate(prods)
-    ]
+    from collector import product_filter
+
+    cards: list[dict] = []
+    for i, pr in enumerate(prods):
+        disc = product_filter.trusted_discount(pr["discount_pct"])
+        orig = pr["original_price_krw"]
+        show_disc = disc is not None and bool(orig)
+        cards.append(
+            {
+                "source": pr["source"] or "",
+                "name": pr["name"],
+                "price": _price_krw(pr["price_krw"]),
+                "url": f"/go/{pr['deeplink_slug']}",
+                "img": WOOD[i % len(WOOD)],  # img_url 없을 때 우드톤 fallback 색
+                "img_url": pr["image_url_external"] or "",  # 실제 상품 이미지(hotlink)
+                "cat": pr["category_path"] or "",
+                "tag": "",
+                "why": "",  # 구조화 장단점은 Tier 2(LLM)에서 — v1은 데이터(가격·할인·판매량)로
+                "orig": _price_krw(orig) if show_disc else "",  # 정가(할인 신뢰 시만)
+                "disc": f"{disc}%" if show_disc else "",  # 할인율(부풀림 차단 후)
+                "volume": pr["sales_volume"] or 0,  # 알리 판매량(Information Gain)
+            }
+        )
+    return cards
+
+
+def _split_article_body(body_html: str) -> tuple[str, str, str]:
+    """본문 HTML → (도입, 추천섹션 前 본문, 추천섹션~) 3분할 (세션 #30 글 레이아웃).
+
+    도입 = 첫 ``<h2>`` 전(H1 + 첫머리 대가성 고지 + 리드). 그 다음에 쿠팡 추천 픽을 끼운다.
+    추천섹션 = ``<h2>`` 텍스트에 '추천'이 든 첫 섹션 → 그 직전에 알리 데이터 비교를 끼운다.
+    구조가 다른 글(추천 헤딩 없음·h2 없음)은 fallback: 데이터 블록을 본문 뒤에 둔다.
+    본문 내용 자체는 무손상(SEO 콘텐츠 보존) — 위치만 분할한다.
+    """
+    m = re.search(r"<h2", body_html)
+    if not m:
+        return body_html, "", ""
+    intro, rest = body_html[: m.start()], body_html[m.start() :]
+    for mm in re.finditer(r"<h2[^>]*>(.*?)</h2>", rest, re.S):
+        if "추천" in mm.group(1):
+            return intro, rest[: mm.start()], rest[mm.start() :]
+    return intro, rest, ""
 
 
 def _article_page_ctx(
@@ -297,7 +328,14 @@ def _article_page_ctx(
     products: list[dict],
     is_draft: bool = False,
 ) -> dict:
-    """article.html 렌더 컨텍스트 (published·draft 공용). is_draft=True면 검토용 배너 표시."""
+    """article.html 렌더 컨텍스트 (published·draft 공용). is_draft=True면 검토용 배너 표시.
+
+    세션 #30: 본문을 도입/前/추천~로 3분할하고 상품을 쿠팡·알리로 분리해 — 쿠팡 추천 픽은
+    도입 다음(상단·이미지), 알리 데이터 비교는 추천 섹션 직전(Information Gain)에 배치한다.
+    """
+    intro_html, pre_html, rec_html = _split_article_body(body_html)
+    coupang_products = [p for p in products if p["source"] == "coupang"]
+    ali_products = [p for p in products if p["source"] != "coupang"]
     return {
         "slug": slug,
         "title": title,
@@ -309,7 +347,10 @@ def _article_page_ctx(
             "title": title,
             "summary": summary,
             "desc": meta_description,
-            "body_html": body_html,
+            "body_html": body_html,  # 전체(스키마·호환용) — 렌더는 분할본 사용
+            "intro_html": intro_html,
+            "pre_html": pre_html,
+            "rec_html": rec_html,
             "persona": persona_slug,
             "persona_name": persona_title,
             "persona_icon": PERSONA_ICON.get(persona_slug, ""),
@@ -318,6 +359,8 @@ def _article_page_ctx(
             "is_draft": is_draft,
         },
         "products": products,
+        "coupang_products": coupang_products,
+        "ali_products": ali_products,
     }
 
 
@@ -413,13 +456,15 @@ def _draft_product_rows(conn: sqlite3.Connection, featured: list[dict]) -> list:
         src = f.get("source")
         if src:
             pr = conn.execute(
-                "SELECT name, price_krw, deeplink_slug, category_path, image_url_external "
+                "SELECT name, price_krw, deeplink_slug, category_path, image_url_external, "
+                "source, original_price_krw, discount_pct, sales_volume "
                 "FROM products WHERE source_product_id = ? AND source = ? LIMIT 1",
                 (str(spid), str(src)),
             ).fetchone()
         else:
             pr = conn.execute(
-                "SELECT name, price_krw, deeplink_slug, category_path, image_url_external "
+                "SELECT name, price_krw, deeplink_slug, category_path, image_url_external, "
+                "source, original_price_krw, discount_pct, sales_volume "
                 "FROM products WHERE source_product_id = ? LIMIT 1",
                 (str(spid),),
             ).fetchone()
@@ -1284,6 +1329,8 @@ def render_site(
                 schema_jsonld=schema,
                 article=pg["article"],
                 products=pg["products"],
+                coupang_products=pg["coupang_products"],
+                ali_products=pg["ali_products"],
                 **common,
             ),
         )
