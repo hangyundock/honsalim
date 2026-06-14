@@ -125,6 +125,31 @@ class TestPhase2HealthChecks:
         """tests/ 모듈 모두 import 가능."""
         assert cli._check_tests_loadable() is True
 
+    def test_load_module_with_module_level_dataclass(self, tmp_path: Any) -> None:
+        """★세션 #30 근본수정 회귀: 모듈 레벨 @dataclass가 단독 로드(sys.modules 미등록) 시
+
+        'NoneType' object has no attribute '__dict__'로 실패하던 doctor 버그. test_refresh_cycle.py가
+        실제 케이스였으나 pytest가 미리 sys.modules에 올려 가려졌다 → pytest가 안 올린 **새 이름**으로
+        재현. _load_module_from_path가 exec 전 sys.modules 등록 → 성공, 실행 후 원복(오염 없음).
+        """
+        if pytest is None:  # pragma: no cover
+            return
+        probe = tmp_path / "probe_mod.py"
+        probe.write_text(
+            "from __future__ import annotations\n"
+            "from dataclasses import dataclass\n\n\n"
+            "@dataclass\n"
+            "class Probe:\n"
+            "    x: int = 0\n",
+            encoding="utf-8",
+        )
+        name = "honsalim_doctor_probe_dataclass"  # pytest가 미리 안 올린 이름
+        import sys
+
+        assert name not in sys.modules
+        cli._load_module_from_path(name, probe)  # 예외 없이 로드되어야(근본수정 전엔 실패)
+        assert name not in sys.modules  # 실행 후 원복 — 외부 sys.modules 오염 없음
+
 
 class TestPhase2Commands:
     """세션 #4 추가 — BACKEND §9 명시 enrich·validate·approve 명령 (3개)."""

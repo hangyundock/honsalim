@@ -69,6 +69,61 @@ def test_window_builds_and_populates(tmp_path: Path, monkeypatch: pytest.MonkeyP
     win.close()
 
 
+def test_progress_busy_done_toggles(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """세션 #30 B: 진행 표시 — 작업 시작/완료 시 진행바·버튼·상태 라벨·타이틀이 토글되는지.
+
+    이벤트 루프·워커 스레드 없이 상태 메서드(_set_busy/_set_done)를 직접 검증. 표시 여부는
+    부모 윈도우 미표시와 무관한 isHidden()(명시적 setVisible 상태)으로 확인.
+    """
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    dbpath = tmp_path / "honsalim.db"
+    _make_db(dbpath)
+
+    from common import db
+
+    monkeypatch.setattr(db, "DB_PATH", dbpath)
+
+    from PyQt5.QtWidgets import QApplication
+
+    from dashboard import app as gui
+
+    qapp = QApplication.instance() or QApplication([])
+    assert qapp is not None
+
+    win = gui.DashboardWindow()
+
+    # 초기: 진행바 숨김 · 액션 버튼 활성 · 타이틀 기본
+    assert win.progress.isHidden() is True
+    assert win._action_buttons and all(b.isEnabled() for b in win._action_buttons)
+    assert win.windowTitle() == gui._TITLE_IDLE
+
+    # 시작: 진행바 표시 · 버튼 일괄 비활성 · 상태 라벨에 작업명 · 타이틀에 진행 표시
+    win._set_busy("글 생성")
+    assert win.progress.isHidden() is False
+    assert all(not b.isEnabled() for b in win._action_buttons)
+    assert "글 생성" in win.status_label.text()
+    assert "⏳" in win.windowTitle()
+
+    # 완료(성공): 진행바 숨김 · 버튼 재활성 · 상태에 완료 · 타이틀 원복
+    win._set_done("ok", "글 생성")
+    assert win.progress.isHidden() is True
+    assert all(b.isEnabled() for b in win._action_buttons)
+    assert "완료" in win.status_label.text()
+    assert win.windowTitle() == gui._TITLE_IDLE
+
+    # 실패 경로: 상태에 실패 표시 + 버튼 복구(작업 실패해도 UI 잠기지 않음)
+    win._set_busy("발행")
+    win._set_done("fail", "발행")
+    assert "실패" in win.status_label.text()
+    assert all(b.isEnabled() for b in win._action_buttons)
+
+    # 이중 _set_done 방어: busy 아닐 때 호출해도 무해(커서 스택 균형)
+    win._set_done("ok", "노옵")  # _busy=False라 무시되어야
+    assert "실패" in win.status_label.text()  # 상태 안 바뀜
+
+    win.close()
+
+
 def test_dialogs_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """쿠팡/설정 다이얼로그가 빌드되고 값 수집이 동작하는지 (Phase E·F)."""
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")

@@ -171,6 +171,7 @@ class TestGatherCandidatesHybrid:
         from types import SimpleNamespace
 
         import collector.aliexpress as ali
+        from collector import category_collect as cc
         from collector import coupang_manual as cm
         from common import config as cfg
         from writer import keyword_queue as kq
@@ -178,21 +179,24 @@ class TestGatherCandidatesHybrid:
         ali_prod = {
             "source": "aliexpress",
             "source_product_id": "A1",
-            "name": "알리 청소기",
+            "name": "알리 메쉬 사무용 의자",  # office-chair 적합성 통과(의자 포함·제외어 없음)
             "deeplink_url": "https://s.click.ali/A1",
             "deeplink_slug": "ali-A1",
             "affiliate_tag": "honsallim",
-            "price_krw": 19900,
+            "price_krw": 89000,
         }
         monkeypatch.setattr(
             ali, "query_products", lambda *a, **k: SimpleNamespace(products=[ali_prod])
         )
         monkeypatch.setattr(cfg, "load_secrets", lambda: None)
+        monkeypatch.setattr(
+            cc.time, "sleep", lambda *a, **k: None
+        )  # 티어 간 sleep 제거(빠른 테스트)
 
         conn = db.connect(migrated_db)
-        kid = kq.add_keyword(conn, "무선청소기", channel="both")
+        kid = kq.add_keyword(conn, "컴퓨터의자", channel="both")  # office-chair 매핑 → 영어검색
         cm.add_to_keyword(
-            conn, kid, cm.build_manual_product("쿠팡청소기", "https://link.coupang.com/a/X")
+            conn, kid, cm.build_manual_product("쿠팡의자", "https://link.coupang.com/a/X")
         )
         kw = kq.get_keyword(conn, kid)
         conn.close()
@@ -200,3 +204,77 @@ class TestGatherCandidatesHybrid:
         cands, _ = cli._gather_keyword_candidates(db.connect(migrated_db), kw, 20)
         sources = {c["source"] for c in cands}
         assert sources == {"coupang", "aliexpress"}  # 결합(하이브리드)
+
+    def test_mapped_keyword_searches_via_category_english(
+        self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """★세션 #30 근본수정 회귀: 알리 검색어 = 카테고리 영어 티어(한글 키워드 직접검색 금지).
+
+        세션 #29 라이브가 적발한 결함(한글 '컴퓨터의자'로 알리 검색 → 폰케이스·티셔츠 잡동사니)
+        의 재발 방지. office-chair로 매핑돼 영어 'office chair'/'ergonomic office chair'로 검색돼야.
+        """
+        import collector.aliexpress as ali
+        from collector import category_collect as cc
+        from common import config as cfg
+        from writer import keyword_queue as kq
+
+        queries: list[str] = []
+
+        def fake_query(q: str, **kw: object) -> ali.QueryResult:
+            queries.append(q)
+            return ali.QueryResult(
+                dry_run=False,
+                request={},
+                products=[
+                    {
+                        "source": "aliexpress",
+                        "source_product_id": "A1",
+                        "name": "메쉬 사무용 의자",
+                        "deeplink_url": "https://s.click.ali/A1",
+                        "deeplink_slug": "ali-A1",
+                        "affiliate_tag": "honsallim",
+                        "price_krw": 89000,
+                    }
+                ],
+                resp_code="200",
+            )
+
+        monkeypatch.setattr(ali, "query_products", fake_query)
+        monkeypatch.setattr(cfg, "load_secrets", lambda: None)
+        monkeypatch.setattr(cc.time, "sleep", lambda *a, **k: None)
+
+        conn = db.connect(migrated_db)
+        kid = kq.add_keyword(conn, "컴퓨터의자", channel="ali")
+        kw = kq.get_keyword(conn, kid)
+        conn.close()
+        assert kw is not None
+        cands, _ = cli._gather_keyword_candidates(db.connect(migrated_db), kw, 20)
+        # ★핵심: 한글 '컴퓨터의자'가 아니라 office-chair 영어 티어 검색어로 검색
+        assert "컴퓨터의자" not in queries
+        assert set(queries) == {"office chair", "ergonomic office chair"}
+        assert [c["source"] for c in cands] == ["aliexpress"]
+
+    def test_unmapped_keyword_skips_ali(
+        self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """미매핑 키워드는 알리 영어 검색어가 없으므로 알리를 호출하지 않고 건너뛴다(쿠팡 단독)."""
+        import collector.aliexpress as ali
+        from collector import coupang_manual as cm
+        from writer import keyword_queue as kq
+
+        def boom(*a: object, **k: object) -> object:
+            raise AssertionError("미매핑 키워드는 알리를 호출하면 안 됨(한글 직접검색 금지)")
+
+        monkeypatch.setattr(ali, "query_products", boom)
+
+        conn = db.connect(migrated_db)
+        kid = kq.add_keyword(conn, "강아지 사료", channel="both")  # 어느 카테고리에도 미매핑
+        cm.add_to_keyword(
+            conn, kid, cm.build_manual_product("쿠팡사료", "https://link.coupang.com/a/Y")
+        )
+        kw = kq.get_keyword(conn, kid)
+        conn.close()
+        assert kw is not None
+        cands, note = cli._gather_keyword_candidates(db.connect(migrated_db), kw, 20)
+        assert [c["source"] for c in cands] == ["coupang"]  # 알리 건너뜀 — 쿠팡 단독
+        assert "건너뜀" in note

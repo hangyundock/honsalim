@@ -248,3 +248,43 @@ def collect_category(
     result.linked = len(seen)
     result.removed_stale = max(0, int(prev_catalog) - int(new_catalog))
     return result
+
+
+def search_tiers(
+    spec: CategorySpec,
+    *,
+    page_size: int = 30,
+    sleep: float = 0.2,
+) -> tuple[list[dict[str, Any]], int]:
+    """카테고리 spec의 영어 티어 검색어로 알리 검색 → 원시 상품(정제·DB 무관·순수).
+
+    ``collect_category``와 같은 ali 호출 규약(티어별 영어 q + 가격밴드 + 호출 간 sleep)을 쓰되
+    관련성 필터·DB 쓰기는 호출자에 맡긴다(키워드 경로는 키워드-인지 '유효 제외어'를 써야 해서
+    필터를 분리한다 — keyword_relevance.filter_products). 키워드→글 경로가 **한글 키워드 직접검색**
+    (알리 영어 인덱스에 매칭 실패 → 폰케이스·티셔츠 등 잡동사니, 세션 #29 라이브 적발) 대신 이
+    영어 검색을 재사용한다. 호출 전 ``config.load_secrets()`` 필요(자격증명).
+
+    티어 간 중복 제품(source+source_product_id)은 한 번만 담는다. 반환 (raw_rows, received_total).
+    """
+    rows: list[dict[str, Any]] = []
+    seen: set[tuple[Any, Any]] = set()
+    received = 0
+    for i, (_tname, term) in enumerate(spec.tiers.items()):
+        if i:
+            time.sleep(sleep)  # 호출 간 간격 (rate limit 보호) — collect_category와 동일
+        res = ali.query_products(
+            term.q,
+            timestamp=int(time.time() * 1000),
+            dry_run=False,
+            page_size=page_size,
+            min_sale_price=term.min_price,
+            max_sale_price=term.max_price,
+        )
+        received += len(res.products)
+        for r in res.products:
+            key = (r.get("source"), r.get("source_product_id"))
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(r)
+    return rows, received

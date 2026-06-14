@@ -363,6 +363,31 @@ def _check_workers_files() -> bool:
     return all_ok
 
 
+def _load_module_from_path(name: str, path: Path) -> None:
+    """경로의 .py를 단독 실행해 로드(회귀 인프라 헬스 점검용).
+
+    ★세션 #30 근본수정: ``module_from_spec`` 후 ``exec_module`` **전에** 반드시 ``sys.modules``에
+    등록한다(importlib 표준 패턴). 안 그러면 **모듈 레벨 @dataclass**가 생성하는 ``__init__``의
+    globals를 ``sys.modules[__name__].__dict__``에서 못 찾아 ``'NoneType' object has no attribute
+    '__dict__'``로 로드 실패한다. (실제 적발: ``test_refresh_cycle.py`` — pytest는 모든 test 모듈을
+    미리 sys.modules에 올려둬 가려졌고, doctor 단독 실행에서만 드러났다.) 실행 후 원복해 pytest 등
+    외부의 sys.modules를 오염시키지 않는다(@dataclass는 클래스 생성 시점=exec 중에만 참조하므로 안전).
+    """
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"spec 생성 실패: {path}")
+    mod = importlib.util.module_from_spec(spec)
+    prev = sys.modules.get(name)
+    sys.modules[name] = mod
+    try:
+        spec.loader.exec_module(mod)
+    finally:
+        if prev is not None:
+            sys.modules[name] = prev
+        else:
+            sys.modules.pop(name, None)
+
+
 def _check_tests_loadable() -> bool:
     """tests/ 모듈 로드 가능 확인 (회귀 인프라 헬스)."""
     tests_dir = PROJECT_ROOT / "tests"
@@ -373,23 +398,17 @@ def _check_tests_loadable() -> bool:
     if not test_files:
         print(f"{WARN} test_*.py 파일 없음")
         return False
-    # tests/conftest.py가 src/를 sys.path에 추가하므로 사전 로드
+    # tests/conftest.py가 src/를 sys.path에 추가하므로 사전 로드(sys.path side effect는 원복돼도 유지)
     conftest = tests_dir / "conftest.py"
     if conftest.exists():
-        spec = importlib.util.spec_from_file_location("conftest", conftest)
-        if spec and spec.loader:
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)
+        try:
+            _load_module_from_path("conftest", conftest)
+        except Exception as e:
+            print(f"{WARN} conftest.py 로드 실패: {e}")
     all_ok = True
     for tf in test_files:
-        spec = importlib.util.spec_from_file_location(tf.stem, tf)
-        if spec is None or spec.loader is None:
-            print(f"{FAIL} {tf.name} spec 생성 실패")
-            all_ok = False
-            continue
-        mod = importlib.util.module_from_spec(spec)
         try:
-            spec.loader.exec_module(mod)
+            _load_module_from_path(tf.stem, tf)
             print(f"{OK} {tf.name}")
         except Exception as e:
             print(f"{FAIL} {tf.name} 로드 실패: {e}")
@@ -1741,6 +1760,12 @@ def _gather_keyword_candidates(
 
     쿠팡(수동·이미지·수익) + 알리(판매량·가격 데이터=구글 Information Gain)를 한 글에 함께 담아
     구글 어필리에이트 페널티를 피하면서 쿠팡 수익도 확보(DECISIONS S1 멀티채널·세션 #28 PartA).
+
+    ★세션 #30 근본수정: 알리 검색은 **카테고리 영어 티어 검색어**로 한다. 한글 키워드를 알리에
+    직접 넣으면 영어 인덱스에 매칭 실패해 폰케이스·티셔츠 등 무관 상품만 와서(세션 #29 라이브
+    적발) 적합성 가드가 전량 제외 → 글이 thin(쿠팡만)이 됐다. 키워드를 카테고리에 매핑하고
+    그 카테고리의 검증된 영어 검색어(라이브 5카테고리 정상)로 검색한다. 미매핑 키워드는 영어
+    검색어가 없어 알리를 건너뛴다(쿠팡 단독 또는 보류 — fail-closed 자동승인이 별도 처리).
     반환: (candidates, note). 후보는 enrich 프롬프트의 {{products}} + promote 연결 소스.
     """
     from collector import products_store
@@ -1774,33 +1799,35 @@ def _gather_keyword_candidates(
                 f"수동 미리선택 {len(items)}개(신규 {up.inserted}·갱신 {up.updated}·스킵 {up.skipped})"
             )
 
-    # (2) 알리 자동수집(판매량·가격 데이터=Information Gain) — 채널 ali/both
+    # (2) 알리 자동수집(판매량·가격 데이터=Information Gain) — 채널 ali/both.
+    #     ★세션 #30: 키워드→카테고리 매핑 → 카테고리 영어 티어 검색어로 검색(한글 직접검색 금지).
     if kw["channel"] in ("ali", "both"):
-        import time as _time
+        from collector import category_collect, keyword_relevance
 
-        from collector import aliexpress as ali
-        from collector import keyword_relevance
-
-        config.load_secrets()
-        res = ali.query_products(
-            kw["keyword"],
-            timestamp=int(_time.time() * 1000),
-            dry_run=False,
-            page_size=page_size,
-        )
-        # 적합성 가드(세션 #29 B-2): 키워드-카테고리 부적합 알리 상품 자동 제외
-        # (예: '컴퓨터의자' 글에 섞인 '화장/드레싱 의자'). 쿠팡 수동 배너는 사람이 골라 제외 안 함.
-        kept, dropped = keyword_relevance.filter_products(kw["keyword"], res.products)
-        if kept:
-            products_store.upsert_products(conn, kept)
-        candidates.extend(_cands(kept))
-        if dropped:
-            notes.append(
-                f"ali 수집 {len(res.products)}개 → 적합 {len(kept)}개"
-                f"(적합성 가드 off-target {len(dropped)}개 제외)"
-            )
+        slug = keyword_relevance.resolve_category(kw["keyword"])
+        spec = category_collect.load_sources().get(slug) if slug else None
+        if spec is None or not spec.tiers:
+            # 미매핑/티어 없음 — 알리 영어 검색어가 없다. 한글 직접검색은 off-target만 와서 건너뛴다
+            # (쿠팡 수동분만 또는 보류 — fail-closed 자동승인이 미매핑을 별도 처리).
+            if slug is None:
+                notes.append(
+                    "ali 건너뜀(카테고리 미매핑 — 영어 검색어 없음·한글 직접검색은 off-target)"
+                )
+            else:
+                notes.append(f"ali 건너뜀(카테고리 {slug} 티어 미정의)")
         else:
-            notes.append(f"ali 수집 {len(res.products)}개")
+            config.load_secrets()
+            # 카테고리 영어 티어 검색(검증된 라이브 경로) → 키워드-적합성 필터(키워드-인지 유효 제외어).
+            # 쿠팡 수동 배너는 사람이 골라 필터하지 않는다.
+            raw, received = category_collect.search_tiers(spec, page_size=page_size)
+            kept, dropped = keyword_relevance.filter_products(kw["keyword"], raw)
+            if kept:
+                products_store.upsert_products(conn, kept)
+            candidates.extend(_cands(kept))
+            note = f"ali 카테고리({slug}) 영어검색 {received}개 → 적합 {len(kept)}개"
+            if dropped:
+                note += f"(off-target {len(dropped)}개 제외)"
+            notes.append(note)
 
     if not candidates:
         return [], "상품 없음 — 쿠팡 단독 채널은 수동 미리선택(target_products)이 필요합니다"
@@ -1837,10 +1864,18 @@ def cmd_keyword_generate(args: argparse.Namespace) -> int:
             print(
                 "     [DRY] 시나리오 파생→상품 확보→draft→enrich→validate (실제 쓰기·API·비용 없음)"
             )
-            print(
-                f"     수동 미리선택 {tp_n}개 · ali 수집 "
-                f"{'예' if kw['channel'] in ('ali', 'both') else '아니오'}"
-            )
+            # ali 수집 여부는 채널뿐 아니라 카테고리 매핑에도 달림(미매핑이면 영어 검색어가 없어 건너뜀)
+            ali_preview = "아니오(채널=쿠팡 단독)"
+            if kw["channel"] in ("ali", "both"):
+                from collector import keyword_relevance
+
+                slug = keyword_relevance.resolve_category(kw["keyword"])
+                ali_preview = (
+                    f"예(카테고리 {slug} 영어검색)"
+                    if slug
+                    else "아니오(카테고리 미매핑 — 알리 영어 검색어 없음·건너뜀)"
+                )
+            print(f"     수동 미리선택 {tp_n}개 · ali 수집 {ali_preview}")
             return 0
 
         persona_slug = settings.get("default_keyword_persona")

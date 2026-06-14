@@ -221,6 +221,37 @@ class TestLiveMocked:
         assert feat == 1  # 추천(featured) 보존 — ON CONFLICT가 is_featured를 내리지 않음
 
 
+class TestSearchTiers:
+    """search_tiers(세션 #30) — 키워드 경로가 재사용하는 영어 티어 검색(정제·DB 무관·순수)."""
+
+    def test_uses_english_q_dedups_and_skips_filter(self, monkeypatch: Any) -> None:
+        if pytest is None:  # pragma: no cover
+            return
+        queries: list[str] = []
+
+        def fake_query(q: str, **kw: Any) -> ali.QueryResult:
+            queries.append(q)
+            if "ergonomic" in q:  # premium 티어
+                items = [_item("P1", "인체공학 의자"), _item("DUP", "메쉬 의자")]
+            else:  # budget 티어
+                items = [_item("DUP", "메쉬 의자"), _item("X1", "폰케이스")]  # 중복·off-target
+            return ali.QueryResult(dry_run=False, request={}, products=items, resp_code="200")
+
+        monkeypatch.setattr(cc.ali, "query_products", fake_query)
+
+        spec = cc.load_sources()["office-chair"]
+        rows, received = cc.search_tiers(spec, sleep=0)
+        # ① 한글 아닌 카테고리 영어 검색어로 검색
+        assert set(queries) == {"office chair", "ergonomic office chair"}
+        ids = [r["source_product_id"] for r in rows]
+        # ② 티어 간 중복(DUP)은 한 번만
+        assert ids.count("DUP") == 1
+        # ③ 필터는 안 함 — off-target('폰케이스')도 원시로 포함(정제는 호출자 몫=keyword_relevance)
+        assert set(ids) == {"P1", "DUP", "X1"}
+        # ④ received는 수신 총건(중복 포함)
+        assert received == 4
+
+
 if __name__ == "__main__":
     if pytest is not None:
         pytest.main([__file__, "-v"])

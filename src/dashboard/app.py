@@ -38,6 +38,7 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QSpinBox,
     QTableWidget,
@@ -65,6 +66,15 @@ STATUS_COLORS: dict[str, str] = {
     "disabled": "#f5f5f5",
     "failed": "#ffebee",
 }
+
+# 진행 상태 표시 (세션 #30 B) — 장시간 작업(글 생성 1~2분 등)의 시작/진행/완료 가시화.
+# 주인 반복지적: 생성 중 무표시 → 끝난지 모름. 상태 라벨 색으로 즉시 구분.
+_TITLE_IDLE = "혼살림 — 운영 대시보드"
+_STATUS_IDLE_CSS = "color:#777;font-size:12px;padding:2px 4px;"
+_STATUS_BUSY_CSS = "color:#e65100;font-size:12px;font-weight:bold;padding:2px 4px;"
+_STATUS_OK_CSS = "color:#1b5e20;font-size:12px;font-weight:bold;padding:2px 4px;"
+_STATUS_WARN_CSS = "color:#e65100;font-size:12px;font-weight:bold;padding:2px 4px;"
+_STATUS_FAIL_CSS = "color:#b71c1c;font-size:12px;font-weight:bold;padding:2px 4px;"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -385,9 +395,12 @@ class SettingsDialog(QDialog):
 class DashboardWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("혼살림 — 운영 대시보드")
+        self.setWindowTitle(_TITLE_IDLE)
         self.resize(1080, 720)
         self.worker: WorkerThread | None = None
+        # 진행 표시(세션 #30 B): 작업 중 비활성화할 액션 버튼 모음 + busy 상태
+        self._action_buttons: list[QPushButton] = []
+        self._busy = False
         self._build_ui()
         self.refresh()
 
@@ -458,6 +471,19 @@ class DashboardWindow(QMainWindow):
         self.tabs.addTab(self._build_settings_tab(), "설정")
         outer.addWidget(self.tabs, 1)
 
+        # 진행 상태 줄 (세션 #30 B) — 상태 라벨 + 불확정 진행바(소요시간 모름 → marquee)
+        status_row = QHBoxLayout()
+        self.status_label = QLabel("대기 중")
+        self.status_label.setStyleSheet(_STATUS_IDLE_CSS)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)  # 0~0 = 불확정(끝없이 흐르는 막대) — "작업 중"의 명확한 신호
+        self.progress.setTextVisible(False)
+        self.progress.setMaximumWidth(200)
+        self.progress.setVisible(False)  # 작업 중에만 표시
+        status_row.addWidget(self.status_label, 1)
+        status_row.addWidget(self.progress)
+        outer.addLayout(status_row)
+
         # 실시간 로그
         log_label = QLabel("실행 로그")
         log_label.setStyleSheet("color:#555;font-size:11px;margin-top:4px;")
@@ -480,6 +506,7 @@ class DashboardWindow(QMainWindow):
             b = QPushButton(label)
             b.clicked.connect(slot)
             bar.addWidget(b)
+            self._action_buttons.append(b)  # 작업 중 일괄 비활성화 대상
         bar.addStretch(1)
         lay.addLayout(bar)
         lay.addWidget(table, 1)
@@ -516,6 +543,7 @@ class DashboardWindow(QMainWindow):
         sched_row.addStretch(1)
         for b in (b_on, b_time, b_off):
             sched_row.addWidget(b)
+        self._action_buttons += [b_edit, b_on, b_time, b_off]  # 작업 중 비활성화 대상
         sched_box = QWidget()
         sched_box.setLayout(sched_row)
         lay.addWidget(sched_box, 0, 0)
@@ -634,10 +662,53 @@ class DashboardWindow(QMainWindow):
         self.log.append(line)
         self.log.ensureCursorVisible()
 
+    def _set_busy(self, label: str) -> None:
+        """작업 시작 — 진행 표시 켜기(진행바·상태 라벨·대기 커서·버튼 비활성·타이틀)."""
+        self._busy = True
+        self.status_label.setText(f"⏳ {label} 진행 중…")
+        self.status_label.setStyleSheet(_STATUS_BUSY_CSS)
+        self.progress.setVisible(True)
+        self.setWindowTitle(f"⏳ {label}… — {_TITLE_IDLE}")
+        for b in self._action_buttons:
+            b.setEnabled(False)
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+
+    def _set_done(self, outcome: str, label: str) -> None:
+        """작업 종료 — 진행 표시 끄고 완료/경고/실패 표시 + 버튼·커서·타이틀 원복.
+
+        outcome: 'ok'(성공) / 'warn'(완료했으나 코드≠0) / 'fail'(예외). 색으로 즉시 구분.
+        """
+        if not self._busy:  # 이중 호출 방어 — 대기 커서 스택 균형 유지
+            return
+        self._busy = False
+        self.progress.setVisible(False)
+        QApplication.restoreOverrideCursor()
+        for b in self._action_buttons:
+            b.setEnabled(True)
+        self.setWindowTitle(_TITLE_IDLE)
+        if outcome == "fail":
+            self.status_label.setText(f"✗ {label} 실패 — 실행 로그 확인")
+            self.status_label.setStyleSheet(_STATUS_FAIL_CSS)
+        elif outcome == "warn":
+            self.status_label.setText(f"⚠ {label} 완료(경고) — 실행 로그 확인")
+            self.status_label.setStyleSheet(_STATUS_WARN_CSS)
+        else:
+            self.status_label.setText(f"✓ {label} 완료")
+            self.status_label.setStyleSheet(_STATUS_OK_CSS)
+
     def run_task(
-        self, fn: Callable[[], Any], on_done: Callable[[bool, Any], None] | None = None
+        self,
+        fn: Callable[[], Any],
+        on_done: Callable[[bool, Any], None] | None = None,
+        *,
+        label: str = "작업",
     ) -> None:
-        """백그라운드 작업 실행(Phase C~ 액션 공용). 동시에 하나만."""
+        """백그라운드 작업 실행(Phase C~ 액션 공용). 동시에 하나만.
+
+        시작~완료를 진행 표시로 가시화(세션 #30 B): label이 상태 라벨/타이틀에 표시되고,
+        작업 중 액션 버튼이 비활성·진행바가 흐르며, 끝나면 완료/경고/실패가 색으로 남는다.
+        주인 반복지적('생성 1~2분 무표시 → 끝난지 모름')의 근본 대책.
+        """
         if self.worker and self.worker.isRunning():
             QMessageBox.warning(
                 self, "실행 중", "다른 작업이 진행 중입니다. 잠시 후 다시 시도하세요."
@@ -649,14 +720,21 @@ class DashboardWindow(QMainWindow):
         def _finish(ok: bool, result: Any) -> None:
             if not ok:
                 self.append_log(f"[오류] {result}")
-                QMessageBox.warning(self, "작업 실패", str(result).splitlines()[0])
+                outcome = "fail"
             elif isinstance(result, int) and result != 0:
                 self.append_log(f"[경고] 명령이 코드 {result}로 종료 — 위 로그를 확인하세요")
+                outcome = "warn"
+            else:
+                outcome = "ok"
+            self._set_done(outcome, label)  # 진행 표시 끄기 + 완료/경고/실패 (UI 원복 후 모달 표시)
             self.refresh()
+            if not ok:
+                QMessageBox.warning(self, "작업 실패", str(result).splitlines()[0])
             if on_done:
                 on_done(ok, result)
 
         self.worker.done.connect(_finish)
+        self._set_busy(label)  # 진행 표시 켜기
         self.worker.start()
 
     # ---- 액션 (Phase C) — 기존 CLI 명령을 백그라운드로 실행, 로그 스트리밍 ----
@@ -706,7 +784,7 @@ class DashboardWindow(QMainWindow):
             print(f"[추천] 후보 {len(recs)}건")
             return recs
 
-        self.run_task(task, on_done=self._after_recommend)
+        self.run_task(task, on_done=self._after_recommend, label="추천 키워드 조회")
 
     def _after_recommend(self, ok: bool, result: Any) -> None:
         if not ok:
@@ -744,7 +822,7 @@ class DashboardWindow(QMainWindow):
                 )
             )
 
-        self.run_task(add_task)
+        self.run_task(add_task, label="키워드 추가")
 
     def _on_add_keyword(self) -> None:
         text, ok = QInputDialog.getText(
@@ -775,7 +853,7 @@ class DashboardWindow(QMainWindow):
                 )
             )
 
-        self.run_task(task)
+        self.run_task(task, label="키워드 추가")
 
     def _on_generate(self) -> None:
         """글 생성. 줄을 선택했으면 그 키워드, 아니면 자동 선정(대기 큐 우선→없으면 추천·추가)."""
@@ -797,7 +875,7 @@ class DashboardWindow(QMainWindow):
             finally:
                 conn.close()
 
-        self.run_task(task, on_done=self._after_auto_pick)
+        self.run_task(task, on_done=self._after_auto_pick, label="키워드 자동 선정")
 
     def _after_auto_pick(self, ok: bool, result: Any) -> None:
         if not ok:
@@ -832,7 +910,7 @@ class DashboardWindow(QMainWindow):
 
             return cli.cmd_keyword_generate(argparse.Namespace(id=kid, page_size=20, dry_run=False))
 
-        self.run_task(task)
+        self.run_task(task, label="글 생성")
 
     def _on_coupang_attach(self) -> None:
         """선택한 대기 키워드에 쿠팡 배너를 저장만 (생성 안 함·pending 유지·세션 #29 naver_blog 흐름).
@@ -892,7 +970,7 @@ class DashboardWindow(QMainWindow):
                 conn.close()
             return 0
 
-        self.run_task(task)
+        self.run_task(task, label="쿠팡 첨부")
 
     def _on_coupang_generate(self) -> None:
         """쿠팡 배너 붙여넣기 → 그 키워드로 하이브리드 글 생성 (원팝업·세션 #28 PartB)."""
@@ -939,7 +1017,7 @@ class DashboardWindow(QMainWindow):
                 conn.close()
             return cli.cmd_keyword_generate(argparse.Namespace(id=kid, page_size=20, dry_run=False))
 
-        self.run_task(task)
+        self.run_task(task, label="쿠팡 하이브리드 글 생성")
 
     def _on_preview(self) -> None:
         # 선택(없으면 맨 위) 발행 큐 글 → 빌드 후 그 글 상세로 바로 이동 (검토 동선·§2-마, 세션 #29)
@@ -976,7 +1054,7 @@ class DashboardWindow(QMainWindow):
                 print(f"[WARN] 미리보기 파일 없음: {target} (먼저 글을 생성하세요)")
             return rc
 
-        self.run_task(task)
+        self.run_task(task, label="미리보기 빌드")
 
     def _on_approve(self) -> None:
         did = self._selected_or_top(self.tab_queue)  # 선택 없으면 맨 위 글
@@ -989,7 +1067,7 @@ class DashboardWindow(QMainWindow):
 
             return cli.cmd_approve(argparse.Namespace(draft=did, note="dashboard 승인"))
 
-        self.run_task(task)
+        self.run_task(task, label="승인")
 
     def _on_reject(self) -> None:
         did = self._selected_or_top(self.tab_queue)  # 선택 없으면 맨 위 글
@@ -1013,7 +1091,7 @@ class DashboardWindow(QMainWindow):
 
             return cli.cmd_reject(argparse.Namespace(draft=did, note="dashboard 반려"))
 
-        self.run_task(task)
+        self.run_task(task, label="반려")
 
     # ---- 발행·예약 (Phase D) ----
     def _refresh_schedule_label(self) -> None:
@@ -1050,7 +1128,7 @@ class DashboardWindow(QMainWindow):
                 argparse.Namespace(count=None, no_deploy=False, dry_run=False)
             )
 
-        self.run_task(task)
+        self.run_task(task, label="발행")
 
     def _on_schedule_on(self) -> None:
         t = settings.load().get("schedule_time", "11:00")
@@ -1071,7 +1149,7 @@ class DashboardWindow(QMainWindow):
 
             return cli.cmd_schedule(argparse.Namespace(schedule_action="set", time=None))
 
-        self.run_task(task)
+        self.run_task(task, label="예약 켜기")
 
     def _on_schedule_time(self) -> None:
         cur = str(settings.load().get("schedule_time", "11:00"))
@@ -1087,7 +1165,7 @@ class DashboardWindow(QMainWindow):
 
             return cli.cmd_schedule(argparse.Namespace(schedule_action="set", time=new_time))
 
-        self.run_task(task)
+        self.run_task(task, label="예약 시각 변경")
 
     def _on_schedule_off(self) -> None:
         if (
@@ -1107,7 +1185,7 @@ class DashboardWindow(QMainWindow):
 
             return cli.cmd_schedule(argparse.Namespace(schedule_action="off", time=None))
 
-        self.run_task(task)
+        self.run_task(task, label="예약 끄기")
 
     def _on_edit_settings(self) -> None:
         dlg = SettingsDialog(self)
