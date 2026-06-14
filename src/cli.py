@@ -259,6 +259,7 @@ def _check_phase2_modules() -> bool:
         ("collector.aliexpress", "map_product"),
         ("collector.naver_searchad", "fetch_related_keywords"),
         ("collector.product_filter", "is_relevant"),
+        ("collector.keyword_relevance", "filter_products"),
         ("collector.category_collect", "collect_category"),
         ("collector.keyword_research", "research_keywords"),
         ("collector.keyword_research", "build_entry"),
@@ -1718,6 +1719,7 @@ def _gather_keyword_candidates(
         import time as _time
 
         from collector import aliexpress as ali
+        from collector import keyword_relevance
 
         config.load_secrets()
         res = ali.query_products(
@@ -1726,10 +1728,19 @@ def _gather_keyword_candidates(
             dry_run=False,
             page_size=page_size,
         )
-        if res.products:
-            products_store.upsert_products(conn, res.products)
-        candidates.extend(_cands(res.products))
-        notes.append(f"ali 수집 {len(res.products)}개")
+        # 적합성 가드(세션 #29 B-2): 키워드-카테고리 부적합 알리 상품 자동 제외
+        # (예: '컴퓨터의자' 글에 섞인 '화장/드레싱 의자'). 쿠팡 수동 배너는 사람이 골라 제외 안 함.
+        kept, dropped = keyword_relevance.filter_products(kw["keyword"], res.products)
+        if kept:
+            products_store.upsert_products(conn, kept)
+        candidates.extend(_cands(kept))
+        if dropped:
+            notes.append(
+                f"ali 수집 {len(res.products)}개 → 적합 {len(kept)}개"
+                f"(적합성 가드 off-target {len(dropped)}개 제외)"
+            )
+        else:
+            notes.append(f"ali 수집 {len(res.products)}개")
 
     if not candidates:
         return [], "상품 없음 — 쿠팡 단독 채널은 수동 미리선택(target_products)이 필요합니다"
