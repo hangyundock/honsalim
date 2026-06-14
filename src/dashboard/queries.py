@@ -50,12 +50,19 @@ def dashboard_stats(conn: sqlite3.Connection) -> dict[str, int]:
 def list_keywords(
     conn: sqlite3.Connection, status: str | None = None, limit: int = 500
 ) -> list[dict[str, Any]]:
-    """키워드 큐 목록 (정렬: score·priority·id). status 지정 시 필터."""
+    """키워드 큐 목록. 정렬: **미리선택(쿠팡 등 target_products) 있는 키워드 우선** → score → priority → id.
+
+    auto_pick_keyword와 동일 정렬(화면 맨 위 = 자동 선정 대상). 쿠팡 세팅한 키워드가
+    검색량 높은 알리 추천보다 먼저 와 '글 생성'에 쿠팡이 포함됨(세션 #28 Part2). status 지정 시 필터.
+    """
     if not _table_exists(conn, "keyword_queue"):
         return []
     conn.row_factory = sqlite3.Row
     base = "SELECT * FROM keyword_queue"
-    order = " ORDER BY score DESC, priority DESC, id LIMIT ?"
+    order = (
+        " ORDER BY (target_products IS NOT NULL AND target_products NOT IN ('', '[]')) DESC, "
+        "score DESC, priority DESC, id LIMIT ?"
+    )
     if status:
         rows = conn.execute(base + " WHERE status = ?" + order, (status, limit)).fetchall()
     else:
