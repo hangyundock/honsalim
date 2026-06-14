@@ -7,19 +7,19 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#28: ★쿠팡 하이브리드 글 — naver_blog식 원팝업 + 알리 데이터 결합(구글 SEO) + 쿠팡 공식배너 이미지** — `🛒 쿠팡 배너→글 생성` 원클릭(키워드 자동·배너 첨부·하이브리드 생성), `_gather`가 쿠팡(수동)+알리(자동) 결합·쿠팡 항상 featured, 배너 hotlink 이미지(함정#3 무관·#24 "이미지 안 씀"→B전환). 회귀 **806**. ★**라이브 생성 미실행**(주인이 다음 세션 안전하게 1회). ★다음(#29)=**(1)라이브 테스트(쿠팡+알리 결합·이미지·DeepSeek 비용 1회) (2)키워드 틈 점수(PartC) (3)자동발행 ON(PartD)**. (#27=글생성 자동선정·발행큐 맨위자동) 상세 EVENTS #27·#28 | 2026-06-14 #28 |
+| 진행 단계 | **#29: ★B-i 무인 자동발행 전체 + naver_blog 흐름 GUI 완성** — 미리보기 버그수정(검토 대기 draft 렌더)·적합성 가드(`keyword_relevance`·한글키워드→카테고리 영어필터)·발행후 안전망(`article_state`/`article_guardrail` 자동비공개)·fail-closed 자동승인(`auto_approve`)·`auto-cycle`·**`auto_mode` 토글 기본 OFF**·`🛒 쿠팡 첨부(저장)` 버튼. PR 자동머지 확립(main 직접 push). **6커밋 전부 main 머지·CI green·라이브 200**. 회귀 **846**. ★**라이브 테스트가 2대 문제 적발**: **(A)키워드 경로 알리 검색=한글→쓰레기 결과→글이 thin(쿠팡만)** — 근본수정 필요(매핑 카테고리 영어 tier 검색어). **(B)진행/완료 표시 없음**. ★다음(#30)=A·B 수정→게이밍의자(#3·쿠팡 첨부됨) 재생성→첫 라이브 글. 상세 EVENTS #29 | 2026-06-15 #29 |
 | 운영 모델 | 자동 게시 활성(콘텐츠 큐). **refresh-cycle = 수동 운영(주인 직접 지시) — C13 [확정 #24], Claude 예약작업 비활성화**. 자동 "승인" 금지(E7→가드레일) | #24 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·Secrets·main-protect)·Cloudflare(도메인·Pages·R2·D1)·Anthropic·INDEXNOW 키·secrets·Git push·pre-commit 9종·Dependabot (세부 archive) | #3 |
 | Phase 2 핵심 모듈 (#3~#5) | cli·common·validator·writer·collector·enricher·builder·deployer·tracker·workers (세부 BACKEND §2) + **#17: category_collect·category_page_builder·concept_image·category_writer** | #17 |
-| Phase 2 회귀 테스트 | **806 / 806 PASS** [확정 pytest, #28] — #28 +19(쿠팡 배너 파싱·이미지·하이브리드 결합·원팝업·get_or_create) · #27 +5(auto_pick·발행큐 맨위자동) · #26 +9(keyword_recommender). black·ruff·mypy 클린 | 2026-06-14 |
-| CLI 명령 (BACKEND §9) | **29개** — doctor·db·collect·collect-products·enrich·validate·approve·promote·unapprove·deploy·sync-slugmap·build(+`--preview`)·dashboard·collect-category·build-category·approve-category·unapprove-category(킬스위치)·register-categories(+`--auto-publish`)·auto-publish·category-status(+`--monitor`)·**refresh-cycle(#23)** · **#25 운영 대시보드: keyword-add·keyword-generate·keyword-list·reject·coupang-add·publish-queue·schedule** · **#26: keyword-recommend(추천 키워드·--add-top)** | #26 |
+| Phase 2 회귀 테스트 | **846 / 846 PASS** [확정 pytest, #29] — #29 +40(미리보기 draft·적합성 가드·발행후 안전망·자동승인·auto-cycle) · #28 +19(쿠팡 하이브리드). black·ruff·mypy 클린 | 2026-06-15 |
+| CLI 명령 (BACKEND §9) | **29개** — doctor·db·collect·collect-products·enrich·validate·approve·promote·unapprove·deploy·sync-slugmap·build(+`--preview`)·dashboard·collect-category·build-category·approve-category·unapprove-category(킬스위치)·register-categories(+`--auto-publish`)·auto-publish·category-status(+`--monitor`)·**refresh-cycle(#23)** · **#25 운영 대시보드: keyword-add·keyword-generate·keyword-list·reject·coupang-add·publish-queue·schedule** · **#26: keyword-recommend** · **#29: unpublish-article·republish-article·monitor-articles(발행후 안전망)·auto-cycle(무인 사이클·auto_mode ON일 때)** = **33개** | #29 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD. 세부 DECISIONS J·O + EVENTS | #4~#16 |
-| doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **65개** + #19 **LLM 키 점검**(활성 모델 기준 OPENROUTER/ANTHROPIC). 65/65 OK [#26 +keyword_recommender.recommend] | #26 |
+| doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **71개** + #19 LLM 키 점검. 71/71 OK [#29 +keyword_relevance·article_state×2·article_guardrail×2·auto_approve] | #29 |
 | DB 초기화 | `data/honsalim.db` **v7** + categories(**5**)·category_products + products 정가/할인·판매량/만족도 + **keyword_queue(발행 큐·migration 007·drafts.keyword_id, #25)** (migration 002~**007**) + personas 3·scenarios 10. ※DB는 gitignore — 다음 워크트리는 `db migrate`+`db seed`(+`collect-category`)로 재생성 | #25 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (docs/ 참조). 일관성 모순 0건 | #2 |
 | 메모리 시스템 | feedback 7건([[incremental-critical-review]]·[[autonomous-safe-system]] 등) + reference market_research + MEMORY.md | #12 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
-| 사이트 게시글 / 트래픽 / 수익 | **라이브 공개 카테고리=5개**(honsallim.com·#24 refresh-cycle 배포). **`mini-dehumidifier`는 가드레일 미달(추천 1개<2)로 자가복원 자동 비공개** — #25 원인 점검 대상. + 쿠팡 승인용 `/reviews/` 리뷰페이지(흠플래닛 모니터암). 측정(Cloudflare·GSC·네이버 누적). 수익=/go/→302 알리. **쿠팡=수동 배너 입력→하이브리드 글 흐름 구축(#28·이미지 hotlink·알리 데이터 결합)·라이브 미실행. collector.coupang(API)=15만원 후** | #28 |
+| 사이트 게시글 / 트래픽 / 수익 | **라이브 공개 카테고리=5개**(honsallim.com·#24 refresh-cycle 배포). **`mini-dehumidifier`는 가드레일 미달(추천 1개<2)로 자가복원 자동 비공개** — #25 원인 점검 대상. + 쿠팡 승인용 `/reviews/` 리뷰페이지(흠플래닛 모니터암). 측정(Cloudflare·GSC·네이버 누적). 수익=/go/→302 알리. **#29 라이브 사이트 200 정상 확인**(접속불가=주인 로컬·honsallim 더블L). **#29 첫 하이브리드 생성 실행** — draft #2·#3(컴퓨터의자)·검토 대기. ★단 **키워드 경로 알리 검색이 한글이라 무관상품만 와서 가드가 다 거름→글 thin(쿠팡만)·#30 근본수정 대상**. naver_blog GUI 흐름 완성(키워드+쿠팡 첨부→스케줄 발행). collector.coupang(API)=15만원 후 | #29 |
 
 ## 인프라
 
@@ -28,7 +28,7 @@
 | 프로젝트 폴더 | `D:\affiliate_hub\` (docs·archive·.claude/commands 하위) |
 | 사이트 / 도메인 | 혼살림 / **honsallim.com**(신·겹ㄹ·알리 'ali' 차단 회피·Cloudflare Pages 커스텀도메인 연결·SSL Active·**라이브**, 만료 2027-06-01·Auto Renew) + honsalim.com(구·만료 2027-05-28·**→honsallim 301 Page Rule** 적용·경로보존) |
 | 호스팅 | **Cloudflare Pages `honsalim`** + Custom domain (Dugi2020@naver.com) |
-| GitHub | **`hangyundock/honsalim` Public** — origin/main = **#20 (홈 리디자인 포함)**, 배포됨. **build-and-deploy: main push → 커밋된 build/site Cloudflare Pages 배포 (CI 재빌드 없음, 글 DB 로컬)**. #20 배포 success(run #39·#40) + CodeQL·lint ✅. ★**wrangler `pages deploy`에 `--commit-message=honsalim-auto-deploy`(ASCII)+`--commit-dirty=true` 명시** — git 한글 커밋메시지 CF 거부(code 8000111) 근본수정. ※로컬 main worktree는 뒤처짐 — 다음 워크트리는 origin/main 기준 |
+| GitHub | **`hangyundock/honsalim` Public** — origin/main = **#29 (6f752d2 · B-i 무인 자동발행 + naver_blog GUI)**, CI green. **build-and-deploy: main push → 커밋된 build/site Cloudflare Pages 배포 (CI 재빌드 없음, 글 DB 로컬)**. #20 배포 success(run #39·#40) + CodeQL·lint ✅. ★**wrangler `pages deploy`에 `--commit-message=honsalim-auto-deploy`(ASCII)+`--commit-dirty=true` 명시** — git 한글 커밋메시지 CF 거부(code 8000111) 근본수정. ※로컬 main worktree는 뒤처짐 — 다음 워크트리는 origin/main 기준 |
 | GitHub Secrets / Branch Protection | CF_API_TOKEN · CF_ACCOUNT_ID · INDEXNOW_KEY 등록 / ruleset `main-protect` Active |
 | R2 / D1 | `honsalim-images` (APAC) / `honsalim-clicks` ID `9bae858e-456f-40e7-8084-c3b90e4ec3ca` |
 | Python | 3.10 32-bit (TIMA·AutoBlog 시스템 공유) |

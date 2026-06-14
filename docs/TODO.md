@@ -3,21 +3,15 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #29 — (상세 EVENTS #28)
+## ★ 다음 세션 #30 — (상세 EVENTS #29) · 라이브 테스트가 적발한 2대 문제 최우선
 
-- [ ] **★0. 라이브 테스트 (최우선)**: 대시보드 재시작 → `🛒 쿠팡 배너→글 생성`(키워드 + 쿠팡 공식배너 `<a><img>`) → 미리보기로 **쿠팡(이미지) + 알리(판매량 데이터) 결합** 확인 (DeepSeek 비용·품질 1회). 알리 단독 빠른 글은 `✨ 글 생성`.
-- [ ] **★PartC 키워드 '틈 점수'**: naver_blog `keyword_scorer` 차용(검색량/문서수/경쟁도→저경쟁 롱테일 우선·신규 사이트 구글 랭킹). 단 네이버 신호=구글 근사치(정직 보정).
-- [ ] **PartD 자동 발행 ON**: 스케줄러(구현됨·기본 OFF) 켜서 승인된 글 매일 자동 발행(E7 준수=승인된 것만).
-- [ ] **off-target 씨앗 curation**: 책·모니터 거치대(편집 판단)·받침대(발받침 모호) exclude_terms 보강.
-- [ ] **0. `mini-dehumidifier` 점검**: 추천 1개(<2)로 가드레일 자가복원→라이브 비공개. 추천 풀 부족 원인 확인 후 복원/보강 결정.
-- [ ] **1. ★★쿠팡 본격 (주인 명시)**: ①가입 완료 ②`/reviews/` 승인용 페이지 활용 ③승인 후 **`collector.coupang` 구현**으로 쿠팡 상품 수집. 쿠팡=메인(§6). ⚠본인·가족 구매 금지.
-- [ ] **2. 멀티채널 배치 구현 (DECISIONS S1·S2)**: 방향=C안(채널별 최선 추천+정성 기준) 확정. 게이팅=`collector.coupang` + 1~2주 트래픽 데이터 후 최종 배치. 가격비교형(A안) 금지.
-- [ ] **3. ★성장 = 무인 마케팅 로드맵**([[growth-first-priority]] · 방향 [확정 #24 DECISIONS T1·T2]):
-  - **Tier 0 (지금)**: SEO 품질 — "데이터 기반 비교" 포지셔닝(알리 판매량=Information Gain)·E-E-A-T·토픽 클러스터·소수 품목 주인 실경험.
-  - **Tier 1 (병렬·승인 1~4주)**: Pinterest 자동 핀(개인정보처리방침+Standard API 승인→리뷰페이지·첫머리 고지). Tier2/3=Threads→쇼츠/네이버연계.
-  - 공통: 소셜 첫머리 고지 자동삽입·정식계정·측정→더블다운. ❌양산/버너. 새 사이트 6~12개월 인내.
-- [ ] (선택) `docs/CATEGORIES.md` · D1 클릭로깅 복원 · main-protect status check · Chrome lookalike(관찰).
-- 참고: **DB gitignore→재생성**(`db migrate`+`db seed`+`register-categories --all --no-dry-run`, ~$2). 워크트리=`PYTHONPATH=src python -m cli`. 발행/배포·라이브 테스트는 **main 체크아웃**(C13 수동).
+- [ ] **★A. 키워드 경로 알리 검색 근본수정 (최우선)**: `_gather_keyword_candidates`가 `ali.query_products(한글 키워드)` → "컴퓨터의자"에 폰케이스·티셔츠·가방 등 무관상품만 옴(가드가 다 거름→글 thin·쿠팡만). **키워드→카테고리 매핑 → 그 카테고리의 영어 tier 검색어**(`category_sources.yml` tiers.q "office chair" 등)로 알리 검색하게 수정 → 하이브리드에 알리 데이터 복원. (카테고리 경로는 이미 영어라 정상=라이브 5카테고리 멀쩡)
+- [ ] **★B. 대시보드 진행/완료 표시**: 생성 1~2분 무표시 → 끝난지 모름(주인 반복지적). 작업 시작·진행중·완료 신호(상태 라벨/타이틀/버튼 비활성 등) 추가.
+- [ ] **A·B 후 첫 라이브 글**: 게이밍의자(#3·쿠팡 첨부됨) `✨ 글 생성` → 제대로된 하이브리드(쿠팡+알리) → 미리보기 → 승인 → 발행. thin draft #3(컴퓨터의자) 반려.
+- [ ] **DECISIONS/CLAUDE.md B-i 기록**: auto_mode 토글(기본 OFF)·fail-closed 자동승인·발행후 안전망·E7 보정(구글정책 정정=AI/자동 아닌 **저가치 양산**만 페널티). critical-review 지적 문서 정합.
+- [ ] **B 켜기 (주인 결정)**: `auto_mode` ON + `run_auto_cycle.ps1` schtask 등록(C13 주인 통제). 그러면 대기키워드(+쿠팡 첨부분)로 매일 자동 생성·승인·발행·사후모니터.
+- (이월) PartC 키워드 틈점수 · `mini-dehumidifier` 점검 · off-target 씨앗 curation · 쿠팡 본격(15만원 후) · 멀티채널(S1) · 성장 Tier0([[growth-first-priority]]·트래픽이 진짜 병목·6~12개월 인내).
+- 참고: 워크트리=`PYTHONPATH=src python -m cli` · DB gitignore→재생성(`db migrate`+`db seed`+`register-categories --all --no-dry-run`). 발행/배포=main 체크아웃. **main 직접머지=`git push origin HEAD:main`(이미 allow·gh 불필요)**.
 
 ## 시점 의존 잔존 (세션 #6~7)
 
