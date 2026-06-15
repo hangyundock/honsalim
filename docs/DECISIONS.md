@@ -281,6 +281,15 @@
 - **V4. 쿠팡 대가성 = 정식 문구·페이지 내 명시 [확정 #31, 출처 쿠팡/공정위]**: 쿠팡 제품 있는 카테고리는 상단 고지 "쿠팡 파트너스 및 AliExpress…" + 쿠팡 zone 옆 **정식 문구** "이 게시물은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다"(함정#4·수익 몰수 회피). O9(고지 위치) 정합.
 - **V5. 카테고리 흡수로 비공개된 글 = 301 리다이렉트 [확정 #31]**: 흡수돼 unpublish된 글의 라이브 URL은 `renderer.REDIRECTS`→`build/site/_redirects`(Cloudflare Pages 301)로 후속 카테고리 영구 이전(404·SEO 손실 방지). 게이밍의자 글 `/articles/kw-e3d08a2c/`→`/categories/office-chair/`.
 
+## W. 운영 대시보드 기능·배포 근본수정 [확정] — 세션 #32 신규
+
+> 주인 요청 대시보드 기능 + 운영 반영·배포 흐름 근본수정. 라이브 실증. 상세 EVENTS #32.
+
+- **W1. 운영 DB 직접수정 = Claude 불가·주인 실행 [확정 #32]**: 운영 DB(`honsalim.db`)는 Write/Edit deny rule + auto-mode 분류기 보호 + **권한 자기부여(settings 자기수정) 하드차단**(EVENTS #29) → Claude가 직접 못 쓰고 **주인이 실행 주체**(§2-마 인간 게이트). 운영 DB/코드 변경은 백업→검증→실패 시 자동복구를 넣은 **주인 실행 원클릭 런처**(.bat: DB 이식·`git pull` 등). ★**런처 경로·.bat 내용은 ASCII 필수**(한글이면 cmd 코드페이지로 깨져 실행 실패). [[powershell-korean-encoding]] 확장.
+- **W2. 카테고리 쿠팡 = 카테고리 단위 직접 관리 [확정 #32]**: 쿠팡 운영자추천 zone(`source='coupang'` category_products)을 `collector.category_coupang`(배너 파싱→products 업서트→category_products 링크·`cmd_category_coupang_*`·대시보드 버튼)으로 카테고리 단위 직접 큐레이션. 기존 키워드/글 경유 흡수만 있던 한계 해소. 이미지=공식 배너 hotlink(함정#3 무관). 광고차단 폴백=빈 박스 대신 플레이스홀더(매크로 `.timg.noimg`+`.timg-ph`·`p.coupang` 스토어 구분).
+- **W3. 빌드·배포 = refresh_cycle commit+push 재사용 (git_push stub 버그 근본 우회) [확정 #32·실증]**: `deployer.git_push`=stub(commit 안 함·push만) → 발행/배포가 build/site를 커밋 안 해 '클릭만으론 진짜 배포 안 됨'(EVENTS #30 무인 치명). `cmd_build_deploy`는 `refresh_cycle.run_refresh_cycle`(DEPLOY_PATHS=build/site·functions/go commit+push·refresh/killswitch 끔) 재사용 → 대시보드 🚀 클릭으로 라이브 도달 실증(e3a2219). 한글 커밋메시지=`git commit -m` argv 정상(Windows Unicode argv·임시저장소 검증).
+- **W4. 키워드 삭제 = 연결 미발행 draft 동반·발행글 차단 [확정 #32]**: `cmd_keyword_delete` — foreign_keys=ON이라 연결 draft 먼저 삭제 후 키워드 삭제. 발행된(`published`) draft 있으면 차단(라이브 글 보호·§0).
+
 ## 폐기된 결정 (역사 참조용)
 
 | 폐기일 | 결정 | 폐기 사유 |

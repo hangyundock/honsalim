@@ -3,15 +3,13 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #32 — (상세 EVENTS #31)
+## ★ 다음 세션 #33 — (상세 EVENTS #32)
 
-- [ ] **★★운영 DB 반영 (최우선·중요)** — 이 세션 승인 상태(의자 카테고리·추천 8선·LLM 가이드)는 **워크트리 복사본 DB(`data/honsalim.db`)에만** 있음. 운영 DB(`D:\affiliate_hub\data\honsalim.db`)는 미반영(옛 상태). **워크트리 폐기 시 복사본 소멸 → 반영 필수.**
-  - 대시보드 닫고 **백업 후**: ① `scripts/apply_chair_taxonomy.py D:\affiliate_hub\data\honsalim.db`(rename·absorb·unpublish 멱등) + `build-category office-chair --no-dry-run`(LLM 8선·가이드 재생성·텍스트 달라짐) + `approve-category office-chair`, OR ② 워크트리 복사본을 sqlite backup으로 운영 이식(승인 콘텐츠 그대로·권장).
-  - ※라이브(build/site·ea2460e)는 이미 배포·정상. 운영 DB는 다음 빌드/대시보드 일관성용.
-- [ ] **부산물 정리** — `_fix_tax.py`(워크트리 루트 임시) 제거 · abandoned `article.html`/`article.css`(카테고리 모방·0 published라 무해) 정리 검토 · `category_products.product_type` 컬럼(복사본만·미사용·렌더는 이름 도출).
-- [ ] (선택) 다른 카테고리(책상 등) 추천 8선 재빌드 · 모니터암·모니터 받침대 "모니터 거치"로 묶기.
+- [ ] **★★실제 제품 추가 배포 테스트 (주인 명시·최우선)** — 이번 세션 만든 대시보드 기능(카테고리 쿠팡 추가/제거·키워드 삭제·🚀 빌드·배포)으로 **실제 쿠팡 제품을 카테고리에 추가 → 빌드·배포** 하여 동작 검증. 운영 폴더는 #32(e3a2219) 동기화 완료(추가 git pull 불요·대시보드 재시작만).
+- [ ] **부산물 정리** — `category_products.product_type` 컬럼(운영 DB·미사용·렌더 무관) · 옛 워크트리들 · 바탕화면 런처 3폴더(`honsalim_db_apply`·`honsalim_update`·`혼살림DB반영`) 삭제(주인).
+- [ ] (선택) 다른 카테고리 쿠팡 추가 · 추천 8선 재빌드 · 모니터암·모니터 받침대 "모니터 거치"로 묶기.
 - (이월) PartC 키워드 틈점수 · `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장 Tier0([[growth-first-priority]]·트래픽이 진짜 병목).
-- 참고: 워크트리=`PYTHONPATH=src python -m cli` · DB gitignore→재생성. 발행/배포=main 체크아웃. **main직접머지=`git push origin HEAD:main`**. ★PowerShell 한글 파이프 깨짐→.py 파일 실행([[powershell-korean-encoding]]).
+- 참고: 워크트리=`PYTHONPATH=src python -m cli` · DB gitignore→재생성. **main직접머지=`git push origin HEAD:main`**. ★PowerShell/cmd 한글 깨짐→.py·ASCII([[powershell-korean-encoding]]).
 
 ## 시점 의존 잔존 (세션 #6~7)
 

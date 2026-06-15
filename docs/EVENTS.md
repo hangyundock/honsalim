@@ -15,6 +15,8 @@
   - 세션 #24 (2026-06-03~06 Tier0 SEO 품질강화+쿠팡 승인용 /reviews/+멀티채널·무인마케팅 전략(DECISIONS S·T)+스케줄러 수동전환+subprocess UTF-8 근본수정·회귀 678→693)
   - 세션 #25 (2026-06-14 ★운영 대시보드 전면 구축 PyQt5 GUI(키워드 큐·글생성·승인·발행·예약·쿠팡 수동·설정)+마이그레이션 007 keyword_queue·DB v7·회귀 693→773)
   - 세션 #26 (2026-06-14 추천 키워드 생성 엔진(keyword_recommender)+대시보드 메뉴 순서 재정렬+노트북거치대 off-target exclude·회귀 773→782)
+  - 세션 #27 (2026-06-14 '글 생성' 자동 키워드 선정(원클릭)+발행큐 맨위 자동+PR 자동화 논의·회귀 782→787)
+  - 세션 #28 (2026-06-14 쿠팡 하이브리드 글—naver_blog식 원팝업+알리 데이터 결합+쿠팡 공식배너 이미지·회귀 782→806)
 - [EVENTS_202605.md](archive/EVENTS_202605.md):
   - 세션 #1 (2026-05-27 프로젝트 신규 셋업·정밀 조사·5파일 시스템·슬래시 명령 등록)
   - 세션 #2 (2026-05-27~28 Phase 0 설계 12/12 + Phase 1 외부 작업: GitHub·Cloudflare·도메인·R2·D1·Git push)
@@ -34,6 +36,24 @@
   - 세션 #18 (2026-05-31 운영자 1클릭 승인 게이트(O21·build-category draft 고정)·doctor §10 64진입점·★카테고리 페이지 디자인 디버깅(글씨 흐림 진짜원인=backdrop-filter 제거)·회귀 569→590)
 
 ## 최근 5세션
+
+### 세션 #32 — 2026-06-15 (Opus 4.8 1M, ★운영 DB 반영 + 쿠팡 카드 광고차단 폴백 + 운영 대시보드 4기능 + 쿠팡 3선 균형 라이브, 회귀 851→865, main e3a2219)
+
+**시작 상황**: `/honsalim-start`(워크트리 tender-jennings·#31 da4f7eb). #31 최우선 미완='운영 DB 반영'. 라이브 검증 중 추가 요청 누적.
+
+**핵심 [확정]** (전부 라이브 배포·검증):
+1. **★운영 DB 반영(#31 미완 해소)**: #31 승인 상태(의자·8선·가이드)가 워크트리 복사본 DB(upbeat-davinci)에만·운영 DB 미반영. ★**운영 DB 직접수정=Claude 불가**(deny rule + auto-mode 분류기 + 권한 자기부여 하드차단) → **주인 실행 원클릭 런처**(★ASCII 경로/.bat — 한글이면 cmd 코드페이지 깨짐)로 백업→sqlite backup 이식→검증→실패 시 자동복구. 감지함수 자기오인 버그(검사 powershell이 'dashboard.app' 자기매칭)+대시보드 닫힘 대기형 근본수정. 운영 DB ALL_PASS 이식.
+2. **★쿠팡 카드 광고차단 폴백**: 라이브 쿠팡 이미지 빈 박스=주인 uBlock이 `coupangcdn /affiliate/banner/` URL 차단(이미지·CSP·핫링크는 정상 확인). 빈 박스→플레이스홀더(쿠팡="🛒 쿠팡 추천 상품"/알리="🛒 상품 보기"·`p.coupang` 구분·매크로 onerror→`.timg.noimg` + `category.css .timg-ph`). 커밋 **c27c3c2** 라이브 검증(css 해시 e4ccd0fb).
+3. **★운영 대시보드 4기능**(주인 요청·main **4118551**): **키워드 삭제**(키워드 탭 🗑·`cmd_keyword_delete`·연결 미발행 draft 동반·발행글 차단=라이브보호) · **카테고리 쿠팡 추가/제거**(`collector.category_coupang` 배너→products 업서트→category_products 링크·`cmd_category_coupang_*`·카테고리·모니터링 탭) · **원스톱 빌드·배포**(🚀·`cmd_build_deploy`=`refresh_cycle` 검증 로직 재사용·refresh/killswitch 끔) · **쿠팡존 레이아웃**(grid→flex+폭제한·1~3개 균형). 회귀 851→**865**(+14)·black/ruff/mypy·doctor 0.
+4. **★EVENTS #30 배포 버그 근본 우회 [확정·실증]**: `deployer.git_push`=stub(commit 안 함·push만)→'클릭만으론 build/site 미커밋'(무인 치명). 빌드·배포 버튼은 `refresh_cycle`(DEPLOY_PATHS=build/site·functions/go commit+push) 사용 → 주인이 직접 클릭해 **쿠팡 3선+레이아웃 라이브 도달**(main **e3a2219**·go-링크 3개)로 실증.
+
+**운영 롤아웃 [확정]**: 신규 대시보드 코드는 운영 폴더(D:\affiliate_hub) **git pull(clean FF)+대시보드 재시작** 후 노출(원클릭 UPDATE.bat 제공). 주인 실사용: 중복 키워드 2개 삭제(연결 draft 3건 동반)→office-chair 쿠팡 2개 추가(총 3)→🚀 빌드·배포→라이브 3선 균형 검증 완료.
+
+**무인·안전(§0)**: 운영 DB 보호 가드 끝까지 유지(우회 안 함·주인=실행 주체). 빌드·배포 killswitch 끔(카테고리 임의 비공개 방지). 가짜 데이터 0(쿠팡=주인 진짜 배너).
+
+**잔존/다음(#33)**: ①**★실제 제품 추가 배포 테스트(주인 명시)**: 실제 쿠팡 제품을 카테고리에 추가→빌드·배포로 이번 기능 동작 검증. ②부산물: `category_products.product_type` 컬럼(운영 DB·미사용)·옛 워크트리·바탕화면 런처 3폴더(`honsalim_db_apply`·`honsalim_update`·`혼살림DB반영`) 정리(주인). ③(이월) PartC 키워드 틈점수·mini-dehumidifier·★성장 Tier0([[growth-first-priority]]). ★워크트리=`PYTHONPATH=src python -m cli`·DB gitignore·main직접머지=`git push origin HEAD:main`·★PowerShell/cmd 한글 깨짐→.py·ASCII([[powershell-korean-encoding]]).
+
+---
 
 ### 세션 #31 — 2026-06-15 (Opus 4.8 1M, ★카테고리 분류 체계(대/중/소) + 게이밍의자→의자 타입 흡수 + 쿠팡 운영자추천 zone·정식 대가성 + 추천 8선 + 라이브 배포, 회귀 851 유지, main ea2460e)
 
@@ -97,39 +117,4 @@
 
 ---
 
-### 세션 #28 — 2026-06-14 (Opus 4.8 1M, ★쿠팡 하이브리드 글 — naver_blog식 원팝업 + 알리 데이터 결합(구글 SEO) + 쿠팡 공식배너 이미지, 회귀 782→806 · ※라이브 생성 미실행)
-
-**시작 상황**: #27 연속. "(A) 첫 글 생성" 중 글에 쿠팡 0개 → **15만원(쿠팡 API 게이트) 도달 경로 막힘** 지적. naver_blog(D:\naver_blog) 방식(키워드에 쿠팡 제품 미리 세팅→매일 자동 발행) 정밀 분석·이식 요청. 단 **구글 SEO가 기본 전제**.
-
-**정밀 분석 [확정]**: naver_blog = ①키워드 점수화(검색량/문서수/경쟁도='틈 찾기'·`keyword_scorer`) ②키워드 클릭→"쿠팡 배너 입력" 팝업→**"이 배너로 글 생성" 원클릭** ③스케줄러 ON. 네이버는 쿠팡 공식배너(`<a><img coupangcdn>`)가 본문 정상 렌더. **핵심 차이: naver_blog=네이버 vs honsalim=구글** — 구글은 데이터 없는 AI 어필리에이트 글 페널티(2025-12·DECISIONS T2) → **역제안 채택: naver_blog UX + honsalim 구글 무기(알리 판매량=Information Gain) 하이브리드**(DECISIONS C16).
-
-**핵심 진척 [확정]** (전부 로컬·머지됨·**DeepSeek 라이브 생성은 미실행**):
-1. **Part1 쿠팡 배너 이미지**: `coupang_manual.parse_banner`(배너→딥링크·이미지·상품명) + `build_manual_product`에 `image_url_external`(공식배너 **hotlink**·다운로드 아님→함정#3 무관). **article 상품카드가 image_url_external 사용**(`ARTICLE_PRODUCTS_SQL`+`product_card` 매크로 `img_url`, 알리·쿠팡 공용·우드톤 fallback). #24 "쿠팡 이미지 안 씀" → **B(공식배너 hotlink) 전환**(주인 결정).
-2. **Part2 쿠팡 우선**: 미리선택(target_products) 있는 키워드를 자동선정·목록 맨 위로(검색량 높은 알리보다 먼저).
-3. **PartA 하이브리드 결합**: `_gather_keyword_candidates`가 쿠팡(수동)+알리(자동수집·데이터) **결합**, 쿠팡(source=coupang)은 **항상 featured**. → 구글 Information Gain + 쿠팡 수익·이미지 동시(S1).
-4. **PartB 원팝업**(naver_blog식): `🛒 쿠팡 배너→글 생성` → 팝업(키워드 자동채움+배너 여러 개) → **"이 키워드로 글 생성"** 한 번 = `get_or_create`+`products_from_banners`(멀티)+첨부+하이브리드 생성. 오프스크린 검증.
-5. 회귀 **782→806**(+24). 린트 클린. 커밋 Part1 e721565·Part2 b3d4cf1·PartA a6c085d·PartB e353b74 (PR #14·#15 머지·메인 **7777c47**).
-
-**무인·안전(§0)**: 쿠팡 이미지=공식배너 hotlink. 추천/수집 무료·LLM은 생성 때만. articles 스키마 무손상. E7 유지(검토대기까지). **★라이브 생성은 주인이 다음 세션에서 안전하게 1회 — 이번 세션 미실행(주인 지시).**
-
-**잔존/다음(#29)**: ①**★라이브 테스트(최우선)**: 대시보드 재시작→`🛒 쿠팡 배너→글 생성`(키워드+쿠팡 공식배너 `<a><img>`)→미리보기로 쿠팡(이미지)+알리(데이터) 결합 확인(DeepSeek 비용·품질 1회). ②**PartC 키워드 '틈 점수'**(naver_blog `keyword_scorer` 차용·저경쟁 롱테일 우선·단 네이버 신호=구글 근사치). ③**PartD 자동 발행 ON**(스케줄러). ④#25~ 잔존: 아이콘 main 재지정·mini-dehumidifier·성장 Tier0. ★DB gitignore→재생성(`db migrate`+`db seed`). 워크트리=`PYTHONPATH=src python -m cli`.
-
----
-
-### 세션 #27 — 2026-06-14 (Opus 4.8 1M, ★'글 생성' 자동 키워드 선정(원클릭) + 발행큐 맨위 자동 + PR 자동화 논의, 회귀 782→787)
-
-**시작 상황**: #26 연속. 주인 "글 생성 누르면 키워드 선정부터 자동" 요청(쓸데없는 클릭 제거).
-
-**핵심 진척 [확정]**:
-1. **자동 글 생성**: `keyword_recommender.auto_pick_keyword`(대기 큐 맨 위 우선→없으면 정의된 방식 추천·추가) + `✨ 글 생성`이 선택 없으면 자동 선정→확인→생성. 정렬을 대시보드 목록과 일치(score↓·표시 맨 위=자동선정).
-2. **발행 큐 맨위 자동**: 승인/반려가 선택 없으면 맨 위 글 대상(`_selected_or_top`).
-3. **PR 자동화 논의**: gh 미설치·deny 룰 + 명령파일 자기수정 가드레일 → 자동화 보류·수동 PR 유지(권고안 A). 코드 머지는 안전 이슈 적음 인정.
-4. 회귀 **782→787**. 커밋 db7f4d0·323308f (PR #12·#13 머지).
-
-**무인·안전(§0)**: 자동 선정도 E7(검토대기까지)·비용 확인 유지. 자기수정/설치는 주인 가드레일 존중(우회 안 함).
-
-**잔존/다음(#28)**: 쿠팡 하이브리드로 이어짐.
-
----
-
-> (세션 #19~#26은 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
+> (세션 #19~#28은 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
