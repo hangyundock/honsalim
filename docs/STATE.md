@@ -7,11 +7,11 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#30: A 키워드 알리 영어검색 근본수정 + doctor 게이트 복구 + B 진행표시 + ★첫 라이브 글 발행 + 발행버그 적발 + 글 레이아웃 Tier1·★Tier2 종합 재설계** — A(`_gather_keyword_candidates`→`category_collect.search_tiers` 영어 티어, 미매핑 fail-closed)·doctor(`_load_module_from_path` sys.modules→exit 0)·B(`run_task` 진행바·상태·버튼). **첫 라이브 글=honsallim.com/articles/kw-e3d08a2c/(200·하이브리드 10상품)**. main 머지 3471248·7cb0168. 회귀 **851**. ★**적발: ①발행 build/site 커밋 버그(클릭만으론 404) ②file:// 미리보기 무스타일 ③글이 "텍스트벽=독서"→Tier2 블루프린트 확정(docs/ARTICLE_LAYOUT_TIER2.md)**. ★다음(#31)=글 레이아웃 Tier2 구현·발행버그 수정·미리보기 HTTP. 상세 EVENTS #30 | 2026-06-15 #30 |
+| 진행 단계 | **#31: ★카테고리 분류 체계(대/중/소) 구축 + 게이밍의자→'의자' 타입 흡수 + 쿠팡 운영자추천 zone·정식 대가성 + 추천 8선 + 라이브 배포** — 제품 종류(게이밍 등)=별도 카테고리 아닌 **타입 필터**(Baymard 과잉카테고리화 회피). office-chair→**"의자"**(사무용+게이밍 흡수, 타입=제품명 `_derive_type`). 인덱스 재설계(대분류·썸네일·타입칩), **category.html 재사용**. 쿠팡 상단 운영자추천 zone·정식 대가성(상단+옆·함정#4). 게이밍의자 글 **비공개+301 리다이렉트**(`_redirects`). 회귀 **851 유지**. main 직접푸시 **ea2460e**→CI 배포·라이브 검증(honsallim.com/categories/·office-chair). ★**다음 최우선(#32)=운영 DB 반영**(이 세션 승인 상태=의자·8선·LLM 가이드가 **워크트리 복사본 DB에만**·운영 DB 미반영). 상세 EVENTS #31 | 2026-06-15 #31 |
 | 운영 모델 | 자동 게시 활성(콘텐츠 큐). **refresh-cycle = 수동 운영(주인 직접 지시) — C13 [확정 #24], Claude 예약작업 비활성화**. 자동 "승인" 금지(E7→가드레일) | #24 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·Secrets·main-protect)·Cloudflare(도메인·Pages·R2·D1)·Anthropic·INDEXNOW 키·secrets·Git push·pre-commit 9종·Dependabot (세부 archive) | #3 |
 | Phase 2 핵심 모듈 (#3~#5) | cli·common·validator·writer·collector·enricher·builder·deployer·tracker·workers (세부 BACKEND §2) + **#17: category_collect·category_page_builder·concept_image·category_writer** | #17 |
-| Phase 2 회귀 테스트 | **851 / 851 PASS** [확정 pytest, #30] — #30 +5(A search_tiers·doctor 로더·B 진행표시) · #29 +40(미리보기 draft·적합성 가드·발행후 안전망). black·ruff·mypy 클린 | 2026-06-15 |
+| Phase 2 회귀 테스트 | **851 / 851 PASS** [확정 pytest, #31] — #31(카테고리 분류체계·타입필터·쿠팡 zone·301 리다이렉트 코드 — 테스트 수 유지) · #30 +5(A search_tiers·doctor 로더·B 진행표시). black·ruff·mypy 클린 | 2026-06-15 |
 | CLI 명령 (BACKEND §9) | **29개** — doctor·db·collect·collect-products·enrich·validate·approve·promote·unapprove·deploy·sync-slugmap·build(+`--preview`)·dashboard·collect-category·build-category·approve-category·unapprove-category(킬스위치)·register-categories(+`--auto-publish`)·auto-publish·category-status(+`--monitor`)·**refresh-cycle(#23)** · **#25 운영 대시보드: keyword-add·keyword-generate·keyword-list·reject·coupang-add·publish-queue·schedule** · **#26: keyword-recommend** · **#29: unpublish-article·republish-article·monitor-articles(발행후 안전망)·auto-cycle(무인 사이클·auto_mode ON일 때)** = **33개** | #29 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD. 세부 DECISIONS J·O + EVENTS | #4~#16 |
 | doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **71개** + #19 LLM 키 점검. 71/71 OK [#29 +keyword_relevance·article_state×2·article_guardrail×2·auto_approve] | #29 |
@@ -19,7 +19,7 @@
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (docs/ 참조). 일관성 모순 0건 | #2 |
 | 메모리 시스템 | feedback 7건([[incremental-critical-review]]·[[autonomous-safe-system]] 등) + reference market_research + MEMORY.md | #12 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
-| 사이트 게시글 / 트래픽 / 수익 | **라이브 공개 카테고리=5개** + **★첫 정식 글 1편=게이밍의자(honsallim.com/articles/kw-e3d08a2c/·#30·하이브리드 쿠팡1+알리)**. 글=새내기자취생 페르소나에서 링크(카테고리 페이지엔 안 나옴=정상·글≠카테고리). + 쿠팡 승인용 `/reviews/`. ★**현 라이브 글 레이아웃=구버전(텍스트벽)→#31 Tier2로 갱신 예정**(docs/ARTICLE_LAYOUT_TIER2.md). 측정(Cloudflare·GSC·네이버 누적). 수익=/go/→302 알리. `mini-dehumidifier` 가드레일 미달 자동비공개(점검 이월). collector.coupang(API)=15만원 후 | #30 |
+| 사이트 게시글 / 트래픽 / 수익 | **라이브 공개 카테고리=5개**(office-chair="**의자**"=사무용+게이밍 타입 필터·쿠팡 운영자추천 zone·추천 8선, #31). **정식 글 0편**(게이밍의자 글 #30→#31 '의자' 카테고리로 흡수·비공개+301 리다이렉트·종류=타입). + 쿠팡 승인용 `/reviews/`. 측정(Cloudflare·GSC·네이버 누적). 수익=/go/→302 알리. `mini-dehumidifier` 가드레일 미달 자동비공개(점검 이월). collector.coupang(API)=15만원 후 | #31 |
 
 ## 인프라
 
@@ -28,7 +28,7 @@
 | 프로젝트 폴더 | `D:\affiliate_hub\` (docs·archive·.claude/commands 하위) |
 | 사이트 / 도메인 | 혼살림 / **honsallim.com**(신·겹ㄹ·알리 'ali' 차단 회피·Cloudflare Pages 커스텀도메인 연결·SSL Active·**라이브**, 만료 2027-06-01·Auto Renew) + honsalim.com(구·만료 2027-05-28·**→honsallim 301 Page Rule** 적용·경로보존) |
 | 호스팅 | **Cloudflare Pages `honsalim`** + Custom domain (Dugi2020@naver.com) |
-| GitHub | **`hangyundock/honsalim` Public** — origin/main = **#29 (6f752d2 · B-i 무인 자동발행 + naver_blog GUI)**, CI green. **build-and-deploy: main push → 커밋된 build/site Cloudflare Pages 배포 (CI 재빌드 없음, 글 DB 로컬)**. #20 배포 success(run #39·#40) + CodeQL·lint ✅. ★**wrangler `pages deploy`에 `--commit-message=honsalim-auto-deploy`(ASCII)+`--commit-dirty=true` 명시** — git 한글 커밋메시지 CF 거부(code 8000111) 근본수정. ※로컬 main worktree는 뒤처짐 — 다음 워크트리는 origin/main 기준 |
+| GitHub | **`hangyundock/honsalim` Public** — origin/main = **#31 (ea2460e · 카테고리 분류체계+게이밍의자 흡수+쿠팡 zone)**, CI green. **build-and-deploy: main push → 커밋된 build/site Cloudflare Pages 배포 (CI 재빌드 없음, 글 DB 로컬)**. #20 배포 success(run #39·#40) + CodeQL·lint ✅. ★**wrangler `pages deploy`에 `--commit-message=honsalim-auto-deploy`(ASCII)+`--commit-dirty=true` 명시** — git 한글 커밋메시지 CF 거부(code 8000111) 근본수정. ※로컬 main worktree는 뒤처짐 — 다음 워크트리는 origin/main 기준 |
 | GitHub Secrets / Branch Protection | CF_API_TOKEN · CF_ACCOUNT_ID · INDEXNOW_KEY 등록 / ruleset `main-protect` Active |
 | R2 / D1 | `honsalim-images` (APAC) / `honsalim-clicks` ID `9bae858e-456f-40e7-8084-c3b90e4ec3ca` |
 | Python | 3.10 32-bit (TIMA·AutoBlog 시스템 공유) |
@@ -58,12 +58,12 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 다음 세션 #31 — 상세 EVENTS #30 / docs/ARTICLE_LAYOUT_TIER2.md
-1. **★글 레이아웃 Tier2 구현 (최우선)**: 글을 "독서(텍스트벽)"→"쇼핑(스캔)"으로 — 빠른결론박스·큐레이션 픽카드·비교표·체크박스·예산표·FAQ아코디언. LLM 구조화 출력 + 템플릿 시각 컴포넌트(카테고리 재사용). **목업 먼저 확정**. ★중복콘텐츠 회피(글=시나리오 큐레이션, 카테고리=전체 카탈로그·의도 분리). 전체 스펙=**docs/ARTICLE_LAYOUT_TIER2.md**.
-2. **★발행 build/site 자동커밋 버그**: `cmd_publish_queue`/`cmd_deploy`가 build/site 커밋 안 함→클릭만으론 404. 자동 커밋 단계 추가(무인 치명).
-3. **미리보기 file://→HTTP 서빙**: 미리보기 버튼이 절대경로 CSS/이미지를 file://로 못 띄움(무스타일). 로컬 HTTP 서빙으로 개선.
-4. (이월) PartC 키워드 틈점수 · off-target 씨앗 curation · mini-dehumidifier 점검 · ★성장 Tier0([[growth-first-priority]]).
-- ★DB gitignore→재생성(`db migrate`+`db seed`). 발행/배포=main 체크아웃(C13). 워크트리=`PYTHONPATH=src python -m cli`. main직접머지=`git push origin HEAD:main`.
+### ★ 다음 세션 #32 — 상세 EVENTS #31
+1. **★★운영 DB 반영 (최우선·중요)**: 이 세션 승인 상태(의자 카테고리·추천 8선·LLM 가이드)는 **워크트리 복사본 DB(`data/honsalim.db`)에만** 있고, 운영 DB(`D:\affiliate_hub\data\honsalim.db`)는 미반영(옛 상태·mtime 03:22 무변동). **워크트리 폐기 시 복사본 소멸 → 반영 필수.** 대시보드 닫고 백업 후 ①`scripts/apply_chair_taxonomy.py D:\affiliate_hub\data\honsalim.db`(rename·absorb·unpublish 멱등) + `build-category office-chair --no-dry-run`(LLM 재생성) + `approve-category office-chair`, OR ②복사본을 sqlite backup으로 운영 이식(승인 콘텐츠 그대로·권장). ※라이브(build/site·ea2460e)는 이미 배포·정상 — 운영 DB는 다음 빌드 일관성용.
+2. **부산물 정리**: `_fix_tax.py`(워크트리 루트 임시·삭제 가드 막힘) 제거 · abandoned `article.html`/`article.css`(카테고리 모방·0 published라 무해) 정리 검토 · `category_products.product_type` 컬럼(복사본만·미사용).
+3. (선택) 다른 카테고리(책상 등) 추천 8선 재빌드 · 모니터암·모니터 받침대 "모니터 거치"로 묶기.
+4. (이월) PartC 키워드 틈점수 · mini-dehumidifier 점검 · ★성장 Tier0([[growth-first-priority]]).
+- ★DB gitignore→재생성. 발행/배포=main 체크아웃(C13). 워크트리=`PYTHONPATH=src python -m cli`. main직접머지=`git push origin HEAD:main`. ★PowerShell 한글 파이프 깨짐→.py 파일 실행([[powershell-korean-encoding]]).
 
 ### Phase 2 진척 가능 (검토 의존 큼)
 - `src/builder/manifest.py` 증분 빌드 (ARCH §7·DB §10) · `src/collector/coupang.py` (Phase 4)

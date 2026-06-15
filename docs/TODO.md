@@ -3,17 +3,15 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #31 — (상세 EVENTS #30 / docs/ARTICLE_LAYOUT_TIER2.md)
+## ★ 다음 세션 #32 — (상세 EVENTS #31)
 
-- [ ] **★글 레이아웃 Tier2 구현 (최우선)** — 글을 "독서(텍스트벽)"→"쇼핑(스캔)"으로. 전체 블루프린트·근거·구현필드=**docs/ARTICLE_LAYOUT_TIER2.md**.
-  - **구조**: ⚡빠른 결론 박스 → 🏆큐레이션 픽 카드(역할배지·소스배지·장단점) → 본문 체크포인트 박스 → 📊한눈에 비교표(1위 강조) → 💰예산대별 표 → 🤝신뢰 박스 → ❓FAQ 아코디언.
-  - **(A) LLM enrich 구조화 출력**: `quick_verdict`·`picks[]`(역할·장단점·이런분께)·`checkpoints[]`·`budget_tiers[]`(+기존 faqs). graceful fallback. **(B) 템플릿**: 카테고리 시각 컴포넌트 재사용 + 빠른결론 박스 신규.
-  - ★**목업 먼저 확정** → 구현 → 미리보기 HTTP 검증 → 배포. ★**중복콘텐츠 회피**(글=시나리오 큐레이션·카테고리=전체, 의도 분리). 별점 금지·판매량=신뢰.
-  - Tier1(#30)에서 renderer 데이터플러밍(source·할인·판매량·본문분할·소스분리)·`product_card` 매크로 완료→**재사용**(article.html 레이아웃만 교체).
-- [ ] **★발행 build/site 자동커밋 버그 근본수정** — `cmd_publish_queue`/`cmd_deploy`가 build/site 커밋 안 함→클릭만으론 글 404(수동 커밋해야 라이브). 자동 커밋 단계 추가(무인 치명).
-- [ ] **미리보기 file://→HTTP 서빙** — 미리보기 버튼이 절대경로 CSS/이미지를 file://로 못 띄움(무스타일·이미지 안보임). 로컬 HTTP 서빙으로 충실한 미리보기.
-- (이월) PartC 키워드 틈점수 · off-target 씨앗 curation · `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장 Tier0([[growth-first-priority]]·트래픽이 진짜 병목).
-- 참고: 워크트리=`PYTHONPATH=src python -m cli` · DB gitignore→재생성(`db migrate`+`db seed`+`register-categories --all --no-dry-run`). 발행/배포=main 체크아웃. **main직접머지=`git push origin HEAD:main`**.
+- [ ] **★★운영 DB 반영 (최우선·중요)** — 이 세션 승인 상태(의자 카테고리·추천 8선·LLM 가이드)는 **워크트리 복사본 DB(`data/honsalim.db`)에만** 있음. 운영 DB(`D:\affiliate_hub\data\honsalim.db`)는 미반영(옛 상태). **워크트리 폐기 시 복사본 소멸 → 반영 필수.**
+  - 대시보드 닫고 **백업 후**: ① `scripts/apply_chair_taxonomy.py D:\affiliate_hub\data\honsalim.db`(rename·absorb·unpublish 멱등) + `build-category office-chair --no-dry-run`(LLM 8선·가이드 재생성·텍스트 달라짐) + `approve-category office-chair`, OR ② 워크트리 복사본을 sqlite backup으로 운영 이식(승인 콘텐츠 그대로·권장).
+  - ※라이브(build/site·ea2460e)는 이미 배포·정상. 운영 DB는 다음 빌드/대시보드 일관성용.
+- [ ] **부산물 정리** — `_fix_tax.py`(워크트리 루트 임시) 제거 · abandoned `article.html`/`article.css`(카테고리 모방·0 published라 무해) 정리 검토 · `category_products.product_type` 컬럼(복사본만·미사용·렌더는 이름 도출).
+- [ ] (선택) 다른 카테고리(책상 등) 추천 8선 재빌드 · 모니터암·모니터 받침대 "모니터 거치"로 묶기.
+- (이월) PartC 키워드 틈점수 · `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장 Tier0([[growth-first-priority]]·트래픽이 진짜 병목).
+- 참고: 워크트리=`PYTHONPATH=src python -m cli` · DB gitignore→재생성. 발행/배포=main 체크아웃. **main직접머지=`git push origin HEAD:main`**. ★PowerShell 한글 파이프 깨짐→.py 파일 실행([[powershell-korean-encoding]]).
 
 ## 시점 의존 잔존 (세션 #6~7)
 

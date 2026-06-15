@@ -271,6 +271,16 @@
 - **U2. 글(article) 레이아웃 = "카테고리 시각 언어 + 추천(롱테일) 의도 구조" [확정 #30, 리서치+주인]**: 글은 산문 텍스트벽("독서") 금지 → 시각 컴포넌트("쇼핑")로. 블루프린트: ⚡빠른결론박스→🏆큐레이션 픽카드(역할·소스·장단점)→체크포인트박스→📊비교표(1위강조)→💰예산표→🤝신뢰박스→❓FAQ아코디언. ①**결론 먼저**(NN/g F패턴) ②**전체 나열 X, 큐레이션 3~6 + 코멘터리** ③비교는 표 1개+1위 강조 ④가이드=시각 블록(텍스트는 그 안에·SEO 유지) ⑤**가짜 평점 금지→누적 판매량=신뢰**(별점 Review/AggregateRating 스키마=구글 수동조치 위험·금지) ⑥★**글 vs 카테고리 의도 분리**(카니발=같은 의도에서 옴·글=큐레이션/시나리오, 카테고리=전체 카탈로그). LLM 구조화 출력(`quick_verdict·picks·checkpoints·budget_tiers`)+카테고리 컴포넌트 재사용. 전체 스펙=docs/ARTICLE_LAYOUT_TIER2.md.
 - **U3. 발행/배포 = build/site 커밋 + git push origin main → CI [확정 #30]**: `cmd_deploy`는 `git push origin main`(skip_wrangler)→GitHub Action이 **커밋된 build/site**를 Cloudflare Pages 배포(재빌드 없음). ★**현 버그: `cmd_publish_queue`/`cmd_deploy`가 build/site를 커밋 안 함** → 발행 클릭만으론 글이 CI에 안 감(라이브 404), 수동 build/site 커밋 필요 → #31 근본수정(무인 치명).
 
+## V. 카테고리 분류 체계·쿠팡 배치·운영 반영 [확정] — 세션 #31 신규
+
+> Baymard/NN-g 리서치 + 주인 결정. 라이브 배포 검증. [[design-research-first]]·[[assist-not-overstep]]. 상세 EVENTS #31.
+
+- **V1. 분류 체계(대/중/소) = 제품 종류는 별도 카테고리 아닌 '타입 필터' [확정 #31, Baymard/NN-g]**: 제품 '종류/속성'(게이밍·사무용·메쉬 등)을 별도 카테고리로 만드는 건 **'과잉 카테고리화'**(Baymard: 이커머스 54% 최다 실수·"gaming laptops"류=카테고리 아닌 필터). 체계 = **대분류=그룹**(홈오피스/주방/생활)·**중분류=카테고리**(의자·책상·도마 = '사러 오는 물건 단위')·**소분류=타입 필터**(같은 카테고리 페이지 안·예 의자=사무용/게이밍). 깊이=넓고 얕게 2~3단계(NN-g). CATEGORY_PAGE §2-2 타입선택기 의도 일치. → **글(article)로 제품-종류 페이지 만들지 않음**(U2 글 레이아웃 방향은 #31 카테고리 흡수로 대체).
+- **V2. 게이밍의자 = '의자' 카테고리의 타입(흡수) [확정 #31]**: office-chair "사무용 의자"→**"의자"**(사무용+게이밍). 게이밍 글 제품 흡수. 타입=`renderer._derive_type`(제품명 키워드·DB 스키마 무변경·`CATEGORY_TYPE_RULES`). 카테고리 인덱스 재설계(대분류 섹션·대표 썸네일·타입칩, `_load_categories_index`+`GROUP_META`). category.html 그대로 재사용(타입 필터=`category.js` data-type). 추천 featured `featured_per_tier` 3→4(8선).
+- **V3. 쿠팡 배치 = 상단 별도 '운영자 추천' zone [확정 #31, 주인]**: 쿠팡(데이터 없는 공식 배너·구매)은 알리 데이터 추천(2티어·비교표·카탈로그)과 **분리**해 상단 별도 zone(`_category_coupang_pick`·source=coupang). #24 미결정(혼합 vs 분리) → **분리** 확정.
+- **V4. 쿠팡 대가성 = 정식 문구·페이지 내 명시 [확정 #31, 출처 쿠팡/공정위]**: 쿠팡 제품 있는 카테고리는 상단 고지 "쿠팡 파트너스 및 AliExpress…" + 쿠팡 zone 옆 **정식 문구** "이 게시물은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다"(함정#4·수익 몰수 회피). O9(고지 위치) 정합.
+- **V5. 카테고리 흡수로 비공개된 글 = 301 리다이렉트 [확정 #31]**: 흡수돼 unpublish된 글의 라이브 URL은 `renderer.REDIRECTS`→`build/site/_redirects`(Cloudflare Pages 301)로 후속 카테고리 영구 이전(404·SEO 손실 방지). 게이밍의자 글 `/articles/kw-e3d08a2c/`→`/categories/office-chair/`.
+
 ## 폐기된 결정 (역사 참조용)
 
 | 폐기일 | 결정 | 폐기 사유 |

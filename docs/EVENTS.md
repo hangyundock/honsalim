@@ -14,6 +14,7 @@
   - 세션 #23 (2026-06-03 무인 스케줄러 A안(refresh-cycle) 구축+모니터링 대시보드+메인 체크아웃 정비+쿠팡 활성화 착수·회귀 659→678)
   - 세션 #24 (2026-06-03~06 Tier0 SEO 품질강화+쿠팡 승인용 /reviews/+멀티채널·무인마케팅 전략(DECISIONS S·T)+스케줄러 수동전환+subprocess UTF-8 근본수정·회귀 678→693)
   - 세션 #25 (2026-06-14 ★운영 대시보드 전면 구축 PyQt5 GUI(키워드 큐·글생성·승인·발행·예약·쿠팡 수동·설정)+마이그레이션 007 keyword_queue·DB v7·회귀 693→773)
+  - 세션 #26 (2026-06-14 추천 키워드 생성 엔진(keyword_recommender)+대시보드 메뉴 순서 재정렬+노트북거치대 off-target exclude·회귀 773→782)
 - [EVENTS_202605.md](archive/EVENTS_202605.md):
   - 세션 #1 (2026-05-27 프로젝트 신규 셋업·정밀 조사·5파일 시스템·슬래시 명령 등록)
   - 세션 #2 (2026-05-27~28 Phase 0 설계 12/12 + Phase 1 외부 작업: GitHub·Cloudflare·도메인·R2·D1·Git push)
@@ -33,6 +34,23 @@
   - 세션 #18 (2026-05-31 운영자 1클릭 승인 게이트(O21·build-category draft 고정)·doctor §10 64진입점·★카테고리 페이지 디자인 디버깅(글씨 흐림 진짜원인=backdrop-filter 제거)·회귀 569→590)
 
 ## 최근 5세션
+
+### 세션 #31 — 2026-06-15 (Opus 4.8 1M, ★카테고리 분류 체계(대/중/소) + 게이밍의자→의자 타입 흡수 + 쿠팡 운영자추천 zone·정식 대가성 + 추천 8선 + 라이브 배포, 회귀 851 유지, main ea2460e)
+
+**시작 상황**: #30 연속 글 레이아웃 Tier2 → 주인 강한 비판(임의로 새 article.html 제작·기존 category.html 미사용·제품 적게/텍스트 위주). 방향 전면 재설정.
+
+**핵심 [확정]** (전부 라이브 배포·검증):
+1. **★분류 체계(대/중/소) 확립** [확정·Baymard/NN-g 근거]: 제품 종류(게이밍 등)는 별도 카테고리 아닌 **타입 필터**(Baymard '과잉 카테고리화'=54% 최다 실수). 대분류=그룹(홈오피스/주방/생활)·중분류=카테고리(의자·책상…)·소분류=타입(사무용/게이밍, 제품명 도출). CATEGORY_PAGE §2-2 의도 일치.
+2. **★게이밍의자→'의자' 흡수**: office-chair "사무용 의자"→**"의자"**, 게이밍 글 제품 흡수. 타입=`renderer._derive_type`(제품명 키워드·DB 스키마 무변경). 카테고리 인덱스 재설계(대분류 섹션·썸네일·타입칩). **category.html 그대로 재사용**(별도 글 템플릿 폐기).
+3. **★쿠팡 운영자추천 zone**(주인 결정): 쿠팡=상단 별도(배너·구매)/알리=2티어+비교표+카탈로그. 쿠팡 **정식 대가성**("이 게시물은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다")·상단+옆 이중(함정#4).
+4. 타입 필터(category.js)·**추천 8선**(featured_per_tier 3→4·의자 LLM 재빌드)·게이밍의자 글 **비공개+301 리다이렉트**(`_redirects`·`renderer.REDIRECTS`).
+5. 회귀 **851 유지**·린트 클린. main 직접 푸시 **ea2460e**→CI 배포·라이브 검증(honsallim.com/categories/·/categories/office-chair/).
+
+**★다음 세션 최우선 [미완·중요]**: **운영 DB 반영**. 이 세션 승인 상태(의자 카테고리·8선·LLM 가이드)는 **워크트리 복사본 DB(`data/honsalim.db`)에만** 존재. 운영 DB(`D:\affiliate_hub\data\honsalim.db`)는 미반영(옛 상태·mtime 03:22 무변동). **워크트리 폐기 시 복사본 소멸 → 반영 필수.** 방법: 대시보드 닫고 백업 후 ①`scripts/apply_chair_taxonomy.py D:\affiliate_hub\data\honsalim.db`(rename·absorb·unpublish 멱등) + `build-category office-chair --no-dry-run`(LLM 8선·가이드·단 텍스트 재생성) + `approve-category office-chair`, OR ②복사본을 sqlite backup으로 운영 이식(승인 콘텐츠 그대로·권장). ※라이브(build/site)는 이미 배포·정상 — 운영 DB는 다음 빌드 일관성용.
+
+**기술 부산물/선택 잔여**(상세 TODO #32): `_fix_tax.py`(임시·삭제 가드 막힘)·`product_type` 컬럼(복사본·미사용)·abandoned `article.html`/`article.css`(0 published·무해) 정리 · 다른 카테고리 8선 재빌드 · 메모리 `powershell-korean-encoding` 신설(한글 파이프 깨짐).
+
+---
 
 ### 세션 #30 — 2026-06-15 (Opus 4.8 1M, A 키워드 알리 영어검색 근본수정 + doctor 게이트 복구 + B 진행표시 + ★첫 라이브 글 발행 + 발행버그 적발 + 글 레이아웃 Tier1·Tier2 종합 재설계, 회귀 846→851, main 머지 3471248·7cb0168)
 
@@ -114,18 +132,4 @@
 
 ---
 
-### 세션 #26 — 2026-06-14 (Opus 4.8 1M, ★추천 키워드 생성 기능 + 대시보드 메뉴 순서 재정렬 + 노트북거치대 off-target 근본수정, 회귀 773→782)
-
-**시작 상황**: origin/main #25. 주인이 키워드 수동선정 대신 **추천 키워드 생성·목록·선택(없으면 자동 1순위)** + 탭 순서 실행 우선순위 요청("선정 방식은 이미 정의됨").
-
-**핵심 [확정]** (로컬·미배포·비용≈0):
-1. **추천 엔진** `writer/keyword_recommender.py`: "정의된 방식"(`keyword_research` 네이버 연관검색어→핵심어/거래성/검색량≥2000 필터→검색량순)을 SEO 씨앗에 적용. 큐/시나리오 중복 제외·네이버 실패→캐시 자가복원. CLI `keyword-recommend`(doctor 64→65) + 대시보드 🎯 버튼·`RecommendDialog`. 네이버 라이브 검증(컴퓨터의자 32,000 등).
-2. **메뉴 순서 재정렬**: 키워드→발행큐→카테고리·모니터링→설정.
-3. **off-target 근본수정**: 라이브서 `노트북 거치대`에 폰·태블릿·자전거 거치대 혼입→`seo_keywords.yml` laptop-stand `exclude_terms` 추가·재검증. (책·모니터 거치대는 편집 판단·미적용)
-4. 회귀 **773→782**. 린트 클린. CLI 28→**29**.
-
-**잔존/다음(#27)**: 머지+대시보드 재시작→추천→첫 글 생성. off-target 씨앗 추가 curation. 쿠팡 본격·성장 Tier0.
-
----
-
-> (세션 #19~#25는 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
+> (세션 #19~#26은 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
