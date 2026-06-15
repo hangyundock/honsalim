@@ -2336,7 +2336,9 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
     # 3. 자동 승인 (fail-closed — 적합성 검증 가능 + featured 적합만, 나머지 보류)
     conn = db.connect(db.DB_PATH)
     try:
-        ar = aa.auto_approve(conn, apply=live)
+        ar = aa.auto_approve(
+            conn, apply=live, min_published=int(settings.get("auto_approve_min_published", 5) or 5)
+        )
     finally:
         conn.close()
     print(f"     자동 승인 {len(ar['approved'])}편 · 보류 {len(ar['held'])}편")

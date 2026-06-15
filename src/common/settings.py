@@ -28,10 +28,14 @@ DEFAULTS: dict[str, Any] = {
     # ★B-i 완전 무인 자동 사이클(생성→자동승인→발행→사후모니터). 기본 OFF = 사람 게이트(E7) 유지.
     # 켜면 auto-cycle이 동작 — 자동 승인은 fail-closed(적합성 검증 가능+featured 적합만, 세션 #29).
     "auto_mode": False,
+    # 자동 승인 안전장치(세션 #33): 발행 이력이 이 수 미만이면 자동 승인 보류(초기 사람 검수 단계).
+    # 사람이 N편 직접 승인·발행해 품질을 확인한 뒤 자동 승인으로 전환(autonomous-safe-system).
+    "auto_approve_min_published": 5,
     # ── 추천/품질 ──
     "featured_per_tier": 3,  # 티어별 추천 수 (실속+고급 = 총 6). category_page_builder 정합
     "satisfaction_floor": 80.0,  # 알리 긍정 피드백율 하한 % (006 신호 필터)
-    "seo_max_attempts": 2,  # SEO 게이트 재생성 상한 (비용 과다청구 방지 — CLAUDE §6)
+    "seo_max_attempts": 2,  # SEO 게이트 재생성 상한 (카테고리 페이지 — 비용 방지 CLAUDE §6)
+    "enrich_max_attempts": 2,  # 키워드 글 5게이트 재생성 상한 (세션 #33 무인 자가복원 — 비용 방지)
     # ── 채널 ──
     "default_channel": "ali",  # 신규 키워드 기본 채널: ali | coupang | both
     "default_keyword_persona": None,  # 키워드 파생 시나리오 기본 페르소나 slug (None=첫 페르소나)

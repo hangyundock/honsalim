@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -92,3 +93,41 @@ class TestAutoCycleOrchestration:
         assert rc == 0
         assert kid in gen  # 대기 키워드 → 생성 호출
         assert pub == [1]  # 승인된 글 → publish-queue 호출(count=1)
+
+
+class TestAutoApproveSafetyGate:
+    """④ 세션 #33 — 초기 검수→자동 전환 안전장치: 발행 이력 N편 미만이면 자동 승인 보류."""
+
+    def _validated_draft(self, p: Path) -> Any:
+        from common import db
+        from writer import article_writer, state_machine
+
+        db.migrate(db_path=p)
+        db.seed(db_path=p)
+        conn = db.connect(p)
+        sid = conn.execute("SELECT id FROM scenarios ORDER BY id LIMIT 1").fetchone()[0]
+        did = article_writer.create_draft(conn, scenario_id=sid)
+        for st in ("enriched", "validated"):
+            state_machine.transition(conn, did, st)
+        conn.commit()
+        return conn
+
+    def test_holds_until_min_published(self, tmp_path: Path) -> None:
+        from writer import auto_approve as aa
+
+        conn = self._validated_draft(tmp_path / "t.db")
+        # published 0 < min_published 5 → 전체 보류(자동 승인 0), 사유는 초기 검수
+        res = aa.auto_approve(conn, apply=False, min_published=5)
+        assert res["approved"] == []
+        assert len(res["held"]) == 1
+        assert "초기 검수" in res["held"][0]["reason"]
+        conn.close()
+
+    def test_gate_off_when_min_zero(self, tmp_path: Path) -> None:
+        from writer import auto_approve as aa
+
+        conn = self._validated_draft(tmp_path / "t.db")
+        # min_published=0 → 게이트 없음(하위호환): eligible 단계로 진행, '초기 검수' 보류 아님
+        res = aa.auto_approve(conn, apply=False, min_published=0)
+        assert all("초기 검수" not in h["reason"] for h in res["held"])
+        conn.close()

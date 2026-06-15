@@ -72,14 +72,27 @@ def eligible(conn: sqlite3.Connection, draft_id: int) -> tuple[bool, str]:
     return True, "적합(게이트+적합성 통과)"
 
 
-def auto_approve(conn: sqlite3.Connection, *, apply: bool = True) -> dict[str, Any]:
+def auto_approve(
+    conn: sqlite3.Connection, *, apply: bool = True, min_published: int = 0
+) -> dict[str, Any]:
     """validated draft 전체 판정 → 적합한 것만 approved 전이(apply). 미달은 validated 유지(보류).
+
+    min_published: 발행 이력(published)이 이 수 미만이면 자동 승인 전체 보류 — 초기 사람 검수
+    단계(세션 #33 안전장치·autonomous-safe-system). 0이면 게이트 없음(하위호환). 사람이 N편
+    직접 승인·발행해 품질을 눈으로 확인한 뒤에만 자동 승인으로 전환(미탐<오탐).
 
     반환: {approved:[id], held:[{draft,reason}]}. 실패 격리 — 한 건이 다음을 막지 않는다.
     """
     rows = conn.execute("SELECT id FROM drafts WHERE status = 'validated' ORDER BY id").fetchall()
     approved: list[int] = []
     held: list[dict[str, Any]] = []
+    if min_published > 0:
+        pub = int(
+            conn.execute("SELECT COUNT(*) FROM drafts WHERE status = 'published'").fetchone()[0]
+        )
+        if pub < min_published:
+            reason = f"초기 검수 단계(발행 {pub}/{min_published}편) — 사람 승인 필요"
+            return {"approved": [], "held": [{"draft": int(r[0]), "reason": reason} for r in rows]}
     for r in rows:
         did = int(r[0])
         ok, reason = eligible(conn, did)
