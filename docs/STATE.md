@@ -7,11 +7,11 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#32: ★운영 DB 반영(#31 미완) + 쿠팡 카드 광고차단 폴백 + 운영 대시보드 4기능 + 쿠팡 3선 균형 라이브** — #31 승인상태(의자·8선·가이드)를 운영 DB에 안전 이식(주인 실행 런처·백업·검증·자동복구). 대시보드: 키워드 삭제(`cmd_keyword_delete`)·카테고리 쿠팡 추가/제거(`collector.category_coupang` 배너→products→category_products)·원스톱 빌드·배포(`cmd_build_deploy`=refresh_cycle 재사용 → EVENTS #30 'build/site 미커밋' 버그 근본 우회)·쿠팡존 flex 레이아웃. 광고차단 폴백(coupangcdn `/affiliate/banner/` 차단→플레이스홀더). 회귀 851→**865**. 배포 c27c3c2(폴백)→4118551(기능)→**e3a2219**(주인이 🚀 빌드·배포로 쿠팡 3선+레이아웃 라이브·검증). ★**다음 최우선(#33)=실제 제품 추가 배포 테스트**(주인 명시). 상세 EVENTS #32 | 2026-06-15 #32 |
+| 진행 단계 | **#33: ★무인 글 생성 파이프라인 완성** — naver_blog 정밀분석 후 혼살림 데이터로 적용(주인 "무인화·품질 기본·역제안" 지시). ①발행→라이브 버그 근본수정(publish-queue가 `refresh_cycle` 재사용=build/site commit+push, EVENTS #30 404 해소) ②무인 SEO 글 생성+자가복원 루프(cmd_enrich가 키워드→카테고리→seo_keywords 주입+5게이트 미달 피드백 재생성·seo_directive 밀도정합·disclosure 측정제외) ③winnable 키워드 선정(검색량×경쟁가중·compIdx 한글 확정) ④초기검수→자동전환 안전장치(auto_approve min_published=5). 무인 흐름=사람(씨앗+쿠팡예약)→[자동]키워드·생성·승인·발행·사후가드. **auto_mode 기본 OFF(안전)**. 실증=알리단독 글 5게이트 PASS. 회귀 865→**873**. main 8377a13·73b8dee·931c5ce·**3a96c49**(운영 동기화). 상세 EVENTS #33 | 2026-06-15 #33 |
 | 운영 모델 | 자동 게시 활성(콘텐츠 큐). **refresh-cycle = 수동 운영(주인 직접 지시) — C13 [확정 #24], Claude 예약작업 비활성화**. 자동 "승인" 금지(E7→가드레일) | #24 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·Secrets·main-protect)·Cloudflare(도메인·Pages·R2·D1)·Anthropic·INDEXNOW 키·secrets·Git push·pre-commit 9종·Dependabot (세부 archive) | #3 |
 | Phase 2 핵심 모듈 (#3~#5) | cli·common·validator·writer·collector·enricher·builder·deployer·tracker·workers (세부 BACKEND §2) + **#17: category_collect·category_page_builder·concept_image·category_writer** | #17 |
-| Phase 2 회귀 테스트 | **851 / 851 PASS** [확정 pytest, #31] — #31(카테고리 분류체계·타입필터·쿠팡 zone·301 리다이렉트 코드 — 테스트 수 유지) · #30 +5(A search_tiers·doctor 로더·B 진행표시). black·ruff·mypy 클린 | 2026-06-15 |
+| Phase 2 회귀 테스트 | **873 / 873 PASS** [확정 pytest, #33] — #33 +8(발행버그·무인 SEO글·자가복원·winnable·초기검수 안전장치) · #32 +14(대시보드 4기능) · #31 분류체계. black·ruff·mypy 클린 | 2026-06-15 |
 | CLI 명령 (BACKEND §9) | **29개** — doctor·db·collect·collect-products·enrich·validate·approve·promote·unapprove·deploy·sync-slugmap·build(+`--preview`)·dashboard·collect-category·build-category·approve-category·unapprove-category(킬스위치)·register-categories(+`--auto-publish`)·auto-publish·category-status(+`--monitor`)·**refresh-cycle(#23)** · **#25 운영 대시보드: keyword-add·keyword-generate·keyword-list·reject·coupang-add·publish-queue·schedule** · **#26: keyword-recommend** · **#29: unpublish-article·republish-article·monitor-articles·auto-cycle** · **#32: keyword-delete·category-coupang-add/list/remove·build-deploy** = **38개** | #32 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD. 세부 DECISIONS J·O + EVENTS | #4~#16 |
 | doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **71개** + #19 LLM 키 점검. 71/71 OK [#29 +keyword_relevance·article_state×2·article_guardrail×2·auto_approve] | #29 |
@@ -58,12 +58,12 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 다음 세션 #33 — 상세 EVENTS #32
-1. **★★실제 제품 추가 배포 테스트 (주인 명시·최우선)**: 이번 세션 만든 대시보드 기능(카테고리 쿠팡 추가/제거·키워드 삭제·🚀 빌드·배포)으로 **실제 쿠팡 제품을 카테고리에 추가 → 빌드·배포**해 동작 검증. 운영 폴더는 이미 #32(e3a2219) 동기화됨(추가 git pull 불요).
-2. **부산물 정리**: `category_products.product_type` 컬럼(운영 DB·미사용·렌더 무관) · 옛 워크트리들 · 바탕화면 런처 3폴더(`honsalim_db_apply`·`honsalim_update`·`혼살림DB반영`) 삭제(주인).
-3. (선택) 다른 카테고리 쿠팡 추가 · 추천 8선 재빌드 · 모니터암·모니터 받침대 묶기.
-4. (이월) PartC 키워드 틈점수 · mini-dehumidifier 점검 · ★성장 Tier0([[growth-first-priority]]).
-- ★DB gitignore→재생성. 운영 폴더=#32 동기화됨. 워크트리=`PYTHONPATH=src python -m cli`. main직접머지=`git push origin HEAD:main`. ★PowerShell/cmd 한글 깨짐→.py·ASCII([[powershell-korean-encoding]]).
+### ★ 다음 세션 #34 — 상세 EVENTS #33
+1. **★⑤ 완전 무인 가동**: 스케줄러가 현재 `publish-queue`(승인글 발행만) 등록 → **완전무인(생성+발행)은 `auto-cycle` 등록 보강 필요**(scheduler.py WRAPPER). + 주인이 글 몇 편 품질 확인 후 `auto_mode` ON(기본 OFF·안전).
+2. **auto_cycle 라이브 통합검증**: auto_mode ON으로 winnable→생성→자동승인→발행 전체 흐름 1회 라이브(주인 대시보드 확인).
+3. **임시파일 정리**: `_verify_kw.py`·`_inspect_draft.py`(#33 검증용·삭제 안전정책 막힘) — 주인 삭제 or 워크트리 폐기 시 소멸.
+4. (이월) `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장 Tier0([[growth-first-priority]]·트래픽 병목).
+- ★DB gitignore→재생성. 운영 폴더=#33 동기화됨. 워크트리=`PYTHONPATH=src python -m cli`. main직접머지=`git push origin HEAD:main`. ★PowerShell/cmd 한글 깨짐→.py·ASCII([[powershell-korean-encoding]]).
 
 ### Phase 2 진척 가능 (검토 의존 큼)
 - `src/builder/manifest.py` 증분 빌드 (ARCH §7·DB §10) · `src/collector/coupang.py` (Phase 4)

@@ -3,12 +3,12 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #33 — (상세 EVENTS #32)
+## ★ 다음 세션 #34 — (상세 EVENTS #33)
 
-- [ ] **★★실제 제품 추가 배포 테스트 (주인 명시·최우선)** — 이번 세션 만든 대시보드 기능(카테고리 쿠팡 추가/제거·키워드 삭제·🚀 빌드·배포)으로 **실제 쿠팡 제품을 카테고리에 추가 → 빌드·배포** 하여 동작 검증. 운영 폴더는 #32(e3a2219) 동기화 완료(추가 git pull 불요·대시보드 재시작만).
-- [ ] **부산물 정리** — `category_products.product_type` 컬럼(운영 DB·미사용·렌더 무관) · 옛 워크트리들 · 바탕화면 런처 3폴더(`honsalim_db_apply`·`honsalim_update`·`혼살림DB반영`) 삭제(주인).
-- [ ] (선택) 다른 카테고리 쿠팡 추가 · 추천 8선 재빌드 · 모니터암·모니터 받침대 "모니터 거치"로 묶기.
-- (이월) PartC 키워드 틈점수 · `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장 Tier0([[growth-first-priority]]·트래픽이 진짜 병목).
+- [ ] **★⑤ 완전 무인 가동** — 스케줄러가 현재 `publish-queue`(승인글 발행만) 등록 → **완전무인(생성+발행)은 `auto-cycle` 등록 보강 필요**(scheduler.py WRAPPER). + 주인이 글 몇 편 품질 확인 후 `auto_mode` ON(기본 OFF·안전).
+- [ ] **auto_cycle 라이브 통합검증** — auto_mode ON으로 winnable→생성→자동승인→발행 전체 1회 라이브(주인 대시보드 확인).
+- [ ] **임시파일 정리** — `_verify_kw.py`·`_inspect_draft.py`(#33 검증용·삭제 안전정책 막힘) 주인 삭제 or 워크트리 폐기 시 소멸.
+- (이월) `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장 Tier0([[growth-first-priority]]·트래픽이 진짜 병목).
 - 참고: 워크트리=`PYTHONPATH=src python -m cli` · DB gitignore→재생성. **main직접머지=`git push origin HEAD:main`**. ★PowerShell/cmd 한글 깨짐→.py·ASCII([[powershell-korean-encoding]]).
 
 ## 시점 의존 잔존 (세션 #6~7)
