@@ -47,19 +47,23 @@ def _split_title_body(body_md: str, explicit_title: str) -> tuple[str, str]:
 
     explicit_title이 있으면 그것을 title로 쓰고, H1 줄은 산문에서 제외만 한다.
     H1이 없으면 explicit_title을 title로, 본문 전체를 산문으로 본다.
+
+    ★세션 #33: H1(제목) **앞**의 줄(시스템이 맨 앞에 삽입하는 공정위 disclosure 문구·서문)은
+    산문 측정에서 제외한다. disclosure는 SEO 콘텐츠가 아닌데 도입부 앞 N자를 차지해
+    intro_no_keyword·밀도 측정을 왜곡하던 버그의 근본 수정(disclosure 존재는 별도 게이트가 검증).
     """
     title = (explicit_title or "").strip()
-    prose_lines: list[str] = []
-    h1_done = False
-    for line in body_md.splitlines():
-        if not h1_done:
-            m = re.match(r"^\s*#\s+(.+?)\s*$", line)
-            if m:
-                h1_done = True
-                if not title:
-                    title = m.group(1).strip()
-                continue  # 제목 줄은 산문 측정에서 제외
-        prose_lines.append(line)
+    lines = body_md.splitlines()
+    h1_idx = -1
+    for i, line in enumerate(lines):
+        m = re.match(r"^\s*#\s+(.+?)\s*$", line)
+        if m:
+            h1_idx = i
+            if not title:
+                title = m.group(1).strip()
+            break
+    # H1이 있으면 그 이후만 산문(앞 서문·disclosure 제외). H1이 없으면 전체(현행 보존).
+    prose_lines = lines[h1_idx + 1 :] if h1_idx >= 0 else lines
     return title, "\n".join(prose_lines)
 
 

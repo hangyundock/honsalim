@@ -101,6 +101,9 @@ class GenerateRequest:
     # SEO 키워드 세트 {primary, secondary} (seo_keywords.gate_config 형태). 세션 #15.
     # 있으면 build_user_prompt가 2층 키워드 배치 지시를 프롬프트에 주입. 없으면 무영향.
     seo: dict[str, Any] = field(default_factory=dict)
+    # 재생성 피드백 — 직전 생성의 게이트 미달 issues. 있으면 프롬프트에 보완 지시로 주입(세션 #33
+    # 무인 자가복원 루프 — category_writer 패턴 미러). 없으면(첫 생성) 무영향.
+    feedback: list[str] | None = None
 
 
 @dataclass
@@ -147,7 +150,7 @@ def build_user_prompt(request: GenerateRequest) -> str:
 
     seo = request.seo or {}
     seo_directive = build_seo_directive(seo.get("primary"), seo.get("secondary"))
-    return prompt_loader.render(
+    prompt = prompt_loader.render(
         "article_main",
         scenario=request.scenario,
         products=request.products,
@@ -156,6 +159,10 @@ def build_user_prompt(request: GenerateRequest) -> str:
         persona=request.persona,
         seo_directive=seo_directive,
     )
+    # 재생성 피드백 주입(세션 #33) — 직전 게이트 미달 issues를 보완 지시로. category_writer 미러.
+    if request.feedback:
+        prompt += "\n\n## 지난 생성의 게이트 미달 — 반드시 보완\n- " + "\n- ".join(request.feedback)
+    return prompt
 
 
 # ── LLM 백엔드 라우팅 (세션 #19) ──────────────────────────────────────────

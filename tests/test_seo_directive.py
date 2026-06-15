@@ -37,12 +37,13 @@ class TestBuildDirective:
         out = build_seo_directive(PRIMARY, ["컴퓨터의자", "  ", ""])
         assert "컴퓨터의자" in out
 
-    def test_caps_repetition_and_bans_absolutes(self) -> None:
-        # 세션 #19(A): 통째 반복 금지·대체 표현·밀도 상한·단정/과장 표현 금지 — DeepSeek 과밀 대책
+    def test_density_range_and_bans_absolutes(self) -> None:
+        # 세션 #33: 게이트 정합 — 정확형 밀도 하한(1.0%) 확보 + 상한(3%) 도배 금지 + 단정/과장 금지.
+        # (세션 #19 '정확형 억제' 과교정으로 하한 미달하던 것을 게이트 범위와 정합하게 수정)
         out = build_seo_directive("노트북 거치대", [])
-        assert "통째로 반복하지" in out  # 키워드 통째 반복 금지
-        assert "3% 이내" in out  # 밀도 상한 명시
-        assert "제품" in out  # 대체 표현 안내
+        assert "1.0~1.7%" in out  # 밀도 하한 확보 범위 명시(게이트 정합)
+        assert "3% 초과" in out  # 도배 상한 금지
+        assert "거치대" in out  # 대체 표현(short form) 안내
         assert "무조건" in out and "절대" in out  # 단정·과장 금지 어휘
 
     def test_short_form_substitution(self) -> None:

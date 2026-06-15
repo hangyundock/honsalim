@@ -558,7 +558,7 @@ def cmd_enrich(args: argparse.Namespace) -> int:
         row = conn.execute(
             """
             SELECT s.slug, s.title_ko, s.season_peak, s.description,
-                   p.slug, p.title_ko, p.description, p.age_range, d.raw_payload
+                   p.slug, p.title_ko, p.description, p.age_range, d.raw_payload, d.keyword_id
             FROM drafts d
             JOIN scenarios s ON d.scenario_id = s.id
             JOIN personas p ON s.persona_id = p.id
@@ -594,8 +594,25 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                     products = rp["candidates"]
             except (json.JSONDecodeError, TypeError):
                 products = []
-        req = GenerateRequest(scenario=scenario_dict, persona=persona_dict, products=products)
+        # ★세션 #33 — SEO 키워드 세트 주입: 키워드 경로 글도 카테고리 SEO 최적화·검증을 받게 한다.
+        # 미주입 시 validator seo 게이트가 skip돼 무인 글이 SEO 미검증으로 양산되던 갭(실증 발견).
+        # 키워드 → 카테고리(resolve_category) → seo_keywords.gate_config → 프롬프트 지시 + seo 게이트 활성.
+        seo_cfg: dict[str, Any] = {}
+        keyword_id = row[9]
+        if keyword_id:
+            kwrow = conn.execute(
+                "SELECT keyword FROM keyword_queue WHERE id = ?", (keyword_id,)
+            ).fetchone()
+            if kwrow and kwrow[0]:
+                from collector import keyword_relevance, seo_keywords
 
+                cat_slug = keyword_relevance.resolve_category(str(kwrow[0]))
+                if cat_slug:
+                    seo_cfg = seo_keywords.gate_config(cat_slug) or {}
+                    if seo_cfg:
+                        print(
+                            f"     SEO 주입: 카테고리 {cat_slug} (primary={seo_cfg.get('primary')!r})"
+                        )
         import os
 
         api_key = None
@@ -603,39 +620,17 @@ def cmd_enrich(args: argparse.Namespace) -> int:
             config.load_secrets()
             api_key = os.environ.get("ANTHROPIC_API_KEY")
         client = ClaudeClient(api_key=api_key)
-        result = client.generate_article(req, dry_run=args.dry_run)
 
         from writer import article_writer, state_machine
 
-        # 라이브: 응답을 META-JSON + BODY-MARKDOWN으로 분리해 본문을 영구 저장.
-        # 분리 실패 시 본문 미저장·상태 전이 없음(돈만 쓰고 stub 저장 방지).
-        if not args.dry_run:
-            from enricher.claude_client import (
-                ArticleResponseError,
-                is_truncated,
-                split_article_response,
-            )
-
-            if not result.response_text:
-                print(f"{FAIL} 라이브 응답 본문 비어있음 — 저장 안 함")
-                return 3
-            if is_truncated(result):
-                print(
-                    f"{FAIL} 응답이 max_tokens({client.max_tokens})에서 잘림 — "
-                    "본문 미완성. max_tokens 상향 또는 본문 축소 필요 (저장 안 함)"
-                )
-                return 3
-            try:
-                meta, body_md = split_article_response(result.response_text)
-            except ArticleResponseError as e:
-                print(f"{FAIL} 응답 형식 오류(META-JSON/BODY 분리 실패): {e}")
-                return 3
-            # 모델이 선언한 featured 상품(deeplink_slug)만 검증·게시 대상으로 — 후보 풀 전체가
-            # 아니라 글이 실제 추천한 상품만 truth 가격 검증을 받아야 정확 (id는 식별용).
+        def _build_enriched_payload(
+            meta: dict[str, Any], body_md: str, usage: dict[str, int]
+        ) -> dict[str, Any]:
+            """META-JSON + 본문 → featured 선별·disclosure·schema_jsonld 포함 enriched_payload 조립."""
+            # 모델이 선언한 featured 상품(deeplink_slug)만 검증·게시 대상. 쿠팡(수동)은 항상 featured
+            # (수익원·세션 #28). 알리는 LLM 선언분(featured_products)만.
             declared = meta.get("featured_products")
             slug_set = {str(s).strip() for s in declared} if isinstance(declared, list) else set()
-            # 운영자가 고른 쿠팡(수동)은 LLM 선언과 무관하게 항상 featured — 의도적 선택·수익원
-            # (세션 #28 PartA). 알리는 LLM이 데이터 기반으로 선별(featured_products 선언분만).
             featured = [
                 {**c, "id": c.get("source_product_id")}
                 for c in products
@@ -643,24 +638,20 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                 or str(c.get("source") or "").lower() == "coupang"
             ]
             if products and not featured:
-                print(
-                    f"{WARN} featured_products 미선언/미매칭 — truth 가격 검증 대상 0개 "
-                    "(모델이 추천 상품 ID를 안 냈거나 ID 불일치)"
-                )
+                print(f"{WARN} featured_products 미선언/미매칭 — truth 가격 검증 대상 0개")
 
-            # disclosure는 featured 상품의 실제 제휴처를 반영 (공정위 정확성). source 없으면
-            # deeplink_slug 접두어(ali-)로 추정. featured 비면 전체 후보로 fallback.
+            # disclosure는 featured 상품의 실제 제휴처 반영(공정위 정확성). source 없으면 ali- 접두어 추정.
             def _affiliate_of(c: dict[str, Any]) -> str | None:
                 if c.get("source"):
                     return str(c["source"]).lower()
-                slug = str(c.get("deeplink_slug") or "")
-                return "aliexpress" if slug.startswith("ali-") else None
+                sl = str(c.get("deeplink_slug") or "")
+                return "aliexpress" if sl.startswith("ali-") else None
 
             affiliates = {a for c in (featured or products) if (a := _affiliate_of(c))}
-            # POLICY §2-2/§2-3 disclosure 자동 삽입 (모델 미작성 — 시스템 책임). 멱등 + 제휴처 인지형.
-            body_md = article_writer.apply_disclosure(body_md, sources=affiliates)
-            enriched_payload: dict[str, Any] = {
-                "body_md": body_md,
+            # POLICY §2-2/§2-3 disclosure 자동 삽입(모델 미작성 — 시스템 책임). 멱등 + 제휴처 인지형.
+            disclosed = article_writer.apply_disclosure(body_md, sources=affiliates)
+            payload: dict[str, Any] = {
+                "body_md": disclosed,
                 "title": meta.get("title"),
                 "summary": meta.get("summary"),
                 "meta_description": meta.get("meta_description"),
@@ -668,17 +659,17 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                 "faqs": meta.get("faqs", []),
                 "products": featured,
                 "candidate_count": len(products),
-                "usage": result.usage,
+                "usage": usage,
                 "model": client.model,
+                "seo": seo_cfg,
             }
-            # schema 게이트용 Article JSON-LD. image_url·published_at은 임시값
-            # (실제 대표 이미지는 Phase 3 AI 생성, 실제 발행일은 promote 시 확정).
+            # schema 게이트용 Article JSON-LD. image_url·published_at은 임시값(발행 시 확정).
             from datetime import date
 
             from builder import build_article_jsonld
 
             try:
-                enriched_payload["schema_jsonld"] = build_article_jsonld(
+                payload["schema_jsonld"] = build_article_jsonld(
                     meta=meta,
                     scenario={"slug": scenario_dict["slug"]},
                     site_base_url=SITE_ORIGIN,
@@ -686,16 +677,83 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                     published_at=date.today().isoformat(),
                 )
             except ValueError as e:
-                print(
-                    f"{WARN} schema_jsonld 생성 실패(메타 필드 부족): {e} — validate schema 게이트 막힘"
-                )
-        else:
+                print(f"{WARN} schema_jsonld 생성 실패(메타 필드 부족): {e}")
+            return payload
+
+        enriched_payload: dict[str, Any]
+        if args.dry_run:
+            req = GenerateRequest(
+                scenario=scenario_dict, persona=persona_dict, products=products, seo=seo_cfg
+            )
+            result = client.generate_article(req, dry_run=True)
             enriched_payload = {
                 "dry_run": True,
                 "user_prompt_preview": result.user_prompt[:500],
                 "system_blocks_count": len(result.system_blocks),
                 "products_count": len(products),
             }
+        else:
+            # ★세션 #33 — 무인 자가복원 재생성 루프: 5게이트 미달이면 issues를 피드백으로 최대 N회
+            # 재생성(category_page_builder 패턴 미러). 게이트 기준은 절대 안 낮추고 생성 품질을 끌어올린다.
+            # 비용 상한(enrich_max_attempts) — tistory 과금 사고 교훈(seo_regenerate 정신).
+            from enricher.claude_client import (
+                ArticleResponseError,
+                is_truncated,
+                split_article_response,
+            )
+            from validator import serialize_report, validate_all
+
+            max_attempts = int(settings.get("enrich_max_attempts", 2) or 2)
+            feedback: list[str] | None = None
+            enriched_payload = {}
+            passed = False
+            for attempt in range(1, max_attempts + 1):
+                req = GenerateRequest(
+                    scenario=scenario_dict,
+                    persona=persona_dict,
+                    products=products,
+                    seo=seo_cfg,
+                    feedback=feedback,
+                )
+                result = client.generate_article(req, dry_run=False)
+                if not result.response_text:
+                    feedback = [
+                        "직전 응답 본문이 비었습니다. META-JSON과 BODY-MARKDOWN을 정확히 출력하세요."
+                    ]
+                    print(f"     [시도 {attempt}] 빈 응답 — 재생성")
+                    continue
+                if is_truncated(result):
+                    feedback = [
+                        "직전 응답이 잘렸습니다(max_tokens). 본문을 약 2,000~2,500자로 더 간결히 쓰세요."
+                    ]
+                    print(f"     [시도 {attempt}] 응답 잘림 — 재생성")
+                    continue
+                try:
+                    meta, body_md = split_article_response(result.response_text)
+                except ArticleResponseError as e:
+                    feedback = [
+                        f"응답 형식 오류({e}). META-JSON + BODY-MARKDOWN 두 블록으로 분리 출력하세요."
+                    ]
+                    print(f"     [시도 {attempt}] 형식 오류 — 재생성")
+                    continue
+                enriched_payload = _build_enriched_payload(meta, body_md, result.usage)
+                report = serialize_report(validate_all(enriched_payload))
+                if report["overall_pass"]:
+                    passed = True
+                    print(f"     게이트 통과 (시도 {attempt}/{max_attempts})")
+                    break
+                feedback = [i for g in report["gates"].values() for i in g.get("issues", [])]
+                print(
+                    f"     게이트 미달 (시도 {attempt}/{max_attempts}) — 재생성: "
+                    f"{'; '.join(feedback)[:140]}"
+                )
+            if not enriched_payload:
+                print(f"{FAIL} {max_attempts}회 생성 모두 응답/형식 실패 — 저장 안 함")
+                return 3
+            if not passed:
+                print(
+                    f"{WARN} 게이트 미통과 — 마지막 시도 저장(검토 대기), cmd_validate가 최종 판정"
+                )
 
         state_machine.transition(
             conn,
