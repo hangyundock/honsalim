@@ -8,27 +8,8 @@
   <script defer src="{{ asset_base | default('/static') }}/js/category.js?v={{ asset_version | default('') }}"></script>
 {% endblock %}
 
-{# 추천 6선 비교 카드 (💰실속/⭐고급 공용). area = 데스크톱 그리드 배치(row/col) — 좌우 같은 행 정렬용 #}
-{% macro pick_card(p, area='') %}
-<div class="tcard"{% if area %} style="grid-area: {{ area }}"{% endif %}>
-  <div class="trank">{% if p.type %}<b>{{ p.type }}</b>{% endif %}</div>
-  <a class="timg" href="{{ p.url }}" rel="sponsored nofollow">
-    {% if p.img_url %}<img loading="{{ 'eager' if eager_images else 'lazy' }}" decoding="async" src="{{ p.img_url }}" alt="{{ p.name }}" onerror="if(!this.dataset.r){this.dataset.r='1';this.src=this.src.split('?')[0]+'?r='+Date.now()}else{this.style.display='none'}">{% endif %}
-  </a>
-  <div class="tnm"><a href="{{ p.url }}" rel="sponsored nofollow" style="color:inherit;text-decoration:none">{{ p.name }}</a></div>
-  <div class="tpriceline">
-    <a href="{{ p.url }}" rel="sponsored nofollow" class="tprice" style="text-decoration:none">{{ p.price }}</a>
-    {% if p.disc %}<span class="tsig">정가 <s>{{ p.orig }}</s> · <b class="off">{{ p.disc }}↓</b></span>{% endif %}
-  </div>
-  {% if p.volume %}<div class="tvol">🔥 알리 판매량 <b>{{ p.volume }}</b><span class="dim"> · 판매처 기준</span></div>{% endif %}
-  {% if p.pros %}<div class="pc-group"><div class="pc-label pros">장점</div>
-    <ul class="tpc">{% for x in p.pros %}<li class="pro">{{ x }}</li>{% endfor %}</ul></div>{% endif %}
-  {% if p.cons %}<div class="pc-group"><div class="pc-label cons">단점</div>
-    <ul class="tpc">{% for x in p.cons %}<li class="con">{{ x }}</li>{% endfor %}</ul></div>{% endif %}
-  {% if p.reason %}<div class="tfor"><b>추천 대상</b> · {{ p.reason }}</div>{% endif %}
-  <div class="tbtns"><a class="btn primary" href="{{ p.url }}" rel="sponsored nofollow">최저가/구매 →</a></div>
-</div>
-{% endmacro %}
+{# 추천 비교 카드 매크로 — 글 페이지와 공유(_macros/cards.html). eager_images 사용 → with context #}
+{% from "_macros/cards.html" import pick_card with context %}
 
 {% block main %}
 <div class="catbar">
@@ -44,7 +25,7 @@
   {# 공정위 고지 — 최상단 (2024.12 개정) #}
   <div class="disc">
     <span>ⓘ</span>
-    <span><b>대가성 안내</b> · 이 페이지에는 AliExpress 어필리에이트 활동의 일환으로 일정 수수료를 제공받습니다. (구매자에게 추가 비용은 발생하지 않습니다.)</span>
+    <span><b>대가성 안내</b> · 이 페이지에는 {% if has_coupang %}쿠팡 파트너스 및 {% endif %}AliExpress 어필리에이트 활동의 일환으로 일정 수수료를 제공받습니다. (구매자에게 추가 비용은 발생하지 않습니다.)</span>
   </div>
 
   {# 타입 선택기 — 추천 6선 썸네일 + 전체 보기 #}
@@ -76,6 +57,18 @@
   {% if pillar_link %}
   {# 필러 백링크 — 허브-스포크 토픽 클러스터(세션 #24) #}
   <p style="margin:12px 0 4px"><a href="{{ pillar_link.url }}" style="color:#1a7f55;font-weight:600;text-decoration:none">📂 {{ pillar_link.title }} 전체 보기 →</a></p>
+  {% endif %}
+
+  {# 쿠팡 운영자 추천 — 상단 별도 zone(주인 결정 #31). 대가성=쿠팡 파트너스 정식 문구(함정 #4) #}
+  {% if has_coupang %}
+  <div class="coupang-head">
+    <p class="cp-lead">쿠팡에서 <b>운영자가 직접 고른</b> 제품입니다. (로켓배송·공식 판매)</p>
+    <div class="sechead"><h2>혼살림이 직접 고른 쿠팡 제품</h2></div>
+    <p class="cp-disc-line"><b class="cp-disc">이 게시물은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</b> 구매자에게 추가 비용은 발생하지 않습니다.</p>
+  </div>
+  <div class="coupang-picks">
+    {% for p in coupang_picks %}{{ pick_card(p) }}{% endfor %}
+  </div>
   {% endif %}
 
   {% if category.has_guide %}
@@ -177,12 +170,16 @@
     <span class="sort on" data-sort="reco">추천순</span><span class="sort" data-sort="price">낮은 가격순</span><span class="sort" data-sort="disc">할인율 높은순</span>
   </div>
   <div class="filters">
+    {% if catalog_types %}
+    {# 타입(소분류) 필터 — 의자=사무용/게이밍 등(세션 #31). 카탈로그에 실제 있는 타입만. #}
+    <div class="frow" id="catType"><span class="fl">타입</span><span class="chip on" data-type="all">전체</span>{% for t in catalog_types %}<span class="chip" data-type="{{ t }}">{{ t }}</span>{% endfor %}</div>
+    {% endif %}
     <div class="frow" id="catTier"><span class="fl">티어</span><span class="chip on" data-tier="all">전체</span><span class="chip" data-tier="budget">💰 실속형</span><span class="chip" data-tier="premium">⭐ 고급형</span></div>
   </div>
   <div class="countbar"><span id="catCount">전체 <b>{{ products | length }}</b>개 · 추천순</span><span>가격·할인 기준 정렬</span></div>
   <div class="grid" id="catGrid">
     {% for p in products %}
-    <div class="card" data-tier="{{ p.tier }}" data-price="{{ p.price_num }}" data-disc="{{ p.disc_num }}" data-idx="{{ loop.index0 }}">
+    <div class="card" data-tier="{{ p.tier }}" data-type="{{ p.type }}" data-price="{{ p.price_num }}" data-disc="{{ p.disc_num }}" data-idx="{{ loop.index0 }}">
       <div class="badges"><span class="tier t-{{ p.tier }}">{{ p.tier_label }}</span></div>
       <a class="img" href="{{ p.url }}" rel="sponsored nofollow">{% if p.img_url %}<img loading="{{ 'eager' if eager_images else 'lazy' }}" decoding="async" src="{{ p.img_url }}" alt="{{ p.name }}" onerror="if(!this.dataset.r){this.dataset.r='1';this.src=this.src.split('?')[0]+'?r='+Date.now()}else{this.style.display='none'}">{% endif %}</a>
       <div class="nm"><a href="{{ p.url }}" rel="sponsored nofollow" style="color:inherit;text-decoration:none">{{ p.name }}</a></div>

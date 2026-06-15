@@ -1,0 +1,25 @@
+{# ===== 공용 제품 카드 매크로 — 카테고리·글 페이지 공유 (세션 #31) =====
+   category.html에 있던 pick_card를 독립 파일로 분리(base를 extends하는 템플릿에서 import하면
+   블록이 평가돼 깨지는 문제 회피). eager_images(전역 컨텍스트) 사용 → import 시 `with context`. #}
+
+{# 추천 비교 카드 (💰실속/⭐고급/운영자추천 공용). area = 데스크톱 그리드 배치(row/col) — 좌우 같은 행 정렬용 #}
+{% macro pick_card(p, area='') %}
+<div class="tcard"{% if area %} style="grid-area: {{ area }}"{% endif %}>
+  <div class="trank">{% if p.type %}<b>{{ p.type }}</b>{% endif %}</div>
+  <a class="timg" href="{{ p.url }}" rel="sponsored nofollow">
+    {% if p.img_url %}<img loading="{{ 'eager' if eager_images else 'lazy' }}" decoding="async" src="{{ p.img_url }}" alt="{{ p.name }}" onerror="if(!this.dataset.r){this.dataset.r='1';this.src=this.src.split('?')[0]+'?r='+Date.now()}else{this.style.display='none'}">{% endif %}
+  </a>
+  <div class="tnm"><a href="{{ p.url }}" rel="sponsored nofollow" style="color:inherit;text-decoration:none">{{ p.name }}</a></div>
+  <div class="tpriceline">
+    <a href="{{ p.url }}" rel="sponsored nofollow" class="tprice" style="text-decoration:none">{{ p.price }}</a>
+    {% if p.disc %}<span class="tsig">정가 <s>{{ p.orig }}</s> · <b class="off">{{ p.disc }}↓</b></span>{% endif %}
+  </div>
+  {% if p.volume %}<div class="tvol">🔥 알리 판매량 <b>{{ p.volume }}</b><span class="dim"> · 판매처 기준</span></div>{% endif %}
+  {% if p.pros %}<div class="pc-group"><div class="pc-label pros">장점</div>
+    <ul class="tpc">{% for x in p.pros %}<li class="pro">{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+  {% if p.cons %}<div class="pc-group"><div class="pc-label cons">단점</div>
+    <ul class="tpc">{% for x in p.cons %}<li class="con">{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+  {% if p.reason %}<div class="tfor"><b>추천 대상</b> · {{ p.reason }}</div>{% endif %}
+  <div class="tbtns"><a class="btn primary" href="{{ p.url }}" rel="sponsored nofollow">최저가/구매 →</a></div>
+</div>
+{% endmacro %}

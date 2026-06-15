@@ -366,10 +366,14 @@ class TestRenderArticleDetail:
         self._html(built_with_article)  # 존재 확인
 
     def test_go_affiliate_links_with_rel(self, built_with_article: dict) -> None:
+        # Tier 2(세션 #31): 같은 상품이 추천 픽 카드 + 한눈 비교표에 함께 노출된다(결정·비교
+        # 두 관점). 단건 카드 시절의 '상품당 링크 1개' 가정 대신, 모든 /go/ 제휴 링크가
+        # 빠짐없이 rel="sponsored nofollow"로 표기되는지(POLICY §6)를 레이아웃 독립 불변식으로 고정.
         html = self._html(built_with_article)
-        assert html.count("/go/ali-p111") == 1
-        assert html.count("/go/ali-p222") == 1
-        assert html.count("sponsored nofollow") == 2  # POLICY §6 제휴 링크 표기
+        assert "/go/ali-p111" in html
+        assert "/go/ali-p222" in html
+        assert html.count("/go/") == html.count("sponsored nofollow"), "표기 안 된 제휴 링크 존재"
+        assert html.count("/go/") >= 4  # 픽 카드(이미지·이름·가격·구매) 다중 노출
 
     def test_prices_rendered(self, built_with_article: dict) -> None:
         html = self._html(built_with_article)

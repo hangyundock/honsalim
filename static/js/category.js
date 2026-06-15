@@ -10,11 +10,12 @@
 
   var sortBar = document.getElementById("catSort");
   var tierBar = document.getElementById("catTier");
+  var typeBar = document.getElementById("catType");
   var countEl = document.getElementById("catCount");
   var cards = Array.prototype.slice.call(grid.querySelectorAll(".card"));
   if (!cards.length) return;
 
-  var state = { sort: "reco", tier: "all" };
+  var state = { sort: "reco", tier: "all", type: "all" };
   var SORT_LABEL = { reco: "추천순", price: "낮은 가격순", disc: "할인율 높은순" };
 
   function num(el, attr) {
@@ -41,10 +42,12 @@
       grid.appendChild(c); // DOM 순서 재배치
     });
 
-    // 2) 티어 필터 + 표시 개수 갱신
+    // 2) 티어 + 타입(소분류) 필터(AND) + 표시 개수 갱신
     var shown = 0;
     ordered.forEach(function (c) {
-      var ok = state.tier === "all" || c.getAttribute("data-tier") === state.tier;
+      var tierOk = state.tier === "all" || c.getAttribute("data-tier") === state.tier;
+      var typeOk = state.type === "all" || c.getAttribute("data-type") === state.type;
+      var ok = tierOk && typeOk;
       c.style.display = ok ? "" : "none";
       if (ok) shown++;
     });
@@ -68,4 +71,5 @@
 
   bind(sortBar, "sort", "data-sort", "sort");
   bind(tierBar, "tier", "data-tier", "chip");
+  bind(typeBar, "type", "data-type", "chip");
 })();

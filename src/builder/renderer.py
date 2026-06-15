@@ -55,6 +55,13 @@ HEADERS_FILE = (
     "  X-Frame-Options: DENY\n"
 )
 
+# 301 리다이렉트 (Cloudflare Pages _redirects 형식) — 카테고리로 흡수돼 비공개된 글의 라이브 URL을
+# 후속 카테고리로 영구 이전(404·SEO 손실 방지, 세션 #31 분류 체계). (src, dst) 튜플.
+REDIRECTS: list[tuple[str, str]] = [
+    # 게이밍의자 글 → 의자 카테고리(게이밍=의자의 타입으로 흡수, #31)
+    ("/articles/kw-e3d08a2c/", "/categories/office-chair/"),
+]
+
 WOOD = ["var(--wood-1)", "var(--wood-2)", "var(--wood-3)", "var(--wood-4)"]
 PERSONA_ICON = {"cheot-jachi": "key", "homeoffice": "laptop", "minimal-life": "plant"}
 # 페르소나 공간 개념이미지(scripts/gen_persona_images.py 생성). 값이 비면 image_block
@@ -289,27 +296,157 @@ def _article_product_cards(prods: list) -> list[dict]:
                 "orig": _price_krw(orig) if show_disc else "",  # 정가(할인 신뢰 시만)
                 "disc": f"{disc}%" if show_disc else "",  # 할인율(부풀림 차단 후)
                 "volume": pr["sales_volume"] or 0,  # 알리 판매량(Information Gain)
+                "price_num": pr["price_krw"] or 0,  # 데이터 요약 가격대 계산용(화면 비노출)
+                "disc_num": disc or 0,  # 픽 역할(가성비) 도출용 숫자 할인율(화면 비노출)
             }
         )
     return cards
 
 
-def _split_article_body(body_html: str) -> tuple[str, str, str]:
-    """본문 HTML → (도입, 추천섹션 前 본문, 추천섹션~) 3분할 (세션 #30 글 레이아웃).
+def _vol_fmt(v: int | None) -> str:
+    """판매량 정수 → 천단위 콤마 문자열(0/None은 빈 값)."""
+    return f"{v:,}" if v else ""
 
-    도입 = 첫 ``<h2>`` 전(H1 + 첫머리 대가성 고지 + 리드). 그 다음에 쿠팡 추천 픽을 끼운다.
-    추천섹션 = ``<h2>`` 텍스트에 '추천'이 든 첫 섹션 → 그 직전에 알리 데이터 비교를 끼운다.
-    구조가 다른 글(추천 헤딩 없음·h2 없음)은 fallback: 데이터 블록을 본문 뒤에 둔다.
-    본문 내용 자체는 무손상(SEO 콘텐츠 보존) — 위치만 분할한다.
+
+def _article_tier_split(ali_cards: list[dict]) -> tuple[list[dict], list[dict]]:
+    """알리 카드를 가격 기준 2티어(💰실속/⭐고급)로 분할 (CATEGORY_PAGE §2-7 구조 차용).
+
+    글에는 category_products.tier 컬럼이 없으므로 가격 중앙값으로 나눈다(저가=실속, 고가=고급).
+    한쪽이 비지 않도록 절반 분할. 카테고리 페이지와 동일한 2티어 비교 경험을 글에도 제공.
+    """
+    s = sorted(ali_cards, key=lambda c: c.get("price_num") or 0)
+    n = len(s)
+    if n == 0:
+        return [], []
+    if n == 1:
+        return s, []
+    half = (n + 1) // 2
+    return s[:half], s[half:]
+
+
+def _article_featured(cards: list[dict], k: int = 3) -> list[dict]:
+    """티어 내 추천 featured 선정 — 판매량 desc(없으면 할인) 상위 k (CATEGORY_PAGE §2-7)."""
+    return sorted(
+        cards, key=lambda c: (c.get("volume") or 0, c.get("disc_num") or 0), reverse=True
+    )[:k]
+
+
+def _article_pick_item(card: dict, tier: str, type_label: str) -> dict:
+    """글 추천 카드 컨텍스트 — category.html pick_card 매크로 호환(이미지·장단점·추천대상).
+
+    장단점(pros/cons)·추천대상(reason)은 LLM 구조화 출력(Tier 2-A)에서 채운다 — 없으면
+    pick_card 매크로가 그 줄만 건너뜀(graceful). 가격·할인·판매량은 데이터로 도출.
+    """
+    return {
+        "tier": tier,
+        "type": type_label,
+        "name": card["name"],
+        "price": card["price"],
+        "orig": card["orig"],
+        "disc": card["disc"],
+        "volume": _vol_fmt(card.get("volume")),
+        "img_url": card["img_url"],
+        "url": card["url"],
+        "pros": card.get("pros") or [],
+        "cons": card.get("cons") or [],
+        "reason": card.get("for_who") or "",
+    }
+
+
+def _article_coupang_pick(card: dict) -> dict:
+    """쿠팡 운영자 추천 픽 — 별도 zone(주인 결정 #31). 할인·판매량 데이터 없음(공식 배너만)."""
+    return {
+        "tier": "coupang",
+        "type": "운영자 추천",
+        "name": card["name"],
+        "price": card["price"],
+        "orig": card["orig"],
+        "disc": card["disc"],
+        "volume": "",
+        "img_url": card["img_url"],
+        "url": card["url"],
+        "pros": card.get("pros") or [],
+        "cons": card.get("cons") or [],
+        "reason": card.get("for_who") or "운영자가 직접 고른 제품",
+    }
+
+
+def _article_catalog_item(card: dict, tier: str) -> dict:
+    """글 전체 제품 카탈로그 카드 — category.html .grid .card 호환(정렬·필터 data-* 포함)."""
+    return {
+        "tier": tier,
+        "tier_label": "💰 실속" if tier == "budget" else "⭐ 고급",
+        "name": card["name"],
+        "price": card["price"],
+        "orig": card["orig"],
+        "disc": card["disc"],
+        "price_num": card.get("price_num") or 0,
+        "disc_num": card.get("disc_num") or 0,
+        "volume": _vol_fmt(card.get("volume")),
+        "img_url": card["img_url"],
+        "url": card["url"],
+        "slug": (card.get("url") or "").rsplit("/", 1)[-1],
+    }
+
+
+def _build_article_compare(featured: list[dict], limit: int = 4) -> dict:
+    """추천 featured(알리) → 한눈 비교표 (category.html cmp 형식: rows·cols).
+
+    데이터(할인·누적 판매)만 비교 — 평점·스펙 같은 미보유 데이터는 만들지 않음(§0 진실성).
+    """
+    cols = [
+        {
+            "name": c["name"],
+            "type": c.get("type", ""),
+            "tier": c.get("tier", "budget"),
+            "price": c["price"],
+            "vals": [c["disc"] or "—", c["volume"] or "—"],
+        }
+        for c in featured[:limit]
+    ]
+    return {"rows": ["할인", "누적 판매"], "cols": cols}
+
+
+def _build_article_data_summary(ali_cards: list[dict]) -> dict:
+    """글 상단 데이터 요약 — 수집 실데이터(개수·가격대·판매 1위)에서 도출(가짜 없음·§0)."""
+    if not ali_cards:
+        return {"count": 0}
+    prices = [c["price_num"] for c in ali_cards if c.get("price_num")]
+    vols = [((c.get("volume") or 0), c["name"]) for c in ali_cards]
+    top_v, top_n = max(vols, key=lambda x: x[0]) if vols else (0, "")
+    return {
+        "count": len(ali_cards),
+        "price_range": (f"{_price_krw(min(prices))} ~ {_price_krw(max(prices))}" if prices else ""),
+        "top_name": ((top_n[:28] + "…" if len(top_n) > 28 else top_n) if top_v > 0 else ""),
+        "top_volume": f"{top_v:,}" if top_v > 0 else "",
+    }
+
+
+def _split_article_guide(body_html: str) -> tuple[str, str, str]:
+    """본문 HTML → (도입, 가이드 前, 가이드 後) 3분할 (세션 #31 카테고리 구조).
+
+    - 도입 = 첫 ``<h2>`` 전(H1 + 첫머리 대가성 고지 + 리드).
+    - 제품 나열 '추천 상품' 섹션(``<h2>``에 '추천'·'제품' 포함)은 **본문에서 제외** —
+      그 자리는 시각 추천 카드(2티어·카탈로그)로 대체한다(주인 지시 #31: 텍스트 말고 이미지).
+    - 가이드 前 = 추천 섹션 앞 정보 섹션(누구를 위한·왜 예산), 가이드 後 = 추천 섹션 뒤(예산 분배·FAQ 등).
+    SEO 정보 콘텐츠(가이드)는 유지하되, 제품은 이미지 카드로 본다(텍스트 벽 제거).
     """
     m = re.search(r"<h2", body_html)
     if not m:
         return body_html, "", ""
     intro, rest = body_html[: m.start()], body_html[m.start() :]
-    for mm in re.finditer(r"<h2[^>]*>(.*?)</h2>", rest, re.S):
-        if "추천" in mm.group(1):
-            return intro, rest[: mm.start()], rest[mm.start() :]
-    return intro, rest, ""
+    heads = list(re.finditer(r"<h2[^>]*>(.*?)</h2>", rest, re.S))
+    # 제품 나열 섹션('추천 상품'/'추천 제품' 등) 헤딩 — '상품'·'제품' 단어로 식별(다른 '추천' 헤딩 오매칭 방지)
+    rec_i = next(
+        (i for i, mm in enumerate(heads) if ("상품" in mm.group(1) or "제품" in mm.group(1))),
+        None,
+    )
+    if rec_i is None:
+        return intro, rest, ""  # 추천 섹션 없음 → 전부 가이드 前
+    guide_pre = rest[: heads[rec_i].start()]
+    # 추천 섹션은 다음 <h2>까지 — 그 뒤(예산 분배·FAQ 등)만 가이드 後로 살린다
+    guide_post = rest[heads[rec_i + 1].start() :] if rec_i + 1 < len(heads) else ""
+    return intro, guide_pre, guide_post
 
 
 def _article_page_ctx(
@@ -327,15 +464,35 @@ def _article_page_ctx(
     budget_max: int | None,
     products: list[dict],
     is_draft: bool = False,
+    structured: dict | None = None,
 ) -> dict:
     """article.html 렌더 컨텍스트 (published·draft 공용). is_draft=True면 검토용 배너 표시.
 
-    세션 #30: 본문을 도입/前/추천~로 3분할하고 상품을 쿠팡·알리로 분리해 — 쿠팡 추천 픽은
-    도입 다음(상단·이미지), 알리 데이터 비교는 추천 섹션 직전(Information Gain)에 배치한다.
+    세션 #31 Tier 2: 글을 '독서(텍스트 벽)'→'쇼핑(스캔)'으로. 빠른 결론·추천 픽 카드(역할·
+    소스 배지)·한눈 비교표(알리 데이터)·체크포인트·예산표를 시각 블록으로 배치한다.
+    - 픽/비교표/데이터 요약은 상품 데이터로 항상 도출(LLM 없이도 작동).
+    - quick_verdict·checkpoints·budget_tiers와 픽의 장단점은 LLM 구조화 출력(structured)이
+      있을 때만 채움 — 없으면 그 섹션만 건너뜀(graceful fallback, 빈 섹션 X).
+    본문(intro/pre/rec)은 무손상(SEO 콘텐츠 보존) — 위치만 분할(세션 #30 데이터 플러밍 재사용).
     """
-    intro_html, pre_html, rec_html = _split_article_body(body_html)
-    coupang_products = [p for p in products if p["source"] == "coupang"]
-    ali_products = [p for p in products if p["source"] != "coupang"]
+    intro_html, guide_pre, guide_post = _split_article_guide(body_html)
+    coupang_cards = [p for p in products if p["source"] == "coupang"]
+    ali_cards = [p for p in products if p["source"] != "coupang"]
+    # 알리 2티어(💰실속/⭐고급) 분할 + 티어별 추천 featured (CATEGORY_PAGE §2-7)
+    budget_cards, premium_cards = _article_tier_split(ali_cards)
+    picks_budget = [
+        _article_pick_item(c, "budget", "💰 실속형") for c in _article_featured(budget_cards)
+    ]
+    picks_premium = [
+        _article_pick_item(c, "premium", "⭐ 고급형") for c in _article_featured(premium_cards)
+    ]
+    # 쿠팡 = 상단 별도 '운영자 추천' zone (주인 결정 #31)
+    coupang_picks = [_article_coupang_pick(c) for c in coupang_cards]
+    # 전체 제품 카탈로그 (알리 전체, 티어 태그) — CATEGORY_PAGE §5-bis (많은 제품 노출)
+    catalog = [_article_catalog_item(c, "budget") for c in budget_cards] + [
+        _article_catalog_item(c, "premium") for c in premium_cards
+    ]
+    compare = _build_article_compare(picks_budget + picks_premium)
     return {
         "slug": slug,
         "title": title,
@@ -348,9 +505,9 @@ def _article_page_ctx(
             "summary": summary,
             "desc": meta_description,
             "body_html": body_html,  # 전체(스키마·호환용) — 렌더는 분할본 사용
-            "intro_html": intro_html,
-            "pre_html": pre_html,
-            "rec_html": rec_html,
+            "intro_html": intro_html,  # H1 + 첫머리 고지 + 리드
+            "guide_pre": guide_pre,  # 추천 前 가이드 정보(누구를 위한·왜 예산)
+            "guide_post": guide_post,  # 추천 後 가이드(예산 분배·FAQ 등)
             "persona": persona_slug,
             "persona_name": persona_title,
             "persona_icon": PERSONA_ICON.get(persona_slug, ""),
@@ -359,8 +516,16 @@ def _article_page_ctx(
             "is_draft": is_draft,
         },
         "products": products,
-        "coupang_products": coupang_products,
-        "ali_products": ali_products,
+        # 카테고리 구조 컨텍스트 (세션 #31): 쿠팡 운영자추천 + 알리 2티어 + 비교표 + 전체 카탈로그
+        "coupang_picks": coupang_picks,
+        "picks_budget": picks_budget,
+        "picks_premium": picks_premium,
+        "has_picks": bool(coupang_picks or picks_budget or picks_premium),
+        "compare": compare,
+        "has_compare": len(compare["cols"]) >= 2,
+        "catalog": catalog,
+        "has_catalog": bool(catalog),
+        "art_data_summary": _build_article_data_summary(ali_cards),
     }
 
 
@@ -436,6 +601,7 @@ def _load_draft_article_pages(conn: sqlite3.Connection, seen_slugs: set[str]) ->
                     _draft_product_rows(conn, ep.get("products") or [])
                 ),
                 is_draft=True,
+                structured=ep,  # quick_verdict·checkpoints·budget_tiers (LLM Tier 2-A·있으면)
             )
         )
         seen_slugs.add(slug)
@@ -473,9 +639,52 @@ def _draft_product_rows(conn: sqlite3.Connection, featured: list[dict]) -> list:
     return rows
 
 
+# 대분류(그룹) 메타 — 카테고리 인덱스 섹션 헤더용(아이콘·한 줄 설명). 세션 #31 분류 체계.
+GROUP_META: dict[str, dict] = {
+    "homeoffice": {"icon": "💻", "desc": "책상 위 작업 환경"},
+    "kitchen": {"icon": "🍳", "desc": "자취 주방 필수템"},
+    "living": {"icon": "🧺", "desc": "원룸 일상 정리"},
+}
+
+# 카테고리 내 '타입(소분류)' 도출 규칙 — 제품명 키워드로 분류(파생·투명, DB 스키마 무변경).
+# CATEGORY_PAGE §2-2(의자=사무용·게이밍·안장형) + Baymard(종류는 카테고리 아닌 '필터')·세션 #31.
+# 규칙 없는 카테고리는 타입 미표시(단일). 첫 매칭 우선, 미매칭은 DEFAULT.
+CATEGORY_TYPE_RULES: dict[str, list[tuple[str, tuple[str, ...]]]] = {
+    "office-chair": [
+        ("게이밍", ("게이밍", "게임", "레이싱", "레이서", "gaming", "racing")),
+        ("안장형", ("안장", "무릎", "saddle", "kneeling")),
+    ],
+    "desk": [
+        ("스탠딩", ("스탠딩", "전동", "모션", "높이조절", "높이 조절", "standing")),
+        ("접이식", ("접이", "폴딩", "folding")),
+    ],
+    "drying-rack": [
+        ("스탠드형", ("스탠드", "타워", "수직")),
+        ("미니", ("미니", "소형", "mini")),
+    ],
+}
+CATEGORY_TYPE_DEFAULT: dict[str, str] = {
+    "office-chair": "사무용",
+    "desk": "일반",
+    "drying-rack": "일반형",
+}
+
+
+def _derive_type(cat_slug: str, name: str) -> str:
+    """제품명 → 카테고리 내 타입(소분류). 규칙 없는 카테고리는 빈 문자열(타입 미사용)."""
+    rules = CATEGORY_TYPE_RULES.get(cat_slug)
+    if not rules:
+        return ""
+    n = name or ""
+    for label, kws in rules:
+        if any(k in n for k in kws):
+            return label
+    return CATEGORY_TYPE_DEFAULT.get(cat_slug, "")
+
+
 CATEGORY_CATALOG_SQL = """
     SELECT p.name, p.price_krw, p.original_price_krw, p.discount_pct, p.sales_volume,
-           p.image_url_external, p.deeplink_slug, cp.tier, cp.display_order
+           p.image_url_external, p.deeplink_slug, p.source, cp.tier, cp.display_order
     FROM category_products cp
     JOIN products p ON p.id = cp.product_id
     WHERE cp.category_id = ?
@@ -486,19 +695,23 @@ CATEGORY_CATALOG_SQL = """
 _TIER_LABEL = {"budget": "💰 실속", "premium": "⭐ 고급"}
 
 
-def _catalog_item(row: sqlite3.Row) -> dict:
+def _catalog_item(row: sqlite3.Row, cat_slug: str = "") -> dict:
     """category_products⋈products 행 → 카탈로그 카드 컨텍스트.
 
     부풀린 할인(>70%)·정가 없는 경우는 product_filter.trusted_discount가 걸러 '단일가'로
     표시(정가·할인율 미노출 — 공정위 가격표시 정확성, §0). 가짜 점수·평점은 두지 않는다.
+    type = 제품명 기반 타입(소분류·필터용, 세션 #31). source = 쿠팡/알리(운영자추천 zone 분리).
     """
     disc = product_filter.trusted_discount(row["discount_pct"])
     orig = row["original_price_krw"]
     show = disc is not None and bool(orig)
     tier = row["tier"] or "budget"
+    src = row["source"] if "source" in row.keys() else ""
     return {
         "tier": tier,
         "tier_label": _TIER_LABEL.get(tier, "💰 실속"),
+        "type": _derive_type(cat_slug, row["name"]),  # 소분류(사무용/게이밍 등) — 필터 data-type
+        "source": src or "",
         "name": row["name"],
         "price": _price_krw(row["price_krw"]),
         "orig": _price_krw(orig) if show else "",
@@ -516,23 +729,44 @@ def _catalog_item(row: sqlite3.Row) -> dict:
 
 CATEGORY_PICKS_SQL = """
     SELECT p.name, p.price_krw, p.original_price_krw, p.discount_pct, p.sales_volume,
-           p.image_url_external, p.deeplink_slug, cp.tier,
+           p.image_url_external, p.deeplink_slug, p.source, cp.tier,
            cp.pros_json, cp.cons_json, cp.pick_reason, cp.pick_type, cp.display_order
     FROM category_products cp
     JOIN products p ON p.id = cp.product_id
-    WHERE cp.category_id = ? AND cp.is_featured = 1
+    WHERE cp.category_id = ? AND cp.is_featured = 1 AND p.source != 'coupang'
     ORDER BY CASE cp.tier WHEN 'budget' THEN 0 WHEN 'premium' THEN 1 ELSE 2 END,
              p.sales_volume DESC, cp.display_order, p.id
 """
 
+# 쿠팡 운영자 추천 zone — 카테고리에 연결된 쿠팡(source=coupang) 제품. 별도 상단 노출(주인 결정 #31).
+CATEGORY_COUPANG_SQL = """
+    SELECT p.name, p.price_krw, p.original_price_krw, p.discount_pct, p.sales_volume,
+           p.image_url_external, p.deeplink_slug, p.source, cp.tier,
+           cp.pros_json, cp.cons_json, cp.pick_reason, cp.pick_type, cp.display_order
+    FROM category_products cp
+    JOIN products p ON p.id = cp.product_id
+    WHERE cp.category_id = ? AND p.source = 'coupang'
+    ORDER BY cp.display_order, p.id
+"""
 
-def _pick_item(row: sqlite3.Row) -> dict:
+
+def _pick_item(row: sqlite3.Row, cat_slug: str = "") -> dict:
     """추천 6선 카드 컨텍스트 = 카탈로그 카드 + 장점·단점·추천대상·타입."""
-    item = _catalog_item(row)
+    item = _catalog_item(row, cat_slug)
     item["pros"] = json.loads(row["pros_json"]) if row["pros_json"] else []
     item["cons"] = json.loads(row["cons_json"]) if row["cons_json"] else []
     item["reason"] = row["pick_reason"] or ""
     item["type"] = row["pick_type"] or ""
+    return item
+
+
+def _category_coupang_pick(row: sqlite3.Row) -> dict:
+    """쿠팡 운영자 추천 픽 (카테고리 상단 별도 zone). pick_card 매크로 호환 — 주인 결정 #31."""
+    item = _catalog_item(row)
+    item["type"] = "운영자 추천"
+    item["pros"] = json.loads(row["pros_json"]) if row["pros_json"] else []
+    item["cons"] = json.loads(row["cons_json"]) if row["cons_json"] else []
+    item["reason"] = row["pick_reason"] or "운영자가 직접 고른 제품"
     return item
 
 
@@ -579,10 +813,22 @@ def _load_category_pages(conn: sqlite3.Connection, include_drafts: bool = False)
     ).fetchall()
     pages: list[dict] = []
     for c in cats:
-        prods = conn.execute(CATEGORY_CATALOG_SQL, (c["id"],)).fetchall()
-        if not prods:
+        prods_all = conn.execute(CATEGORY_CATALOG_SQL, (c["id"],)).fetchall()
+        # 쿠팡(운영자 추천)은 카탈로그·티어에서 분리 — 상단 별도 zone(주인 결정 #31)
+        prods = [r for r in prods_all if r["source"] != "coupang"]
+        coupang_picks = [
+            _category_coupang_pick(r)
+            for r in conn.execute(CATEGORY_COUPANG_SQL, (c["id"],)).fetchall()
+        ]
+        if not prods and not coupang_picks:
             continue
-        picks = [_pick_item(r) for r in conn.execute(CATEGORY_PICKS_SQL, (c["id"],)).fetchall()]
+        picks = [
+            _pick_item(r, c["slug"])
+            for r in conn.execute(CATEGORY_PICKS_SQL, (c["id"],)).fetchall()
+        ]
+        catalog = [_catalog_item(r, c["slug"]) for r in prods]
+        # 타입(소분류) 필터 칩 — 카탈로그에 실제 존재하는 타입만(파생·정직, 빈 칩 없음)
+        cat_types = list(dict.fromkeys(it["type"] for it in catalog if it["type"]))
         faq = json.loads(c["faq_json"]) if c["faq_json"] else []
         content = json.loads(c["content_json"]) if c["content_json"] else {}
         has_guide = bool(content.get("lead"))
@@ -681,7 +927,10 @@ def _load_category_pages(conn: sqlite3.Connection, include_drafts: bool = False)
                     "concept_image": c["concept_image"] or "",
                     "concept_image_alt": c["concept_image_alt"] or "",
                 },
-                "products": [_catalog_item(r) for r in prods],
+                "products": catalog,
+                "catalog_types": cat_types,
+                "coupang_picks": coupang_picks,
+                "has_coupang": bool(coupang_picks),
                 "picks_budget": [p for p in picks if p["tier"] == "budget"],
                 "picks_premium": [p for p in picks if p["tier"] == "premium"],
                 "has_picks": bool(picks),
@@ -699,15 +948,22 @@ def _load_categories_index(conn: sqlite3.Connection, include_drafts: bool = Fals
     include_drafts=True는 미리보기(검토)용 — draft도 포함(§2-마). 기본은 published만.
     """
     rows = conn.execute(
-        "SELECT id, slug, name_ko, intro, group_name_ko FROM categories "
+        "SELECT id, slug, name_ko, intro, group_slug, group_name_ko, concept_image FROM categories "
         "WHERE (? OR status = 'published') ORDER BY display_order, id",
         (1 if include_drafts else 0,),
     ).fetchall()
     groups: list[dict] = []
     for c in rows:
-        count = conn.execute(
-            "SELECT COUNT(*) FROM category_products WHERE category_id = ?", (c["id"],)
-        ).fetchone()[0]
+        # 카탈로그 제품(쿠팡 제외) 이름 → 개수 + 타입(소분류) 칩 도출(파생·정직, 세션 #31)
+        names = conn.execute(
+            "SELECT p.name FROM category_products cp JOIN products p ON p.id = cp.product_id "
+            "WHERE cp.category_id = ? AND p.source != 'coupang'",
+            (c["id"],),
+        ).fetchall()
+        count = len(names)
+        types = list(
+            dict.fromkeys(t for t in (_derive_type(c["slug"], r["name"]) for r in names) if t)
+        )
         item = {
             "slug": c["slug"],
             "name": c["name_ko"],
@@ -715,14 +971,24 @@ def _load_categories_index(conn: sqlite3.Connection, include_drafts: bool = Fals
             "count": count,
             "available": count > 0,
             "url": f"/categories/{c['slug']}/",
+            "thumb": c["concept_image"] or "",  # 대표 썸네일(개념 이미지)
+            "types": types,  # 소분류 칩
         }
         gname = c["group_name_ko"] or "기타"
         grp = next((g for g in groups if g["name"] == gname), None)
         if grp is None:
+            meta = GROUP_META.get(c["group_slug"] or "", {})
             # 키 이름은 'cards' — Jinja에서 group.items는 dict.items 메서드로 해석되는 함정 회피
-            grp = {"name": gname, "cards": []}
+            grp = {
+                "name": gname,
+                "icon": meta.get("icon", "📦"),
+                "desc": meta.get("desc", ""),
+                "total": 0,
+                "cards": [],
+            }
             groups.append(grp)
         grp["cards"].append(item)
+        grp["total"] += count
     return groups
 
 
@@ -1074,6 +1340,7 @@ def _asset_version() -> str:
         "css/components.css",
         "css/pages.css",
         "css/category.css",
+        "css/article.css",
         "js/home.js",
         "js/category.js",
         "js/hub-filter.js",
@@ -1329,8 +1596,15 @@ def render_site(
                 schema_jsonld=schema,
                 article=pg["article"],
                 products=pg["products"],
-                coupang_products=pg["coupang_products"],
-                ali_products=pg["ali_products"],
+                coupang_picks=pg["coupang_picks"],
+                picks_budget=pg["picks_budget"],
+                picks_premium=pg["picks_premium"],
+                has_picks=pg["has_picks"],
+                compare=pg["compare"],
+                has_compare=pg["has_compare"],
+                catalog=pg["catalog"],
+                has_catalog=pg["has_catalog"],
+                art_data_summary=pg["art_data_summary"],
                 **common,
             ),
         )
@@ -1409,6 +1683,9 @@ def render_site(
                 data_summary=pg["data_summary"],
                 pillar_link=pg["pillar_link"],
                 products=pg["products"],
+                catalog_types=pg["catalog_types"],
+                coupang_picks=pg["coupang_picks"],
+                has_coupang=pg["has_coupang"],
                 picks_budget=pg["picks_budget"],
                 picks_premium=pg["picks_premium"],
                 has_picks=pg["has_picks"],
@@ -1449,6 +1726,9 @@ def render_site(
     # robots.txt + _headers (배포 산출물 — 색인 규칙·캐시·보안 헤더)
     w("robots.txt", ROBOTS_TXT)
     w("_headers", HEADERS_FILE)
+    # _redirects — 카테고리로 흡수돼 비공개된 글의 라이브 URL 301 이전(세션 #31)
+    if REDIRECTS:
+        w("_redirects", "".join(f"{src}  {dst}  301\n" for src, dst in REDIRECTS))
 
     # static 복사
     shutil.copytree(STATIC_DIR, out_dir / "static", dirs_exist_ok=True)

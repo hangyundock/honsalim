@@ -1,0 +1,39 @@
+/* ===== article.css — 글(상세) 페이지 보강. 세션 #31 =====
+   글은 카테고리 페이지(사진2) 구조·시각 언어를 그대로 쓴다(category.css .catpage 재사용).
+   본 파일은 글 전용 보강만: 검토 배너·도입(H1/고지/리드)·페르소나 칩·쿠팡 zone·가이드 표·고지 푸터.
+   주인 결정 #31: 쿠팡=상단 별도 운영자 추천 / 알리=2티어+비교표+전체 카탈로그. */
+
+/* 검토용 미리보기 배너 (draft만 — §2-마. 공개 배포엔 없음) */
+.catpage .art-draft { background: #fff8e1; border: 1px solid #ffe082; border-radius: 10px; padding: 12px 16px; margin: 0 0 14px; color: #7a5b00; font-size: 14px; line-height: 1.55; }
+.catpage .art-draft b { color: #5a4400; }
+
+/* 칩 줄 — 페르소나(solid 녹색)·시즌·예산. category.css .catpage .chip(필터칩) 오버라이드 복구. */
+.catpage .art-chips { display: flex; flex-wrap: wrap; gap: 7px; margin: 6px 0 10px; }
+.catpage .art-chips .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 16px; background: var(--accent); color: #fff; border: 1px solid var(--accent); cursor: default; }
+.catpage .art-chips .chip.solid { background: var(--accent); color: #fff; }
+.catpage .art-chips .chip.ghost { background: #fff; color: var(--accent-ink); border-color: var(--border); }
+.catpage .art-chips .chip svg { stroke: currentColor; }
+
+/* 도입 — H1 + 첫머리 대가성 고지(compact) + 리드 */
+.catpage .art-intro { margin: 4px 0 8px; }
+.catpage .art-intro h1 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; line-height: 1.3; margin: 6px 0 10px; color: var(--text); }
+.catpage .art-intro > p:first-child { font-size: 12.5px; color: var(--sub); background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 13px; margin: 2px 0 14px; line-height: 1.6; }
+.catpage .art-intro p { font-size: 16px; color: var(--sub); line-height: 1.8; }
+
+/* 쿠팡 운영자 추천 zone — 추천 카드(tcard)에 약한 쿠팡 톤 강조 */
+.catpage .art-coupang-picks .tcard { border-color: #f0d6bd; }
+.catpage .art-coupang-picks .trank b { color: #9a5b13; }
+
+/* 가이드 prose 안의 표(예산 분배표 등 마크다운 table) — category.css .cat-guide엔 표 스타일 없음 */
+.catpage .cat-guide table { width: 100%; border-collapse: collapse; font-size: 14.5px; margin: 14px 0; background: #fff; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.catpage .cat-guide th, .catpage .cat-guide td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.catpage .cat-guide thead th { background: var(--card-bg); font-weight: 800; color: var(--text); }
+.catpage .cat-guide td { color: var(--sub); }
+.catpage .cat-guide tbody td:first-child, .catpage .cat-guide tbody th:first-child { font-weight: 700; color: var(--text); }
+
+/* 풀 고지 + 사업자 정보 */
+.catpage .art-legal { margin-top: 28px; border-top: 1px solid var(--divider); padding-top: 16px; }
+.catpage .art-legal h4 { font-size: 14px; font-weight: 800; color: var(--text); margin-bottom: 7px; }
+.catpage .art-legal p { font-size: 12.5px; color: var(--meta); line-height: 1.7; margin: 0; }
+.catpage .art-legal p b { color: var(--sub); }
+.catpage .biz-grid { display: flex; flex-wrap: wrap; gap: 5px 16px; margin-top: 10px; font-size: 11.5px; color: var(--meta); }

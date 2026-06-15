@@ -81,16 +81,31 @@
   .catpage .nm { min-height: 36px; font-size: 14px; }
 }
 
-/* ===== 카테고리 인덱스 ===== */
-.catindex { padding-top: 40px; padding-bottom: 70px; } /* 좌우는 .wrap(24px)에 위임 — 헤더 정렬(세션 #18) */
-.catindex h1 { font-size: var(--fs-h1); font-weight: 800; margin: 6px 0 10px; color: var(--text); }
-.catindex .grp { font-size: 14px; font-weight: 800; color: var(--accent); margin: 26px 0 4px; letter-spacing: .04em; }
-.catindex .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 8px; }
-.catindex .ccard { border: 1px solid var(--border); border-radius: 12px; padding: 18px; background: #fff; display: block; }
+/* ===== 카테고리 인덱스 — 대분류 섹션 + 가로형 카드(썸네일·타입 칩). 세션 #31 분류 체계 ===== */
+.catindex { padding-top: 36px; padding-bottom: 70px; } /* 좌우는 .wrap(24px)에 위임 — 헤더 정렬 */
+.catindex h1 { font-size: var(--fs-h1); font-weight: 800; margin: 6px 0 6px; color: var(--text); }
+.catindex .sub { font-size: 15px; color: var(--sub); margin-bottom: 6px; line-height: 1.6; }
+.catindex .sub b { color: var(--text); }
+/* 대분류(그룹) 섹션 헤더 — 아이콘·설명·제품수 */
+.catindex .grp-head { display: flex; align-items: center; gap: 12px; margin: 26px 0 0; padding: 13px 15px; background: var(--card-bg); border-left: 4px solid var(--accent); border-radius: 0 9px 9px 0; }
+.catindex .grp-ic { width: 38px; height: 38px; border-radius: 9px; background: #eaf5f0; display: flex; align-items: center; justify-content: center; font-size: 20px; flex: 0 0 auto; }
+.catindex .grp-name { font-size: 17px; font-weight: 800; color: var(--text); }
+.catindex .grp-desc { font-size: 12.5px; color: var(--meta); margin-top: 1px; }
+.catindex .grp-count { margin-left: auto; font-size: 12px; font-weight: 800; color: var(--accent-ink); background: #eaf5f0; border-radius: 20px; padding: 5px 12px; white-space: nowrap; }
+/* 카테고리 카드 — 가로형(썸네일 + 본문) */
+.catindex .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 12px 0 4px; }
+.catindex .ccard { display: flex; gap: 13px; align-items: center; border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: #fff; text-decoration: none; }
 .catindex a.ccard:hover { border-color: var(--accent); }
-.catindex .ccard .cn { font-size: 17px; font-weight: 800; color: var(--text); }
-.catindex .ccard .ci { font-size: 14px; color: var(--sub); margin-top: 6px; line-height: 1.6; }
-.catindex .ccard .cmeta { font-size: 14px; color: var(--meta); margin-top: 10px; }
+.catindex .cc-thumb { width: 66px; height: 66px; flex: 0 0 auto; border-radius: 9px; background: var(--wood-3); border: 1px solid var(--border); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.catindex .cc-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.catindex .cc-body { min-width: 0; flex: 1; }
+.catindex .ccard .cn { font-size: 15.5px; font-weight: 800; color: var(--text); }
+.catindex .ccard .ci { font-size: 13px; color: var(--sub); margin-top: 4px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.catindex .cc-types { display: flex; flex-wrap: wrap; gap: 4px; margin: 5px 0 4px; }
+.catindex .cc-types .tp { font-size: 10.5px; font-weight: 700; color: var(--accent-ink); background: #eaf5f0; border: 1px solid #cfe7dd; border-radius: 5px; padding: 2px 6px; }
+.catindex .cc-types .tp.new { color: #9a5b13; background: #fdeee0; border-color: #f0d6bd; }
+.catindex .ccard .cmeta { font-size: 13px; color: var(--accent); font-weight: 700; margin-top: 3px; }
+.catindex .ccard.soon { opacity: .7; }
 .catindex .soon-badge { display: inline-block; font-size: 10.5px; font-weight: 800; color: var(--meta); background: var(--card-bg); border: 1px solid var(--border); border-radius: 5px; padding: 1px 7px; margin-left: 6px; vertical-align: middle; }
 @media (max-width: 760px) { .catindex .grid { grid-template-columns: 1fr; } }
 
@@ -205,6 +220,19 @@
 .catpage .tfor b { color: var(--accent-ink); }
 .catpage .tbtns { margin-top: auto; }  /* 카드 높이가 늘어도 버튼은 항상 바닥에 — 좌우 카드 아래단 정렬 */
 .catpage .tbtns .btn { display: block; }
+
+/* ===== 쿠팡 운영자 추천 zone (세션 #31 — 상단 별도, 소스 투명) ===== */
+.catpage .coupang-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin: 10px 0 4px; }
+.catpage .coupang-picks .tcard { border-color: #f0d6bd; }
+.catpage .coupang-picks .trank b { color: #9a5b13; }
+/* 쿠팡 zone 헤더 — 설명문(위)·제목·대가성(아래) 컴팩트 배치(세션 #31, 주인 요청) */
+.catpage .coupang-head { margin-top: 30px; }
+.catpage .coupang-head .cp-lead { font-size: 13px; color: var(--meta); margin: 0 0 3px; }
+.catpage .coupang-head .cp-lead b { color: var(--text); }
+.catpage .coupang-head .sechead { margin: 0; }  /* 위 간격은 cp-lead가 제공 — 중복 여백 제거 */
+.catpage .coupang-head .cp-disc-line { font-size: 12.5px; color: var(--sub); margin: 5px 0 10px; line-height: 1.55; }
+/* 쿠팡 파트너스 대가성 — 정식 문구·명확히(함정 #4, 세션 #31) */
+.catpage .cp-disc { color: #9a5b13; font-weight: 800; }
 
 /* ===== 한눈에 비교표 ===== */
 .catpage .cmp-wrap { overflow-x: auto; margin: 10px 0; }
