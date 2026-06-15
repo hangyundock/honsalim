@@ -32,6 +32,35 @@ def _norm(text: str | None) -> str:
     return re.sub(r"\s", "", unicodedata.normalize("NFKC", text or "")).lower()
 
 
+# ── winnable('틈') 점수 — 검색량 * 경쟁 낮을수록 우선 (세션 #33) ──────────────
+# 검색량만 보면 과경쟁 head를 잡아 좋은 글도 노출 0이 되므로, 수요는 있되 경쟁이 낮은
+# '들어갈 틈'을 우선한다(naver_blog winnable 정신을 혼살림 가용 데이터로 적용).
+_COMP_FACTOR: dict[str, float] = {
+    "낮음": 1.0,
+    "low": 1.0,
+    "중간": 0.6,
+    "mid": 0.6,
+    "medium": 0.6,
+    "높음": 0.3,
+    "high": 0.3,
+}
+# 검색량 상한(이 이상은 동일 취급) — head 키워드 검색량 과가중 억제. [추정·운영 트래픽으로 보정].
+WINNABLE_VOL_CAP = 30000
+
+
+def _comp_factor(competition: Any) -> float:
+    """네이버 compIdx(경쟁정도) → 가중치. 미상/미매칭은 중간(0.5)."""
+    key = str(competition or "").strip()
+    return _COMP_FACTOR.get(key) or _COMP_FACTOR.get(key.lower(), 0.5)
+
+
+def winnable_score(volume: int | None, competition: Any) -> float:
+    """'틈' 점수 = 검색량(상한 cap) * 경쟁 가중. 검색량 미상(캐시)은 최하(-1.0). 세션 #33."""
+    if volume is None:
+        return -1.0
+    return min(int(volume), WINNABLE_VOL_CAP) * _comp_factor(competition)
+
+
 def default_seeds(path: Path | None = None) -> list[dict[str, Any]]:
     """seo_keywords.yml 카테고리 → 씨앗 목록 [{seed, core, exclude_terms, category, cached_secondary}]."""
     entries = seo_keywords.load_all() if path is None else seo_keywords.load_all(path)
@@ -151,8 +180,9 @@ def recommend(
                 }
             )
 
-    # 검색량 있는 것 우선(내림차순) → 캐시(volume None)는 뒤로(stable=원순서 보존)
-    out.sort(key=lambda d: (d["volume"] is None, -(d["volume"] or 0)))
+    # winnable 정렬(세션 #33): '틈' 점수(검색량 * 경쟁 낮을수록 ↑) 내림차순 → 캐시(미상)는 뒤로.
+    # 검색량만 보면 과경쟁 head를 잡아 노출 0이 되므로 경쟁 낮은 틈을 우선. stable=동점 원순서 보존.
+    out.sort(key=lambda d: -winnable_score(d.get("volume"), d.get("competition")))
     return out[:limit]
 
 

@@ -54,15 +54,17 @@ def _fetch(seed: str, dry_run: bool = False) -> list[dict[str, Any]]:
 
 
 class TestRecommend:
-    def test_ranked_by_volume_and_filtered(self) -> None:
+    def test_ranked_by_winnable_and_filtered(self) -> None:
         conn = _db()
         recs = kr.recommend(conn, seeds=SEED, fetch=_fetch)
         kws = [r["keyword"] for r in recs]
-        # 검색량 내림차순, 브랜드/거래성/seed/no_core 제외
-        assert kws == ["게이밍의자", "책상의자", "공부의자"]
+        # winnable 정렬(세션 #33): 경쟁 낮은 '틈' 우선 — 책상의자(중간·20620) > 게이밍의자(높음·30100,
+        # 검색량 1위지만 경쟁 높아 후순위) > 공부의자(중간·9000). 브랜드/거래성/seed/no_core 제외.
+        assert kws == ["책상의자", "게이밍의자", "공부의자"]
         assert recs[0]["source"] == "naver"
         assert recs[0]["channel"] == "ali"
-        assert recs[0]["volume"] == 30100
+        assert recs[0]["keyword"] == "책상의자"
+        assert recs[0]["volume"] == 20620
         assert recs[0]["category"] == "office-chair"
 
     def test_dedupe_against_queue(self) -> None:
@@ -114,13 +116,13 @@ class TestRecommend:
     def test_limit(self) -> None:
         conn = _db()
         recs = kr.recommend(conn, seeds=SEED, fetch=_fetch, limit=2)
-        assert [r["keyword"] for r in recs] == ["게이밍의자", "책상의자"]
+        assert [r["keyword"] for r in recs] == ["책상의자", "게이밍의자"]
 
     def test_top_recommendation(self) -> None:
         conn = _db()
         top = kr.top_recommendation(conn, seeds=SEED, fetch=_fetch)
         assert top is not None
-        assert top["keyword"] == "게이밍의자"
+        assert top["keyword"] == "책상의자"  # winnable 1위(경쟁 낮은 틈)
 
     def test_top_recommendation_none_when_empty(self) -> None:
         conn = _db()
@@ -161,12 +163,12 @@ class TestAutoPick:
         picked = kr.auto_pick_keyword(conn, seeds=SEED, fetch=_fetch)
         assert picked is not None
         assert picked["source"] == "recommend"
-        assert picked["keyword"] == "게이밍의자"  # 검색량 1위
+        assert picked["keyword"] == "책상의자"  # winnable 1위(경쟁 낮은 틈)
         # 큐에 실제로 추가됐는지(이후 generate가 쓸 수 있게)
         row = conn.execute(
             "SELECT keyword, status FROM keyword_queue WHERE id = ?", (picked["keyword_id"],)
         ).fetchone()
-        assert row[0] == "게이밍의자"
+        assert row[0] == "책상의자"
         assert row[1] == "pending"
 
     def test_none_when_no_recommendations(self) -> None:
@@ -198,6 +200,27 @@ class TestAutoPick:
         cm.add_to_keyword(conn, kid, cm.build_manual_product("P", "https://link.coupang.com/a/Z"))
         rows = queries.list_keywords(conn, status="pending")
         assert rows[0]["keyword"] == "쿠팡세팅"  # 미리선택 있는 것 맨 위 (자동 선정과 일치)
+
+
+class TestWinnableScore:
+    def test_lower_competition_ranks_higher(self) -> None:
+        # 같은 검색량이면 경쟁 낮을수록 '틈' 점수가 높다(낮음 > 중간 > 높음).
+        assert kr.winnable_score(10000, "낮음") > kr.winnable_score(10000, "중간")
+        assert kr.winnable_score(10000, "중간") > kr.winnable_score(10000, "높음")
+
+    def test_volume_capped(self) -> None:
+        # 상한 이상 검색량은 동일 취급 — head 키워드 과가중 억제.
+        assert kr.winnable_score(30000, "중간") == kr.winnable_score(99999, "중간")
+
+    def test_cached_volume_none_is_lowest(self) -> None:
+        # 캐시(검색량 미상)는 최하 — 실데이터 키워드가 항상 우선.
+        assert kr.winnable_score(None, "낮음") == -1.0
+        assert kr.winnable_score(None, "낮음") < kr.winnable_score(1, "높음")
+
+    def test_unknown_competition_is_middle(self) -> None:
+        # 미상 경쟁도는 중간(0.5) — 낮음(1.0)과 높음(0.3) 사이.
+        s = kr.winnable_score(10000, "unknown")
+        assert kr.winnable_score(10000, "높음") < s < kr.winnable_score(10000, "낮음")
 
 
 if __name__ == "__main__":
