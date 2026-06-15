@@ -1940,6 +1940,37 @@ def cmd_keyword_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_keyword_delete(args: argparse.Namespace) -> int:
+    """키워드 큐에서 키워드 삭제 — 연결된 미발행 draft 동반 삭제.
+
+    발행된 글이 연결돼 있으면 차단(라이브 글 보호·§0). foreign_keys=ON이라 draft를 먼저 지운다.
+    """
+    conn = db.connect(db.DB_PATH)
+    try:
+        kid = int(args.id)
+        kw = conn.execute("SELECT keyword FROM keyword_queue WHERE id = ?", (kid,)).fetchone()
+        if kw is None:
+            print(f"{FAIL} 키워드 #{kid} 없음")
+            return 2
+        pub = conn.execute(
+            "SELECT id FROM drafts WHERE keyword_id = ? AND status = 'published'", (kid,)
+        ).fetchall()
+        if pub:
+            ids = ", ".join(f"#{r[0]}" for r in pub)
+            print(
+                f"{FAIL} 발행된 글({ids})이 연결돼 삭제 불가 — "
+                "먼저 글을 비공개(unpublish-article)하세요."
+            )
+            return 2
+        n = conn.execute("DELETE FROM drafts WHERE keyword_id = ?", (kid,)).rowcount
+        conn.execute("DELETE FROM keyword_queue WHERE id = ?", (kid,))
+        conn.commit()
+        print(f"{OK} 키워드 #{kid} {kw[0]!r} 삭제 (연결 draft {n}건 동반 삭제)")
+        return 0
+    finally:
+        conn.close()
+
+
 def cmd_reject(args: argparse.Namespace) -> int:
     """draft → rejected (대시보드 반려). approved면 먼저 승인취소 후 반려."""
     from writer import state_machine
@@ -1991,6 +2022,118 @@ def cmd_coupang_add(args: argparse.Namespace) -> int:
         conn.close()
     print(f"{OK} 쿠팡 상품 {product['name']!r} → 키워드 #{args.keyword_id} 미리선택 (총 {n}개)")
     return 0
+
+
+def cmd_category_coupang_add(args: argparse.Namespace) -> int:
+    """카테고리 쿠팡 운영자추천 zone에 쿠팡 배너 상품 추가 (세션 #32).
+
+    공식 배너(<a><img></a>) 여러 개 한 번에 가능 — 파싱 → products 업서트 → category_products 링크.
+    """
+    from collector import category_coupang
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        try:
+            res = category_coupang.add_banners(
+                conn,
+                args.slug,
+                getattr(args, "banner", None),
+                affiliate_tag=settings.get("coupang_tag"),
+            )
+        except ValueError as e:
+            print(f"{FAIL} {e}")
+            return 2
+    finally:
+        conn.close()
+    if res["added"] == 0:
+        print(f"{WARN} 추가된 쿠팡 상품 없음 — 배너(<a><img></a>) 확인 (카테고리 {args.slug})")
+        return 1
+    print(f"{OK} 카테고리 {args.slug!r} 쿠팡 {res['added']}개 추가: " + ", ".join(res["names"]))
+    return 0
+
+
+def cmd_category_coupang_list(args: argparse.Namespace) -> int:
+    """카테고리 쿠팡존 상품 목록."""
+    from collector import category_coupang
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        rows = category_coupang.list_coupang(conn, args.slug)
+    finally:
+        conn.close()
+    if not rows:
+        print(f"{WARN} 카테고리 {args.slug!r} 쿠팡 상품 없음")
+        return 0
+    print(f"{OK} 카테고리 {args.slug!r} 쿠팡 {len(rows)}개:")
+    for r in rows:
+        print(f"  #{r['id']:>4} {r['name']}")
+    return 0
+
+
+def cmd_category_coupang_remove(args: argparse.Namespace) -> int:
+    """카테고리 쿠팡존에서 상품 링크 해제 (products 행은 보존)."""
+    from collector import category_coupang
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        try:
+            n = category_coupang.remove(conn, args.slug, args.product_id)
+        except ValueError as e:
+            print(f"{FAIL} {e}")
+            return 2
+    finally:
+        conn.close()
+    if n == 0:
+        print(f"{WARN} 해제할 쿠팡 링크 없음 (카테고리 {args.slug}, product #{args.product_id})")
+        return 1
+    print(f"{OK} 카테고리 {args.slug!r}에서 쿠팡 product #{args.product_id} 링크 해제")
+    return 0
+
+
+def cmd_build_deploy(args: argparse.Namespace) -> int:
+    """현재 운영 DB로 빌드 → build/site·functions/go 커밋 → main push (CI가 honsallim.com 반영).
+
+    카테고리·쿠팡 등 DB 변경의 라이브 반영용 원스톱 (세션 #32). refresh_cycle의 검증된
+    빌드+커밋+푸시 로직 재사용(refresh·killswitch 끔). 외부 게시(§2-라) — 호출 자체가 승인.
+    ★git_push stub의 'build/site 미커밋' 버그(EVENTS #30) 우회: refresh_cycle은 DEPLOY_PATHS를 commit.
+    """
+    import datetime
+
+    from deployer import refresh_cycle
+
+    if getattr(args, "dry_run", False):
+        changed, txt = refresh_cycle.detect_changes(PROJECT_ROOT)
+        print(f"[DRY] 배포 산출물 변경: {'있음' if changed else '없음'}")
+        if txt:
+            print(txt)
+        return 0
+
+    msg = getattr(args, "message", None) or (
+        f"[운영 배포 {datetime.date.today().isoformat()}] 카테고리·쿠팡 등 변경 라이브 반영"
+    )
+    conn = db.connect(db.DB_PATH)
+    try:
+        res = refresh_cycle.run_refresh_cycle(
+            conn,
+            project_root=PROJECT_ROOT,
+            refresh=False,
+            auto_killswitch=False,
+            do_build=True,
+            do_deploy=True,
+            dry_run=False,
+            commit_message=msg,
+            db_path=db.DB_PATH,
+        )
+    finally:
+        conn.close()
+    if res.deployed:
+        print(f"{OK} 빌드·배포 완료 (go {res.go_count}개) — CI가 1~2분 후 honsallim.com 반영")
+        return 0
+    if not res.changed:
+        print(f"{WARN} 산출물 변경 없음 — 이미 최신이거나 빌드 결과가 동일")
+        return 0
+    print(f"{FAIL} 배포 실패: {'; '.join(res.notes) or '알 수 없음'}")
+    return 2
 
 
 # ─── 예약 발행 (세션 #25) — 승인된 큐 자동/수동 발행 + 스케줄러 ──────────
@@ -2554,6 +2697,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_kw_list.add_argument("--status", type=str, default=None, help="status 필터 (예: pending)")
     p_kw_list.set_defaults(func=cmd_keyword_list)
 
+    p_kw_del = sub.add_parser(
+        "keyword-delete", help="키워드 삭제 (연결 미발행 draft 동반·발행글 차단)"
+    )
+    p_kw_del.add_argument("id", type=int, help="삭제할 키워드 id")
+    p_kw_del.set_defaults(func=cmd_keyword_delete)
+
     p_kw_rec = sub.add_parser(
         "keyword-recommend",
         help="추천 키워드 생성 (네이버 연관검색어→필터→검색량순). --add-top로 1순위 큐 추가",
@@ -2596,6 +2745,33 @@ def build_parser() -> argparse.ArgumentParser:
     p_cp_add.add_argument("--price", type=int, default=None, help="가격 KRW (선택)")
     p_cp_add.add_argument("--widget", type=str, default=None, help="공식 위젯 HTML (선택·보관)")
     p_cp_add.set_defaults(func=cmd_coupang_add)
+
+    p_ccp_add = sub.add_parser(
+        "category-coupang-add",
+        help="카테고리 쿠팡 운영자추천 zone에 쿠팡 배너 상품 추가 (여러 개 가능·세션 #32)",
+    )
+    p_ccp_add.add_argument("slug", type=str, help="카테고리 slug (예: office-chair)")
+    p_ccp_add.add_argument(
+        "--banner", type=str, default=None, help="쿠팡 공식 배너 HTML(<a><img>) — 여러 개 가능"
+    )
+    p_ccp_add.set_defaults(func=cmd_category_coupang_add)
+
+    p_ccp_list = sub.add_parser("category-coupang-list", help="카테고리 쿠팡존 상품 목록")
+    p_ccp_list.add_argument("slug", type=str, help="카테고리 slug")
+    p_ccp_list.set_defaults(func=cmd_category_coupang_list)
+
+    p_ccp_rm = sub.add_parser("category-coupang-remove", help="카테고리 쿠팡존에서 상품 링크 해제")
+    p_ccp_rm.add_argument("slug", type=str, help="카테고리 slug")
+    p_ccp_rm.add_argument("product_id", type=int, help="해제할 product id")
+    p_ccp_rm.set_defaults(func=cmd_category_coupang_remove)
+
+    p_bd = sub.add_parser(
+        "build-deploy",
+        help="현재 운영 DB로 빌드 → build/site·functions/go 커밋 → main push (CI 배포·세션 #32)",
+    )
+    p_bd.add_argument("--message", type=str, default=None, help="커밋 메시지 (기본 자동)")
+    p_bd.add_argument("--dry-run", action="store_true", help="변경 감지만 (배포 안 함)")
+    p_bd.set_defaults(func=cmd_build_deploy)
 
     # ─── 예약 발행 (세션 #25) ───
     p_pubq = sub.add_parser(

@@ -225,8 +225,9 @@
 .catpage .tbtns .btn { display: block; }
 
 /* ===== 쿠팡 운영자 추천 zone (세션 #31 — 상단 별도, 소스 투명) ===== */
-.catpage .coupang-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin: 10px 0 4px; }
-.catpage .coupang-picks .tcard { border-color: #f0d6bd; }
+/* flex+카드 폭 제한(세션 #32): 쿠팡 1개=적당한 폭(허전 X)·2~3개=균형 채움·많으면 wrap */
+.catpage .coupang-picks { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0 4px; }
+.catpage .coupang-picks .tcard { border-color: #f0d6bd; flex: 1 1 240px; max-width: 340px; }
 .catpage .coupang-picks .trank b { color: #9a5b13; }
 /* 쿠팡 zone 헤더 — 설명문(위)·제목·대가성(아래) 컴팩트 배치(세션 #31, 주인 요청) */
 .catpage .coupang-head { margin-top: 30px; }

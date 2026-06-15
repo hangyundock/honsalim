@@ -451,6 +451,7 @@ class DashboardWindow(QMainWindow):
                     ("🛒 쿠팡 첨부(저장)", self._on_coupang_attach),
                     ("🛒 쿠팡 배너→글 생성", self._on_coupang_generate),
                     ("✨ 글 생성", self._on_generate),
+                    ("🗑 키워드 삭제", self._on_keyword_delete),
                 ],
             ),
             "키워드",
@@ -519,9 +520,37 @@ class DashboardWindow(QMainWindow):
         self.cycle_label.setStyleSheet("padding:6px;")
         self.cycle_label.setWordWrap(True)
         lay.addWidget(self.cycle_label)
+        # 카테고리 쿠팡 관리 (세션 #32) — 아래 표에서 카테고리 선택 후 사용
+        bar = QHBoxLayout()
+        for label, slot in [
+            ("🛒 쿠팡 추가", self._on_category_coupang_add),
+            ("🛒 쿠팡 제거", self._on_category_coupang_remove),
+            ("🚀 빌드·배포", self._on_build_deploy),
+        ]:
+            b = QPushButton(label)
+            b.clicked.connect(slot)
+            bar.addWidget(b)
+            self._action_buttons.append(b)
+        bar.addStretch(1)
+        lay.addLayout(bar)
+        hint = QLabel(
+            "아래 표에서 카테고리를 먼저 선택한 뒤 쿠팡을 추가/제거하세요. "
+            "추가/제거 후 라이브 반영은 '🚀 빌드·배포'가 필요합니다."
+        )
+        hint.setStyleSheet("color:#666;font-size:11px;")
+        hint.setWordWrap(True)
+        lay.addWidget(hint)
         self.tab_health = _read_only_table(["카테고리", "slug", "추천", "전체", "상태"])
         lay.addWidget(self.tab_health, 1)
         return w
+
+    def _selected_category_slug(self) -> str | None:
+        """카테고리·모니터링 표에서 선택된 행의 slug (컬럼 1)."""
+        row = self.tab_health.currentRow()
+        if row < 0:
+            return None
+        item = self.tab_health.item(row, 1)
+        return item.text() if item else None
 
     def _build_settings_tab(self) -> QWidget:
         w = QWidget()
@@ -855,6 +884,35 @@ class DashboardWindow(QMainWindow):
 
         self.run_task(task, label="키워드 추가")
 
+    def _on_keyword_delete(self) -> None:
+        """선택한 키워드 삭제 (연결 미발행 글 동반). 발행된 글 있으면 차단(라이브 보호)."""
+        kid = self._selected_id(self.tab_keywords)
+        if kid is None:
+            QMessageBox.information(self, "키워드 선택", "삭제할 키워드를 먼저 선택하세요.")
+            return
+        row = self.tab_keywords.currentRow()
+        kw_item = self.tab_keywords.item(row, 1) if row >= 0 else None
+        kw = kw_item.text() if kw_item else str(kid)
+        resp = QMessageBox.question(
+            self,
+            "키워드 삭제",
+            f"키워드 #{kid} '{kw}'을(를) 삭제할까요?\n\n"
+            "· 연결된 미발행 글(검토 대기 등)도 함께 삭제됩니다.\n"
+            "· 발행된 글이 있으면 삭제되지 않습니다(라이브 보호).\n"
+            "· 되돌릴 수 없습니다.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if resp != QMessageBox.Yes:
+            return
+
+        def task() -> int:
+            import cli
+
+            return cli.cmd_keyword_delete(argparse.Namespace(id=kid))
+
+        self.run_task(task, label="키워드 삭제")
+
     def _on_generate(self) -> None:
         """글 생성. 줄을 선택했으면 그 키워드, 아니면 자동 선정(대기 큐 우선→없으면 추천·추가)."""
         kid = self._selected_id(self.tab_keywords)
@@ -1018,6 +1076,87 @@ class DashboardWindow(QMainWindow):
             return cli.cmd_keyword_generate(argparse.Namespace(id=kid, page_size=20, dry_run=False))
 
         self.run_task(task, label="쿠팡 하이브리드 글 생성")
+
+    def _on_category_coupang_add(self) -> None:
+        """선택한 카테고리의 쿠팡 운영자추천 zone에 쿠팡 배너 상품 추가 (여러 개 가능·세션 #32)."""
+        slug = self._selected_category_slug()
+        if not slug:
+            QMessageBox.information(
+                self, "카테고리 선택", "쿠팡을 추가할 카테고리를 표에서 먼저 선택하세요."
+            )
+            return
+        dlg = CoupangProductDialog(slug, self, attach_mode=True)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+        v = dlg.values()
+        if not v["banner"]:
+            QMessageBox.warning(
+                self, "배너 필요", "쿠팡 공식 배너 HTML(<a><img>)을 붙여넣으세요 (여러 개 가능)."
+            )
+            return
+
+        def task() -> int:
+            import cli
+
+            return cli.cmd_category_coupang_add(argparse.Namespace(slug=slug, banner=v["banner"]))
+
+        self.run_task(task, label="카테고리 쿠팡 추가")
+
+    def _on_category_coupang_remove(self) -> None:
+        """선택한 카테고리의 쿠팡 상품 목록에서 하나를 골라 링크 해제."""
+        slug = self._selected_category_slug()
+        if not slug:
+            QMessageBox.information(
+                self, "카테고리 선택", "쿠팡을 제거할 카테고리를 표에서 먼저 선택하세요."
+            )
+            return
+        from collector import category_coupang
+
+        conn = db.connect(db.DB_PATH)
+        try:
+            rows = category_coupang.list_coupang(conn, slug)
+        finally:
+            conn.close()
+        if not rows:
+            QMessageBox.information(self, "쿠팡 없음", f"카테고리 '{slug}'에 쿠팡 상품이 없습니다.")
+            return
+        labels = [f"#{r['id']} {r['name']}" for r in rows]
+        choice, ok = QInputDialog.getItem(self, "쿠팡 제거", "제거할 상품:", labels, 0, False)
+        if not ok:
+            return
+        try:
+            pid = int(choice.split(maxsplit=1)[0].lstrip("#"))
+        except (ValueError, IndexError):
+            return
+
+        def task() -> int:
+            import cli
+
+            return cli.cmd_category_coupang_remove(argparse.Namespace(slug=slug, product_id=pid))
+
+        self.run_task(task, label="카테고리 쿠팡 제거")
+
+    def _on_build_deploy(self) -> None:
+        """현재 운영 DB로 빌드 → build/site 커밋 → main push (CI가 라이브 반영). 외부 게시(§2-마 확인)."""
+        resp = QMessageBox.question(
+            self,
+            "빌드·배포",
+            "현재 운영 DB 상태로 사이트를 빌드해 라이브(honsallim.com)에 배포할까요?\n\n"
+            "· 카테고리·쿠팡 등 변경이 실제 사이트에 반영됩니다(외부 게시).\n"
+            "· GitHub Actions가 약 1~2분 후 배포합니다.\n"
+            "· 운영 폴더가 최신(main) 상태여야 합니다 — 아니면 push 실패로 안내됩니다.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if resp != QMessageBox.Yes:
+            return
+
+        def task() -> int:
+            import cli
+
+            return cli.cmd_build_deploy(argparse.Namespace(dry_run=False, message=None))
+
+        self.run_task(task, label="빌드·배포")
 
     def _on_preview(self) -> None:
         # 선택(없으면 맨 위) 발행 큐 글 → 빌드 후 그 글 상세로 바로 이동 (검토 동선·§2-마, 세션 #29)

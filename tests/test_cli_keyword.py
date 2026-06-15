@@ -136,6 +136,57 @@ class TestReject:
         assert cli.cmd_reject(_ns(draft=999, note=None)) == 2
 
 
+class TestKeywordDelete:
+    def _kid_with_draft(self, dbpath: Path, status: str) -> tuple[int, int]:
+        """키워드 + 그 키워드에 연결된 draft(status) 생성. (keyword_id, draft_id) 반환."""
+        _add_kw("컴퓨터의자")
+        conn = db.connect(dbpath)
+        kid = conn.execute("SELECT id FROM keyword_queue ORDER BY id DESC LIMIT 1").fetchone()[0]
+        conn.execute(
+            "INSERT INTO drafts (scenario_id, status, keyword_id) VALUES (1, ?, ?)", (status, kid)
+        )
+        did = conn.execute("SELECT id FROM drafts ORDER BY id DESC LIMIT 1").fetchone()[0]
+        conn.execute("UPDATE keyword_queue SET status='drafted' WHERE id=?", (kid,))
+        conn.commit()
+        conn.close()
+        return int(kid), int(did)
+
+    def test_delete_keyword_and_unpublished_draft(self, migrated_db: Path) -> None:
+        kid, did = self._kid_with_draft(migrated_db, "validated")
+        assert cli.cmd_keyword_delete(_ns(id=kid)) == 0
+        conn = db.connect(migrated_db)
+        assert (
+            conn.execute("SELECT COUNT(*) FROM keyword_queue WHERE id=?", (kid,)).fetchone()[0] == 0
+        )
+        assert conn.execute("SELECT COUNT(*) FROM drafts WHERE id=?", (did,)).fetchone()[0] == 0
+        conn.close()
+
+    def test_delete_blocked_when_published(self, migrated_db: Path) -> None:
+        kid, did = self._kid_with_draft(migrated_db, "published")
+        assert cli.cmd_keyword_delete(_ns(id=kid)) == 2  # 라이브 보호 — 차단
+        conn = db.connect(migrated_db)
+        assert (
+            conn.execute("SELECT COUNT(*) FROM keyword_queue WHERE id=?", (kid,)).fetchone()[0] == 1
+        )
+        assert conn.execute("SELECT COUNT(*) FROM drafts WHERE id=?", (did,)).fetchone()[0] == 1
+        conn.close()
+
+    def test_delete_missing_returns_2(self, migrated_db: Path) -> None:
+        assert cli.cmd_keyword_delete(_ns(id=999)) == 2
+
+    def test_delete_keyword_without_drafts(self, migrated_db: Path) -> None:
+        _add_kw("선풍기")
+        conn = db.connect(migrated_db)
+        kid = conn.execute("SELECT id FROM keyword_queue ORDER BY id DESC LIMIT 1").fetchone()[0]
+        conn.close()
+        assert cli.cmd_keyword_delete(_ns(id=kid)) == 0
+        conn = db.connect(migrated_db)
+        assert (
+            conn.execute("SELECT COUNT(*) FROM keyword_queue WHERE id=?", (kid,)).fetchone()[0] == 0
+        )
+        conn.close()
+
+
 class TestParserRegistration:
     def test_new_commands_registered(self) -> None:
         parser = cli.build_parser()
@@ -144,7 +195,13 @@ class TestParserRegistration:
         for action in parser._actions:
             if isinstance(action, argparse._SubParsersAction):
                 names |= set(action.choices)
-        assert {"keyword-add", "keyword-generate", "keyword-list", "reject"} <= names
+        assert {
+            "keyword-add",
+            "keyword-generate",
+            "keyword-list",
+            "keyword-delete",
+            "reject",
+        } <= names
 
 
 class TestGatherCandidatesHybrid:
