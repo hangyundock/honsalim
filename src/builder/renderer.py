@@ -357,6 +357,7 @@ def _article_coupang_pick(card: dict) -> dict:
     """쿠팡 운영자 추천 픽 — 별도 zone(주인 결정 #31). 할인·판매량 데이터 없음(공식 배너만)."""
     return {
         "tier": "coupang",
+        "coupang": True,
         "type": "운영자 추천",
         "name": card["name"],
         "price": card["price"],
@@ -764,6 +765,7 @@ def _category_coupang_pick(row: sqlite3.Row) -> dict:
     """쿠팡 운영자 추천 픽 (카테고리 상단 별도 zone). pick_card 매크로 호환 — 주인 결정 #31."""
     item = _catalog_item(row)
     item["type"] = "운영자 추천"
+    item["coupang"] = True
     item["pros"] = json.loads(row["pros_json"]) if row["pros_json"] else []
     item["cons"] = json.loads(row["cons_json"]) if row["cons_json"] else []
     item["reason"] = row["pick_reason"] or "운영자가 직접 고른 제품"

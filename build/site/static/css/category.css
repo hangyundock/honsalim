@@ -202,6 +202,9 @@
 .catpage .trank b { color: var(--accent); }
 .catpage .timg { display: flex; height: 150px; background: var(--wood-3); border: 1px solid var(--border); border-radius: 9px; align-items: center; justify-content: center; overflow: hidden; margin: 7px 0; }
 .catpage .timg img { width: 100%; height: 100%; object-fit: contain; }
+/* 이미지 차단(광고차단기)·로드 실패·무이미지 시 빈 박스 대신 플레이스홀더 (세션 #32) */
+.catpage .timg .timg-ph { display: none; }
+.catpage .timg.noimg .timg-ph { display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; font-size: 13px; font-weight: 700; color: var(--meta); text-align: center; line-height: 1.4; }
 .catpage .tnm { font-size: 14px; font-weight: 700; line-height: 1.45; color: var(--text); }
 .catpage .tpriceline { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; margin: 5px 0 8px; }
 .catpage .tprice { font-size: 18px; font-weight: 800; color: var(--text); }

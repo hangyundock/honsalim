@@ -6,8 +6,9 @@
 {% macro pick_card(p, area='') %}
 <div class="tcard"{% if area %} style="grid-area: {{ area }}"{% endif %}>
   <div class="trank">{% if p.type %}<b>{{ p.type }}</b>{% endif %}</div>
-  <a class="timg" href="{{ p.url }}" rel="sponsored nofollow">
-    {% if p.img_url %}<img loading="{{ 'eager' if eager_images else 'lazy' }}" decoding="async" src="{{ p.img_url }}" alt="{{ p.name }}" onerror="if(!this.dataset.r){this.dataset.r='1';this.src=this.src.split('?')[0]+'?r='+Date.now()}else{this.style.display='none'}">{% endif %}
+  <a class="timg{% if not p.img_url %} noimg{% endif %}" href="{{ p.url }}" rel="sponsored nofollow">
+    {% if p.img_url %}<img loading="{{ 'eager' if eager_images else 'lazy' }}" decoding="async" src="{{ p.img_url }}" alt="{{ p.name }}" onerror="if(!this.dataset.r){this.dataset.r='1';this.src=this.src.split('?')[0]+'?r='+Date.now()}else{this.style.display='none';this.parentNode.classList.add('noimg')}">{% endif %}
+    <span class="timg-ph" aria-hidden="true">🛒 {{ '쿠팡 추천 상품' if p.coupang else '상품 보기' }}</span>
   </a>
   <div class="tnm"><a href="{{ p.url }}" rel="sponsored nofollow" style="color:inherit;text-decoration:none">{{ p.name }}</a></div>
   <div class="tpriceline">
