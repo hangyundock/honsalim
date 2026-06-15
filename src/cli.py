@@ -2177,29 +2177,46 @@ def cmd_publish_queue(args: argparse.Namespace) -> int:
         print(f"{FAIL} promote된 글 없음 — 빌드·배포 생략")
         return 1
 
-    rc = cmd_build(argparse.Namespace(manifest=None, full=True, preview=False, save_empty=False))
-    if rc != 0:
-        print(f"{FAIL} 빌드 실패 (rc={rc})")
-        return rc
+    # 빌드+배포는 refresh_cycle 재사용 — build/site·functions/go를 add+commit+push 한다.
+    # ★EVENTS #30 버그 근본수정: 옛 경로(cmd_build + cmd_deploy)는 git_push가 commit 없이
+    #   push만 하는 stub이라 새 글이 CI에 안 가 라이브 미반영(404). refresh_cycle은 DEPLOY_PATHS를
+    #   커밋·푸시하므로 스케줄러 무인 발행도 라이브에 안전 반영(§0). cmd_build_deploy와 동일 로직.
+    import datetime
+
+    from deployer import refresh_cycle
+
+    msg = f"[publish-queue {datetime.date.today().isoformat()}] 승인 글 {promoted}편 발행·배포"
+    conn = db.connect(db.DB_PATH)
+    try:
+        res = refresh_cycle.run_refresh_cycle(
+            conn,
+            project_root=PROJECT_ROOT,
+            refresh=False,
+            auto_killswitch=False,
+            do_build=True,
+            do_deploy=not args.no_deploy,
+            dry_run=False,
+            verify_url=settings.get("verify_url"),
+            commit_message=msg,
+            db_path=db.DB_PATH,
+        )
+    finally:
+        conn.close()
+
+    if not res.built:
+        print(f"{FAIL} 빌드 실패: {'; '.join(res.notes) or '알 수 없음'}")
+        return 1
     if args.no_deploy:
         print(f"{OK} {promoted}편 게시·빌드 완료 (배포 생략 — --no-deploy)")
         return 0
-
-    rc = cmd_deploy(
-        argparse.Namespace(
-            dry_run=False,
-            skip_push=False,
-            skip_wrangler=True,
-            verify_url=settings.get("verify_url"),
-            remote="origin",
-            branch="main",
-            build_dir="build/site",
-            project="honsalim",
-        )
-    )
-    if rc == 0:
-        print(f"{OK} {promoted}편 발행·배포 완료 — CI가 honsallim.com 반영")
-    return rc
+    if res.deployed:
+        print(f"{OK} {promoted}편 발행·배포 완료 (go {res.go_count}개) — CI가 honsallim.com 반영")
+        return 0
+    if not res.changed:
+        print(f"{WARN} {promoted}편 게시했으나 배포 산출물 변경 없음 — 이미 반영됐을 수 있음")
+        return 0
+    print(f"{FAIL} 배포 실패: {'; '.join(res.notes) or '알 수 없음'}")
+    return 2
 
 
 def _deploy_ns() -> argparse.Namespace:
