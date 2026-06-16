@@ -41,9 +41,16 @@
   </div>
   {% endif %}
 
+  {% if is_article %}
+  {# 글(키워드): 검토 배너 + H1·첫머리 대가성 고지·리드를 글 intro로 — H1 단일·공정위 고지 유지(세션 #34) #}
+  {% if is_draft %}<div class="art-draft">🔍 <b>검토용 미리보기</b> — 아직 발행되지 않은 글입니다. 승인하면 이 내용 그대로 게시됩니다. <span style="opacity:.8">(이 안내는 공개 사이트에는 나타나지 않습니다.)</span></div>{% endif %}
+  <article class="art-intro cat-guide">{{ article_intro_html | safe }}</article>
+  <div class="byline"><span class="av">혼</span><span class="au">혼살다</span> · <a href="/method/">추천 기준</a></div>
+  {% else %}
   <h1>{{ category.guide_title or (category.name + ' — 어떻게 고를까') }}</h1>
   <div class="byline"><span class="av">혼</span><span class="au">혼살다</span> · <a href="/method/">추천 기준</a></div>
   <p class="lead">{{ category.lead }}</p>
+  {% endif %}
 
   {# 신뢰 박스 2개 (정적 — 모든 카테고리 공통, CATEGORY_PAGE §2-4) #}
   <div class="box"><div class="bt">🤝 혼살림의 약속</div><p>혼살림은 <b>제조사로부터 광고비·협찬을 받지 않습니다.</b> 위 고지처럼 제휴 링크로 구매가 일어나면 판매처에서 수수료를 받지만, 그 수수료는 <b>어떤 제품을 추천할지와 무관</b>합니다. 추천 기준은 오직 1인 가구 독자에게 도움이 되도록 객관적으로 정리했습니다.</p></div>
@@ -53,6 +60,12 @@
   {% if data_summary.count %}
   <div class="box"><div class="bt">📊 데이터로 본 {{ category.name }}</div><p>비교 제품 <b>{{ data_summary.count }}개</b>{% if data_summary.price_range %} · 가격대 <b>{{ data_summary.price_range }}</b>{% endif %}{% if data_summary.top_name %} · 가장 많이 팔린 제품 <b>{{ data_summary.top_name }}</b> (판매량 {{ data_summary.top_volume }}){% endif %}. <span class="dim">판매처가 표기한 판매량·가격 기준{% if data_summary.collected %} · 데이터 수집 {{ data_summary.collected }}{% endif %}이며, 가격은 변동될 수 있어요.</span></p></div>
   {% endif %}
+
+  {# 글(키워드): 빠른 결론 + 키워드 가이드(누구를 위한·왜 예산) — 카테고리엔 없음(세션 #34) #}
+  {% if is_article and quick_verdict %}
+  <div class="box verdict"><div class="bt">⚡ 빠른 결론</div><p>{{ quick_verdict }}</p></div>
+  {% endif %}
+  {% if is_article and article_guide_pre %}<div class="cat-guide art-guide">{{ article_guide_pre | safe }}</div>{% endif %}
 
   {% if pillar_link %}
   {# 필러 백링크 — 허브-스포크 토픽 클러스터(세션 #24) #}
@@ -192,6 +205,9 @@
   </div>
 
   <div class="honest"><b>혼살림은 제품에 점수·평점을 매기지 않습니다.</b> 전체 제품 순서는 <b>가격·할인율 기준 정렬</b>이며 품질 순위가 아닙니다. 가격·할인은 수집 시점 기준이며 변동될 수 있습니다.</div>
+
+  {# 글(키워드): 키워드 가이드 後(예산표·함께보기·FAQ) — 상품 아래 SEO 텍스트(세션 #34) #}
+  {% if is_article and article_guide_post %}<div class="cat-guide art-guide">{{ article_guide_post | safe }}</div>{% endif %}
 
   {% if related %}
   {# 연관 카테고리 크로스링크 — 같은 홈오피스 그룹 (체류시간·내부링크·SEO) #}

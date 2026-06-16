@@ -854,6 +854,38 @@ def _md_mistakes(text: str) -> Markup:
     return Markup(_CIRCLED_RE.sub("<br><br>", str(_md_inline(text))))  # noqa: S704
 
 
+def _cat_slug_from_concept(concept_image: str) -> str:
+    """글의 개념 이미지 경로 → 매핑 카테고리 slug (세션 #34).
+
+    /static/images/concepts/office-chair.webp → office-chair. 글 enrich가 매핑 카테고리의
+    concept_image를 저장하므로(structured) 별도 컬럼 없이 카테고리를 역추적한다. 없으면 ''.
+    """
+    return Path(concept_image).stem if concept_image else ""
+
+
+def _article_as_category_ctx(art: dict, base: dict) -> dict:
+    """키워드 글을 카테고리 페이지(category.html) 컨텍스트로 변환 — 의자 페이지 구성 재사용(세션 #34).
+
+    매핑 카테고리(base)의 검증된 추천 픽·전체 카탈로그·비교표·이미지를 그대로 쓰고, 글은
+    제목(H1)·첫머리 대가성 고지·키워드 가이드·빠른결론만 덧입힌다(별도 글 템플릿 폐기·#31 결정).
+    category.html은 is_article일 때 카테고리 H1/lead 대신 글 intro(H1+고지+리드)를 써 H1 단일·
+    공정위 고지를 유지한다. base의 picks/catalog/compare/coupang/data_summary는 그대로 통과.
+    """
+    a = art["article"]
+    ctx = dict(base)
+    ctx["slug"] = art["slug"]
+    ctx["is_article"] = True
+    ctx["is_draft"] = bool(art.get("is_draft"))
+    ctx["article_intro_html"] = a.get("intro_html", "")  # H1 + 대가성 고지 + 리드(카테고리 H1 대체)
+    ctx["article_guide_pre"] = a.get("guide_pre", "")
+    ctx["article_guide_post"] = a.get("guide_post", "")
+    ctx["quick_verdict"] = art.get("quick_verdict", "")
+    ctx["article_checkpoints"] = art.get("checkpoints", [])
+    ctx["has_article_checkpoints"] = bool(art.get("checkpoints"))
+    ctx["category"] = {**base["category"], "name": art["title"]}
+    return ctx
+
+
 def _load_category_pages(conn: sqlite3.Connection, include_drafts: bool = False) -> list[dict]:
     """제품이 연결된 카테고리만 → 카테고리 페이지 컨텍스트.
 
@@ -1626,8 +1658,11 @@ def render_site(
     # 404
     w("404.html", env.get_template("404.html").render(active_nav="", **common))
 
-    # 상세글: published articles → article.html (산문 body_html + /go/ 제휴 상품 카드)
+    # 상세글: 매핑 카테고리가 있으면 category.html(의자 페이지 구성 그대로 재사용·세션 #34),
+    # 없으면 article.html 폴백(옛 글·미매핑). 카탈로그·이미지·비교를 카테고리에서 물려받는다.
     art_tmpl = env.get_template("article.html")
+    cat_tmpl_art = env.get_template("category.html")
+    cat_by_slug = {cpg["slug"]: cpg for cpg in category_pages}
     for pg in article_pages:
         slug = pg["slug"]
         schema = jsonld.as_script_tags(
@@ -1643,6 +1678,42 @@ def render_site(
                 pg["schema_raw"],
             ]
         )
+        base = cat_by_slug.get(_cat_slug_from_concept(pg.get("concept_image", "")))
+        if base is not None:
+            actx = _article_as_category_ctx(pg, base)
+            w(
+                f"articles/{slug}/index.html",
+                cat_tmpl_art.render(
+                    active_nav="",
+                    canonical_url=f"{SITE_ORIGIN}/articles/{slug}/",
+                    meta_title=f"{pg['title']} | 혼살림",
+                    meta_description=pg["meta_description"],
+                    schema_jsonld=schema,
+                    category=actx["category"],
+                    data_summary=actx["data_summary"],
+                    pillar_link=actx["pillar_link"],
+                    products=actx["products"],
+                    catalog_types=actx["catalog_types"],
+                    coupang_picks=actx["coupang_picks"],
+                    has_coupang=actx["has_coupang"],
+                    picks_budget=actx["picks_budget"],
+                    picks_premium=actx["picks_premium"],
+                    has_picks=actx["has_picks"],
+                    compare=actx["compare"],
+                    has_compare=actx["has_compare"],
+                    related=actx["related"],
+                    is_article=True,
+                    is_draft=actx["is_draft"],
+                    article_intro_html=actx["article_intro_html"],
+                    article_guide_pre=actx["article_guide_pre"],
+                    article_guide_post=actx["article_guide_post"],
+                    quick_verdict=actx["quick_verdict"],
+                    article_checkpoints=actx["article_checkpoints"],
+                    has_article_checkpoints=actx["has_article_checkpoints"],
+                    **common,
+                ),
+            )
+            continue
         w(
             f"articles/{slug}/index.html",
             art_tmpl.render(

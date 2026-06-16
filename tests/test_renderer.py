@@ -1031,3 +1031,45 @@ class TestPublishedArticleTier2:
         assert "인체공학 설계" in html  # 픽 장점(pros) — pick_card에 렌더
         assert "cat-hero" in html  # 개념 이미지 배너(시각 격차 보강·세션 #34)
         assert "office-chair.webp" in html
+
+
+class TestArticleAsCategory:
+    """글을 카테고리 페이지 구성으로 재사용 (세션 #34) — 매핑 도출 + 컨텍스트 병합."""
+
+    def test_cat_slug_from_concept(self) -> None:
+        assert (
+            renderer._cat_slug_from_concept("/static/images/concepts/office-chair.webp")
+            == "office-chair"
+        )
+        assert renderer._cat_slug_from_concept("") == ""
+
+    def test_article_as_category_ctx_merges(self) -> None:
+        base = {
+            "slug": "office-chair",
+            "category": {"name": "의자", "lead": "L"},
+            "products": [{"name": "P"}],  # 카테고리 전체 카탈로그 — 글이 그대로 물려받음
+            "picks_budget": [],
+            "data_summary": {},
+        }
+        art = {
+            "slug": "kw-x",
+            "title": "키워드 글 제목",
+            "is_draft": True,
+            "quick_verdict": "QV",
+            "checkpoints": [{"title": "c", "why": "w"}],
+            "article": {
+                "intro_html": "<h1>키워드 글 제목</h1>",
+                "guide_pre": "PRE",
+                "guide_post": "POST",
+            },
+        }
+        ctx = renderer._article_as_category_ctx(art, base)
+        assert ctx["is_article"] is True
+        assert ctx["is_draft"] is True
+        assert ctx["slug"] == "kw-x"  # URL은 글 slug
+        assert ctx["category"]["name"] == "키워드 글 제목"  # H1 = 글 제목(SEO)
+        assert ctx["products"] == [{"name": "P"}]  # 카테고리 제품 그대로(이미지·전체 카탈로그)
+        assert ctx["article_intro_html"] == "<h1>키워드 글 제목</h1>"  # 대가성 고지 포함 intro
+        assert ctx["quick_verdict"] == "QV"
+        assert ctx["article_guide_pre"] == "PRE"
+        assert ctx["article_guide_post"] == "POST"
