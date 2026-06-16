@@ -663,6 +663,26 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                 "model": client.model,
                 "seo": seo_cfg,
             }
+            # Tier 2 구조화(세션 #34) — 추천별 장단점·추천대상·빠른결론·체크포인트(LLM 있으면).
+            # featured와 slug로 매칭돼 렌더러가 픽 카드/요약 박스를 채운다. 없으면 그 영역만 생략(graceful).
+            notes: dict[str, Any] = {}
+            picks = meta.get("picks")
+            if isinstance(picks, list):
+                for pk in picks:
+                    if isinstance(pk, dict) and pk.get("slug"):
+                        notes[str(pk["slug"])] = {
+                            "pros": [str(x) for x in (pk.get("pros") or [])][:3],
+                            "cons": [str(x) for x in (pk.get("cons") or [])][:2],
+                            "for_who": str(pk.get("for") or pk.get("for_who") or ""),
+                        }
+            payload["product_notes"] = notes
+            payload["quick_verdict"] = str(meta.get("quick_verdict") or "")
+            cps = meta.get("checkpoints")
+            payload["checkpoints"] = [
+                {"title": str(c.get("title") or ""), "why": str(c.get("why") or "")}
+                for c in (cps if isinstance(cps, list) else [])
+                if isinstance(c, dict) and (c.get("title") or c.get("why"))
+            ][:6]
             # schema 게이트용 Article JSON-LD. image_url·published_at은 임시값(발행 시 확정).
             from datetime import date
 
@@ -840,6 +860,21 @@ def cmd_approve(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def _article_structured_json(ep: dict[str, Any]) -> str | None:
+    """draft ep의 Tier 2 구조화(product_notes·quick_verdict·checkpoints)를 발행 저장용 JSON으로 (세션 #34).
+
+    셋 다 비면 None(구조화 없는 글·옛 글 안전). 발행 글이 미리보기와 동일 레이아웃이 되도록 보존.
+    """
+    struct = {
+        "product_notes": ep.get("product_notes") or {},
+        "quick_verdict": ep.get("quick_verdict") or "",
+        "checkpoints": ep.get("checkpoints") or [],
+    }
+    if not (struct["product_notes"] or struct["quick_verdict"] or struct["checkpoints"]):
+        return None
+    return json.dumps(struct, ensure_ascii=False)
+
+
 def cmd_promote(args: argparse.Namespace) -> int:
     """approved draft → articles + article_products → published (게시 경로 배선).
 
@@ -913,6 +948,8 @@ def cmd_promote(args: argparse.Namespace) -> int:
             "truth_check_passed_at": now,
             "user_approved_at": now,
             "user_approved_note": args.note,
+            # Tier 2 구조화(세션 #34) — 발행 글이 미리보기와 동일 레이아웃이 되도록 보존(없으면 None)
+            "structured_json": _article_structured_json(ep),
         }
         article_id = article_writer.promote_to_article(conn, args.draft, article_fields)
 

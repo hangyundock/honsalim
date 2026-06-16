@@ -28,6 +28,9 @@
   "meta_description": "150자 한국어 SEO 메타",
   "meta_keywords": "쉼표 구분 5~8개",
   "featured_products": ["본문 §3·§4에서 실제 추천한 상품의 고유 ID(아래 수집 상품 목록의 deeplink_slug 그대로)"],
+  "quick_verdict": "핵심 결론 2~3문장 — 예산·상황별로 어떤 추천을 고르면 되는지 바로 정해주는 요약(빠른 결론 박스)",
+  "checkpoints": [{"title": "사기 전 체크 항목", "why": "왜 중요한지 1~2문장"}],
+  "picks": [{"slug": "featured_products의 고유 ID 그대로", "pros": ["장점1", "장점2"], "cons": ["단점1"], "for": "이 제품이 잘 맞는 사람"}],
   "faqs": [
     {"q": "...", "a": "..."},
     ...

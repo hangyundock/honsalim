@@ -69,3 +69,9 @@ system 프롬프트의 §2 형식대로 META-JSON + BODY-MARKDOWN 두 블록 분
 같은 문구는 시스템이 표준 문구로 자동 삽입한다. 본문은 "# 페이지 제목"부터 시작.
 META-JSON `featured_products`에는 본문에서 실제 추천·언급한 상품의 고유 ID(deeplink_slug)만 나열
 (추천 안 한 상품은 제외). 본문 가격은 반드시 위 목록 가격과 일치.
+
+**추가 구조화 필드(META-JSON):** 추천 카드·요약 박스를 채운다 — 빠지면 그 영역만 생략된다.
+- `quick_verdict`: 핵심 결론 2~3문장(예산·상황별 어떤 추천을 고르면 되는지 바로 정해줌).
+- `checkpoints`: 사기 전 체크 3~5개, 각 `{title, why}`(1~2문장).
+- `picks`: `featured_products`의 **각 상품**마다 `{slug(고유 ID 그대로), pros(2개), cons(1개), for(잘 맞는 사람)}`.
+  pros·cons·for는 **1인칭·과장 금지**, 수집 정보 기반의 간결한 사실로(미보유 스펙·평점 지어내기 금지).

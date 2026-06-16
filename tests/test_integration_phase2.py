@@ -41,7 +41,17 @@ from writer.state_machine import transition
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MIGRATION_001 = PROJECT_ROOT / "sql" / "migrations" / "001_initial_schema.sql"
+MIGRATIONS_DIR = PROJECT_ROOT / "sql" / "migrations"
 SEED_001 = PROJECT_ROOT / "sql" / "seeds" / "001_personas_scenarios.sql"
+
+
+def _apply_migrations(conn: sqlite3.Connection) -> None:
+    """전체 마이그레이션(001~)을 순서대로 적용 — 테스트 스키마=운영 스키마.
+
+    001만 적용하면 이후 컬럼(예: 008 articles.structured_json)이 없어 실제 발행 경로와 어긋난다.
+    """
+    for sql_path in sorted(MIGRATIONS_DIR.glob("*.sql")):
+        conn.executescript(sql_path.read_text(encoding="utf-8"))
 
 
 # ─── 공통 픽스처 ──────────────────────────────────────────────────────
@@ -50,7 +60,7 @@ SEED_001 = PROJECT_ROOT / "sql" / "seeds" / "001_personas_scenarios.sql"
 def _full_db() -> sqlite3.Connection:
     """마이그레이션 + seed 적용 in-memory DB."""
     conn = sqlite3.connect(":memory:")
-    conn.executescript(MIGRATION_001.read_text(encoding="utf-8"))
+    _apply_migrations(conn)
     conn.executescript(SEED_001.read_text(encoding="utf-8"))
     conn.commit()
     return conn
@@ -467,7 +477,7 @@ class TestTrackerAggregateExportChain:
 
         try:
             conn = sqlite3.connect(db_path)
-            conn.executescript(MIGRATION_001.read_text(encoding="utf-8"))
+            _apply_migrations(conn)
             conn.executescript(SEED_001.read_text(encoding="utf-8"))
             conn.commit()
 

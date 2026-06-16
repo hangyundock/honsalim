@@ -39,6 +39,11 @@
   <div class="box"><div class="bt">📊 데이터로 본 추천</div><p>비교 제품 <b>{{ art_data_summary.count }}개</b>{% if art_data_summary.price_range %} · 가격대 <b>{{ art_data_summary.price_range }}</b>{% endif %}{% if art_data_summary.top_name %} · 가장 많이 팔린 제품 <b>{{ art_data_summary.top_name }}</b>(누적 {{ art_data_summary.top_volume }}){% endif %}. <span class="dim">판매처가 표기한 판매량·가격 기준이며 변동될 수 있어요.</span></p></div>
   {% endif %}
 
+  {# ⚡ 빠른 결론 — Tier 2 구조화(세션 #34). LLM structured 있을 때만(없으면 건너뜀). #}
+  {% if quick_verdict %}
+  <div class="box verdict"><div class="bt">⚡ 빠른 결론</div><p>{{ quick_verdict }}</p></div>
+  {% endif %}
+
   {# 🛒 쿠팡 운영자 추천 — 상단 별도 zone(주인 결정 #31). 데이터(할인·판매량) 없는 공식 배너·구매. #}
   {% if coupang_picks %}
   <div class="sechead"><div class="eb">운영자 추천</div><h2>혼살림이 직접 고른 쿠팡 제품</h2></div>
@@ -50,6 +55,14 @@
 
   {# 가이드 前 — 정보 콘텐츠(누구를 위한·왜 예산). 제품 나열 prose는 아래 시각 카드로 대체. #}
   {% if article.guide_pre %}<div class="cat-guide art-guide">{{ article.guide_pre | safe }}</div>{% endif %}
+
+  {# 구매 전 체크포인트 — Tier 2 구조화(세션 #34). category와 동일 스타일(.checklist). #}
+  {% if has_checkpoints %}
+  <div class="sub-h">사기 전 체크포인트</div>
+  <ul class="checklist">
+    {% for c in checkpoints %}<li><div class="ck-t">{{ c.title }}</div><div class="ck-w">{{ c.why }}</div></li>{% endfor %}
+  </ul>
+  {% endif %}
 
   {# 데이터로 고른 추천 — 알리 💰실속 / ⭐고급 2티어 (CATEGORY_PAGE §2-7) #}
   {% if picks_budget or picks_premium %}

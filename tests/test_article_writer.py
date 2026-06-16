@@ -32,11 +32,14 @@ from writer.state_machine import transition
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MIGRATION_001 = PROJECT_ROOT / "sql" / "migrations" / "001_initial_schema.sql"
+MIGRATIONS_DIR = PROJECT_ROOT / "sql" / "migrations"
 
 
 def _seeded_db() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:")
-    conn.executescript(MIGRATION_001.read_text(encoding="utf-8"))
+    # 전체 마이그레이션 적용(008 articles.structured_json 등) — 테스트 스키마=운영 스키마
+    for sql_path in sorted(MIGRATIONS_DIR.glob("*.sql")):
+        conn.executescript(sql_path.read_text(encoding="utf-8"))
     conn.executescript("""
         INSERT INTO personas (slug, title_ko, description) VALUES ('p1', 'P', 'd');
         INSERT INTO scenarios (slug, title_ko, description, persona_id) VALUES ('s1', 'S', 'd', 1);

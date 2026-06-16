@@ -263,7 +263,7 @@ def _load_personas(conn: sqlite3.Connection) -> list[dict]:
 
 ARTICLE_DETAIL_SQL = """
     SELECT a.id, a.slug, a.title, a.summary, a.body_html, a.meta_description,
-           a.schema_jsonld, a.published_at,
+           a.schema_jsonld, a.published_at, a.structured_json,
            s.season_peak, s.budget_min_krw, s.budget_max_krw,
            p.slug AS persona_slug, p.title_ko AS persona_title
     FROM articles a
@@ -508,6 +508,15 @@ def _article_page_ctx(
       있을 때만 채움 — 없으면 그 섹션만 건너뜀(graceful fallback, 빈 섹션 X).
     본문(intro/pre/rec)은 무손상(SEO 콘텐츠 보존) — 위치만 분할(세션 #30 데이터 플러밍 재사용).
     """
+    # Tier 2 구조화(세션 #34): structured(LLM 출력)의 추천별 장단점·추천대상을 카드에 slug로 부착 →
+    # pick_card 매크로가 카테고리와 동일하게 렌더. quick_verdict·checkpoints는 컨텍스트로 전달.
+    notes = (structured or {}).get("product_notes") or {}
+    for c in products:
+        n = notes.get((c.get("url") or "").rsplit("/", 1)[-1])
+        if n:
+            c["pros"] = list(n.get("pros") or [])
+            c["cons"] = list(n.get("cons") or [])
+            c["for_who"] = str(n.get("for_who") or n.get("for") or "")
     intro_html, guide_pre, guide_post = _split_article_guide(body_html)
     coupang_cards = [p for p in products if p["source"] == "coupang"]
     ali_cards = [p for p in products if p["source"] != "coupang"]
@@ -559,6 +568,10 @@ def _article_page_ctx(
         "catalog": catalog,
         "has_catalog": bool(catalog),
         "art_data_summary": _build_article_data_summary(ali_cards),
+        # Tier 2 구조화(세션 #34) — LLM structured가 있을 때만 채움(없으면 빈 값·섹션 건너뜀)
+        "quick_verdict": str((structured or {}).get("quick_verdict") or ""),
+        "checkpoints": (structured or {}).get("checkpoints") or [],
+        "has_checkpoints": bool((structured or {}).get("checkpoints")),
     }
 
 
@@ -573,6 +586,10 @@ def _load_article_pages(conn: sqlite3.Connection, include_drafts: bool = False) 
     seen_slugs: set[str] = set()
     for row in conn.execute(ARTICLE_DETAIL_SQL).fetchall():
         prods = conn.execute(ARTICLE_PRODUCTS_SQL, (row["id"],)).fetchall()
+        try:  # Tier 2 구조화(세션 #34) — 발행 글의 추천 장단점·빠른결론·체크포인트(있으면)
+            structured = json.loads(row["structured_json"]) if row["structured_json"] else None
+        except (json.JSONDecodeError, TypeError):
+            structured = None
         pages.append(
             _article_page_ctx(
                 slug=row["slug"],
@@ -587,6 +604,7 @@ def _load_article_pages(conn: sqlite3.Connection, include_drafts: bool = False) 
                 budget_min=row["budget_min_krw"],
                 budget_max=row["budget_max_krw"],
                 products=_article_product_cards(prods),
+                structured=structured,
             )
         )
         seen_slugs.add(row["slug"])
@@ -1639,6 +1657,9 @@ def render_site(
                 catalog=pg["catalog"],
                 has_catalog=pg["has_catalog"],
                 art_data_summary=pg["art_data_summary"],
+                quick_verdict=pg["quick_verdict"],  # Tier 2 구조화(세션 #34)
+                checkpoints=pg["checkpoints"],
+                has_checkpoints=pg["has_checkpoints"],
                 **common,
             ),
         )

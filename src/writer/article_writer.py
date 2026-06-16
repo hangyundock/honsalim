@@ -351,9 +351,9 @@ def promote_to_article(
             slug, scenario_id, title, summary, body_md, body_html,
             meta_description, meta_keywords, schema_jsonld, disclosure_first,
             status, published_at, content_hash,
-            truth_check_passed_at, user_approved_at, user_approved_note
+            truth_check_passed_at, user_approved_at, user_approved_note, structured_json
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?, ?, ?)
         """,
         (
             article_fields["slug"],
@@ -371,6 +371,7 @@ def promote_to_article(
             article_fields["truth_check_passed_at"],
             article_fields["user_approved_at"],
             article_fields.get("user_approved_note"),
+            article_fields.get("structured_json"),
         ),
     )
     article_id = int(cur.lastrowid or 0)
