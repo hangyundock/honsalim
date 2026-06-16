@@ -128,6 +128,55 @@ class TestLiveMocked:
         ).fetchone()
         assert tuple(op) == (200000, 25)
 
+    def test_vision_gate_drops_offtarget(self, monkeypatch: Any) -> None:
+        """세션 #35: vision_gate ON이면 키워드 필터는 통과해도 비전이 카테고리 불일치를 드롭."""
+        if pytest is None:  # pragma: no cover
+            return
+        from collector import vision_relevance as vr
+
+        conn = _conn()
+
+        def fake_query(q: str, **kw: Any) -> ali.QueryResult:
+            if "ergonomic" in q:  # premium — 키워드는 통과('의자')하나 비전이 드롭할 항목
+                items = [_item("D1", "의자 ZZDROP", image_url_external="http://x/d1.jpg")]
+            else:  # budget — 정상
+                items = [_item("P2", "메쉬 컴퓨터 의자", image_url_external="http://x/p2.jpg")]
+            return ali.QueryResult(dry_run=False, request={}, products=items, resp_code="200")
+
+        monkeypatch.setattr(cc.ali, "query_products", fake_query)
+        monkeypatch.setattr("common.config.load_secrets", lambda *a, **k: None)
+        # vision_gate ON + 네트워크/Anthropic 모킹 (a[4]=prompt에 상품명 포함 → ZZDROP면 탈락)
+        monkeypatch.setattr(
+            "common.settings.get",
+            lambda key, default=None: {"vision_gate": True, "vision_gate_cap": 40}.get(
+                key, default
+            ),
+        )
+        monkeypatch.setattr(vr, "_resolve_key", lambda k: "test-key")  # 키 있다고 가정
+        monkeypatch.setattr(
+            vr, "_fetch_image", lambda url, timeout=15.0: (b"\xff\xd8\xff", "image/jpeg")
+        )
+        monkeypatch.setattr(
+            vr,
+            "_call_vision",
+            lambda *a, **k: (
+                '{"ok": false, "reason": "딴거"}'
+                if "ZZDROP" in a[4]
+                else '{"ok": true, "reason": "ok"}'
+            ),
+        )
+
+        res = cc.collect_category(conn, "office-chair", dry_run=False, sleep=0)
+        assert res.vision_dropped == 1
+        kept = {
+            r[0]
+            for r in conn.execute(
+                "SELECT p.source_product_id FROM category_products cp "
+                "JOIN products p ON p.id = cp.product_id"
+            ).fetchall()
+        }
+        assert "P2" in kept and "D1" not in kept
+
     def test_dedup_same_product_across_tiers(self, monkeypatch: Any) -> None:
         if pytest is None:  # pragma: no cover
             return

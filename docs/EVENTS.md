@@ -18,6 +18,7 @@
   - 세션 #27 (2026-06-14 '글 생성' 자동 키워드 선정(원클릭)+발행큐 맨위 자동+PR 자동화 논의·회귀 782→787)
   - 세션 #28 (2026-06-14 쿠팡 하이브리드 글—naver_blog식 원팝업+알리 데이터 결합+쿠팡 공식배너 이미지·회귀 782→806)
   - 세션 #29 (2026-06-14~15 ★B-i 무인 자동발행 전체(article_state·guardrail·auto_approve·auto-cycle·auto_mode OFF)+naver_blog 흐름 GUI+미리보기 버그수정+PR 자동머지·구글정책 정정·회귀 806→846)
+  - 세션 #30 (2026-06-15 A 키워드 알리 영어검색 근본수정+doctor 게이트 복구+B 진행표시+★첫 라이브 글 발행(게이밍의자)+발행 build/site 커밋버그 적발+글 레이아웃 Tier2 재설계·회귀 846→851)
 - [EVENTS_202605.md](archive/EVENTS_202605.md):
   - 세션 #1 (2026-05-27 프로젝트 신규 셋업·정밀 조사·5파일 시스템·슬래시 명령 등록)
   - 세션 #2 (2026-05-27~28 Phase 0 설계 12/12 + Phase 1 외부 작업: GitHub·Cloudflare·도메인·R2·D1·Git push)
@@ -38,26 +39,41 @@
 
 ## 최근 5세션
 
+### 세션 #35 — 2026-06-16 (Opus 4.8 1M, ★무인 발행 라이브 실증 + 글=카테고리 흡수(고아·중복 근본해소) + 채널 역할분리 + ★비전 게이트·자동 카테고리 생성 ①②③, 회귀 896→932, main 푸시)
+
+**시작 상황**: `/honsalim-start`(#34 e9e3fd2). #34 최우선 '무인 라이브 테스트' 착수 → 발견 문제 근본 해결 + 자동화 확장.
+
+**핵심 [확정]** (검증·main):
+1. **무인 발행 라이브 실증**: 대시보드 상태 한글화 + 설정창 '예약 시각' 변경이 실제 schtasks 재등록되도록 `scheduler.reconcile(time_hhmm)`(config만 갱신되던 footgun 수정). 예약→`run_publish_queue.ps1` 실발행(노트북받침대)→라이브 검증 → '승인→예약 자동발행→라이브' 입증. 무인 OFF=승인글만. 커밋 1680a86.
+2. **글=카테고리 흡수(고아·중복 해소)**(주인 "글 닿을 길 없음" 지적): 키워드 글이 가짜 시나리오로 세팅 오염+카테고리 중복. → 노트북받침대→모니터받침대 **301**·키워드 시나리오 **active=0**·키워드 삭제 시 시나리오 동반삭제(버그수정)·정리 런처. 라이브 검증=리다이렉트·junk 7개 제거. 사무실의자 삭제. 커밋 42fa75a.
+3. **채널 역할분리 [확정·주인 채택]**: 볼륨 키워드 자동발행=**naver_blog**(C-Rank 권위)·honsalim=**카테고리 허브**(독립 도메인→대량 자동발행은 구글 scaled-content 위험·함정#1). naver_blog 무인 발행 인프라 거의 완성(6/16 첫 자동발행·별도 세션 확인).
+4. **★비전 게이트+자동 카테고리 ①②③**(주인 "품질위험 없앨 방법 연구·비판 재점검"): 원인=`product_filter` 키워드 매칭 brittle. → tistory `image_qa`(Haiku) 패턴 이식 `vision_relevance`(이미지로 카테고리 적합성·fail_closed·cap)+`collect_category` 통합(`vision_gate` 기본OFF·spec/vision 주입). `category_config_gen`(②한글명→영어검색어 설정·①신규 후보)·`category_autopilot.provision_category`(③설정→행draft→수집(vision)→빌드)·CLI `suggest-categories`/`provision-category`(dry_run 기본). §2-마 유지(draft만). ANTHROPIC_API_KEY 필요. 회귀 896→**932**(+36). doctor 클린.
+
+**무인·안전(§0)**: vision_gate OFF 기본·fail_closed·dry_run 기본·draft만(인간 게이트). 채널 분리로 신생 도메인 패널티 회피.
+
+**잔존/다음(#36)**: ①비전·자동 카테고리 **라이브 첫 실행**(감독·ANTHROPIC 키 확인·`provision-category --no-dry-run` 1개) ②naver_blog 볼륨 본격(`/naver-start`·6/16 결과) ③(이월)쿠팡 카테고리 배너·★성장=트래픽(GSC 색인). ★main직접머지=`git push origin HEAD:main`·한글→.py ASCII.
+
+---
+
 ### 세션 #34 — 2026-06-16 (Opus 4.8 1M, ★글 렌더링=카테고리 구성 통합 + 무인 골격 보강 + 품질 대수술, 회귀 873→896, main e9e3fd2·13커밋)
 
-**시작 상황**: `/honsalim-start`(워크트리 nice-bardeen·#33 3a96c49). 주인 "①완전 무인 가동 어떤 순서로?" 질문 → 정밀분석 중 무인 골격의 빠진 고리 발견. 이후 품질·페이지 구성을 주인 강한 피드백에 따라 반복 개선.
+**시작 상황**: `/honsalim-start`(#33 3a96c49). 주인 "완전 무인 가동 순서?" → 무인 골격 빠진 고리 발견 + 품질·페이지 구성 반복 개선. (상세 [확정]=DECISIONS C18)
 
-**핵심 [확정]** (전부 main·운영 동기화·라이브 검증):
-1. **★완전 무인 골격 보강**: `auto-cycle`이 대기 키워드만 소비(빈 큐→생성 0편 갭·실증)→`auto_pick_keyword`로 큐 비어도 winnable 자동 보충. 스케줄러가 `auto_mode`에 따라 `auto-cycle`(생성+발행)/`publish-queue`(발행만) 래퍼 선택+`reconcile`(auto_mode 변경 시 옛 wrapper 굳음 방지). 설정 GUI에 `auto_mode` 토글+검수편수+재생성상한·배너 무인 상태. **대시보드 시작 시 자동 마이그레이션**(main()·§2-가 비개발자 무명령·멱등·best-effort). **Gap B 라이브 실증**=빈 큐→리클라이너의자 자동선정→생성→5게이트 PASS.
-2. **★품질 근본수정**: `clean_product_name`(알리 기계번역명/제로폭문자/콤마나열 표시 정리·표시용만·_derive_type/필터는 원본 보존), `render_body_html`(본문 `(ali-)/(coupang-)` 참조코드 제거·발행+미리보기 공용·실증 draft 본문 8개→0), `dashboard.preview_server`(미리보기 로컬 HTTP 서빙→file:// 절대경로 무스타일 한계 EVENTS #30 근본해소·스타일 정상).
-3. **★Tier2 글 레이아웃**: 글 enrich가 quick_verdict·checkpoints·picks(추천별 장단점/추천대상) 생성→렌더러/템플릿 소비. migration 008 `articles.structured_json`(발행 보존)+버전기록 누락 버그 근본수정(재migrate duplicate column 방지). 시각 격차 보강(개념 이미지 히어로 배너 재사용·8선·비교표 확장).
-4. **★★글 = 카테고리 페이지 구성 통합**(주인 "의자 페이지 최종구성 따라 재사용" 지시·#31 실현): 주인이 글(article.html)이 카테고리보다 어설픔·이미지 빈칸·카탈로그 빈약 지적 + "왜 잘된 카테고리 구성 안 쓰고 억지로 만드냐"는 **정확한 논리적 비판**. **제 SEO 논리 오류 인정·정정**(중복 콘텐츠=같은 내용+상품이지 같은 구성 아님). → 별도 article 템플릿 폐기, 키워드 글을 `category.html`로 렌더(매핑 카테고리 picks/**전체 카탈로그/이미지**/비교 물려받고 글은 제목(H1)·첫머리 대가성 고지·키워드 가이드·빠른결론만·`_article_as_category_ctx`·`is_article` 조건부 additive·미매핑/옛글은 article.html 폴백). **라이브 검증=draft8(모니터받침대) 카탈로그 36개·이미지 44개·H1 1개·대가성 고지 유지·office-chair 카테고리 무손상.**
-회귀 873→**896**(+23). black·ruff·mypy·doctor 클린. 13커밋(059c357~**e9e3fd2**).
+**핵심 [확정]** (main·운영 동기화·라이브 검증):
+1. **완전 무인 골격 보강**: `auto_pick_keyword`(빈 큐도 winnable 자동보충)·스케줄러가 auto_mode 따라 auto-cycle/publish-queue 래퍼 선택+`reconcile`·설정 GUI auto_mode 토글·**대시보드 시작 시 자동 마이그레이션**. Gap 라이브 실증.
+2. **품질 근본수정**: `clean_product_name`(알리 기계번역명 표시정리)·`render_body_html`(본문 참조코드 제거)·`preview_server`(file:// 무스타일 한계 해소).
+3. **★글=카테고리 구성 통합**(주인 "의자 페이지 재사용" 지시·내 SEO 오류 정정=중복은 내용+상품이지 구성 아님): 별도 article 템플릿 폐기, 키워드 글을 `category.html`로 렌더(매핑 카테고리 카탈로그/이미지/비교 물려받고 글은 H1·대가성고지·가이드만·`is_article` 조건부 additive·미매핑은 폴백). 라이브 검증=draft8 카탈로그 36·이미지 44·H1 1·office-chair 무손상. migration 008 structured_json.
+회귀 873→**896**. 13커밋(~e9e3fd2). doctor 클린.
 
-**무인·안전(§0)**: auto_mode 기본 OFF 유지(머지해도 자동발행 0). category.html 변경은 additive(`is_article` 조건부)→카테고리 페이지 무영향 검증(H1 1개·글 마커 누출 0·제품 23개 정상). 대가성 고지·H1 단일 컴플라이언스 유지 검증. 운영 DB 직접수정 안 함(주인 실행/대시보드 자동 migrate).
+**무인·안전(§0)**: auto_mode 기본 OFF·category.html additive(카테고리 무영향 검증)·대가성/H1 컴플라이언스 유지·운영 DB 직접수정 안 함.
 
-**잔존/다음(#35)**: ①**★★자동실현(완전 무인) 실제 라이브 테스트**(주인 #34 명시·최우선): draft 7·8 검토→승인→발행으로 첫 5편(min_published=5)→`auto_mode` ON→'예약 켜기'(auto-cycle 등록)→winnable→생성→자동승인→발행·배포 **전체 1회 라이브**. 무인 OFF→ON 실증. ②(이월)쿠팡 이미지 테스트·mini-dehumidifier·쿠팡 본격(15만원후)·★성장 Tier0([[growth-first-priority]]). ★draft 5·6=article.html 폴백(단순)·7·8=카테고리 구성. 워크트리=`PYTHONPATH=src python -m cli`(시작 시 자동 migrate)·main직접머지=`git push origin HEAD:main`·PowerShell 한글→.py ASCII([[powershell-korean-encoding]]).
+**잔존/다음(#35)**: 완전 무인 라이브 테스트·(이월)쿠팡·성장 Tier0. → #35에서 실증·발전.
 
 ---
 
 ### 세션 #33 — 2026-06-15 (Opus 4.8 1M, ★무인 글 생성 파이프라인 완성 — SEO 주입·자가복원 재생성 루프·winnable 선정·초기검수 안전장치·발행 버그 근본수정, 회귀 865→873, main 3a96c49)
 
-**시작 상황**: `/honsalim-start`(워크트리 tender-proskuriakova·#32 e3a2219). 주인 "naver_blog식 무인발행(키워드 미리선정+쿠팡이미지 예약→스케줄러 자동발행) 준비됐나" 확인 요청 → 정밀분석 중 **"무인화 최적화·품질(구글 SEO) 기본·naver_blog 정밀분석 후 더 나은 역제안"** 강한 지시.
+**시작 상황**: `/honsalim-start`(#32 e3a2219). 주인 "naver_blog식 무인발행 준비됐나" → "무인화·품질(구글 SEO)·naver_blog 정밀분석 후 역제안" 강한 지시.
 
 **핵심 [확정]** (전부 main 반영·운영 폴더 동기화·실증):
 1. **★발행→라이브 버그 근본수정**: `cmd_publish_queue`/스케줄러가 `git_push` stub(commit 없음)으로 build/site 미커밋→새 글 CI 미반영(404·무인 치명, EVENTS #30 발견). `refresh_cycle`(build/site·functions/go add+commit+push) 재사용 교체 + 재발방지 테스트. main **8377a13**.
@@ -107,26 +123,4 @@
 
 ---
 
-### 세션 #30 — 2026-06-15 (Opus 4.8 1M, A 키워드 알리 영어검색 근본수정 + doctor 게이트 복구 + B 진행표시 + ★첫 라이브 글 발행 + 발행버그 적발 + 글 레이아웃 Tier1·Tier2 종합 재설계, 회귀 846→851, main 머지 3471248·7cb0168)
-
-**시작 상황**: #29 연속. 라이브 테스트가 적발한 2문제(A 키워드 알리검색 한글→쓰레기 / B 진행표시) 수정 착수.
-
-**핵심 [확정]** (A·B·doctor 전부 main 머지·라이브 검증):
-1. **★A 키워드 알리검색 근본수정**: `cli._gather_keyword_candidates`가 한글 키워드 직접검색(알리 영어인덱스 매칭실패→폰케이스·티셔츠) 대신 `keyword_relevance.resolve_category`→`category_collect.search_tiers`(카테고리 **영어 티어** "office chair"…)로 검색 + 키워드-적합성 필터. 미매핑=fail-closed 건너뜀. **라이브 검증: 게이밍의자→하이브리드 13개(쿠팡1+알리12 전부 의자)·thin 해소**. 커밋 3471248.
-2. **doctor 게이트 근본수정**: `_check_tests_loadable`가 `module_from_spec` 후 `sys.modules` 미등록 exec→모듈레벨 @dataclass 로드실패(false-FAIL·test_refresh_cycle). `_load_module_from_path`(exec 전 등록+원복)로 수정→**doctor exit 0 복구**. (pytest가 미리 올려 가렸던 버그·실증 재현).
-3. **B 대시보드 진행표시**: `run_task` 중앙에 진행바·상태라벨·버튼비활성·타이틀(`_set_busy`/`_set_done`, 14작업 label). '생성 1~2분 무표시' 해소. 라이브 검증됨.
-4. 회귀 **846→851**. black·ruff·mypy 클린.
-
-**★첫 라이브 글 발행 [확정]**: 옵션A(워크트리 검증→main 실발행). 게이밍의자 main 생성(B 진행표시 확인)→승인→발행→**honsallim.com/articles/kw-e3d08a2c/ 라이브(200·스타일·이미지·하이브리드 10상품)**. 새내기자취생 페르소나 페이지서 링크(글=카테고리 아님, 카테고리 페이지엔 안 나옴이 정상).
-
-**★발행 build/site 커밋 버그 적발 [확정]**: `cmd_publish_queue`/`cmd_deploy`가 build/site를 **커밋 안 함**→`git push`만→새 글이 CI에 안 감(404). 수동 build/site 커밋(7cb0168)으로 배포 완성. → **다음 근본수정 필요**(클릭만으론 발행 안 됨=무인 치명).
-
-**★file:// 미리보기 한계 [확정]**: 절대경로 CSS(`/static/`)·이미지가 file://에서 안 뜸→무스타일·이미지 안보임. **로컬 HTTP 서버**로 검증(라이브는 정상). 미리보기 버튼 HTTP 서빙 개선 필요(별도).
-
-**글 레이아웃**: Tier1(쿠팡 픽+알리 데이터 카드 본문삽입·renderer 데이터플러밍) 구현·미리보기 검증(워크트리·미배포). 단 주인 "여전히 텍스트벽=독서" 지적→**★Tier2 종합 재설계**: SEO·소비자행동·시각설계 **3관점 병렬 리서치**(NN/g·Baymard·Google) 수렴→**블루프린트 확정**(빠른결론박스·큐레이션 픽카드·비교표·체크박스·예산표·FAQ아코디언·판매량proof·★중복회피=의도분리). 전체 스펙=**docs/ARTICLE_LAYOUT_TIER2.md**.
-
-**잔존/다음(#31)**: ①**★글 레이아웃 Tier2 구현**(ARTICLE_LAYOUT_TIER2.md: LLM 구조화 출력 + 템플릿 시각 컴포넌트. 목업 먼저 확정) ②**★발행 build/site 자동커밋 근본수정**(cmd_publish_queue/cmd_deploy) ③file:// 미리보기→HTTP 서빙 개선 ④(이월) PartC 키워드 틈점수·mini-dehumidifier·성장 Tier0. ★워크트리=`PYTHONPATH=src python -m cli`·DB gitignore·발행=main 체크아웃·main직접머지=`git push origin HEAD:main`.
-
----
-
-> (세션 #19~#29는 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
+> (세션 #19~#30은 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)

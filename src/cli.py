@@ -1175,6 +1175,68 @@ def cmd_collect_category(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_suggest_categories(args: argparse.Namespace) -> int:
+    """신규 카테고리 후보 제안 (세션 #35 ①) — 기존 카테고리 제외, LLM 브레인스토밍. 기본 dry_run."""
+    import sqlite3
+
+    from collector import category_config_gen
+
+    if not args.dry_run:
+        config.load_secrets()
+    conn = db.connect(db.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        existing = [r[0] for r in conn.execute("SELECT name_ko FROM categories").fetchall()]
+    finally:
+        conn.close()
+    out = category_config_gen.suggest_categories(existing, n=args.count, dry_run=args.dry_run)
+    if not out:
+        print(f"{WARN} 후보 없음 (dry_run이거나 생성 실패 — 라이브는 --no-dry-run)")
+        return 0
+    print(f"{OK} 신규 카테고리 후보 {len(out)}개 (기존 {len(existing)}개 제외):")
+    for c in out:
+        print(f"     · {c['label']} — {c['reason']}")
+    print("     마음에 드는 것을 'provision-category <이름> --no-dry-run'으로 생성")
+    return 0
+
+
+def cmd_provision_category(args: argparse.Namespace) -> int:
+    """신규 카테고리 자동 프로비저닝 (세션 #35 ③): 설정생성→수집(vision 게이트)→빌드(draft).
+
+    기본 dry_run. --no-dry-run은 LLM(설정·빌드)+알리 수집+Imagen 비용·DB 쓰기. status='draft'로만
+    만들고 자동 공개 안 함 — 사람이 대시보드에서 검토·승인 후 배포(§2-마). vision_gate 강제로 사람
+    단어튜닝 없이 오염 상품을 거른다(ANTHROPIC_API_KEY 필요 — 없으면 fail_closed로 전량 드롭).
+    """
+    import sqlite3
+
+    from collector import category_autopilot
+
+    if not args.dry_run:
+        config.load_secrets()
+    conn = db.connect(db.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        res = category_autopilot.provision_category(
+            conn, args.label, dry_run=args.dry_run, build=not args.no_build
+        )
+    finally:
+        conn.close()
+    if not res.get("ok"):
+        print(f"{WARN} {res.get('reason', '프로비저닝 미완')}")
+        print("     [DRY] 실제 실행은 --no-dry-run (LLM+알리+Imagen 비용·DB 쓰기)")
+        return 0 if args.dry_run else 1
+    built = "빌드함" if res.get("build") else "빌드 안 함"
+    print(
+        f"{OK} provision-category {res['label']!r} → slug={res['slug']} "
+        f"(수집 {res['relevant']}편·비전드롭 {res['vision_dropped']}·연결 {res['linked']}, {built})"
+    )
+    print(
+        f"     status=draft(미공개) — 검토 후 'approve-category {res['slug']}'로 공개 "
+        "(AI 자동승인 금지·§2-마)"
+    )
+    return 0
+
+
 def cmd_build_category(args: argparse.Namespace) -> int:
     """카테고리 콘텐츠(가이드·추천6선·FAQ·비교표·개념이미지) 생성·게이트·저장 (세션 #17).
 
@@ -2604,6 +2666,30 @@ def build_parser() -> argparse.ArgumentParser:
     p_collect_cat.set_defaults(func=cmd_collect_category, dry_run=True)
 
     # 카테고리 콘텐츠·이미지 생성 (세션 #17)
+    # 세션 #35 ①③ — 신규 카테고리 자동 프로비저닝
+    p_suggest = sub.add_parser(
+        "suggest-categories", help="신규 카테고리 후보 제안 (LLM·기존 제외) (기본 dry_run)"
+    )
+    p_suggest.add_argument("--count", type=int, default=5, help="후보 수 (기본 5)")
+    p_suggest.add_argument(
+        "--no-dry-run", dest="dry_run", action="store_false", help="실제 LLM 호출 (비용)"
+    )
+    p_suggest.set_defaults(func=cmd_suggest_categories, dry_run=True)
+
+    p_prov = sub.add_parser(
+        "provision-category",
+        help="신규 카테고리 자동 프로비저닝 — 설정생성→수집(vision)→빌드(draft) (기본 dry_run)",
+    )
+    p_prov.add_argument("label", type=str, help="한글 카테고리명 (예: 가습기)")
+    p_prov.add_argument(
+        "--no-dry-run",
+        dest="dry_run",
+        action="store_false",
+        help="실제 실행 (LLM+알리+Imagen 비용·DB 쓰기 — 명시 승인 후)",
+    )
+    p_prov.add_argument("--no-build", action="store_true", help="수집까지만 (페이지 빌드 생략)")
+    p_prov.set_defaults(func=cmd_provision_category, dry_run=True)
+
     p_build_cat = sub.add_parser(
         "build-category", help="카테고리 가이드·추천6선·FAQ·비교표·개념이미지 생성 (기본 dry_run)"
     )

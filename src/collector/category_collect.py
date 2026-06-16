@@ -97,6 +97,9 @@ class CategoryCollectResult:
     relevant: int = 0  # 관련성 정제 통과 총건
     linked: int = 0  # category_products 연결 건수(중복 제외)
     removed_stale: int = 0  # 정합화로 제거된 옛 카탈로그 연결(재수집 시 오염 청소, 세션 #19)
+    vision_dropped: int = (
+        0  # 비전 게이트가 카테고리 불일치로 드롭한 건수 (세션 #35, vision_gate ON 시)
+    )
     per_tier: dict[str, dict[str, int]] = field(default_factory=dict)
     terms: list[tuple[str, SearchTerm]] = field(default_factory=list)
 
@@ -104,6 +107,12 @@ class CategoryCollectResult:
 def _category_id(conn: sqlite3.Connection, slug: str) -> int | None:
     row = conn.execute("SELECT id FROM categories WHERE slug = ?", (slug,)).fetchone()
     return int(row[0]) if row else None
+
+
+def _category_name_ko(conn: sqlite3.Connection, slug: str) -> str | None:
+    """카테고리 한글명(비전 게이트 프롬프트용 — '의자'/'모니터 받침대'). 없으면 None."""
+    row = conn.execute("SELECT name_ko FROM categories WHERE slug = ?", (slug,)).fetchone()
+    return str(row[0]) if row and row[0] else None
 
 
 _LINK_SQL = """
@@ -119,21 +128,28 @@ def collect_category(
     conn: sqlite3.Connection,
     slug: str,
     *,
+    spec: CategorySpec | None = None,
+    vision: bool | None = None,
     dry_run: bool = True,
     page_size: int = 30,
     sleep: float = 0.2,
 ) -> CategoryCollectResult:
     """카테고리 slug의 티어별 검색어로 수집·정제·연결.
 
+    spec: 명시하면 category_sources.yml 대신 그 CategorySpec을 쓴다(자동 생성 카테고리·세션 #35 ③).
+        None이면 yml에서 로드(기존 동작).
+    vision: 비전 게이트 사용 여부 강제 — None이면 설정(vision_gate)을 따른다. 자동 provisioning은
+        True로 강제(사람 단어튜닝 없이 품질 보증).
     dry_run=True: 검색어·밴드만 채운 결과 반환 (HTTP·DB 쓰기 없음 — 키 불필요).
     dry_run=False: ali.env 자격증명 + 실제 호출(쿼터 소모) + DB 쓰기 (§2-라 사용자 승인 후).
 
     호출자가 conn 생명주기 관리. 같은 제품이 두 티어에 겹쳐 잡히면 첫 티어로 한 번만 연결.
     """
-    sources = load_sources()
-    if slug not in sources:
-        raise KeyError(f"category_sources.yml에 {slug!r} 정의 없음 (정의됨: {sorted(sources)})")
-    spec = sources[slug]
+    if spec is None:
+        sources = load_sources()
+        if slug not in sources:
+            raise KeyError(f"category_sources.yml에 {slug!r} 정의 없음 (정의됨: {sorted(sources)})")
+        spec = sources[slug]
     result = CategoryCollectResult(slug=slug, dry_run=dry_run)
     result.terms = list(spec.tiers.items())
     result.category_id = _category_id(conn, slug)
@@ -177,6 +193,28 @@ def collect_category(
     result.relevant = len(all_rows)
     if not all_rows:
         return result
+
+    # 비전 관련성 게이트(세션 #35) — 설정 ON 시 수집 상품 이미지를 Haiku가 보고 카테고리 적합성을
+    # 판정해 키워드 필터가 못 거른 오염(엉뚱한 사물)을 드롭. fail_closed(불확실=드롭·자동 안전).
+    # 기본 OFF라 기존 카테고리 수집엔 무영향. 자동 카테고리 생성 시 사람 단어튜닝을 대체한다.
+    from common import settings as _settings
+
+    use_vision = _settings.get("vision_gate", False) if vision is None else vision
+    if use_vision:
+        from collector import vision_relevance
+
+        label = _category_name_ko(conn, slug) or slug
+        vres = vision_relevance.filter_relevant(
+            all_rows,
+            label,
+            cap=int(_settings.get("vision_gate_cap", 40) or 40),
+            fail_closed=True,
+        )
+        result.vision_dropped = len(vres["dropped"])
+        all_rows = vres["kept"]
+        result.relevant = len(all_rows)
+        if not all_rows:
+            return result
 
     products_store.upsert_products(conn, all_rows)
 

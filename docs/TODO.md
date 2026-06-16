@@ -3,11 +3,12 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #35 — (상세 EVENTS #34)
+## ★ 다음 세션 #36 — (상세 EVENTS #35)
 
-- [ ] **★★자동실현(완전 무인) 실제 라이브 테스트** (주인 #34 명시·최우선) — ①draft 7·8 등 미리보기 검토→승인→발행으로 **첫 5편 사람 검수·발행**(min_published=5 게이트 충족) ②설정 `auto_mode` ON ③'예약 켜기'(스케줄러 auto-cycle 등록) ④winnable 키워드 자동선정→생성→(5편후)자동승인→발행·배포 **전체 1회 라이브 검증**. **무인 가동 OFF→ON 실증이 목표.**
-- [ ] (이월) 쿠팡 이미지 테스트(키워드 쿠팡 첨부→글 생성→상단 운영자추천 zone) · `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장 Tier0([[growth-first-priority]]·트래픽이 진짜 병목).
-- 참고: **draft 5·6=article.html 폴백(단순)·draft 7·8=카테고리 구성**(이미지·전체 카탈로그). 워크트리=`PYTHONPATH=src python -m cli`(★대시보드 시작 시 자동 migrate) · DB gitignore→재생성. **main직접머지=`git push origin HEAD:main`**. ★PowerShell/cmd 한글 깨짐→.py·ASCII([[powershell-korean-encoding]]).
+- [ ] **★비전 게이트·자동 카테고리 라이브 첫 실행** (감독 권장) — ①`D:\secrets\affiliate_hub\`에 **ANTHROPIC_API_KEY 존재 확인**(비전 게이트 필수·없으면 fail_closed 전량드롭) ②`provision-category <품목> --no-dry-run` 1개 실증(설정생성→수집(vision)→빌드 draft) ③대시보드 draft 검토→승인→배포 ④품질·비용·드롭률 확인.
+- [ ] **naver_blog 볼륨 자동화 본격** (별도 프로젝트·`/naver-start`) — 6/16 첫 무인 자동발행 결과 확인 + 키워드 7개 7일 스케줄러 테스트(주인 모델·네이버 C-Rank 권위라 honsalim보다 적합).
+- [ ] (이월) 쿠팡 카테고리 배너(카테고리·모니터링 탭) · `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장=트래픽(GSC 색인·[[growth-first-priority]]).
+- 참고: 운영 폴더=#35 동기화(fc1bf29+). 워크트리=`PYTHONPATH=src python -m cli`(대시보드 시작 시 자동 migrate)·DB gitignore→재생성. **main직접머지=`git push origin HEAD:main`**. 운영 DB 직접수정 불가→주인 런처. ★PowerShell/cmd 한글→.py·ASCII([[powershell-korean-encoding]]).
 
 ## 시점 의존 잔존 (세션 #6~7)
 

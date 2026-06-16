@@ -36,6 +36,10 @@ DEFAULTS: dict[str, Any] = {
     "satisfaction_floor": 80.0,  # 알리 긍정 피드백율 하한 % (006 신호 필터)
     "seo_max_attempts": 2,  # SEO 게이트 재생성 상한 (카테고리 페이지 — 비용 방지 CLAUDE §6)
     "enrich_max_attempts": 2,  # 키워드 글 5게이트 재생성 상한 (세션 #33 무인 자가복원 — 비용 방지)
+    # 비전 관련성 게이트(세션 #35): 수집 상품 이미지를 Haiku가 보고 카테고리 적합성 판정 → 오염 드롭.
+    # 기본 OFF(기존 카테고리 무영향·키워드 필터만). 자동 카테고리 생성 시 ON으로 사람 단어튜닝 대체.
+    "vision_gate": False,
+    "vision_gate_cap": 40,  # 카테고리당 비전 호출 상한 (비용 보호)
     # ── 채널 ──
     "default_channel": "ali",  # 신규 키워드 기본 채널: ali | coupang | both
     "default_keyword_persona": None,  # 키워드 파생 시나리오 기본 페르소나 slug (None=첫 페르소나)
