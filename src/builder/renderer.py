@@ -422,7 +422,7 @@ def _article_catalog_item(card: dict, tier: str) -> dict:
     }
 
 
-def _build_article_compare(featured: list[dict], limit: int = 4) -> dict:
+def _build_article_compare(featured: list[dict], limit: int = 6) -> dict:
     """추천 featured(알리) → 한눈 비교표 (category.html cmp 형식: rows·cols).
 
     데이터(할인·누적 판매)만 비교 — 평점·스펙 같은 미보유 데이터는 만들지 않음(§0 진실성).
@@ -572,6 +572,8 @@ def _article_page_ctx(
         "quick_verdict": str((structured or {}).get("quick_verdict") or ""),
         "checkpoints": (structured or {}).get("checkpoints") or [],
         "has_checkpoints": bool((structured or {}).get("checkpoints")),
+        "concept_image": str((structured or {}).get("concept_image") or ""),  # 글 히어로(세션 #34)
+        "concept_image_alt": str((structured or {}).get("concept_image_alt") or ""),
     }
 
 
@@ -1660,6 +1662,8 @@ def render_site(
                 quick_verdict=pg["quick_verdict"],  # Tier 2 구조화(세션 #34)
                 checkpoints=pg["checkpoints"],
                 has_checkpoints=pg["has_checkpoints"],
+                concept_image=pg["concept_image"],
+                concept_image_alt=pg["concept_image_alt"],
                 **common,
             ),
         )

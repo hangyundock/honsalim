@@ -104,6 +104,8 @@ def built_with_article(tmp_path: Path) -> dict:
                             "for_who": "재택 장시간 근무",
                         }
                     },
+                    "concept_image": "/static/images/concepts/office-chair.webp",
+                    "concept_image_alt": "의자 비교 가이드",
                 },
                 ensure_ascii=False,
             ),
@@ -1027,3 +1029,5 @@ class TestPublishedArticleTier2:
         assert "예산 따라 의자부터" in html  # quick_verdict
         assert "요추 지지" in html  # checkpoint title
         assert "인체공학 설계" in html  # 픽 장점(pros) — pick_card에 렌더
+        assert "cat-hero" in html  # 개념 이미지 배너(시각 격차 보강·세션 #34)
+        assert "office-chair.webp" in html

@@ -598,6 +598,8 @@ def cmd_enrich(args: argparse.Namespace) -> int:
         # 미주입 시 validator seo 게이트가 skip돼 무인 글이 SEO 미검증으로 양산되던 갭(실증 발견).
         # 키워드 → 카테고리(resolve_category) → seo_keywords.gate_config → 프롬프트 지시 + seo 게이트 활성.
         seo_cfg: dict[str, Any] = {}
+        concept_image = ""
+        concept_image_alt = ""
         keyword_id = row[9]
         if keyword_id:
             kwrow = conn.execute(
@@ -609,6 +611,14 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                 cat_slug = keyword_relevance.resolve_category(str(kwrow[0]))
                 if cat_slug:
                     seo_cfg = seo_keywords.gate_config(cat_slug) or {}
+                    # 시각 보강(세션 #34): 매핑 카테고리 개념 이미지를 글 히어로 배너로 재사용(생성 0)
+                    crow = conn.execute(
+                        "SELECT concept_image, concept_image_alt FROM categories WHERE slug = ?",
+                        (cat_slug,),
+                    ).fetchone()
+                    if crow:
+                        concept_image = crow[0] or ""
+                        concept_image_alt = crow[1] or ""
                     if seo_cfg:
                         print(
                             f"     SEO 주입: 카테고리 {cat_slug} (primary={seo_cfg.get('primary')!r})"
@@ -683,6 +693,10 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                 for c in (cps if isinstance(cps, list) else [])
                 if isinstance(c, dict) and (c.get("title") or c.get("why"))
             ][:6]
+            payload["concept_image"] = (
+                concept_image  # 매핑 카테고리 개념 이미지(글 히어로·세션 #34)
+            )
+            payload["concept_image_alt"] = concept_image_alt
             # schema 게이트용 Article JSON-LD. image_url·published_at은 임시값(발행 시 확정).
             from datetime import date
 
@@ -869,8 +883,10 @@ def _article_structured_json(ep: dict[str, Any]) -> str | None:
         "product_notes": ep.get("product_notes") or {},
         "quick_verdict": ep.get("quick_verdict") or "",
         "checkpoints": ep.get("checkpoints") or [],
+        "concept_image": ep.get("concept_image") or "",
+        "concept_image_alt": ep.get("concept_image_alt") or "",
     }
-    if not (struct["product_notes"] or struct["quick_verdict"] or struct["checkpoints"]):
+    if not any(struct.values()):
         return None
     return json.dumps(struct, ensure_ascii=False)
 

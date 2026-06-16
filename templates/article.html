@@ -31,6 +31,17 @@
   <article class="art-intro cat-guide">{{ article.intro_html | safe }}</article>
   <div class="byline"><span class="av">혼</span><span class="au">혼살다</span> · <a href="/method/">데이터로 고르는 기준</a></div>
 
+  {# 배너형 개념 이미지 — 매핑 카테고리 이미지 재사용(시각 격차 보강·세션 #34). 없으면 건너뜀. #}
+  {% if concept_image %}
+  <div class="cat-hero" style="background-image: url('{{ concept_image }}')" role="img" aria-label="{{ concept_image_alt }}">
+    <div class="cat-hero-in">
+      <div class="ch-eyebrow">1인 가구 · 홈오피스 가이드</div>
+      <h2 class="ch-title">{{ article.title }}</h2>
+      {% if has_picks %}<a class="ch-cta" href="#picks">추천 보기 →</a>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
   {# 신뢰 박스 2개 (정적 공통 — CATEGORY_PAGE §2-4) #}
   <div class="box"><div class="bt">🤝 혼살림의 약속</div><p>혼살림은 <b>제조사로부터 광고비·협찬을 받지 않습니다.</b> 제휴 링크로 구매가 일어나면 판매처에서 수수료를 받지만, 그 수수료는 <b>어떤 제품을 추천할지와 무관</b>합니다. 추천 기준은 오직 1인 가구 독자에게 도움이 되도록 정리했습니다.</p></div>
   <div class="box"><div class="bt">📋 이렇게 골랐어요</div><p>판매처의 <b>실제 판매량·가격·할인</b>을 출발점으로 <b>1인 가구 관점</b>(오래 써도 좋은가·공간·예산)에서 비교했습니다. 가짜 평점은 만들지 않습니다. <a href="/method/">추천 방법 자세히 →</a> <span class="dim">가격·할인은 수집 시점 기준이며 변동될 수 있습니다.</span></p></div>
