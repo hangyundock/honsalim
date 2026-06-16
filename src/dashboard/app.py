@@ -1209,8 +1209,12 @@ class DashboardWindow(QMainWindow):
                     if art.exists():
                         target = art
             if target.exists():
-                webbrowser.open(target.as_uri())
-                print(f"[OK] 미리보기 열기: {target}")
+                # file:// 대신 로컬 HTTP로 — 절대경로 /static·이미지가 정상 해석돼 라이브와 동일(세션 #34)
+                from dashboard import preview_server
+
+                url = preview_server.url_for(preview, target)
+                webbrowser.open(url)
+                print(f"[OK] 미리보기 열기: {url} (로컬 HTTP — 스타일·이미지 정상)")
             else:
                 print(f"[WARN] 미리보기 파일 없음: {target} (먼저 글을 생성하세요)")
             return rc
