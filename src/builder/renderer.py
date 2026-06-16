@@ -603,7 +603,7 @@ def _load_draft_article_pages(conn: sqlite3.Connection, seen_slugs: set[str]) ->
     같은 slug published 글이 있으면 published 우선(미리보기에서 라이브 글을 draft로 덮지 않음).
     draft 글은 sitemap·게시수에서 제외되고 build/preview에만 생성된다(공개 배포 산출물 아님).
     """
-    import markdown as md_lib  # promote(cmd_promote)와 동일 (BACKEND §10-1)
+    from writer import article_writer  # 본문 변환 공용(제품 코드 제거) — promote와 동일
 
     pages: list[dict] = []
     for row in conn.execute(DRAFT_ARTICLE_SQL).fetchall():
@@ -624,7 +624,7 @@ def _load_draft_article_pages(conn: sqlite3.Connection, seen_slugs: set[str]) ->
                 summary=ep.get("summary") or "",
                 meta_description=ep.get("meta_description") or "",
                 schema_raw=ep.get("schema_jsonld"),
-                body_html=md_lib.markdown(body_md, extensions=["extra", "sane_lists"]),
+                body_html=article_writer.render_body_html(body_md),
                 persona_slug=row["persona_slug"],
                 persona_title=row["persona_title"],
                 season_peak=row["season_peak"],

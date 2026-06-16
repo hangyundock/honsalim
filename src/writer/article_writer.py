@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 from collections.abc import Iterable
 from datetime import datetime, timezone
@@ -65,6 +66,23 @@ CONTENT_HASH_PREFIX = "sha256:"
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+# LLM이 본문에 남기는 제품 참조 코드 '제품명 (ali-슬러그)/(coupang-슬러그)' — 앞 공백까지 함께 제거.
+_PRODUCT_REF_RE = re.compile(r"[ \t]*\((?:ali|coupang)-[A-Za-z0-9-]+\)")
+
+
+def render_body_html(body_md: str) -> str:
+    """검증된 body_md → 발행·미리보기 공용 HTML (세션 #34).
+
+    본문의 제품 참조 코드 '(ali-슬러그)/(coupang-슬러그)'를 제거한 뒤 markdown 변환한다. 표준
+    markdown은 이 괄호 코드를 처리하지 않아 독자에게 그대로 노출되는데, 상품 카드가 이미 /go/
+    제휴 링크를 제공하므로 본문 코드는 불필요하다. 코드 제거 외 본문 무변형(무결성·결정적·무비용).
+    """
+    import markdown as md_lib  # BACKEND §10-1 (top-level 의존 최소화 — 호출부 관례 유지)
+
+    cleaned = _PRODUCT_REF_RE.sub("", body_md or "")
+    return str(md_lib.markdown(cleaned, extensions=["extra", "sane_lists"]))
 
 
 def compute_content_hash(body_md: str) -> str:

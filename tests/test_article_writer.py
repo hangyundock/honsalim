@@ -581,6 +581,27 @@ class TestLinkArticleProducts:
         assert (linked, skipped) == (0, 1)
 
 
+class TestRenderBodyHtml:
+    """본문 변환 공용 헬퍼 (세션 #34) — 제품 참조 코드 제거 + markdown 변환."""
+
+    def test_strips_ali_and_coupang_refs(self) -> None:
+        md = "발판 게이밍 의자 (ali-1005012426286194)는 좋다. 책상 (coupang-77a)도 추천."
+        html = article_writer.render_body_html(md)
+        assert "ali-" not in html
+        assert "coupang-" not in html
+        assert "발판 게이밍 의자" in html
+        assert "는 좋다" in html  # 코드 앞 공백까지 제거하되 텍스트는 보존
+
+    def test_markdown_converted(self) -> None:
+        html = article_writer.render_body_html("# 제목\n\n본문 문단")
+        assert "<h1" in html
+        assert "본문 문단" in html
+
+    def test_empty_and_none_safe(self) -> None:
+        assert article_writer.render_body_html("") == ""
+        assert article_writer.render_body_html(None) == ""  # type: ignore[arg-type]
+
+
 if __name__ == "__main__":
     if pytest is not None:
         pytest.main([__file__, "-v"])

@@ -851,8 +851,6 @@ def cmd_promote(args: argparse.Namespace) -> int:
     """
     from datetime import datetime, timezone
 
-    import markdown as md_lib  # BACKEND §10-1 1차 의존성
-
     from writer import article_writer
 
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -897,8 +895,8 @@ def cmd_promote(args: argparse.Namespace) -> int:
             print(f"{FAIL} 첫머리 disclosure 추출 실패 — POLICY §2-2 표준 문구 누락 (게시 중단)")
             return 2
 
-        # 검증된 body_md를 변형 없이 HTML 변환 (본문 무결성 — validated 본문 = published 본문)
-        body_html = md_lib.markdown(body_md, extensions=["extra", "sane_lists"])
+        # 검증된 body_md → HTML (제품 참조 코드 제거·본문 무결성 — validated 본문 = published 본문)
+        body_html = article_writer.render_body_html(body_md)
 
         article_fields: dict[str, Any] = {
             "slug": slug,
