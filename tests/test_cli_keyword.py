@@ -171,6 +171,54 @@ class TestKeywordDelete:
         assert conn.execute("SELECT COUNT(*) FROM drafts WHERE id=?", (did,)).fetchone()[0] == 1
         conn.close()
 
+    def test_delete_removes_derived_scenario(self, migrated_db: Path) -> None:
+        """세션 #35: 키워드 삭제 시 파생 시나리오도 함께 삭제(세팅에 쓰레기 카드 잔존 방지)."""
+        from writer import keyword_queue as kq
+
+        _add_kw("리클라이너의자")
+        conn = db.connect(migrated_db)
+        kid = conn.execute("SELECT id FROM keyword_queue ORDER BY id DESC LIMIT 1").fetchone()[0]
+        sid = kq.ensure_scenario_for_keyword(conn, kid)
+        conn.execute(
+            "INSERT INTO drafts (scenario_id, status, keyword_id) VALUES (?, 'validated', ?)",
+            (sid, kid),
+        )
+        conn.commit()
+        conn.close()
+
+        assert cli.cmd_keyword_delete(_ns(id=kid)) == 0
+        conn = db.connect(migrated_db)
+        assert conn.execute("SELECT COUNT(*) FROM scenarios WHERE id=?", (sid,)).fetchone()[0] == 0
+        conn.close()
+
+    def test_delete_keeps_scenario_referenced_by_article(self, migrated_db: Path) -> None:
+        """글(article)이 걸린 시나리오는 키워드 삭제로도 지우지 않는다(라이브/잔존 글 보호·FK 안전)."""
+        from writer import keyword_queue as kq
+
+        _add_kw("책상의자")
+        conn = db.connect(migrated_db)
+        kid = conn.execute("SELECT id FROM keyword_queue ORDER BY id DESC LIMIT 1").fetchone()[0]
+        sid = kq.ensure_scenario_for_keyword(conn, kid)
+        conn.execute(
+            "INSERT INTO articles (slug, scenario_id, title, summary, body_md, body_html, "
+            "meta_description, schema_jsonld, disclosure_first, content_hash, "
+            "truth_check_passed_at, user_approved_at, status) VALUES "
+            "(?, ?, 'T', 's', 'm', 'h', 'd', '{}', 'disc', 'hash', "
+            "'2026-01-01', '2026-01-01', 'unpublished')",
+            ("kw-x", sid),
+        )
+        conn.commit()
+        conn.close()
+
+        assert cli.cmd_keyword_delete(_ns(id=kid)) == 0
+        conn = db.connect(migrated_db)
+        # 시나리오 보존(글이 참조) — 키워드만 삭제됨
+        assert conn.execute("SELECT COUNT(*) FROM scenarios WHERE id=?", (sid,)).fetchone()[0] == 1
+        assert (
+            conn.execute("SELECT COUNT(*) FROM keyword_queue WHERE id=?", (kid,)).fetchone()[0] == 0
+        )
+        conn.close()
+
     def test_delete_missing_returns_2(self, migrated_db: Path) -> None:
         assert cli.cmd_keyword_delete(_ns(id=999)) == 2
 

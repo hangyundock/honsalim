@@ -2071,10 +2071,23 @@ def cmd_keyword_delete(args: argparse.Namespace) -> int:
                 "먼저 글을 비공개(unpublish-article)하세요."
             )
             return 2
+        srow = conn.execute("SELECT scenario_id FROM keyword_queue WHERE id = ?", (kid,)).fetchone()
+        sid = srow[0] if srow else None
         n = conn.execute("DELETE FROM drafts WHERE keyword_id = ?", (kid,)).rowcount
         conn.execute("DELETE FROM keyword_queue WHERE id = ?", (kid,))
+        # 키워드 파생 가짜 시나리오도 함께 정리 — 단 글(article)이 안 걸린 경우만(라이브/잔존 글
+        # 보호·FK 안전). 세션 #35: 키워드만 지우고 시나리오가 남아 세팅에 쓰레기 카드로 남던 버그 수정.
+        scen_removed = False
+        if sid is not None:
+            has_art = conn.execute(
+                "SELECT 1 FROM articles WHERE scenario_id = ? LIMIT 1", (sid,)
+            ).fetchone()
+            if has_art is None:
+                conn.execute("DELETE FROM scenarios WHERE id = ?", (sid,))
+                scen_removed = True
         conn.commit()
-        print(f"{OK} 키워드 #{kid} {kw[0]!r} 삭제 (연결 draft {n}건 동반 삭제)")
+        extra = " + 연결 시나리오" if scen_removed else ""
+        print(f"{OK} 키워드 #{kid} {kw[0]!r} 삭제 (연결 draft {n}건{extra} 동반 삭제)")
         return 0
     finally:
         conn.close()

@@ -92,6 +92,8 @@ HEADERS_FILE = (
 REDIRECTS: list[tuple[str, str]] = [
     # 게이밍의자 글 → 의자 카테고리(게이밍=의자의 타입으로 흡수, #31)
     ("/articles/kw-e3d08a2c/", "/categories/office-chair/"),
+    # 노트북받침대 글 → 모니터받침대 카테고리(같은 36개 상품·중복이라 카테고리로 흡수, #35)
+    ("/articles/kw-4d525971/", "/categories/monitor-stand/"),
 ]
 
 WOOD = ["var(--wood-1)", "var(--wood-2)", "var(--wood-3)", "var(--wood-4)"]

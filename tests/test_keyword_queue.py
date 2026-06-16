@@ -121,11 +121,13 @@ class TestEnsureScenario:
         sid = kq.ensure_scenario_for_keyword(conn, kid)
         assert sid > 0
         srow = conn.execute(
-            "SELECT title_ko, persona_id, budget_min_krw FROM scenarios WHERE id = ?", (sid,)
+            "SELECT title_ko, persona_id, budget_min_krw, active FROM scenarios WHERE id = ?",
+            (sid,),
         ).fetchone()
         assert srow[0] == "자취생 전자레인지 추천"
         assert srow[1] == 1  # 첫 페르소나 (default)
         assert srow[2] == 10000
+        assert srow[3] == 0  # 세션 #35: 키워드 파생 시나리오는 비활성 — '내맘대로 세팅' 미노출
         # keyword_queue.scenario_id 연결됨
         linked = conn.execute(
             "SELECT scenario_id FROM keyword_queue WHERE id = ?", (kid,)

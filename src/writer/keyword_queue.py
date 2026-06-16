@@ -176,9 +176,12 @@ def ensure_scenario_for_keyword(
         raise ValueError("페르소나가 없습니다 — `db seed`로 페르소나를 먼저 만드세요")
 
     sslug = _unique_slug(conn, "scenarios", str(kw["slug"]))
+    # active=0 — 키워드 파생 시나리오는 '내맘대로 세팅'(라이프스타일 시나리오) 목록에 노출하지 않는다
+    # (세션 #35: 제품 키워드 글이 가짜 시나리오로 세팅 페이지를 오염시키던 문제 근본 차단). draft FK용
+    # 으로만 존재하고, 글은 카테고리로 흡수·리다이렉트되므로 세팅에 카드가 필요 없다.
     cur = conn.execute(
         "INSERT INTO scenarios (slug, title_ko, description, persona_id, "
-        "budget_min_krw, budget_max_krw, active) VALUES (?, ?, ?, ?, ?, ?, 1)",
+        "budget_min_krw, budget_max_krw, active) VALUES (?, ?, ?, ?, ?, ?, 0)",
         (
             sslug,
             kw["keyword"],
