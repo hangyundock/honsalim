@@ -1368,6 +1368,20 @@ class DashboardWindow(QMainWindow):
 
 
 def main() -> int:
+    # 대기 마이그레이션 자동 적용(멱등·세션 #34) — 기존 운영 DB에 새 스키마(예: 008 structured_json)를
+    # 무명령으로 반영(§2-가 비개발자 배려·§0 자가복원). DB가 아예 없으면 건너뜀(seed 포함 안내 UX 유지).
+    try:
+        from common import db as _db
+
+        if _db.DB_PATH.exists():
+            applied = _db.migrate(_db.DB_PATH)
+            if applied:
+                print(
+                    f"[migrate] 대기 마이그레이션 {len(applied)}개 자동 적용 (v{applied[-1].version})"
+                )
+    except Exception as exc:  # 마이그레이션 실패가 대시보드 기동을 막지 않음(best-effort)
+        print(f"[migrate] 자동 마이그레이션 건너뜀: {exc}")
+
     app = QApplication(sys.argv)
     win = DashboardWindow()
     win.show()
