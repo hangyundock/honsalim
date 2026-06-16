@@ -64,17 +64,6 @@
   </div>
   {% endif %}
 
-  {# 가이드 前 — 정보 콘텐츠(누구를 위한·왜 예산). 제품 나열 prose는 아래 시각 카드로 대체. #}
-  {% if article.guide_pre %}<div class="cat-guide art-guide">{{ article.guide_pre | safe }}</div>{% endif %}
-
-  {# 구매 전 체크포인트 — Tier 2 구조화(세션 #34). category와 동일 스타일(.checklist). #}
-  {% if has_checkpoints %}
-  <div class="sub-h">사기 전 체크포인트</div>
-  <ul class="checklist">
-    {% for c in checkpoints %}<li><div class="ck-t">{{ c.title }}</div><div class="ck-w">{{ c.why }}</div></li>{% endfor %}
-  </ul>
-  {% endif %}
-
   {# 데이터로 고른 추천 — 알리 💰실속 / ⭐고급 2티어 (CATEGORY_PAGE §2-7) #}
   {% if picks_budget or picks_premium %}
   <div class="sechead" id="picks"><div class="eb">추천 · 비교</div><h2>데이터로 고른 추천</h2></div>
@@ -110,9 +99,6 @@
   </div>
   {% endif %}
 
-  {# 가이드 後 — 예산 분배·함께 보기·FAQ 등 정보 콘텐츠(prose). #}
-  {% if article.guide_post %}<div class="cat-guide art-guide">{{ article.guide_post | safe }}</div>{% endif %}
-
   {# 전체 제품 카탈로그 — 더 많은 제품을 이미지로(CATEGORY_PAGE §5-bis). 정렬·필터 재사용(category.js). #}
   {% if has_catalog %}
   <div id="all"></div>
@@ -140,6 +126,21 @@
   </div>
   <div class="honest"><b>혼살림은 제품에 점수·평점을 매기지 않습니다.</b> 전체 제품 순서는 <b>가격·할인율 기준 정렬</b>이며 품질 순위가 아닙니다. 가격·할인은 수집 시점 기준이며 변동될 수 있습니다.</div>
   {% endif %}
+
+  {# ── 상세 가이드(SEO 텍스트) — 상품을 위로, 가이드는 아래로(세션 #34 상품 먼저 구성) ── #}
+  {# 누구를 위한·왜 예산 #}
+  {% if article.guide_pre %}<div class="cat-guide art-guide">{{ article.guide_pre | safe }}</div>{% endif %}
+
+  {# 구매 전 체크포인트 — Tier 2 구조화 #}
+  {% if has_checkpoints %}
+  <div class="sub-h">사기 전 체크포인트</div>
+  <ul class="checklist">
+    {% for c in checkpoints %}<li><div class="ck-t">{{ c.title }}</div><div class="ck-w">{{ c.why }}</div></li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  {# 예산 분배·함께 보기·FAQ 등 #}
+  {% if article.guide_post %}<div class="cat-guide art-guide">{{ article.guide_post | safe }}</div>{% endif %}
 
   {# 풀 고지 + 사업자 정보 #}
   <div class="art-legal">

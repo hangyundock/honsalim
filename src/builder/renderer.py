@@ -356,8 +356,11 @@ def _article_tier_split(ali_cards: list[dict]) -> tuple[list[dict], list[dict]]:
     return s[:half], s[half:]
 
 
-def _article_featured(cards: list[dict], k: int = 3) -> list[dict]:
-    """티어 내 추천 featured 선정 — 판매량 desc(없으면 할인) 상위 k (CATEGORY_PAGE §2-7)."""
+def _article_featured(cards: list[dict], k: int = 4) -> list[dict]:
+    """티어 내 추천 featured 선정 — 판매량 desc(없으면 할인) 상위 k (CATEGORY_PAGE §2-7).
+
+    k=4 → 실속 4 + 고급 4 = 추천 8선(주인 요청·세션 #34 상품 중심). LLM이 featured 8개 선언 시 채워짐.
+    """
     return sorted(
         cards, key=lambda c: (c.get("volume") or 0, c.get("disc_num") or 0), reverse=True
     )[:k]
