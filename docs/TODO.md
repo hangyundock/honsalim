@@ -3,13 +3,11 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #34 — (상세 EVENTS #33)
+## ★ 다음 세션 #35 — (상세 EVENTS #34)
 
-- [ ] **★⑤ 완전 무인 가동** — 스케줄러가 현재 `publish-queue`(승인글 발행만) 등록 → **완전무인(생성+발행)은 `auto-cycle` 등록 보강 필요**(scheduler.py WRAPPER). + 주인이 글 몇 편 품질 확인 후 `auto_mode` ON(기본 OFF·안전).
-- [ ] **auto_cycle 라이브 통합검증** — auto_mode ON으로 winnable→생성→자동승인→발행 전체 1회 라이브(주인 대시보드 확인).
-- [ ] **임시파일 정리** — `_verify_kw.py`·`_inspect_draft.py`(#33 검증용·삭제 안전정책 막힘) 주인 삭제 or 워크트리 폐기 시 소멸.
-- (이월) `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장 Tier0([[growth-first-priority]]·트래픽이 진짜 병목).
-- 참고: 워크트리=`PYTHONPATH=src python -m cli` · DB gitignore→재생성. **main직접머지=`git push origin HEAD:main`**. ★PowerShell/cmd 한글 깨짐→.py·ASCII([[powershell-korean-encoding]]).
+- [ ] **★★자동실현(완전 무인) 실제 라이브 테스트** (주인 #34 명시·최우선) — ①draft 7·8 등 미리보기 검토→승인→발행으로 **첫 5편 사람 검수·발행**(min_published=5 게이트 충족) ②설정 `auto_mode` ON ③'예약 켜기'(스케줄러 auto-cycle 등록) ④winnable 키워드 자동선정→생성→(5편후)자동승인→발행·배포 **전체 1회 라이브 검증**. **무인 가동 OFF→ON 실증이 목표.**
+- [ ] (이월) 쿠팡 이미지 테스트(키워드 쿠팡 첨부→글 생성→상단 운영자추천 zone) · `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장 Tier0([[growth-first-priority]]·트래픽이 진짜 병목).
+- 참고: **draft 5·6=article.html 폴백(단순)·draft 7·8=카테고리 구성**(이미지·전체 카탈로그). 워크트리=`PYTHONPATH=src python -m cli`(★대시보드 시작 시 자동 migrate) · DB gitignore→재생성. **main직접머지=`git push origin HEAD:main`**. ★PowerShell/cmd 한글 깨짐→.py·ASCII([[powershell-korean-encoding]]).
 
 ## 시점 의존 잔존 (세션 #6~7)
 

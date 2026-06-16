@@ -7,15 +7,15 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#33: ★무인 글 생성 파이프라인 완성** — naver_blog 정밀분석 후 혼살림 데이터로 적용(주인 "무인화·품질 기본·역제안" 지시). ①발행→라이브 버그 근본수정(publish-queue가 `refresh_cycle` 재사용=build/site commit+push, EVENTS #30 404 해소) ②무인 SEO 글 생성+자가복원 루프(cmd_enrich가 키워드→카테고리→seo_keywords 주입+5게이트 미달 피드백 재생성·seo_directive 밀도정합·disclosure 측정제외) ③winnable 키워드 선정(검색량×경쟁가중·compIdx 한글 확정) ④초기검수→자동전환 안전장치(auto_approve min_published=5). 무인 흐름=사람(씨앗+쿠팡예약)→[자동]키워드·생성·승인·발행·사후가드. **auto_mode 기본 OFF(안전)**. 실증=알리단독 글 5게이트 PASS. 회귀 865→**873**. main 8377a13·73b8dee·931c5ce·**3a96c49**(운영 동기화). 상세 EVENTS #33 | 2026-06-15 #33 |
+| 진행 단계 | **#34: ★글 렌더링=카테고리 구성 통합 + 무인 골격 보강 + 품질 대수술** — 주인 "의자 페이지 최종구성 따라 재사용" 지시 실현. ①완전 무인 골격(키워드 자동보충 `auto_pick_keyword`·스케줄러 auto_mode 분기·GUI auto_mode 토글·대시보드 시작 시 자동 마이그레이션) ②품질(상품명 정리·본문 코드 제거·미리보기 로컬HTTP→file:// 무스타일 해소) ③★**글=category.html로 렌더**(별도 article 템플릿 폐기·매핑 카테고리 picks/**전체 카탈로그/이미지**/비교 물려받고 글은 제목·대가성 고지·가이드·빠른결론만·`_article_as_category_ctx`·`is_article` 조건부 additive·미매핑은 폴백) — 라이브 draft8 **카탈로그 36개·이미지 44개**·H1 1개·고지 유지·office-chair 무손상 ④Tier2·migration 008(structured_json·버전버그) 흡수. **auto_mode 기본 OFF**. 회귀 873→**896**. main **e9e3fd2**(13커밋). 상세 EVENTS #34 | 2026-06-16 #34 |
 | 운영 모델 | 자동 게시 활성(콘텐츠 큐). **refresh-cycle = 수동 운영(주인 직접 지시) — C13 [확정 #24], Claude 예약작업 비활성화**. 자동 "승인" 금지(E7→가드레일) | #24 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·Secrets·main-protect)·Cloudflare(도메인·Pages·R2·D1)·Anthropic·INDEXNOW 키·secrets·Git push·pre-commit 9종·Dependabot (세부 archive) | #3 |
 | Phase 2 핵심 모듈 (#3~#5) | cli·common·validator·writer·collector·enricher·builder·deployer·tracker·workers (세부 BACKEND §2) + **#17: category_collect·category_page_builder·concept_image·category_writer** | #17 |
-| Phase 2 회귀 테스트 | **873 / 873 PASS** [확정 pytest, #33] — #33 +8(발행버그·무인 SEO글·자가복원·winnable·초기검수 안전장치) · #32 +14(대시보드 4기능) · #31 분류체계. black·ruff·mypy 클린 | 2026-06-15 |
+| Phase 2 회귀 테스트 | **896 / 896 PASS** [확정 pytest, #34] — #34 +23(무인골격 보강·상품명/본문코드/미리보기HTTP·Tier2·글=카테고리 통합·migration 008) · #33 +8 · #32 +14. black·ruff·mypy 클린·doctor OK | 2026-06-16 |
 | CLI 명령 (BACKEND §9) | **29개** — doctor·db·collect·collect-products·enrich·validate·approve·promote·unapprove·deploy·sync-slugmap·build(+`--preview`)·dashboard·collect-category·build-category·approve-category·unapprove-category(킬스위치)·register-categories(+`--auto-publish`)·auto-publish·category-status(+`--monitor`)·**refresh-cycle(#23)** · **#25 운영 대시보드: keyword-add·keyword-generate·keyword-list·reject·coupang-add·publish-queue·schedule** · **#26: keyword-recommend** · **#29: unpublish-article·republish-article·monitor-articles·auto-cycle** · **#32: keyword-delete·category-coupang-add/list/remove·build-deploy** = **38개** | #32 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD. 세부 DECISIONS J·O + EVENTS | #4~#16 |
 | doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **71개** + #19 LLM 키 점검. 71/71 OK [#29 +keyword_relevance·article_state×2·article_guardrail×2·auto_approve] | #29 |
-| DB 초기화 | `data/honsalim.db` **v7** + categories(**5**)·category_products + products 정가/할인·판매량/만족도 + **keyword_queue(발행 큐·migration 007·drafts.keyword_id, #25)** (migration 002~**007**) + personas 3·scenarios 10. ※DB는 gitignore — 다음 워크트리는 `db migrate`+`db seed`(+`collect-category`)로 재생성 | #25 |
+| DB 초기화 | `data/honsalim.db` **v8** + categories(**8**)·category_products + products 정가/할인·판매량/만족도 + keyword_queue(발행 큐·#25) + **articles.structured_json(Tier2 발행 보존·migration 008, #34)** (migration 002~**008**) + personas 3·scenarios 10. ★**대시보드 시작 시 자동 migrate**(#34·무명령). ※DB는 gitignore — 다음 워크트리는 `db migrate`+`db seed`(+`collect-category`)로 재생성 | #34 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (docs/ 참조). 일관성 모순 0건 | #2 |
 | 메모리 시스템 | feedback 7건([[incremental-critical-review]]·[[autonomous-safe-system]] 등) + reference market_research + MEMORY.md | #12 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
@@ -28,7 +28,7 @@
 | 프로젝트 폴더 | `D:\affiliate_hub\` (docs·archive·.claude/commands 하위) |
 | 사이트 / 도메인 | 혼살림 / **honsallim.com**(신·겹ㄹ·알리 'ali' 차단 회피·Cloudflare Pages 커스텀도메인 연결·SSL Active·**라이브**, 만료 2027-06-01·Auto Renew) + honsalim.com(구·만료 2027-05-28·**→honsallim 301 Page Rule** 적용·경로보존) |
 | 호스팅 | **Cloudflare Pages `honsalim`** + Custom domain (Dugi2020@naver.com) |
-| GitHub | **`hangyundock/honsalim` Public** — origin/main = **#32 (e3a2219 · 대시보드 4기능+쿠팡 3선 배포)**, CI green. **build-and-deploy: main push → 커밋된 build/site Cloudflare Pages 배포 (CI 재빌드 없음, 글 DB 로컬)**. ★**빌드·배포는 `cmd_build_deploy`(refresh_cycle)가 build/site·functions/go를 commit+push** — `deployer.git_push` stub의 '미커밋' 버그 근본 우회(#32). wrangler `--commit-message`(ASCII)+`--commit-dirty` 유지. ※**운영 폴더(D:\affiliate_hub)는 #32(e3a2219)로 git pull 동기화함**(이번 세션·clean FF). 워크트리는 origin/main 기준 |
+| GitHub | **`hangyundock/honsalim` Public** — origin/main = **#34 (e9e3fd2 · 글=카테고리 구성 통합+무인골격+품질)**, CI green. **build-and-deploy: main push → 커밋된 build/site Cloudflare Pages 배포 (CI 재빌드 없음, 글 DB 로컬)**. ★**빌드·배포는 `cmd_build_deploy`(refresh_cycle)가 build/site·functions/go를 commit+push** — `deployer.git_push` stub의 '미커밋' 버그 근본 우회(#32). wrangler `--commit-message`(ASCII)+`--commit-dirty` 유지. ※**운영 폴더(D:\affiliate_hub)는 #34(e9e3fd2)로 git pull 동기화함**(이번 세션·clean FF·13커밋). 워크트리는 origin/main 기준 |
 | GitHub Secrets / Branch Protection | CF_API_TOKEN · CF_ACCOUNT_ID · INDEXNOW_KEY 등록 / ruleset `main-protect` Active |
 | R2 / D1 | `honsalim-images` (APAC) / `honsalim-clicks` ID `9bae858e-456f-40e7-8084-c3b90e4ec3ca` |
 | Python | 3.10 32-bit (TIMA·AutoBlog 시스템 공유) |
@@ -58,12 +58,11 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 다음 세션 #34 — 상세 EVENTS #33
-1. **★⑤ 완전 무인 가동**: 스케줄러가 현재 `publish-queue`(승인글 발행만) 등록 → **완전무인(생성+발행)은 `auto-cycle` 등록 보강 필요**(scheduler.py WRAPPER). + 주인이 글 몇 편 품질 확인 후 `auto_mode` ON(기본 OFF·안전).
-2. **auto_cycle 라이브 통합검증**: auto_mode ON으로 winnable→생성→자동승인→발행 전체 흐름 1회 라이브(주인 대시보드 확인).
-3. **임시파일 정리**: `_verify_kw.py`·`_inspect_draft.py`(#33 검증용·삭제 안전정책 막힘) — 주인 삭제 or 워크트리 폐기 시 소멸.
-4. (이월) `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장 Tier0([[growth-first-priority]]·트래픽 병목).
-- ★DB gitignore→재생성. 운영 폴더=#33 동기화됨. 워크트리=`PYTHONPATH=src python -m cli`. main직접머지=`git push origin HEAD:main`. ★PowerShell/cmd 한글 깨짐→.py·ASCII([[powershell-korean-encoding]]).
+### ★ 다음 세션 #35 — 상세 EVENTS #34
+1. **★★자동실현(완전 무인) 실제 라이브 테스트** (주인 #34 명시·최우선): ①draft 7·8 등 미리보기 검토→승인→발행으로 **첫 5편 사람 검수·발행**(min_published=5 게이트 충족) ②설정 `auto_mode` ON ③'예약 켜기'→스케줄러 auto-cycle 등록 ④winnable 키워드 자동선정→생성→(5편후)자동승인→발행·배포 **전체 1회 라이브 검증**(주인 대시보드). **무인 가동 OFF→ON 실증이 목표.** 글은 카테고리 구성(이미지·전체 카탈로그)으로 나옴.
+2. (이월) 쿠팡 이미지 테스트(키워드 쿠팡 첨부→글 생성→상단 운영자추천 zone) · `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장 Tier0([[growth-first-priority]]·트래픽 병목).
+- ★draft 5·6은 concept_image 이전 생성→article.html 폴백(단순). **draft 7·8(매핑 有)이 카테고리 구성**으로 나옴. 새 글은 전부 카테고리 구성.
+- ★DB gitignore→재생성(★대시보드 시작 시 자동 migrate). 운영 폴더=#34 동기화됨. 워크트리=`PYTHONPATH=src python -m cli`. main직접머지=`git push origin HEAD:main`. ★PowerShell/cmd 한글 깨짐→.py·ASCII([[powershell-korean-encoding]]).
 
 ### Phase 2 진척 가능 (검토 의존 큼)
 - `src/builder/manifest.py` 증분 빌드 (ARCH §7·DB §10) · `src/collector/coupang.py` (Phase 4)

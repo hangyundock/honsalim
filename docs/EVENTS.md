@@ -17,6 +17,7 @@
   - 세션 #26 (2026-06-14 추천 키워드 생성 엔진(keyword_recommender)+대시보드 메뉴 순서 재정렬+노트북거치대 off-target exclude·회귀 773→782)
   - 세션 #27 (2026-06-14 '글 생성' 자동 키워드 선정(원클릭)+발행큐 맨위 자동+PR 자동화 논의·회귀 782→787)
   - 세션 #28 (2026-06-14 쿠팡 하이브리드 글—naver_blog식 원팝업+알리 데이터 결합+쿠팡 공식배너 이미지·회귀 782→806)
+  - 세션 #29 (2026-06-14~15 ★B-i 무인 자동발행 전체(article_state·guardrail·auto_approve·auto-cycle·auto_mode OFF)+naver_blog 흐름 GUI+미리보기 버그수정+PR 자동머지·구글정책 정정·회귀 806→846)
 - [EVENTS_202605.md](archive/EVENTS_202605.md):
   - 세션 #1 (2026-05-27 프로젝트 신규 셋업·정밀 조사·5파일 시스템·슬래시 명령 등록)
   - 세션 #2 (2026-05-27~28 Phase 0 설계 12/12 + Phase 1 외부 작업: GitHub·Cloudflare·도메인·R2·D1·Git push)
@@ -36,6 +37,23 @@
   - 세션 #18 (2026-05-31 운영자 1클릭 승인 게이트(O21·build-category draft 고정)·doctor §10 64진입점·★카테고리 페이지 디자인 디버깅(글씨 흐림 진짜원인=backdrop-filter 제거)·회귀 569→590)
 
 ## 최근 5세션
+
+### 세션 #34 — 2026-06-16 (Opus 4.8 1M, ★글 렌더링=카테고리 구성 통합 + 무인 골격 보강 + 품질 대수술, 회귀 873→896, main e9e3fd2·13커밋)
+
+**시작 상황**: `/honsalim-start`(워크트리 nice-bardeen·#33 3a96c49). 주인 "①완전 무인 가동 어떤 순서로?" 질문 → 정밀분석 중 무인 골격의 빠진 고리 발견. 이후 품질·페이지 구성을 주인 강한 피드백에 따라 반복 개선.
+
+**핵심 [확정]** (전부 main·운영 동기화·라이브 검증):
+1. **★완전 무인 골격 보강**: `auto-cycle`이 대기 키워드만 소비(빈 큐→생성 0편 갭·실증)→`auto_pick_keyword`로 큐 비어도 winnable 자동 보충. 스케줄러가 `auto_mode`에 따라 `auto-cycle`(생성+발행)/`publish-queue`(발행만) 래퍼 선택+`reconcile`(auto_mode 변경 시 옛 wrapper 굳음 방지). 설정 GUI에 `auto_mode` 토글+검수편수+재생성상한·배너 무인 상태. **대시보드 시작 시 자동 마이그레이션**(main()·§2-가 비개발자 무명령·멱등·best-effort). **Gap B 라이브 실증**=빈 큐→리클라이너의자 자동선정→생성→5게이트 PASS.
+2. **★품질 근본수정**: `clean_product_name`(알리 기계번역명/제로폭문자/콤마나열 표시 정리·표시용만·_derive_type/필터는 원본 보존), `render_body_html`(본문 `(ali-)/(coupang-)` 참조코드 제거·발행+미리보기 공용·실증 draft 본문 8개→0), `dashboard.preview_server`(미리보기 로컬 HTTP 서빙→file:// 절대경로 무스타일 한계 EVENTS #30 근본해소·스타일 정상).
+3. **★Tier2 글 레이아웃**: 글 enrich가 quick_verdict·checkpoints·picks(추천별 장단점/추천대상) 생성→렌더러/템플릿 소비. migration 008 `articles.structured_json`(발행 보존)+버전기록 누락 버그 근본수정(재migrate duplicate column 방지). 시각 격차 보강(개념 이미지 히어로 배너 재사용·8선·비교표 확장).
+4. **★★글 = 카테고리 페이지 구성 통합**(주인 "의자 페이지 최종구성 따라 재사용" 지시·#31 실현): 주인이 글(article.html)이 카테고리보다 어설픔·이미지 빈칸·카탈로그 빈약 지적 + "왜 잘된 카테고리 구성 안 쓰고 억지로 만드냐"는 **정확한 논리적 비판**. **제 SEO 논리 오류 인정·정정**(중복 콘텐츠=같은 내용+상품이지 같은 구성 아님). → 별도 article 템플릿 폐기, 키워드 글을 `category.html`로 렌더(매핑 카테고리 picks/**전체 카탈로그/이미지**/비교 물려받고 글은 제목(H1)·첫머리 대가성 고지·키워드 가이드·빠른결론만·`_article_as_category_ctx`·`is_article` 조건부 additive·미매핑/옛글은 article.html 폴백). **라이브 검증=draft8(모니터받침대) 카탈로그 36개·이미지 44개·H1 1개·대가성 고지 유지·office-chair 카테고리 무손상.**
+회귀 873→**896**(+23). black·ruff·mypy·doctor 클린. 13커밋(059c357~**e9e3fd2**).
+
+**무인·안전(§0)**: auto_mode 기본 OFF 유지(머지해도 자동발행 0). category.html 변경은 additive(`is_article` 조건부)→카테고리 페이지 무영향 검증(H1 1개·글 마커 누출 0·제품 23개 정상). 대가성 고지·H1 단일 컴플라이언스 유지 검증. 운영 DB 직접수정 안 함(주인 실행/대시보드 자동 migrate).
+
+**잔존/다음(#35)**: ①**★★자동실현(완전 무인) 실제 라이브 테스트**(주인 #34 명시·최우선): draft 7·8 검토→승인→발행으로 첫 5편(min_published=5)→`auto_mode` ON→'예약 켜기'(auto-cycle 등록)→winnable→생성→자동승인→발행·배포 **전체 1회 라이브**. 무인 OFF→ON 실증. ②(이월)쿠팡 이미지 테스트·mini-dehumidifier·쿠팡 본격(15만원후)·★성장 Tier0([[growth-first-priority]]). ★draft 5·6=article.html 폴백(단순)·7·8=카테고리 구성. 워크트리=`PYTHONPATH=src python -m cli`(시작 시 자동 migrate)·main직접머지=`git push origin HEAD:main`·PowerShell 한글→.py ASCII([[powershell-korean-encoding]]).
+
+---
 
 ### 세션 #33 — 2026-06-15 (Opus 4.8 1M, ★무인 글 생성 파이프라인 완성 — SEO 주입·자가복원 재생성 루프·winnable 선정·초기검수 안전장치·발행 버그 근본수정, 회귀 865→873, main 3a96c49)
 
@@ -111,27 +129,4 @@
 
 ---
 
-### 세션 #29 — 2026-06-14~15 (Opus 4.8 1M, ★B-i 무인 자동발행 전체 + naver_blog 흐름 GUI 완성 + 미리보기 버그수정 + PR 자동머지·구글정책 정정, 회귀 806→846, 6커밋 전부 main 머지·CI green)
-
-**시작**: #28 연속, ★라이브 테스트(쿠팡 하이브리드 생성) 실행.
-
-**핵심 [확정]** (전부 main 머지·배포 green·라이브 200 정상):
-1. **미리보기 버그 근본수정**(라이브 테스트 적발): 검토 대기 시나리오 draft를 미리보기 못 봤음(렌더러가 articles published만·draft는 drafts 테이블)→§2-마 인간검토 게이트 무력화. `_load_article_pages(include_drafts)`+`_load_draft_article_pages`(enriched_payload body_md→html·promote 동일)+미리보기 선택글 직접이동, draft는 sitemap/게시수 제외. 실데이터 검증. 커밋 1736c06.
-2. **★적합성 가드** `collector/keyword_relevance.py`: 키워드→카테고리(seo_keywords.yml)→require/exclude(category_sources.yml) 알리에 적용(product_filter 재사용). ★유효exclude=카테고리exclude−키워드(안락의자 자기차단 방지). draft #2 드레싱의자 실제 제외 실증. 커밋 aba9868.
-3. **★PR 자동머지 확립**: settings 자기수정은 Claude 안전분류기 하드차단(권한 자기부여 금지)→`git push origin HEAD:main`이 이미 allow라 **main 직접머지 자동화**(gh·PR 불필요). 6커밋 전부 이 방식.
-4. **★구글정책 정정 [확정·공식 검증]**: "AI 자동발행=페널티"는 부정확. 구글은 생성방식 무관(AI OK)·**Scaled Content Abuse(대량 저가치)**만 침. → B 리스크=AI/자동 아닌 검토없는 저품질 양산. 사람게이트=품질검사(AI숨기기 아님). (출처 developers.google.com 4건)
-5. **★B-i 무인 자동발행**(주인 B-i 선택=완전무인+안전판): **2a 발행후 안전망** `article_state`(글 비공개/재공개·published↔unpublished)+`article_guardrail`(발행글 무결성+적합성 모니터→미달 자동비공개 fail-closed)+unpublish/republish/monitor-articles. 커밋 69b2230·70282c2. **2b 파이프라인** `auto_approve`(fail-closed:validated+카테고리매핑+featured적합만·나머지 보류)+`auto-cycle`(모니터→대기키워드 생성→자동승인→발행)+**`auto_mode` 기본 OFF**(E7유지)+run_auto_cycle.ps1. 커밋 685a7f5.
-6. **naver_blog 흐름 GUI 완성**: `🛒 쿠팡 첨부(저장)` 버튼 — 선택 대기키워드에 쿠팡 배너 저장만(생성X·pending 유지·channel=both)→스케줄러/글생성이 그 쿠팡으로 하이브리드. 커밋 6f752d2.
-7. 회귀 **806→846**(+40). 린트 클린. main=**6f752d2**.
-
-**★라이브 테스트가 적발한 2대 문제 (다음 세션 최우선)**:
-- **A. 키워드 경로 알리 검색=한글→쓰레기 [확정·진단]**: `_gather`가 `ali.query_products(한글키워드)`→"컴퓨터의자" 검색 시 알리가 폰케이스·티셔츠·가방 등 무관 20개 반환(의자 2개도 드레싱/인형의집=off-target). 가드 정상작동해 전부 제외→글이 **쿠팡 1개만(thin·알리 데이터 없음)**. **카테고리 경로는 영어 검색어("office chair")라 정상**(라이브 5카테고리 멀쩡)→키워드 경로도 매핑 카테고리 영어 tier 검색어 쓰게 근본수정 필요. (draft #3 컴퓨터의자=thin·반려/재생성 대상)
-- **B. 진행/완료 표시 없음 [주인 반복지적]**: 생성 1~2분 무표시→끝난지 모름. 대시보드 작업 진행중/완료 신호 추가 필요.
-
-**무인·안전(§0)**: auto_mode 기본 OFF(머지해도 자동발행 0)·fail-closed 곳곳·발행후 자동비공개 안전판·all destructive deny 유지. 라이브 200 정상(주인 접속불가=로컬 이슈·honsallim.com 더블L 확인).
-
-**잔존/다음(#30)**: ①**★A 근본수정**=키워드 경로 알리 검색을 매핑 카테고리 영어 tier 검색어로(키워드→카테고리→category_sources.yml tiers.q)→하이브리드에 알리 데이터 복원 ②**★B 진행표시** 대시보드 ③A·B 후 게이밍의자(#3·쿠팡 첨부됨) 재생성→제대로된 하이브리드→미리보기→승인→발행(첫 라이브 글)+thin draft #3 반려 ④DECISIONS/CLAUDE.md에 B-i(auto_mode·fail-closed·E7 보정) 기록 ⑤PartC 키워드 틈점수·mini-dehumidifier·성장 Tier0(잔존). ★워크트리=`PYTHONPATH=src python -m cli`·DB gitignore·발행/배포=main 체크아웃.
-
----
-
-> (세션 #19~#28은 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
+> (세션 #19~#29는 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
