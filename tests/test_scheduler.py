@@ -104,9 +104,38 @@ class TestReconcile:
         assert res is not None and res[0] is True
         assert any("run_auto_cycle.ps1" in a for a in cap["argv"])
 
+    def test_moves_to_new_time_when_provided(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # 세션 #35: time_hhmm 주면 등록 시각을 그 시각으로 옮긴다(설정창 시각 변경 실제 반영)
+        monkeypatch.setattr(scheduler, "query_scheduled_time", lambda: (11, 0))
+        cap: dict[str, list[str]] = {}
+
+        def fake_run(argv: list[str], timeout: float = 30.0) -> subprocess.CompletedProcess[str]:
+            cap["argv"] = argv
+            return _cp(0, "SUCCESS")
+
+        monkeypatch.setattr(scheduler, "_run", fake_run)
+        res = scheduler.reconcile(full_auto=False, time_hhmm="14:30")
+        assert res is not None and res[0] is True
+        assert "14:30" in cap["argv"]  # 옛 11:00 아닌 새 시각으로 등록
+
+    def test_keeps_old_time_when_new_time_invalid(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # 형식 오류 시각은 무시하고 기존 등록 시각 유지(안전 폴백 — 잘못된 입력에 작업 안 깨짐)
+        monkeypatch.setattr(scheduler, "query_scheduled_time", lambda: (11, 0))
+        cap: dict[str, list[str]] = {}
+
+        def fake_run(argv: list[str], timeout: float = 30.0) -> subprocess.CompletedProcess[str]:
+            cap["argv"] = argv
+            return _cp(0, "SUCCESS")
+
+        monkeypatch.setattr(scheduler, "_run", fake_run)
+        res = scheduler.reconcile(full_auto=False, time_hhmm="9시반")
+        assert res is not None and res[0] is True
+        assert "11:00" in cap["argv"]  # 기존 시각 유지
+
     def test_noop_when_unregistered(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(scheduler, "query_scheduled_time", lambda: None)
         assert scheduler.reconcile(full_auto=True) is None
+        assert scheduler.reconcile(full_auto=True, time_hhmm="14:30") is None
 
 
 class TestDelete:

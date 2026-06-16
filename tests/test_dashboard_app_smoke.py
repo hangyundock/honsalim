@@ -124,6 +124,45 @@ def test_progress_busy_done_toggles(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     win.close()
 
 
+def test_status_cells_render_korean(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """세션 #35: 발행 큐·키워드 탭 '상태' 컬럼이 한글 라벨로 표시 (DB status 값은 영어 유지).
+
+    주인 지시 — 화면에 'validated/drafted' 같은 영어가 보이지 않게. 매핑은 표시 레이어에서만
+    하고 DB·상태머신 값은 그대로(쿼리 WHERE status='validated' 무영향). 미정의 상태는 원문 폴백.
+    """
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    dbpath = tmp_path / "honsalim.db"
+    _make_db(dbpath)
+
+    from common import db
+
+    monkeypatch.setattr(db, "DB_PATH", dbpath)
+
+    from PyQt5.QtWidgets import QApplication
+
+    from dashboard import app as gui
+
+    qapp = QApplication.instance() or QApplication([])
+    assert qapp is not None
+
+    # 순수 매핑 — 알려진 상태는 한글, 미정의는 원문 그대로(안전 폴백)
+    assert gui._status_label("validated") == "검토 대기"
+    assert gui._status_label("drafted") == "글 생성됨"
+    assert gui._status_label("approved") == "승인됨"
+    assert gui._status_label("published") == "게시됨"
+    assert gui._status_label("pending") == "대기"
+    assert gui._status_label("rejected") == "반려됨"
+    assert gui._status_label("어떤상태없음") == "어떤상태없음"
+
+    win = gui.DashboardWindow()
+    win.refresh()
+    # 발행 큐: draft status='validated' → '검토 대기'(영어 미노출)
+    assert win.tab_queue.item(0, 1).text() == "검토 대기"
+    # 키워드 탭: keyword status='pending' → '대기'
+    assert win.tab_keywords.item(0, 3).text() == "대기"
+    win.close()
+
+
 def test_dialogs_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """쿠팡/설정 다이얼로그가 빌드되고 값 수집이 동작하는지 (Phase E·F)."""
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")

@@ -68,6 +68,28 @@ STATUS_COLORS: dict[str, str] = {
     "failed": "#ffebee",
 }
 
+# 상태 한글 표시 라벨 (세션 #35 주인 지시 — 화면 표시만 한글, DB status 값은 영어 유지).
+# 상단 카드 용어(검토 대기·승인·게시)와 맞춘다. 미정의 상태는 원문 그대로(안전 폴백).
+STATUS_LABELS: dict[str, str] = {
+    "pending": "대기",
+    "generating": "생성 중",
+    "collected": "수집됨",
+    "enriched": "보강됨",
+    "validated": "검토 대기",
+    "drafted": "글 생성됨",
+    "approved": "승인됨",
+    "published": "게시됨",
+    "rejected": "반려됨",
+    "disabled": "비활성",
+    "failed": "실패",
+}
+
+
+def _status_label(status: str) -> str:
+    """원시 상태 코드(영어) → 화면용 한글 라벨. DB·상태머신 값은 그대로 두고 표시만 변환."""
+    return STATUS_LABELS.get(status, status)
+
+
 # 진행 상태 표시 (세션 #30 B) — 장시간 작업(글 생성 1~2분 등)의 시작/진행/완료 가시화.
 # 주인 반복지적: 생성 중 무표시 → 끝난지 모름. 상태 라벨 색으로 즉시 구분.
 _TITLE_IDLE = "혼살림 — 운영 대시보드"
@@ -401,11 +423,13 @@ class SettingsDialog(QDialog):
     def save(self) -> None:
         cfg = self.collect()
         settings.save(cfg)
-        # auto_mode를 바꿨으면 등록된 예약 작업의 wrapper도 맞춰 재등록(무인 생성 footgun 방지·§0).
+        # 예약이 켜져 있으면 변경된 시각·auto_mode로 작업 재등록(설정창에서 시간 조절이 실제 예약에
+        # 반영되도록 + 무인 생성 wrapper footgun 방지·§0·세션 #35). 미등록이면 무동작.
         try:
             from deployer import scheduler
 
-            scheduler.reconcile(bool(cfg.get("auto_mode", False)))
+            new_time = str(cfg.get("schedule_time") or "").strip() or None
+            scheduler.reconcile(bool(cfg.get("auto_mode", False)), new_time)
         except Exception:  # noqa: S110 — 재조정 실패가 설정 저장을 막지 않음(베스트에포트·§0)
             pass
 
@@ -661,7 +685,7 @@ class DashboardWindow(QMainWindow):
             title = r.get("keyword") or r.get("working_title") or f"(제목 없음) #{r['id']}"
             st = str(r.get("status") or "")
             self.tab_queue.setItem(i, 0, _cell(str(r["id"])))
-            self.tab_queue.setItem(i, 1, _cell(st, st))
+            self.tab_queue.setItem(i, 1, _cell(_status_label(st), st))
             self.tab_queue.setItem(i, 2, _cell(str(title)))
             self.tab_queue.setItem(i, 3, _cell(str(r.get("created_at") or "")))
 
@@ -680,7 +704,7 @@ class DashboardWindow(QMainWindow):
             self.tab_keywords.setItem(i, 0, _cell(str(r["id"])))
             self.tab_keywords.setItem(i, 1, _cell(str(r.get("keyword") or "")))
             self.tab_keywords.setItem(i, 2, _cell(str(r.get("channel") or "")))
-            self.tab_keywords.setItem(i, 3, _cell(st, st))
+            self.tab_keywords.setItem(i, 3, _cell(_status_label(st), st))
             self.tab_keywords.setItem(i, 4, _cell(str(r.get("score") or 0)))
             self.tab_keywords.setItem(i, 5, _cell(str(n_products)))
 

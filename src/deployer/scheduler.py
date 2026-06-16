@@ -89,16 +89,21 @@ def create_or_update(time_hhmm: str, *, full_auto: bool = False) -> tuple[bool, 
     return True, f"예약 {kind} 등록 — 매일 {time_hhmm}"
 
 
-def reconcile(full_auto: bool) -> tuple[bool, str] | None:
-    """등록된 예약이 있으면 시각을 유지하고 wrapper만 auto_mode에 맞게 재등록. 미등록이면 None(무동작).
+def reconcile(full_auto: bool, time_hhmm: str | None = None) -> tuple[bool, str] | None:
+    """등록된 예약이 있으면 config 상태(시각·wrapper)에 맞게 재등록. 미등록이면 None(무동작).
 
-    auto_mode를 바꿔도 예약 작업이 옛 wrapper(예: 발행만)로 굳어 무인 생성이 안 도는 footgun을
-    막는다(§0 무인 안전 — 설정 저장 후 호출). 베스트에포트: 실패해도 호출측 설정 저장은 유지.
+    두 footgun을 함께 막는다(§0 무인 안전 — 설정 저장 후 호출):
+      ① auto_mode를 바꿔도 예약이 옛 wrapper(예: 발행만)로 굳어 무인 생성이 안 도는 문제.
+      ② 설정창에서 '예약 시각'만 바꾸면 config만 갱신되고 실제 예약 작업은 옛 시각에 그대로 도는
+         문제 — time_hhmm을 주면 그 시각으로 옮긴다(세션 #35 주인 테스트). 형식 오류·미지정이면
+         기존 등록 시각을 유지(안전 폴백).
+    베스트에포트: 실패해도 호출측 설정 저장은 유지.
     """
     t = query_scheduled_time()
     if t is None:
         return None
-    return create_or_update(f"{t[0]:02d}:{t[1]:02d}", full_auto=full_auto)
+    when = time_hhmm if (time_hhmm and _TIME_RE.match(time_hhmm)) else f"{t[0]:02d}:{t[1]:02d}"
+    return create_or_update(when, full_auto=full_auto)
 
 
 def delete_task() -> tuple[bool, str]:
