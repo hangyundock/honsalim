@@ -21,6 +21,7 @@ import re
 import shutil
 import sqlite3
 import statistics
+import unicodedata
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -36,6 +37,37 @@ STATIC_DIR = PROJECT_ROOT / "static"
 DEFAULT_OUT = PROJECT_ROOT / "build" / "site"
 SITE_ORIGIN = "https://honsallim.com"
 SITE_DESC = "1인 가구·자취·홈오피스·일상살림 추천 가이드. 혼자 살림을 따뜻하게 시작하세요."
+
+# ── 상품명 표시 정리 (세션 #34) ──────────────────────────────────────────
+# 알리 원본 상품명은 기계번역 키워드 나열·제로폭문자·잡기호가 섞여, 카드에 그대로 쓰면 지저분하다
+# (예: "게임 의자, 리클라이닝, 컴퓨터 의자, 집, 점심 시간, ..."). **표시용으로만** 정리한다 —
+# 저장값·타입추출(_derive_type)·관련성 필터는 원본을 써 신호를 보존한다. 결정적·무비용(LLM 무관·§0).
+_INVISIBLE = frozenset(
+    cp
+    for lo, hi in ((0x200B, 0x200F), (0x202A, 0x202E), (0x2060, 0x2060), (0xFEFF, 0xFEFF))
+    for cp in range(lo, hi + 1)
+)
+_MULTISPACE_RE = re.compile(r"\s+")
+
+
+def clean_product_name(raw: str, max_len: int = 44, max_parts: int = 3) -> str:
+    """알리 원본 상품명 → 카드 표시용 깔끔한 이름. 결정적·무비용(세션 #34).
+
+    제로폭/방향제어 문자·홀로 떠도는 기호(°) 제거 → 공백 정리 → 콤마 나열형은 앞쪽 핵심
+    max_parts개 구절만 취함(끝없는 키워드 나열 차단) → 길이 초과 시 단어 경계 절단. 빈 값은 '추천 상품'.
+    """
+    s = unicodedata.normalize("NFKC", raw or "").translate({c: None for c in _INVISIBLE})
+    s = s.replace("°", " ")
+    s = _MULTISPACE_RE.sub(" ", s).strip(" ,·-|")
+    if not s:
+        return "추천 상품"
+    parts = [p.strip() for p in s.split(",") if p.strip()][:max_parts]
+    name = " ".join(parts)
+    if len(name) > max_len:
+        cut = name[:max_len].rstrip()
+        name = (cut.rsplit(" ", 1)[0] if " " in cut else cut) + "…"
+    return name or "추천 상품"
+
 
 # robots.txt — /go/ 게이트웨이(제휴 redirect)는 색인 제외, sitemap 안내
 ROBOTS_TXT = f"User-agent: *\nAllow: /\nDisallow: /go/\n\nSitemap: {SITE_ORIGIN}/sitemap.xml\n"
@@ -285,7 +317,7 @@ def _article_product_cards(prods: list) -> list[dict]:
         cards.append(
             {
                 "source": pr["source"] or "",
-                "name": pr["name"],
+                "name": clean_product_name(pr["name"]),
                 "price": _price_krw(pr["price_krw"]),
                 "url": f"/go/{pr['deeplink_slug']}",
                 "img": WOOD[i % len(WOOD)],  # img_url 없을 때 우드톤 fallback 색
@@ -713,7 +745,7 @@ def _catalog_item(row: sqlite3.Row, cat_slug: str = "") -> dict:
         "tier_label": _TIER_LABEL.get(tier, "💰 실속"),
         "type": _derive_type(cat_slug, row["name"]),  # 소분류(사무용/게이밍 등) — 필터 data-type
         "source": src or "",
-        "name": row["name"],
+        "name": clean_product_name(row["name"]),
         "price": _price_krw(row["price_krw"]),
         "orig": _price_krw(orig) if show else "",
         "disc": f"{disc}%" if show else "",

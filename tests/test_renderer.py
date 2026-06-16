@@ -889,3 +889,37 @@ class TestNoAiJargonTerms:
 
     def test_article_page_has_no_banned_terms(self, built_with_article: dict) -> None:
         _assert_no_banned_terms(built_with_article["out"])
+
+
+class TestCleanProductName:
+    """상품명 표시 정리 (세션 #34) — 알리 원본 기계번역명을 카드용으로 깔끔하게."""
+
+    def test_comma_salad_capped_to_few_parts(self) -> None:
+        # 끝없는 키워드 나열 → 앞쪽 핵심 몇 구절만(나열 차단)
+        raw = "게임 의자, 리클라이닝, 컴퓨터 의자, 집, 점심 시간, 인체 공학, 기숙사, 학생, 학습, 사무실"
+        out = renderer.clean_product_name(raw)
+        assert out == "게임 의자 리클라이닝 컴퓨터 의자"
+        assert "학생" not in out and "사무실" not in out
+
+    def test_long_name_truncated_at_word_boundary(self) -> None:
+        raw = "인체공학적 게이밍 의자 높이 조절 가능 하이백 회전식 사무실 의자 스트리머 침실용 완전 리클라이닝 패딩 팔걸이"
+        out = renderer.clean_product_name(raw)
+        assert len(out) <= 45
+        assert out.endswith("…")
+
+    def test_strips_invisible_and_stray_symbols(self) -> None:
+        # 제로폭(U+200C)·홀로 떠도는 ° 제거 — 소스엔 코드포인트로(보이지 않는 문자 직접 금지)
+        zwnj = chr(0x200C)
+        raw = f"{zwnj} 빈티지 스타일 회전 의자, Smooth-360 °   회전"
+        out = renderer.clean_product_name(raw)
+        assert zwnj not in out
+        assert "°" not in out
+        assert out.startswith("빈티지 스타일 회전 의자")
+
+    def test_empty_or_none_safe_fallback(self) -> None:
+        assert renderer.clean_product_name("") == "추천 상품"
+        assert renderer.clean_product_name(None) == "추천 상품"  # type: ignore[arg-type]
+
+    def test_clean_name_passthrough(self) -> None:
+        # 이미 깔끔한 이름은 그대로(불필요한 변형 없음)
+        assert renderer.clean_product_name("스탠드 책상 조명") == "스탠드 책상 조명"
