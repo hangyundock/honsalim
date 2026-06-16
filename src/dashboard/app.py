@@ -24,6 +24,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QFont
 from PyQt5.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -351,9 +352,19 @@ class SettingsDialog(QDialog):
             self._w[key] = c
             form.addRow(label, c)
 
+        def add_check(key: str, label: str) -> None:
+            cb = QCheckBox()
+            cb.setChecked(bool(cfg.get(key, False)))
+            self._w[key] = cb
+            form.addRow(label, cb)
+
         add_spin("publish_per_day", "하루 발행 편수", 0, 50)
         add_line("schedule_time", "예약 시각 (HH:MM)")
         add_spin("schedule_jitter_min", "발행 지터(분)", 0, 120)
+        # ★완전 무인(세션 #34) — 켜면 예약 작업이 생성·승인·발행까지 자동(끄면 승인 글만 발행).
+        add_check("auto_mode", "완전 무인 모드 (생성·승인·발행 자동)")
+        add_spin("auto_approve_min_published", "자동승인 전 사람 검수 편수", 0, 50)
+        add_spin("enrich_max_attempts", "글 5게이트 재생성 상한", 1, 5)
         add_spin("featured_per_tier", "티어별 추천 수", 1, 10)
         add_dspin("satisfaction_floor", "만족도 하한(%)", 0.0, 100.0)
         add_spin("seo_max_attempts", "SEO 재생성 상한", 1, 5)
@@ -380,13 +391,23 @@ class SettingsDialog(QDialog):
                 cfg[key] = widget.value()
             elif isinstance(widget, QComboBox):
                 cfg[key] = widget.currentText()
+            elif isinstance(widget, QCheckBox):
+                cfg[key] = widget.isChecked()
             elif isinstance(widget, QLineEdit):
                 txt = widget.text().strip()
                 cfg[key] = (txt or None) if key == "default_keyword_persona" else txt
         return cfg
 
     def save(self) -> None:
-        settings.save(self.collect())
+        cfg = self.collect()
+        settings.save(cfg)
+        # auto_mode를 바꿨으면 등록된 예약 작업의 wrapper도 맞춰 재등록(무인 생성 footgun 방지·§0).
+        try:
+            from deployer import scheduler
+
+            scheduler.reconcile(bool(cfg.get("auto_mode", False)))
+        except Exception:  # noqa: S110 — 재조정 실패가 설정 저장을 막지 않음(베스트에포트·§0)
+            pass
 
 
 # ─────────────────────────────────────────────────────────────
@@ -603,9 +624,10 @@ class DashboardWindow(QMainWindow):
 
     def refresh(self) -> None:
         cfg = settings.load()
+        unmanned = "🟢 완전 무인 ON" if cfg.get("auto_mode") else "⚪ 무인 OFF(사람 검수)"
         self.banner.setText(
             f"자동발행 — 하루 {cfg['publish_per_day']}편 · 예약 시각 {cfg['schedule_time']} KST "
-            f"· 쿠팡 모드: {cfg['coupang_mode']}"
+            f"· 쿠팡 모드: {cfg['coupang_mode']} · {unmanned}"
         )
         self.settings_view.setText(json.dumps(cfg, ensure_ascii=False, indent=2))
         self._refresh_schedule_label()
@@ -1270,12 +1292,19 @@ class DashboardWindow(QMainWindow):
         self.run_task(task, label="발행")
 
     def _on_schedule_on(self) -> None:
-        t = settings.load().get("schedule_time", "11:00")
+        cfg = settings.load()
+        t = cfg.get("schedule_time", "11:00")
+        full_auto = bool(cfg.get("auto_mode", False))
+        what = (
+            "키워드 자동선정→글 생성→자동승인→발행까지 전부(완전 무인)"
+            if full_auto
+            else "승인된 글만 발행"
+        )
         if (
             QMessageBox.question(
                 self,
                 "예약 발행 켜기",
-                f"매일 {t}에 승인된 글을 자동 발행하도록 등록할까요?\n(Windows 작업 스케줄러)",
+                f"매일 {t}에 {what} 하도록 등록할까요?\n(Windows 작업 스케줄러)",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No,
             )

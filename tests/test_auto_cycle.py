@@ -94,6 +94,45 @@ class TestAutoCycleOrchestration:
         assert kid in gen  # 대기 키워드 → 생성 호출
         assert pub == [1]  # 승인된 글 → publish-queue 호출(count=1)
 
+    def test_empty_queue_autopicks_from_recommender(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # ★완전 무인(세션 #34): 대기 키워드가 0개여도 winnable 추천에서 자동 보충→생성 호출.
+        # 옛 코드는 pending만 소비해 빈 큐면 0편 생성(EVENTS #33 갭). auto_pick_keyword 배선 검증.
+        from common import db
+        from writer import keyword_recommender as kr_mod
+
+        p = tmp_path / "t.db"
+        db.migrate(db_path=p)
+        db.seed(db_path=p)  # 대기 키워드는 추가하지 않음 — 큐 비어 있음
+
+        monkeypatch.setattr(cli.db, "DB_PATH", p)
+        monkeypatch.setattr(
+            cli.settings,
+            "get",
+            lambda k, d=None, **kw: (
+                True if k == "auto_mode" else (1 if k == "publish_per_day" else d)
+            ),
+        )
+        # 추천 경로(네이버 조회·LLM)는 모킹 — 빈 큐→추천 키워드 1건 반환만 검증.
+        monkeypatch.setattr(
+            kr_mod,
+            "auto_pick_keyword",
+            lambda conn, **kw: {"keyword_id": 99, "keyword": "원룸 수납", "source": "recommend"},
+        )
+        gen: list[int] = []
+
+        def fake_gen(ns: argparse.Namespace) -> int:
+            gen.append(ns.id)
+            return 0
+
+        monkeypatch.setattr(cli, "cmd_keyword_generate", fake_gen)
+        monkeypatch.setattr(cli, "cmd_publish_queue", lambda ns: 0)
+
+        rc = cli.cmd_auto_cycle(argparse.Namespace(count=1, dry_run=False, no_deploy=True))
+        assert rc == 0
+        assert gen == [99]  # 빈 큐인데도 추천 키워드로 생성 호출됨(완전 무인 핵심)
+
 
 class TestAutoApproveSafetyGate:
     """④ 세션 #33 — 초기 검수→자동 전환 안전장치: 발행 이력 N편 미만이면 자동 승인 보류."""

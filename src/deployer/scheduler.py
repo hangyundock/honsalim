@@ -15,7 +15,9 @@ from pathlib import Path
 
 TASK_NAME = "Honsalim_PublishQueue"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-WRAPPER = PROJECT_ROOT / "scripts" / "run_publish_queue.ps1"
+WRAPPER_PUBLISH = PROJECT_ROOT / "scripts" / "run_publish_queue.ps1"  # 반자동: 승인 글만 발행
+WRAPPER_AUTOCYCLE = PROJECT_ROOT / "scripts" / "run_auto_cycle.ps1"  # ★완전 무인: 생성+승인+발행
+WRAPPER = WRAPPER_PUBLISH  # 하위호환(옛 참조 — 기본 발행 래퍼)
 
 _TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 _START_RE = re.compile(r"<StartBoundary>\d{4}-\d{2}-\d{2}T(\d{2}):(\d{2}):")
@@ -52,14 +54,17 @@ def is_registered() -> bool:
     return query_scheduled_time() is not None
 
 
-def create_or_update(time_hhmm: str) -> tuple[bool, str]:
-    """매일 time_hhmm(HH:MM)에 발행 작업 등록(있으면 교체). 반환: (성공, 메시지).
+def create_or_update(time_hhmm: str, *, full_auto: bool = False) -> tuple[bool, str]:
+    """매일 time_hhmm(HH:MM)에 예약 작업 등록(있으면 교체). 반환: (성공, 메시지).
 
-    schtasks /create /f 로 멱등 등록. 작업은 run_publish_queue.ps1을 실행.
+    full_auto=True면 run_auto_cycle.ps1(★완전 무인: 생성→자동승인→발행)을, False면
+    run_publish_queue.ps1(반자동: 사람이 승인한 글만 발행)을 등록한다. 단일 작업名(TASK_NAME)이라
+    둘이 동시 등록돼 이중 발행되는 일은 없다(auto-cycle도 발행 포함). schtasks /create /f 로 멱등 등록.
     """
     if not _TIME_RE.match(time_hhmm):
         return False, f"시각 형식 오류: {time_hhmm!r} (HH:MM, 00:00~23:59)"
-    tr = f'powershell -NoProfile -ExecutionPolicy Bypass -File "{WRAPPER}"'
+    wrapper = WRAPPER_AUTOCYCLE if full_auto else WRAPPER_PUBLISH
+    tr = f'powershell -NoProfile -ExecutionPolicy Bypass -File "{wrapper}"'
     try:
         r = _run(
             [
@@ -80,7 +85,20 @@ def create_or_update(time_hhmm: str) -> tuple[bool, str]:
         return False, f"schtasks 실행 실패: {e}"
     if r.returncode != 0:
         return False, (r.stderr or r.stdout or "schtasks 등록 실패").strip()
-    return True, f"예약 발행 등록 — 매일 {time_hhmm}"
+    kind = "완전 무인(생성·승인·발행)" if full_auto else "발행(승인 글만)"
+    return True, f"예약 {kind} 등록 — 매일 {time_hhmm}"
+
+
+def reconcile(full_auto: bool) -> tuple[bool, str] | None:
+    """등록된 예약이 있으면 시각을 유지하고 wrapper만 auto_mode에 맞게 재등록. 미등록이면 None(무동작).
+
+    auto_mode를 바꿔도 예약 작업이 옛 wrapper(예: 발행만)로 굳어 무인 생성이 안 도는 footgun을
+    막는다(§0 무인 안전 — 설정 저장 후 호출). 베스트에포트: 실패해도 호출측 설정 저장은 유지.
+    """
+    t = query_scheduled_time()
+    if t is None:
+        return None
+    return create_or_update(f"{t[0]:02d}:{t[1]:02d}", full_auto=full_auto)
 
 
 def delete_task() -> tuple[bool, str]:

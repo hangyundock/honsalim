@@ -2318,20 +2318,44 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
             f"     사후 모니터 — 미달 {len(mr['failed'])}편 · 자동 비공개 {len(mr['unpublished'])}편"
         )
 
-    # 2. 대기 키워드 N개 생성 (DeepSeek 비용 — count 상한)
-    conn = db.connect(db.DB_PATH)
-    try:
-        pending = conn.execute(
-            "SELECT id FROM keyword_queue WHERE status='pending' "
-            "ORDER BY score DESC, priority DESC, id LIMIT ?",
-            (count,),
-        ).fetchall()
-    finally:
-        conn.close()
-    print(f"     대기 키워드 {len(pending)}개 생성")
+    # 2. 글 생성 N편 — 대기 키워드 우선, 부족하면 winnable 추천에서 자동 보충(★완전 무인·세션 #34).
+    #    auto_pick_keyword: pending 있으면 그것(쿠팡 첨부 우선) 재사용, 없으면 seo 씨앗→winnable 추천을
+    #    큐에 추가해 반환. 각 생성이 키워드를 generating→drafted/failed로 옮기므로 다음 회차가 다음
+    #    키워드를 집는다(중복·무한루프 없음). ★큐가 비어도 멈추지 않는 게 완전 무인의 핵심 —
+    #    옛 코드는 pending만 소비해 대기 키워드 0이면 0편 생성(EVENTS #33 갭). DeepSeek 비용은 count 상한.
     if live:
-        for kr in pending:
-            cmd_keyword_generate(argparse.Namespace(id=int(kr[0]), page_size=20, dry_run=False))
+        from writer import keyword_recommender as kr_mod
+
+        channel = str(settings.get("default_channel", "ali") or "ali")
+        made = 0
+        for _ in range(count):
+            conn = db.connect(db.DB_PATH)
+            try:
+                pick = kr_mod.auto_pick_keyword(conn, channel=channel, live=True)
+            finally:
+                conn.close()
+            if pick is None:
+                print("     보충할 키워드 없음(대기·추천 모두 고갈) — 생성 중단")
+                break
+            print(
+                f"     글 생성 — 키워드 #{pick['keyword_id']} {pick['keyword']!r} ({pick['source']})"
+            )
+            cmd_keyword_generate(
+                argparse.Namespace(id=int(pick["keyword_id"]), page_size=20, dry_run=False)
+            )
+            made += 1
+        print(f"     글 생성 {made}편 완료")
+    else:
+        conn = db.connect(db.DB_PATH)
+        try:
+            n_pending = int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM keyword_queue WHERE status='pending'"
+                ).fetchone()[0]
+            )
+        finally:
+            conn.close()
+        print(f"     [DRY] 대기 키워드 {n_pending}개(+추천 자동 보충) — 생성 생략")
 
     # 3. 자동 승인 (fail-closed — 적합성 검증 가능 + featured 적합만, 나머지 보류)
     conn = db.connect(db.DB_PATH)
@@ -2382,17 +2406,23 @@ def cmd_schedule(args: argparse.Namespace) -> int:
     if args.schedule_action == "show":
         t = scheduler.query_scheduled_time()
         if t:
-            print(f"{OK} 예약 발행 등록됨 — 매일 {t[0]:02d}:{t[1]:02d}")
+            mode = (
+                "완전 무인(생성·승인·발행)"
+                if settings.get("auto_mode", False)
+                else "발행(승인 글만)"
+            )
+            print(f"{OK} 예약 {mode} 등록됨 — 매일 {t[0]:02d}:{t[1]:02d}")
         else:
-            print(f"{WARN} 예약 발행 미등록 (수동 발행만)")
+            print(f"{WARN} 예약 미등록 (수동 발행만)")
         return 0
     if args.schedule_action == "off":
         ok, msg = scheduler.delete_task()
         print(f"{OK if ok else FAIL} {msg}")
         return 0 if ok else 1
-    # set
+    # set — auto_mode ON이면 완전 무인(auto-cycle), OFF면 발행 전용(publish-queue) 래퍼 등록(세션 #34)
     time_hhmm = args.time or str(settings.get("schedule_time", "11:00"))
-    ok, msg = scheduler.create_or_update(time_hhmm)
+    full_auto = bool(settings.get("auto_mode", False))
+    ok, msg = scheduler.create_or_update(time_hhmm, full_auto=full_auto)
     print(f"{OK if ok else FAIL} {msg}")
     if ok:
         cfg = settings.load()
