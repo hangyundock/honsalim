@@ -21,6 +21,7 @@
   - 세션 #30 (2026-06-15 A 키워드 알리 영어검색 근본수정+doctor 게이트 복구+B 진행표시+★첫 라이브 글 발행(게이밍의자)+발행 build/site 커밋버그 적발+글 레이아웃 Tier2 재설계·회귀 846→851)
   - 세션 #31 (2026-06-15 ★카테고리 분류체계(대/중/소)+게이밍의자→'의자' 타입흡수+쿠팡 운영자추천 zone·정식 대가성+추천 8선+라이브 배포·회귀 851 유지·main ea2460e)
   - 세션 #32 (2026-06-15 운영 DB 반영(#31 미완·주인 런처 이식)+쿠팡 카드 광고차단 폴백+운영 대시보드 4기능(키워드삭제·카테고리쿠팡·원스톱 빌드배포·쿠팡존)+쿠팡 3선 균형 라이브·회귀 851→865·main e3a2219)
+  - 세션 #33 (2026-06-15 ★무인 글 생성 파이프라인 완성 — SEO 주입·자가복원 재생성 루프·winnable 선정·초기검수 안전장치(min_published)·발행→라이브 버그 근본수정·회귀 865→873·main 3a96c49)
 - [EVENTS_202605.md](archive/EVENTS_202605.md):
   - 세션 #1 (2026-05-27 프로젝트 신규 셋업·정밀 조사·5파일 시스템·슬래시 명령 등록)
   - 세션 #2 (2026-05-27~28 Phase 0 설계 12/12 + Phase 1 외부 작업: GitHub·Cloudflare·도메인·R2·D1·Git push)
@@ -40,6 +41,26 @@
   - 세션 #18 (2026-05-31 운영자 1클릭 승인 게이트(O21·build-category draft 고정)·doctor §10 64진입점·★카테고리 페이지 디자인 디버깅(글씨 흐림 진짜원인=backdrop-filter 제거)·회귀 569→590)
 
 ## 최근 5세션
+
+### 세션 #38 — 2026-06-27 (Opus 4.8, ★완전무인 첫 라이브 발행 성공(0-falsy 버그 근본수정) + 빈글차단 + 무인 표준 문서화 + 글/카테고리 정형화·featured 8 통일, 회귀 950→961, main 푸시)
+
+**시작 상황**: `/honsalim-start`(#37 395a1bb). 주인 "무인 가동 결정·실행". 운영 폴더는 이미 #37 동기화 확인. 주인이 **직접 무인을 켜서 라이브로 돌려보는** 과정에서 치명 버그·품질 문제를 연쇄 적발·근본 수정(§0 fail-fast).
+
+**핵심 [확정]** (전부 검증·main·라이브):
+1. **★완전무인 막던 0-falsy 버그 근본수정**(치명): `auto_approve_min_published=0`(완전무인)으로 설정해도 `int(settings.get(...) or 5)`에서 `0 or 5 = 5`로 강제돼 자동승인 영구 보류 → 글 생성되나 발행 안 됨. `settings.get_int/get_float`(0 보존) 헬퍼 신설·0 유효 설정 교체(무해/0=기본 곳은 원복). **주인이 직접 무인 켜서 라이브로 돌렸기에 적발**. 회귀 가드 5건. main **f026492**.
+2. **★무인 자동발행 첫 라이브 성공**: 키워드(고용량멀티탭)+쿠팡 적재→예약 시각 auto-cycle→자동 생성·자동승인·발행·배포→`honsallim.com/articles/kw-625b3b85` 라이브(사람 개입 0). 0-falsy 수정 후 검증. 발행 후 404는 CI 배포 지연(버그 아님).
+3. **빈 글 차단 가드**: 상품 0개 키워드('책거치대' 미매핑·쿠팡 미선택)는 LLM 호출 전 생성 중단·키워드 failed(수동·무인 공통·비용0). main **5405caf**.
+4. **★무인 표준 작업 순서 문서화**(주인 강한 비판: 매 세션 같은 설명 반복·인수인계 단절): **키워드 선정도 자동**(씨앗 `seo_keywords.yml`→`keyword_recommender`(네이버 검색량·winnable)→`auto_pick_keyword`). '키워드 직접 입력'·'글 먼저 수동 생성' 안내 금지. CLAUDE.md §7 + **`docs/AUTOMATION.md`**(전체 파이프라인 표준·Claude 체크리스트) + DECISIONS C22·C23 + 메모리 보강. 추천 키워드 다중선택(체크박스·전체선택·행클릭). main **e4dda08·9c4bfa3·27faff5**.
+5. **★글 정형화 근본수정**(워크플로우 4차원 분석으로 단일 원인 확정): 키워드 글이 매핑 카테고리 stale 컨텍스트를 통째 상속→자기 상품(쿠팡3+알리8) 폐기(쿠팡0·상단4·비교4). `_article_as_category_ctx`가 글 자기 picks/쿠팡/비교/카탈로그로 렌더하도록 보정 + 비교=픽 동수(옛 limit 6 제거). 라이브 검증 **쿠팡3·상단8·비교8**. 회귀 가드 2건. main **0e46125**.
+6. **★featured 8 통일**: 글 `_article_featured` k=4(8)·카테고리 `featured_per_tier`(3=6) 불일치 → 둘 다 `featured_per_tier` 단일소스·기본 4(=8). 카테고리 6개 LLM 재빌드(featured 8·compare 8·truth/disclosure/links/SEO 게이트 통과)→`approve-category`→빌드·배포→**라이브 카테고리 8 검증**(글도 8 유지). 카테고리·모니터링에 '🌐 카테고리 보기' 경로 추가(주인 지적). main **678f55a·4e37c40** + 배포 **4875df2**.
+7. **무인 ON/OFF 토글 + 9초 프리징 근본수정**: 상단 무인 토글(라디오버튼 오해 해소)+예약 재등록을 백그라운드로(schtasks 메인스레드 3회 동기호출→UI 9초 프리징 제거·즉시 갱신). main **aa3a2a7·ddd0522**.
+회귀 950→**961**. black·ruff·mypy 클린.
+
+**무인·안전(§0)**: 0-falsy 수정으로 완전무인 가능(주인 min_published=0 선택)·빈글 차단·글 정형화=자기상품(키워드별 쿠팡 반영)·featured 정형성. 카테고리 재빌드는 draft→사람 승인(§2-마). 라이브 게시(build-deploy)는 보안 가드로 주인만 실행.
+
+**잔존/다음(#39)**: ①**무인 운영 지속 관찰**: 예약 19:15·auto_mode ON·min_published=0 상태 — 매일 자동 발행되는 글 품질 사후 검토(발행 글 관리 탭·monitor 2겹 그물). 키워드/쿠팡 큐 적재 보충. ②(이월) `review-helpfulknow` 월 상한(무인 폭주 방지)·쿠팡 수동 배너 부트스트랩(15만원→API)·★성장=트래픽(GSC 색인·[[growth-first-priority]]).
+
+---
 
 ### 세션 #37 — 2026-06-27 (Opus 4.8, ★Google 프로젝트 분리(티스토리 한도 탈출) + 대표이미지 라이브 + 무인 운영모델 정밀검증(이미 구현 확인) + 발행 글 관리 탭, 회귀 950→953, main 푸시)
 
@@ -107,21 +128,4 @@
 
 ---
 
-### 세션 #33 — 2026-06-15 (Opus 4.8 1M, ★무인 글 생성 파이프라인 완성 — SEO 주입·자가복원 재생성 루프·winnable 선정·초기검수 안전장치·발행 버그 근본수정, 회귀 865→873, main 3a96c49)
-
-**시작 상황**: `/honsalim-start`(#32 e3a2219). 주인 "naver_blog식 무인발행 준비됐나" → "무인화·품질(구글 SEO)·naver_blog 정밀분석 후 역제안" 강한 지시.
-
-**핵심 [확정]** (전부 main 반영·운영 폴더 동기화·실증):
-1. **★발행→라이브 버그 근본수정**: `cmd_publish_queue`/스케줄러가 `git_push` stub(commit 없음)으로 build/site 미커밋→새 글 CI 미반영(404·무인 치명, EVENTS #30 발견). `refresh_cycle`(build/site·functions/go add+commit+push) 재사용 교체 + 재발방지 테스트. main **8377a13**.
-2. **★무인 SEO 글 생성 + 자가복원 루프**: 키워드→article 경로가 SEO 게이트 **skip**(cmd_enrich가 SEO 키워드 미주입)→무인 글 SEO 미검증 양산 갭(실증 발견). cmd_enrich가 키워드→카테고리(resolve_category)→`seo_keywords.gate_config` 주입 + **5게이트 미달 issues를 피드백으로 최대 N회 재생성**(`category_page_builder` 패턴 미러·`enrich_max_attempts`·게이트 약화 0). `seo_directive` 정확형 억제(#19 과교정)→밀도범위(1.0~1.7%) 정합. `validator/seo`가 제목 앞 disclosure를 산문 측정서 제외(intro/밀도 왜곡 근본수정). **실증: 알리단독 글 truth 1인칭 자동교정→5게이트 PASS→validated**. main **73b8dee**.
-3. **★winnable 키워드 선정**(C16 PartC '틈 점수' 구현): `keyword_recommender` 검색량순(과경쟁 head 위험)→**winnable_score=min(검색량,30000)×경쟁가중**(낮음1.0/중간0.6/높음0.3) 정렬. 라이브=네이버 compIdx 실값 한글('중간/높음') 확정·검색량 1위 head가 경쟁 높으면 후순위로 밀림. main **931c5ce**.
-4. **★초기 검수→자동 전환 안전장치**: `auto_approve` `min_published` 게이트(발행<설정값(기본5) 미만이면 자동승인 전체 보류→초기 사람검수→N편 검증 후 자동전환·[[autonomous-safe-system]]). settings `auto_approve_min_published`=5. main **3a96c49**.
-회귀 865→**873**(+8). black·ruff·mypy 클린.
-
-**무인 흐름 완성 [확정]**: 사람(씨앗+쿠팡 예약)→[자동] winnable 키워드→알리수집+SEO글 생성(자가복원)→5게이트→(초기검수 후)자동승인→발행·배포→사후가드. **auto_mode 기본 OFF(안전·E7 유지)**. 알리중심 무인 + 쿠팡 15만원 후 API 완전무인(주인 결정). naver_blog는 글생성·승인도 사람(발행만 자동)인데, 혼살림은 더 무인화(생성·승인까지 자동·자가복원·품질게이트).
-
-**잔존/다음(#34)**: ①**★⑤ 완전무인 가동**=스케줄러가 현재 `publish-queue`(승인글 발행만) 등록→완전무인(생성+발행)은 `auto-cycle` 등록 보강 필요(scheduler 코드)+주인 품질확인 후 auto_mode ON. ②auto_cycle 라이브 통합검증(주인 대시보드). ③임시파일(`_verify_kw`·`_inspect_draft`) 정리(삭제 안전정책 막힘). ④(이월)mini-dehumidifier·쿠팡 본격·★성장 Tier0. ★워크트리=`PYTHONPATH=src python -m cli`·DB gitignore→재생성·main직접머지=`git push origin HEAD:main`·PowerShell 한글→.py ASCII([[powershell-korean-encoding]]).
-
----
-
-> (세션 #19~#32은 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
+> (세션 #19~#33은 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)

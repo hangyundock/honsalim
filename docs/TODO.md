@@ -3,11 +3,10 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #38 — (상세 EVENTS #37)
+## ★ 다음 세션 #39 — (상세 EVENTS #38)
 
-- [ ] **★무인 가동 결정·실행**(핵심) — 대기 키워드/쿠팡 배너 적재 → 자동 생성 몇 편으로 품질 직접 확인 → 좋으면 `auto_mode` ON + 스케줄러 등록(주인 결정·C13 '수동운영' 뒤집기). 무인 모델은 **이미 코드 완비**(#37 검증·끊김 없음). 첫 `min_published`(5)편 사람검수.
-- [ ] **★발행 글 관리 탭 운영 동기화** — 운영 폴더 `git pull`(#37 a5930c6) + 대시보드 재시작 → '발행 글 관리' 탭(발행글 사후 검토·비공개/재공개·라이브링크) 노출.
-- [ ] (이월) `review-helpfulknow` 월 지출 한도(무인 폭주 방지·선택) · 쿠팡 수동 배너 부트스트랩(15만원→API) · 적대적 별개개선(카탈로그 오염 가시화·비전 intro 주입) · `mini-dehumidifier` 점검 · ★성장=트래픽(GSC 색인·[[growth-first-priority]]) · naver_blog 볼륨(`/naver-start`).
+- [ ] **★무인 운영 지속 관찰**(핵심) — auto_mode ON·예약 19:15·min_published=0 가동 중. 매일 자동 발행 글 **품질 사후 검토**(발행 글 관리 탭 라이브 확인·monitor 자동비공개). 키워드/쿠팡 큐 적재 보충(고갈 시 추천 자동보충하나 의도 키워드 관리). ★무인/자동화 작업 안내 전 `docs/AUTOMATION.md` 필독(키워드 직접입력·글 먼저생성 안내 금지).
+- [ ] (이월) `review-helpfulknow` 월 지출 한도(무인 폭주 방지·선택) · 쿠팡 수동 배너 부트스트랩(15만원→API) · `mini-dehumidifier` 점검 · ★성장=트래픽(GSC 색인·[[growth-first-priority]]) · naver_blog 볼륨(`/naver-start`).
 - 참고: 워크트리=`PYTHONPATH=src python -m cli`(대시보드 시작 시 자동 migrate)·DB gitignore→재생성. **main직접머지=`git push origin HEAD:main`**. 운영 DB 직접수정 불가→주인 런처(`D:\honsalim_test\*.bat`). ★PowerShell/cmd 한글→.py·ASCII([[powershell-korean-encoding]]).
 
 ## 시점 의존 잔존 (세션 #6~7)
