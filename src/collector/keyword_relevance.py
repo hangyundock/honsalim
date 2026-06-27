@@ -61,6 +61,23 @@ def relevance_terms(keyword: str) -> RelevanceTerms | None:
     return spec.require_any, spec.require_all, eff_exclude, slug
 
 
+def publishability(keyword: str) -> tuple[bool, str]:
+    """키워드만으로 '생성 전' 판정 가능한 발행가능성(필요조건) — (ok, code). 세션 #39.
+
+    생성 전에 확실히 아는 건 '카테고리에 매핑되나'(resolve_category) 하나뿐이다. 매핑이 없으면
+    auto_approve.eligible이 featured 검사 이전에 '적합성 검증 불가'로 보류하므로(코드 'unmapped')
+    쿠팡 첨부 여부와 무관하게 자동 발행이 안 된다 — 그래서 여기서도 쿠팡으로 면제하지 않는다(eligible과
+    정확히 일치). off-target·featured>0·seo 통과는 글·상품을 만든 뒤에만 알 수 있어 여기선 못 본다.
+
+    ★따라서 ok=True는 '발행 보장'이 아니라 '생성 전엔 명백히 막히지 않음'(필요조건)이다 — 이 신호로
+    키워드를 **거부/skip 하지 말 것**(추천 롱테일·완전무인 자동보충을 죽임). 후순위 강등 + 가시화
+    (어떤 키워드가 왜 막히는지 보고)에만 쓴다. code: 'mapped' | 'unmapped'(드리프트 방지 단일 소스).
+    """
+    if resolve_category(keyword) is None:
+        return False, "unmapped"
+    return True, "mapped"
+
+
 def filter_products(
     keyword: str, products: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:

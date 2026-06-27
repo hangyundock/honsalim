@@ -49,6 +49,27 @@ class TestEffectiveExclude:
         assert kr.relevance_terms("강아지 사료") is None
 
 
+class TestPublishability:
+    """세션 #39: 키워드만으로 '생성 전' 판정 가능한 발행가능성(필요조건) — (ok, code).
+
+    거부·skip이 아니라 후순위 강등·가시화의 단일 소스. eligible의 미매핑 보류와 정확히 일치
+    (미매핑은 쿠팡 유무와 무관하게 보류되므로 여기서도 매핑 기준만 본다).
+    """
+
+    def test_mapped_keyword(self) -> None:
+        ok, code = kr.publishability("컴퓨터의자")
+        assert ok is True and code == "mapped"
+
+    def test_unmapped_keyword(self) -> None:
+        ok, code = kr.publishability("책상정리함")
+        assert ok is False and code == "unmapped"
+
+    def test_newly_mapped_keyword_publishable(self) -> None:
+        # #39 매핑 보강된 키워드는 publishable
+        ok, code = kr.publishability("메쉬의자")
+        assert ok is True and code == "mapped"
+
+
 class TestFilterProducts:
     def test_draft2_dressing_chair_dropped(self) -> None:
         # 세션 #29 draft #2 실제 적발: '컴퓨터의자' 글에 결합된 화장/드레싱 의자

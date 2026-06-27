@@ -59,31 +59,31 @@ def conn(tmp_path: Path) -> sqlite3.Connection:
 class TestEligible:
     def test_validated_mapped_relevant_is_eligible(self, conn: sqlite3.Connection) -> None:
         did = _make_validated_draft(conn, "컴퓨터의자", ("인체공학 사무용 의자",))
-        ok, _reason = aa.eligible(conn, did)
+        ok, _reason, _code = aa.eligible(conn, did)
         assert ok is True
 
     def test_not_validated_held(self, conn: sqlite3.Connection) -> None:
         did = _make_validated_draft(conn, "컴퓨터의자", ("의자",), set_validated=False)
-        ok, reason = aa.eligible(conn, did)
+        ok, reason, _code = aa.eligible(conn, did)
         assert ok is False
         assert "validated 아님" in reason
 
     def test_no_keyword_held(self, conn: sqlite3.Connection) -> None:
         did = _make_validated_draft(conn, None, ("의자",))
-        ok, reason = aa.eligible(conn, did)
+        ok, reason, _code = aa.eligible(conn, did)
         assert ok is False
         assert "키워드" in reason
 
     def test_unmapped_keyword_held(self, conn: sqlite3.Connection) -> None:
         # 카테고리에 없는 키워드 → 적합성 검증 불가 → 보류(fail-closed)
         did = _make_validated_draft(conn, "강아지 사료", ("강아지 사료 1kg",))
-        ok, reason = aa.eligible(conn, did)
+        ok, reason, _code = aa.eligible(conn, did)
         assert ok is False
         assert "미매핑" in reason
 
     def test_offtarget_featured_held(self, conn: sqlite3.Connection) -> None:
         did = _make_validated_draft(conn, "컴퓨터의자", ("화장 드레싱 의자",))
-        ok, reason = aa.eligible(conn, did)
+        ok, reason, _code = aa.eligible(conn, did)
         assert ok is False
         assert "off-target" in reason
 
@@ -120,13 +120,13 @@ class TestCoupangExempt:
 
     def test_offtarget_coupang_banner_is_exempt(self, conn: sqlite3.Connection) -> None:
         did = _make_validated_draft(conn, "무중력의자", (self.OFFTARGET,), sources=("coupang",))
-        ok, reason = aa.eligible(conn, did)
+        ok, reason, _code = aa.eligible(conn, did)
         assert ok is True, reason
 
     def test_same_name_aliexpress_still_held(self, conn: sqlite3.Connection) -> None:
         # ali 자동수집은 면제 아님 — 동일 상품명이라도 적합성 검사로 보류돼야 함
         did = _make_validated_draft(conn, "무중력의자", (self.OFFTARGET,), sources=("aliexpress",))
-        ok, reason = aa.eligible(conn, did)
+        ok, reason, _code = aa.eligible(conn, did)
         assert ok is False
         assert "off-target" in reason
 
@@ -140,7 +140,7 @@ class TestCoupangExempt:
             (self.OFFTARGET, "인체공학 사무용 의자"),
             sources=("coupang", "aliexpress"),
         )
-        ok, reason = aa.eligible(conn, did)
+        ok, reason, _code = aa.eligible(conn, did)
         assert ok is True, reason
 
     def test_mixed_coupang_exempt_but_ali_offtarget_still_held(
@@ -153,7 +153,7 @@ class TestCoupangExempt:
             (self.OFFTARGET, "캠핑 낚시 야외 접이식 푸프"),
             sources=("coupang", "aliexpress"),
         )
-        ok, reason = aa.eligible(conn, did)
+        ok, reason, _code = aa.eligible(conn, did)
         assert ok is False
         assert "off-target" in reason
 
@@ -167,5 +167,46 @@ class TestNewlyMappedKeywords:
         self, conn: sqlite3.Connection, kw: str
     ) -> None:
         did = _make_validated_draft(conn, kw, ("인체공학 사무용 의자",))
-        ok, reason = aa.eligible(conn, did)
+        ok, reason, _code = aa.eligible(conn, did)
         assert ok is True, reason
+
+
+class TestReasonCode:
+    """세션 #39: 보류 사유를 machine-readable code로 — 무인 알림이 '의도적 보류(min_published)
+    vs 문제 보류(unmapped/offtarget…)'를 로그 파싱 없이 코드로 분류·집계(오경보 방지)."""
+
+    def test_eligible_ok_code(self, conn: sqlite3.Connection) -> None:
+        did = _make_validated_draft(conn, "컴퓨터의자", ("인체공학 사무용 의자",))
+        ok, _reason, code = aa.eligible(conn, did)
+        assert ok is True and code == "ok"
+
+    def test_unmapped_code(self, conn: sqlite3.Connection) -> None:
+        did = _make_validated_draft(conn, "강아지 사료", ("강아지 사료 1kg",))
+        ok, _reason, code = aa.eligible(conn, did)
+        assert ok is False and code == "unmapped"
+
+    def test_offtarget_code(self, conn: sqlite3.Connection) -> None:
+        did = _make_validated_draft(conn, "컴퓨터의자", ("화장 드레싱 의자",))
+        ok, _reason, code = aa.eligible(conn, did)
+        assert ok is False and code == "offtarget"
+
+    def test_featured_zero_code(self, conn: sqlite3.Connection) -> None:
+        did = _make_validated_draft(conn, "컴퓨터의자", ())
+        ok, _reason, code = aa.eligible(conn, did)
+        assert ok is False and code == "featured_zero"
+
+    def test_min_published_hold_is_coded_intentional(self, conn: sqlite3.Connection) -> None:
+        # min_published 미달 보류는 code='min_published'(정상) — 알림이 '문제'로 오인하면 안 됨
+        did = _make_validated_draft(conn, "컴퓨터의자", ("인체공학 사무용 의자",))
+        res = aa.auto_approve(conn, apply=True, min_published=5)
+        assert res["approved"] == []
+        assert did in {h["draft"] for h in res["held"]}
+        assert all(h["code"] == "min_published" for h in res["held"])
+
+    def test_problem_hold_carries_specific_code(self, conn: sqlite3.Connection) -> None:
+        good = _make_validated_draft(conn, "컴퓨터의자", ("인체공학 사무용 의자",))
+        unmapped = _make_validated_draft(conn, "강아지 사료", ("사료",))
+        res = aa.auto_approve(conn, apply=True)
+        assert good in res["approved"]
+        codes = {h["draft"]: h["code"] for h in res["held"]}
+        assert codes.get(unmapped) == "unmapped"

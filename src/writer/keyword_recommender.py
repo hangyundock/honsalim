@@ -211,13 +211,25 @@ def auto_pick_keyword(
        (score=월검색량) → 그 키워드.
     반환: {keyword_id, keyword, source: "queue"|"recommend"} 또는 None(추천도 없음).
     """
-    row = conn.execute(
+    # pending 중 '발행가능(카테고리 매핑)'을 우선 집는다 — 미매핑은 후순위 강등(세션 #39).
+    #   ★skip·삭제가 아니다: 미매핑 키워드는 큐에 그대로 남아 auto-cycle digest/ALERT로 운영자에게
+    #   보고된다(추천 롱테일·완전무인 자동보충을 죽이지 않기 위함). 전부 미매핑이면 기존처럼 맨 위
+    #   1건을 반환해 behavior를 보존한다(멈추지 않음 — 그 사유는 digest가 보고). 정렬은 대시보드
+    #   목록과 동일(쿠팡 첨부 우선 → score → priority → id)을 유지하고 그 위에 매핑 우선만 얹는다.
+    rows = conn.execute(
         "SELECT id, keyword FROM keyword_queue WHERE status = 'pending' "
         "ORDER BY (target_products IS NOT NULL AND target_products NOT IN ('', '[]')) DESC, "
-        "score DESC, priority DESC, id LIMIT 1"
-    ).fetchone()
-    if row:
-        return {"keyword_id": int(row[0]), "keyword": str(row[1]), "source": "queue"}
+        "score DESC, priority DESC, id"
+    ).fetchall()
+    if rows:
+        from collector import keyword_relevance  # 지연 임포트(순환 회피)
+
+        for kid, kw in rows:
+            ok, _code = keyword_relevance.publishability(str(kw))
+            if ok:
+                return {"keyword_id": int(kid), "keyword": str(kw), "source": "queue"}
+        # 전부 미매핑 — 멈추지 않고 맨 위 1건(behavior 보존). digest가 '큐 발행가능 0'을 ALERT.
+        return {"keyword_id": int(rows[0][0]), "keyword": str(rows[0][1]), "source": "queue"}
 
     top = top_recommendation(
         conn, seeds=seeds, custom_seed=custom_seed, channel=channel, fetch=fetch, live=live

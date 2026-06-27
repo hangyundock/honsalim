@@ -201,6 +201,25 @@ class TestAutoPick:
         rows = queries.list_keywords(conn, status="pending")
         assert rows[0]["keyword"] == "쿠팡세팅"  # 미리선택 있는 것 맨 위 (자동 선정과 일치)
 
+    def test_publishable_keyword_preferred_over_unmapped(self) -> None:
+        # 세션 #39 후순위 강등: 미매핑(고점수)보다 매핑된(저점수) 키워드를 우선 집는다.
+        conn = _db()
+        kq.add_keyword(conn, "양자역학교재", channel="ali", score=99999.0)  # 미매핑
+        kq.add_keyword(conn, "컴퓨터의자", channel="ali", score=10.0)  # office-chair 매핑
+        picked = kr.auto_pick_keyword(conn, seeds=SEED, fetch=_fetch)
+        assert picked is not None
+        assert picked["keyword"] == "컴퓨터의자"  # 발행가능(매핑) 우선 — 고점수 미매핑보다 먼저
+
+    def test_all_unmapped_falls_back_to_top_not_none(self) -> None:
+        # 전부 미매핑이면 멈추지 않고 맨 위 1건(기존 정렬 보존) — skip·None 아님(digest가 사유 보고).
+        conn = _db()
+        kq.add_keyword(conn, "양자역학교재", channel="ali", score=10.0)
+        kq.add_keyword(conn, "상대성이론책", channel="ali", score=9999.0)
+        picked = kr.auto_pick_keyword(conn, seeds=SEED, fetch=_fetch)
+        assert picked is not None
+        assert picked["source"] == "queue"
+        assert picked["keyword"] == "상대성이론책"  # score 최고(기존 정렬 보존)
+
 
 class TestWinnableScore:
     def test_lower_competition_ranks_higher(self) -> None:

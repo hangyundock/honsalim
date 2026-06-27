@@ -2449,6 +2449,60 @@ def _deploy_ns() -> argparse.Namespace:
     )
 
 
+def _auto_cycle_digest_and_alert(
+    conn: sqlite3.Connection, *, made: int, ar: dict[str, Any], approved_n: int
+) -> dict[str, Any]:
+    """무인 사이클 결과를 구조화 JSON으로 영속화 + 비정상 시 [ALERT] 로그(세션 #39 자기보고).
+
+    무인 운영 중 대시보드(수동 GUI)는 안 열리므로 1차 채널은 파일(data/auto_cycle_last.json) +
+    [ALERT] 로그(run_auto_cycle.ps1이 auto_cycle.log에 남김 → 향후 푸시 채널이 grep 가능). 보류 사유는
+    reason_code로 분류해 로그 문자열 파싱을 피하고, min_published(의도된 정상 보류)는 '문제'로 안 친다
+    (오경보 방지). 큐 건강 = pending 키워드를 keyword_relevance.publishability(매핑=발행가능 필요조건)로
+    집계. '발행대기 0 + (문제보류 있거나 큐에 발행가능 0)' = 조용한 정지 위험 → ALERT.
+    """
+    from collections import Counter
+
+    from collector import keyword_relevance
+
+    pend = conn.execute("SELECT keyword FROM keyword_queue WHERE status = 'pending'").fetchall()
+    publishable = 0
+    blocked: Counter[str] = Counter()
+    for (kw,) in pend:
+        ok, code = keyword_relevance.publishability(str(kw))
+        if ok:
+            publishable += 1
+        else:
+            blocked[code] += 1
+    held_codes: Counter[str] = Counter(str(h.get("code") or "?") for h in ar["held"])
+    problem_codes = {k: v for k, v in held_codes.items() if k != "min_published"}
+    problem_held = sum(problem_codes.values())
+    abnormal = approved_n == 0 and (problem_held > 0 or (len(pend) > 0 and publishable == 0))
+    digest: dict[str, Any] = {
+        "made": made,
+        "approved_this_run": len(ar["approved"]),
+        "approved_pending_publish": approved_n,
+        "held_total": len(ar["held"]),
+        "held_by_code": dict(held_codes),
+        "queue_pending": len(pend),
+        "queue_publishable": publishable,
+        "queue_blocked_by_code": dict(blocked),
+        "abnormal": abnormal,
+    }
+    try:
+        path = db.DB_PATH.parent / "auto_cycle_last.json"
+        path.write_text(json.dumps(digest, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError as e:
+        print(f"{WARN} 사이클 다이제스트 기록 실패(무시): {e}")
+    if abnormal:
+        print(
+            f"{FAIL} [ALERT] 무인 발행 0편 위험 — 발행대기 {approved_n}편 · 문제보류 "
+            f"{problem_held}편 {dict(problem_codes) or ''} · 큐 발행가능 {publishable}/{len(pend)} "
+            f"(막힘 {dict(blocked) or '없음'}). 막힌 키워드를 카테고리에 매핑(seo_keywords.yml "
+            "secondary)하거나 쿠팡 배너 첨부 또는 큐에서 제거하세요."
+        )
+    return digest
+
+
 def cmd_auto_cycle(args: argparse.Namespace) -> int:
     """★무인 자동 사이클 (B-i·세션 #29): auto_mode ON일 때만 — 사후모니터→생성→자동승인→발행.
 
@@ -2498,9 +2552,16 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
             print(
                 f"     글 생성 — 키워드 #{pick['keyword_id']} {pick['keyword']!r} ({pick['source']})"
             )
-            rc = cmd_keyword_generate(
-                argparse.Namespace(id=int(pick["keyword_id"]), page_size=20, dry_run=False)
-            )
+            try:
+                rc = cmd_keyword_generate(
+                    argparse.Namespace(id=int(pick["keyword_id"]), page_size=20, dry_run=False)
+                )
+            except Exception as e:  # 한 키워드 생성 예외(DeepSeek 429/네트워크 등)가 무인 사이클
+                # 전체를 죽이지 않게 격리(세션 #39). generating에 끼인 좀비 키워드를 failed로
+                # 복원하고 다음 회차로 — 사이클 사망·좀비 누적 방지.
+                _set_keyword_status(int(pick["keyword_id"]), "failed", f"생성 예외 격리: {e}")
+                print(f"{WARN} 키워드 #{pick['keyword_id']} 생성 예외 — 격리·계속: {e}")
+                rc = 3
             if (
                 rc == 0
             ):  # 상품 0개(빈 글 차단·rc=3) 등 실패는 세지 않음 — 다음 회차가 다른 키워드를 집는다
@@ -2541,6 +2602,8 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
         approved_n = int(
             conn.execute("SELECT COUNT(*) FROM drafts WHERE status='approved'").fetchone()[0]
         )
+        # 무인 자기보고(세션 #39): 사이클 결과·큐 건강을 영속화하고 조용한 정지 위험 시 [ALERT].
+        _auto_cycle_digest_and_alert(conn, made=made, ar=ar, approved_n=approved_n)
     finally:
         conn.close()
     if approved_n:

@@ -170,3 +170,70 @@ class TestAutoApproveSafetyGate:
         res = aa.auto_approve(conn, apply=False, min_published=0)
         assert all("초기 검수" not in h["reason"] for h in res["held"])
         conn.close()
+
+
+class TestAutoCycleDigest:
+    """세션 #39 무인 자기보고: 사이클 health 다이제스트 + '조용한 정지' 비정상 판정.
+
+    무인 운영 중 대시보드는 안 열리므로 결과를 파일/로그로 자기보고. min_published(의도된 보류)는
+    '문제'로 안 쳐 오경보를 막고, 발행 0 + (문제보류 or 큐 발행가능 0)일 때만 abnormal(ALERT)."""
+
+    def _conn(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
+        from common import db
+
+        p = tmp_path / "t.db"
+        db.migrate(db_path=p)
+        db.seed(db_path=p)
+        monkeypatch.setattr(cli.db, "DB_PATH", p)  # 다이제스트 파일이 tmp에 쓰이도록
+        return db.connect(p)
+
+    def test_healthy_not_abnormal(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        from writer import keyword_queue as kq
+
+        conn = self._conn(tmp_path, monkeypatch)
+        kq.add_keyword(conn, "컴퓨터의자", channel="ali")  # 매핑 → publishable
+        d = cli._auto_cycle_digest_and_alert(
+            conn, made=1, ar={"approved": [1], "held": []}, approved_n=1
+        )
+        assert d["abnormal"] is False
+        assert d["queue_publishable"] == 1
+        conn.close()
+
+    def test_problem_hold_zero_publish_is_abnormal(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        conn = self._conn(tmp_path, monkeypatch)
+        ar = {"approved": [], "held": [{"draft": 5, "reason": "x", "code": "unmapped"}]}
+        d = cli._auto_cycle_digest_and_alert(conn, made=1, ar=ar, approved_n=0)
+        assert d["abnormal"] is True
+        assert d["held_by_code"]["unmapped"] == 1
+        conn.close()
+
+    def test_min_published_hold_not_abnormal(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from writer import keyword_queue as kq
+
+        conn = self._conn(tmp_path, monkeypatch)
+        kq.add_keyword(conn, "컴퓨터의자", channel="ali")  # 발행가능 큐 존재
+        ar = {
+            "approved": [],
+            "held": [{"draft": 5, "reason": "초기 검수", "code": "min_published"}],
+        }
+        d = cli._auto_cycle_digest_and_alert(conn, made=1, ar=ar, approved_n=0)
+        assert d["abnormal"] is False  # 의도된 보류는 ALERT 아님(오경보 방지)
+        conn.close()
+
+    def test_all_unmapped_queue_is_abnormal(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from writer import keyword_queue as kq
+
+        conn = self._conn(tmp_path, monkeypatch)
+        kq.add_keyword(conn, "양자역학교재", channel="ali")  # 미매핑 → 큐 발행가능 0
+        d = cli._auto_cycle_digest_and_alert(
+            conn, made=0, ar={"approved": [], "held": []}, approved_n=0
+        )
+        assert d["abnormal"] is True
+        assert d["queue_blocked_by_code"]["unmapped"] == 1
+        conn.close()

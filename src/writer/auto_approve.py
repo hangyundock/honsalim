@@ -34,30 +34,35 @@ def _draft_keyword(conn: sqlite3.Connection, keyword_id: int | None) -> str | No
     return str(row[0]) if row and row[0] else None
 
 
-def eligible(conn: sqlite3.Connection, draft_id: int) -> tuple[bool, str]:
-    """draft가 자동 승인 가능한지 (validated + 키워드 매핑 + featured 적합). 반환: (ok, reason)."""
+def eligible(conn: sqlite3.Connection, draft_id: int) -> tuple[bool, str, str]:
+    """draft가 자동 승인 가능한지. 반환: (ok, reason, code).
+
+    code = machine-readable 보류 사유(영문 enum) — 무인 가시화·알림이 '문제 보류'를 분류·집계하는
+    단일 소스(세션 #39). 사람용 reason과 분리해 로그 문자열 파싱 없이 코드로 판정한다.
+    값: ok / no_draft / not_validated / no_keyword / unmapped / payload_error / featured_zero / offtarget.
+    """
     row = conn.execute(
         "SELECT status, keyword_id, enriched_payload FROM drafts WHERE id = ?", (draft_id,)
     ).fetchone()
     if row is None:
-        return False, "draft 없음"
+        return False, "draft 없음", "no_draft"
     status, keyword_id, ep_json = row[0], row[1], row[2]
     if status != "validated":
-        return False, f"상태 {status!r}(validated 아님)"
+        return False, f"상태 {status!r}(validated 아님)", "not_validated"
     keyword = _draft_keyword(conn, keyword_id)
     if not keyword:
-        return False, "키워드 추적 불가(검증 불가→보류)"
+        return False, "키워드 추적 불가(검증 불가→보류)", "no_keyword"
     terms = keyword_relevance.relevance_terms(keyword)
     if terms is None:
-        return False, f"키워드 {keyword!r} 카테고리 미매핑(적합성 검증 불가→보류)"
+        return False, f"키워드 {keyword!r} 카테고리 미매핑(적합성 검증 불가→보류)", "unmapped"
     require_any, require_all, exclude, _slug = terms
     try:
         ep = json.loads(ep_json) if ep_json else {}
     except (json.JSONDecodeError, TypeError):
-        return False, "enriched_payload 파싱 불가"
+        return False, "enriched_payload 파싱 불가", "payload_error"
     featured = ep.get("products") or []
     if not featured:
-        return False, "featured 상품 0개"
+        return False, "featured 상품 0개", "featured_zero"
     offtarget = [
         str(p.get("name") or "")
         for p in featured
@@ -74,8 +79,8 @@ def eligible(conn: sqlite3.Connection, draft_id: int) -> tuple[bool, str]:
         )
     ]
     if offtarget:
-        return False, f"featured off-target {len(offtarget)}개: {offtarget[0][:30]}"
-    return True, "적합(게이트+적합성 통과)"
+        return False, f"featured off-target {len(offtarget)}개: {offtarget[0][:30]}", "offtarget"
+    return True, "적합(게이트+적합성 통과)", "ok"
 
 
 def auto_approve(
@@ -87,7 +92,9 @@ def auto_approve(
     단계(세션 #33 안전장치·autonomous-safe-system). 0이면 게이트 없음(하위호환). 사람이 N편
     직접 승인·발행해 품질을 눈으로 확인한 뒤에만 자동 승인으로 전환(미탐<오탐).
 
-    반환: {approved:[id], held:[{draft,reason}]}. 실패 격리 — 한 건이 다음을 막지 않는다.
+    반환: {approved:[id], held:[{draft,reason,code}]}. code는 eligible의 machine-readable 사유
+    (min_published 의도적 보류는 code='min_published' — 무인 알림이 '정상 보류 vs 문제 보류'를
+    코드로 구분해 오경보를 막는다, 세션 #39). 실패 격리 — 한 건이 다음을 막지 않는다.
     """
     rows = conn.execute("SELECT id FROM drafts WHERE status = 'validated' ORDER BY id").fetchall()
     approved: list[int] = []
@@ -98,18 +105,24 @@ def auto_approve(
         )
         if pub < min_published:
             reason = f"초기 검수 단계(발행 {pub}/{min_published}편) — 사람 승인 필요"
-            return {"approved": [], "held": [{"draft": int(r[0]), "reason": reason} for r in rows]}
+            # code='min_published' = 의도된 정상 보류(첫 N편 사람검수) — 알림에서 '문제'로 안 침.
+            return {
+                "approved": [],
+                "held": [
+                    {"draft": int(r[0]), "reason": reason, "code": "min_published"} for r in rows
+                ],
+            }
     for r in rows:
         did = int(r[0])
-        ok, reason = eligible(conn, did)
+        ok, reason, code = eligible(conn, did)
         if not ok:
-            held.append({"draft": did, "reason": reason})
+            held.append({"draft": did, "reason": reason, "code": code})
             continue
         if apply:
             try:
                 state_machine.transition(conn, did, "approved", reason="auto-approve (B-i)")
             except (state_machine.IllegalStateError, ValueError) as e:  # 전이 실패 격리
-                held.append({"draft": did, "reason": f"전이 실패: {e}"})
+                held.append({"draft": did, "reason": f"전이 실패: {e}", "code": "transition_error"})
                 continue
         approved.append(did)
     return {"approved": approved, "held": held}
