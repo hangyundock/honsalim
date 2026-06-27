@@ -477,13 +477,23 @@ class DashboardWindow(QMainWindow):
         cards_row.addWidget(btn_refresh)
         outer.addLayout(cards_row)
 
-        # 상태 배너 (자동발행 설정 요약)
+        # 상태 배너 (자동발행 설정 요약) + 무인 ON/OFF 토글 버튼(세션 #38).
+        # 옛 배너는 QLabel뿐이라 '⚪ 무인 OFF' 동그라미가 라디오버튼처럼 보여도 클릭이 안 돼
+        # 혼란을 줬다(주인 지적). 상단에서 바로 켜고 끄도록 실제 토글 버튼을 둔다.
+        banner_row = QHBoxLayout()
         self.banner = QLabel()
         self.banner.setStyleSheet(
             "background:#e8f5e9;border:1px solid #a5d6a7;border-radius:6px;"
             "padding:6px 10px;color:#1b5e20;"
         )
-        outer.addWidget(self.banner)
+        banner_row.addWidget(self.banner, 1)
+        self.btn_unmanned = QPushButton()
+        self.btn_unmanned.setMinimumWidth(190)
+        self.btn_unmanned.setToolTip("완전 무인 모드를 켜고 끕니다 (예약 시각마다 자동 생성·발행)")
+        self.btn_unmanned.clicked.connect(self._on_toggle_unmanned)
+        self._action_buttons.append(self.btn_unmanned)
+        banner_row.addWidget(self.btn_unmanned)
+        outer.addLayout(banner_row)
 
         # 탭
         self.tabs = QTabWidget()
@@ -671,10 +681,20 @@ class DashboardWindow(QMainWindow):
 
     def refresh(self) -> None:
         cfg = settings.load()
-        unmanned = "🟢 완전 무인 ON" if cfg.get("auto_mode") else "⚪ 무인 OFF(사람 검수)"
+        unmanned_on = bool(cfg.get("auto_mode"))
+        unmanned = "🟢 완전 무인 ON" if unmanned_on else "⚪ 무인 OFF(사람 검수)"
         self.banner.setText(
             f"자동발행 — 하루 {cfg['publish_per_day']}편 · 예약 시각 {cfg['schedule_time']} KST "
             f"· 쿠팡 모드: {cfg['coupang_mode']} · {unmanned}"
+        )
+        self.btn_unmanned.setText("🟢 무인 ON — 끄기" if unmanned_on else "⚪ 무인 OFF — 켜기")
+        self.btn_unmanned.setStyleSheet(
+            "padding:6px 12px;font-weight:bold;border-radius:6px;"
+            + (
+                "background:#2e7d32;color:white;border:1px solid #1b5e20;"
+                if unmanned_on
+                else "background:#f5f5f5;color:#444;border:1px solid #bbb;"
+            )
         )
         self.settings_view.setText(json.dumps(cfg, ensure_ascii=False, indent=2))
         self._refresh_schedule_label()
@@ -693,6 +713,45 @@ class DashboardWindow(QMainWindow):
             self._fill_health(conn)
         finally:
             conn.close()
+
+    def _on_toggle_unmanned(self) -> None:
+        """상단 배너의 무인 ON/OFF 토글(세션 #38). 켤 때 확인창 + 예약 작업 재등록.
+
+        설정 다이얼로그의 'auto_mode' 체크와 같은 config 키를 쓰므로 한 곳만 바꿔도 동기화된다.
+        """
+        cfg = settings.load()
+        turning_on = not bool(cfg.get("auto_mode", False))
+        if turning_on:
+            minp = int(cfg.get("auto_approve_min_published", 5) or 0)
+            gate = (
+                f"처음 {minp}편은 사람이 승인해야 발행되고, 그 뒤부터 완전 자동입니다."
+                if minp > 0
+                else "첫 글부터 사람 승인 없이 자동 발행됩니다(검수 편수 0)."
+            )
+            resp = QMessageBox.question(
+                self,
+                "완전 무인 켜기",
+                "완전 무인 모드를 켤까요?\n\n"
+                "· 예약 시각마다 등록된 키워드로 글을 자동 생성·발행합니다.\n"
+                f"· {gate}\n"
+                "· 같은 버튼을 다시 누르면 끕니다.",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if resp != QMessageBox.Yes:
+                return
+        cfg["auto_mode"] = turning_on
+        settings.save(cfg)
+        # 예약이 등록돼 있으면 새 모드에 맞는 wrapper(auto-cycle/publish-queue)로 재등록(§0·#35).
+        try:
+            from deployer import scheduler
+
+            new_time = str(cfg.get("schedule_time") or "").strip() or None
+            scheduler.reconcile(turning_on, new_time)
+        except Exception:  # noqa: S110 — 재조정 실패가 설정 저장을 막지 않음(베스트에포트·§0)
+            pass
+        self.append_log(f"[OK] 완전 무인 {'ON' if turning_on else 'OFF'}")
+        self.refresh()
 
     def _has_schema(self, conn: sqlite3.Connection) -> None:
         """스키마 없으면 안내(무인 환경 친화)."""
