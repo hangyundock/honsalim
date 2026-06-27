@@ -610,7 +610,12 @@ def cmd_enrich(args: argparse.Namespace) -> int:
 
                 cat_slug = keyword_relevance.resolve_category(str(kwrow[0]))
                 if cat_slug:
-                    seo_cfg = seo_keywords.gate_config(cat_slug) or {}
+                    # ★세션 #39 근본수정: 키워드 글의 SEO 대표키워드 = 그 키워드 자신(winnable 롱테일),
+                    # 카테고리 대표어는 보조로 강등. 광의·고경쟁 카테고리어로 검사하면(예 '등받이의자'
+                    # 글에 '사무용 의자'를 소제목까지 강요) 키워드 중심 글이 자가복원으로도 못 맞춰
+                    # 영구 rejected → 글 생성 지시·seo 게이트가 같은 seo_cfg를 쓰므로 primary만 키워드로
+                    # 정렬하면 생성·검증이 함께 키워드 기준이 된다. 카테고리 페이지 빌드는 영향 없음.
+                    seo_cfg = seo_keywords.keyword_gate_config(str(kwrow[0]), cat_slug) or {}
                     # 시각 보강(세션 #34): 매핑 카테고리 개념 이미지를 글 히어로 배너로 재사용(생성 0)
                     crow = conn.execute(
                         "SELECT concept_image, concept_image_alt FROM categories WHERE slug = ?",
@@ -621,7 +626,8 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                         concept_image_alt = crow[1] or ""
                     if seo_cfg:
                         print(
-                            f"     SEO 주입: 카테고리 {cat_slug} (primary={seo_cfg.get('primary')!r})"
+                            f"     SEO 주입: 키워드 글 primary={seo_cfg.get('primary')!r} "
+                            f"(카테고리 {cat_slug} 대표어는 보조)"
                         )
         import os
 

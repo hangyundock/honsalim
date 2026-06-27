@@ -84,6 +84,74 @@ class TestLoaderEdge:
         assert sk.load_all(p) == {}
 
 
+class TestKeywordGateConfig:
+    """세션 #39: 키워드 글은 '그 키워드'를 대표키워드로, 카테고리 대표어는 보조로.
+
+    카테고리어(광의·고경쟁)로 seo 검사하면 키워드 중심 글이 소제목 등에서 자가복원으로도 못 맞춰
+    영구 rejected 되던 문제(라이브 적발) 근본수정.
+    """
+
+    def test_keyword_becomes_primary(self) -> None:
+        cfg = sk.keyword_gate_config("등받이의자", "office-chair")
+        assert cfg is not None
+        assert cfg["primary"] == "등받이의자"
+
+    def test_category_primary_demoted_to_secondary(self) -> None:
+        cfg = sk.keyword_gate_config("무중력의자", "office-chair")
+        assert cfg is not None
+        assert cfg["primary"] == "무중력의자"
+        assert cfg["secondary"] == ["사무용 의자"]  # 카테고리 대표어만 보조로(맥락 유지)
+
+    def test_keyword_equal_to_category_primary_no_dup(self) -> None:
+        # 키워드가 카테고리 대표어와 같으면 보조에 중복 안 넣음
+        cfg = sk.keyword_gate_config("사무용 의자", "office-chair")
+        assert cfg is not None
+        assert cfg["primary"] == "사무용 의자"
+        assert cfg["secondary"] == []
+
+    def test_unmapped_returns_none(self) -> None:
+        assert sk.keyword_gate_config("등받이의자", "no-such-category") is None
+
+    def test_density_overrides_preserved(self, tmp_path: Path) -> None:
+        p = tmp_path / "seo_keywords.yml"
+        p.write_text(
+            "categories:\n"
+            "  test-cat:\n"
+            "    primary: 테스트 대표어\n"
+            "    secondary: [가나, 다라]\n"
+            "    density_floor: 1.5\n"
+            "    density_ceil: 3.0\n",
+            encoding="utf-8",
+        )
+        cfg = sk.keyword_gate_config("롱테일 키워드", "test-cat", path=p)
+        assert cfg is not None
+        assert cfg["primary"] == "롱테일 키워드"
+        assert cfg["secondary"] == ["테스트 대표어"]
+        assert cfg["density_floor"] == 1.5  # gate_config 오버라이드 승계
+        assert cfg["density_ceil"] == 3.0
+
+    def test_keyword_primary_satisfies_headings_but_category_does_not(self) -> None:
+        # 핵심 증명: '등받이의자' 글(소제목이 등받이의자 중심)을
+        #   - 키워드 기준으로 보면 소제목 키워드 충족 → headings_keyword_low 없음
+        #   - 카테고리 대표어('사무용 의자') 기준으로 보면 소제목에 그 광의어가 없어 rejected
+        from validator.seo import check_seo
+
+        body = (
+            "# 등받이의자 추천\n\n"
+            "등받이의자를 고를 때 허리 지지가 핵심이다.\n\n"
+            "## 등받이의자 고르는 법\n등받이 각도와 재질을 본다.\n\n"
+            "## 가격대별 비교\n실속형부터 고급형까지.\n"
+        )
+        kw_cfg = sk.keyword_gate_config("등받이의자", "office-chair")
+        cat_cfg = sk.gate_config("office-chair")
+        _, kw_rep = check_seo({"body_md": body, "title": "등받이의자 추천", "seo": kw_cfg})
+        _, cat_rep = check_seo({"body_md": body, "title": "등받이의자 추천", "seo": cat_cfg})
+        assert kw_rep["metrics"]["headings_with_keyword"] >= 1
+        assert not any("headings_keyword_low" in i for i in kw_rep["issues"])
+        assert cat_rep["metrics"]["headings_with_keyword"] == 0
+        assert any("headings_keyword_low" in i for i in cat_rep["issues"])
+
+
 class TestBuildEntry:
     def test_build_entry_shape(self) -> None:
         entry = kr.build_entry(

@@ -60,6 +60,32 @@ def gate_config(category_key: str, path: Path = SEO_KEYWORDS_FILE) -> dict[str, 
     return cfg
 
 
+def keyword_gate_config(
+    keyword: str, category_key: str, path: Path = SEO_KEYWORDS_FILE
+) -> dict[str, Any] | None:
+    """키워드 파생 글용 seo 설정 — **그 키워드 자신을 대표키워드(primary)**, 카테고리 대표어는 보조로.
+
+    카테고리 페이지는 ``gate_config``(카테고리 대표어=primary)를 쓰지만, 키워드로 만든 글은 그
+    키워드(winnable 롱테일)를 타겟해야 한다(세션 #39 근본수정). 광의·고경쟁 카테고리어를 primary로
+    쓰면 ① seo 게이트가 그 광의어를 소제목·제목·도입부에 강요해 키워드 중심 글이 자가복원으로도
+    못 맞춰 영구 rejected 되고(라이브 적발), ② 신생 사이트가 못 이길 광의어를 타겟하는 SEO 비효율이
+    생긴다. 카테고리 대표어는 보조키워드(존재는 warning·하드 fail 아님)로 강등해 맥락은 유지한다.
+
+    category_key 미매핑이면 None(상위에서 fail-open). density 오버라이드는 gate_config에서 승계.
+    """
+    cfg = gate_config(category_key, path)
+    if cfg is None:
+        return None
+    kw = (keyword or "").strip()
+    if not kw:
+        return cfg
+    cat_primary = str(cfg.get("primary") or "").strip()
+    cfg = dict(cfg)
+    cfg["primary"] = kw
+    cfg["secondary"] = [cat_primary] if cat_primary and cat_primary != kw else []
+    return cfg
+
+
 def all_category_keys(path: Path = SEO_KEYWORDS_FILE) -> list[str]:
     """정의된 카테고리 key 정렬 목록."""
     return sorted(load_all(path).keys())
