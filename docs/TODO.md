@@ -3,11 +3,13 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #39 — (상세 EVENTS #38)
+## ★ 다음 세션 #40 — (상세 EVENTS #39)
 
-- [ ] **★무인 운영 지속 관찰**(핵심) — auto_mode ON·예약 19:15·min_published=0 가동 중. 매일 자동 발행 글 **품질 사후 검토**(발행 글 관리 탭 라이브 확인·monitor 자동비공개). 키워드/쿠팡 큐 적재 보충(고갈 시 추천 자동보충하나 의도 키워드 관리). ★무인/자동화 작업 안내 전 `docs/AUTOMATION.md` 필독(키워드 직접입력·글 먼저생성 안내 금지).
-- [ ] (이월) `review-helpfulknow` 월 지출 한도(무인 폭주 방지·선택) · 쿠팡 수동 배너 부트스트랩(15만원→API) · `mini-dehumidifier` 점검 · ★성장=트래픽(GSC 색인·[[growth-first-priority]]) · naver_blog 볼륨(`/naver-start`).
-- 참고: 워크트리=`PYTHONPATH=src python -m cli`(대시보드 시작 시 자동 migrate)·DB gitignore→재생성. **main직접머지=`git push origin HEAD:main`**. 운영 DB 직접수정 불가→주인 런처(`D:\honsalim_test\*.bat`). ★PowerShell/cmd 한글→.py·ASCII([[powershell-korean-encoding]]).
+- [ ] **★성장(검색노출·트래픽) 최우선**([[growth-first-priority]]·주인 #39 선택) — ①**색인 토대 점검·정비**(GSC 색인·사이트맵·IndexNow·네이버 서치어드바이저 **실작동 확인**·빈 것 정비) ②**씨앗 커버리지 확장**(seo_keywords.yml — '미매핑' 근본 해소) ③E-E-A-T(about/Person Schema). *코딩 전 첫 단계 = 현재 색인 상태 확인(주인 계정 접근 필요할 수 있음).*
+- [ ] **무인 일일 발행(22:02) 관찰** — 발행 글 품질 사후검토(발행 글 관리 탭·monitor 2겹) + **#39 자기보고 확인**(`[ALERT]` 로그·`data/auto_cycle_last.json`). 키워드/쿠팡 큐 보충. 무인 안내 전 `docs/AUTOMATION.md` 필독.
+- [ ] (선택·보험) **Phase 2 자가복원** — ali off-target graceful-degrade · 배포 drift 가드 · 능동 푸시 채널 · `run_auto_cycle.ps1` git pull footgun 정정.
+- [ ] (이월) `review-helpfulknow` 월 지출 한도 · 쿠팡 배너 부트스트랩(15만원→API) · `mini-dehumidifier` · naver_blog 볼륨(`/naver-start`).
+- 참고: 워크트리=`PYTHONPATH=src python -m cli`(자동 migrate)·DB gitignore→재생성. **main직접머지=`git push origin HEAD:main`**. 운영 DB 직접수정 불가→주인 런처. ★한글→.py·ASCII([[powershell-korean-encoding]]). ★무인 발행이 origin 전진([[autonomous-deploy-advances-origin]])—푸시 전 ff.
 
 ## 시점 의존 잔존 (세션 #6~7)
 

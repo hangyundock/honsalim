@@ -22,6 +22,7 @@
   - 세션 #31 (2026-06-15 ★카테고리 분류체계(대/중/소)+게이밍의자→'의자' 타입흡수+쿠팡 운영자추천 zone·정식 대가성+추천 8선+라이브 배포·회귀 851 유지·main ea2460e)
   - 세션 #32 (2026-06-15 운영 DB 반영(#31 미완·주인 런처 이식)+쿠팡 카드 광고차단 폴백+운영 대시보드 4기능(키워드삭제·카테고리쿠팡·원스톱 빌드배포·쿠팡존)+쿠팡 3선 균형 라이브·회귀 851→865·main e3a2219)
   - 세션 #33 (2026-06-15 ★무인 글 생성 파이프라인 완성 — SEO 주입·자가복원 재생성 루프·winnable 선정·초기검수 안전장치(min_published)·발행→라이브 버그 근본수정·회귀 865→873·main 3a96c49)
+  - 세션 #34 (2026-06-16 글 렌더링=카테고리 구성 통합(category.html 재사용)·완전무인 골격 보강(auto_pick·스케줄러 reconcile·자동 migrate)·품질 대수술·migration 008 structured_json·회귀 873→896·main e9e3fd2)
 - [EVENTS_202605.md](archive/EVENTS_202605.md):
   - 세션 #1 (2026-05-27 프로젝트 신규 셋업·정밀 조사·5파일 시스템·슬래시 명령 등록)
   - 세션 #2 (2026-05-27~28 Phase 0 설계 12/12 + Phase 1 외부 작업: GitHub·Cloudflare·도메인·R2·D1·Git push)
@@ -41,6 +42,23 @@
   - 세션 #18 (2026-05-31 운영자 1클릭 승인 게이트(O21·build-category draft 고정)·doctor §10 64진입점·★카테고리 페이지 디자인 디버깅(글씨 흐림 진짜원인=backdrop-filter 제거)·회귀 569→590)
 
 ## 최근 5세션
+
+### 세션 #39 — 2026-06-27 (Opus 4.8, 무인 발행 블로커 근본수정(A·B·C 라이브) + 비판가 5인 적대검증 + 자가복원 1차, 회귀 961→989, main 푸시)
+
+**시작 상황**: `/honsalim-start`(#38 48ac85a). 주인 "무인 단계 테스트가 이전 세션 성공 못 함 → 실제 스케줄에 맞춰 재테스트". 예약을 21:26·22:02로 직접 바꿔 라이브로 돌리는 과정에서 '글은 생성·5게이트 통과하나 발행 0편'을 연쇄 적발·근본수정(§0 fail-fast). 운영 폴더(D:\affiliate_hub)=main 48ac85a.
+
+**핵심 [확정]** (검증·main·일부 라이브):
+1. **Ⓐ 쿠팡 수동배너 자동승인 면제**(라이브 적발·DECISIONS X1): 21:26 회차 '무중력의자'(쿠팡3)가 생성·5게이트 통과하나 자동승인 보류 — 원인=주인이 고른 쿠팡 배너를 office-chair `exclude_terms`(리클라이너·쿠션·소파)로 재검사해 거부(featured off-target 3=전부 쿠팡). → `eligible`이 `source=coupang` 면제. 22:02 재테스트로 **무중력의자 무인 발행→`honsallim.com/articles/kw-95e2ad52` 라이브 200**(사람 개입 0).
+2. **Ⓑ 미매핑 사무의자 키워드 매핑**(X3): 메쉬·허리편한·학생용 의자가 secondary 미등록→무조건 보류 → office-chair secondary 추가. 입구 거부는 비채택.
+3. **Ⓒ 키워드 글 SEO primary = 키워드 자신**(X2): 22:02 새 글 '등받이의자'가 seo `headings_keyword_low`로 rejected(광의 '사무용 의자'를 소제목 강요·rejected는 held에도 안 잡히는 침묵 정지). → `keyword_gate_config`로 키워드 자신을 primary·카테고리어는 보조. dry-run으로 draft #12 eligible False→True 실증.
+4. **★자가복원 1차**(비판검증 후·X4·X5·X6): 주인 "근본적으로 막을 수 있나?" → 내 3제안(입구차단·skip·대시보드알림)을 비판가 5인(워크플로우·코드근거)으로 적대검증 → 결함 적발(추천엔진 자기파괴·생성前 판정불가·무인 중 대시보드 미열람·min_published 오경보) → 채택안 구현: `publishability` 단일판정·보류 `reason_code`·사이클 health 다이제스트(`auto_cycle_last.json`)/[ALERT](파일·로그)·생성 예외격리·발행가능 우선선정. 실 운영 큐에 dry-run 실증(발행가능 3/3·abnormal=false·오경보 없음).
+회귀 961→**989**(+28). black·ruff·mypy(75파일) 클린. main 푸시(A·B·C **aaad6cb·b2933ff**·자가복원 **5774c50**).
+
+**무인·안전(§0)**: fail-safe(나쁜 글 자동발행 안 됨)는 견고 유지 / 새로 fail-loud(자기보고) 추가. 막힌 키워드는 지우지 말고 강등+reason_code로 파일/로그 보고. 운영 배포=로컬 ff-merge(외부 push는 무인 발행이 자동 수행 — [[autonomous-deploy-advances-origin]]).
+
+**잔존/다음(#40)**: ①**★성장 최우선**(주인 선택·[[growth-first-priority]]): 색인 토대 점검(GSC·사이트맵·IndexNow·네이버)·씨앗 커버리지 확장·E-E-A-T. ②무인 일일 발행(22:02) 관찰+자기보고 확인. ③(선택)Phase 2 자가복원: ali off-target·배포 drift·푸시 채널·git pull footgun.
+
+---
 
 ### 세션 #38 — 2026-06-27 (Opus 4.8, ★완전무인 첫 라이브 발행 성공(0-falsy 버그 근본수정) + 빈글차단 + 무인 표준 문서화 + 글/카테고리 정형화·featured 8 통일, 회귀 950→961, main 푸시)
 
@@ -81,51 +99,18 @@
 
 ### 세션 #36 — 2026-06-27 (Opus 4.8, ★provision-category 첫 라이브 실증 + 라이브 버그3종 근본수정 + 근본자동화 + 적대적리뷰 7건 보강 + Google지출 트래커, 회귀 932→950, main 푸시)
 
-**시작 상황**: `/honsalim-start`(#35 fc36814). 주인 "자동화를 실전 테스트해 오늘 이후 반자동이 계획대로 정상작동하는지 최종확인". 자동 카테고리 생성(#35 신규)을 라이브로 돌려 발견 문제를 근본 해결.
+**핵심 [확정]** (검증·main·라이브): ①**provision-category 첫 라이브**(미니 전기밥솥 자동생성→승인→배포→`honsallim.com/categories/mini-rice-cooker/` 라이브·6단계 입증). ②라이브 버그 3종: `to_spec` 한글 core를 require_any 강제→알리 기계번역 매칭 굶음→`require_any=()`로 비전 전담 / 자동 카테고리 `category_sources.yml` 미등록→`append_category_source` 자동등록(멱등·원자적) / 가이드 `image_prompt` 누락→slug 폴백. ③적대적 16건 리뷰→핵심 7건 보강(`load_sources` 깨진 yml 방어 등). ④**Google 지출 트래커**(migration 009 `api_usage`+대시보드 월상한·추정). 회귀 932→**950**. 클린.
 
-**핵심 [확정]** (검증·main·라이브):
-1. **★provision-category 첫 라이브 실증**: 미니 전기밥솥 자동생성→검토→승인→배포→검증 성공. `honsallim.com/categories/mini-rice-cooker/` 라이브(상품 46·이미지 58·대가성 고지·홈/목록 내비 연결, 주방 그룹). 6단계(발굴→프로비저닝→검토→승인→배포→검증) 전부 입증.
-2. **라이브 버그 3종 근본수정**: ①`to_spec`이 한글 core를 `require_any`로 강제 → 알리 **한글 기계번역** 상품명 변형 때문에 통째 매칭 거의 안 돼(30건 중 0~2건) 비전게이트가 굶음(수집 0편) → **`require_any=()`로 비전이 관련성 전담**(회귀 가드). ②자동 카테고리가 `category_sources.yml` 미등록 → 가드레일 "정의 없음"으로 **'미달'**(자동 비공개 위험) → `append_category_source` 자동등록(멱등·원자적·검증). ③가이드 LLM이 `image_prompt` 누락 → `_image_desc` slug 폴백.
-3. **적대적 16건 리뷰 → 핵심 7건 선제 보강**(§0): `load_sources` 방어(깨진 yml→가드레일 전체 크래시 방지·치명)·원자적 쓰기·멱등 정규식·q escape·이미지 실패 로깅·CLI 경고.
-4. **★Google 지출 트래커**(주인 요청): migration **009** `api_usage` + `writer/api_usage` + `build_and_save` 훅(이미지 생성마다 기록·재사용 0과금) + 설정 "Google 월 상한($)" + 대시보드 모니터탭 **"이번 달 N장·약 $X / 상한 (%)·429/임박 색상 경고"**. 구글 실수치는 단순 키로 못 가져와 **호출수×단가 추정**(명시).
-회귀 932→**950**(+18 가드). ruff·black·mypy 클린.
-
-**무인·안전(§0)**: draft 고정·사람 승인 유지. yml 깨짐 방어·추적 실패가 본기능 안 막음. 트래커는 "추정" 명시.
-
-**잔존/다음(#37)**: ①**대표 이미지** — Google 월 상한 전파 대기(ai.studio/spend·주인 결제영역), 풀리면 `3_run_cleanup.bat` 재실행→재배포 ②리뷰가 짚은 **별개 개선**(대시보드 카탈로그 오염 가시화·비전 intro 주입·vision cap 커버리지 경고) ③(이월) 성장=트래픽·GSC 색인. **★운영 동기화 필수**: 이 세션 코드는 #36 커밋으로 main에 있음 → 운영 폴더 `git pull` + **대시보드 재시작(자동 migrate 009)** 해야 트래커·수정 작동.
+**잔존/다음(#37)**: 대표 이미지(Google 월상한 대기)·리뷰 별개 개선·성장 트래픽. ★운영 동기화(git pull+대시보드 재시작=migrate 009).
 
 ---
 
 ### 세션 #35 — 2026-06-16 (Opus 4.8 1M, ★무인 발행 라이브 실증 + 글=카테고리 흡수(고아·중복 근본해소) + 채널 역할분리 + ★비전 게이트·자동 카테고리 생성 ①②③, 회귀 896→932, main 푸시)
 
-**시작 상황**: `/honsalim-start`(#34 e9e3fd2). #34 최우선 '무인 라이브 테스트' 착수 → 발견 문제 근본 해결 + 자동화 확장.
+**핵심 [확정]** (검증·main): ①**무인 발행 라이브 실증**: `scheduler.reconcile(time_hhmm)`(예약시각 변경이 schtasks 재등록 안 되던 footgun 수정)→예약 자동발행→라이브 입증. ②**글=카테고리 흡수**(고아·중복 해소): 노트북받침대→모니터받침대 301·키워드 시나리오 active=0·삭제 시 동반삭제. ③**채널 역할분리**[주인 채택]: 볼륨 키워드 자동발행=naver_blog / honsalim=카테고리 허브(독립도메인 대량발행=구글 scaled-content 위험·함정#1). ④**비전 게이트+자동 카테고리**: tistory image_qa 이식 `vision_relevance`(fail_closed·cap)+`provision_category`(설정→draft→수집→빌드)·CLI `suggest/provision-category`(dry_run 기본·draft만). 회귀 896→**932**. 클린.
 
-**핵심 [확정]** (검증·main):
-1. **무인 발행 라이브 실증**: 대시보드 상태 한글화 + 설정창 '예약 시각' 변경이 실제 schtasks 재등록되도록 `scheduler.reconcile(time_hhmm)`(config만 갱신되던 footgun 수정). 예약→`run_publish_queue.ps1` 실발행(노트북받침대)→라이브 검증 → '승인→예약 자동발행→라이브' 입증. 무인 OFF=승인글만. 커밋 1680a86.
-2. **글=카테고리 흡수(고아·중복 해소)**(주인 "글 닿을 길 없음" 지적): 키워드 글이 가짜 시나리오로 세팅 오염+카테고리 중복. → 노트북받침대→모니터받침대 **301**·키워드 시나리오 **active=0**·키워드 삭제 시 시나리오 동반삭제(버그수정)·정리 런처. 라이브 검증=리다이렉트·junk 7개 제거. 사무실의자 삭제. 커밋 42fa75a.
-3. **채널 역할분리 [확정·주인 채택]**: 볼륨 키워드 자동발행=**naver_blog**(C-Rank 권위)·honsalim=**카테고리 허브**(독립 도메인→대량 자동발행은 구글 scaled-content 위험·함정#1). naver_blog 무인 발행 인프라 거의 완성(6/16 첫 자동발행·별도 세션 확인).
-4. **★비전 게이트+자동 카테고리 ①②③**(주인 "품질위험 없앨 방법 연구·비판 재점검"): 원인=`product_filter` 키워드 매칭 brittle. → tistory `image_qa`(Haiku) 패턴 이식 `vision_relevance`(이미지로 카테고리 적합성·fail_closed·cap)+`collect_category` 통합(`vision_gate` 기본OFF·spec/vision 주입). `category_config_gen`(②한글명→영어검색어 설정·①신규 후보)·`category_autopilot.provision_category`(③설정→행draft→수집(vision)→빌드)·CLI `suggest-categories`/`provision-category`(dry_run 기본). §2-마 유지(draft만). ANTHROPIC_API_KEY 필요. 회귀 896→**932**(+36). doctor 클린.
-
-**무인·안전(§0)**: vision_gate OFF 기본·fail_closed·dry_run 기본·draft만(인간 게이트). 채널 분리로 신생 도메인 패널티 회피.
-
-**잔존/다음(#36)**: ①비전·자동 카테고리 **라이브 첫 실행**(감독·ANTHROPIC 키 확인·`provision-category --no-dry-run` 1개) ②naver_blog 볼륨 본격(`/naver-start`·6/16 결과) ③(이월)쿠팡 카테고리 배너·★성장=트래픽(GSC 색인). ★main직접머지=`git push origin HEAD:main`·한글→.py ASCII.
+**잔존/다음(#36)**: 비전·자동 카테고리 라이브 첫 실행·naver_blog 볼륨·쿠팡 배너·성장 트래픽.
 
 ---
 
-### 세션 #34 — 2026-06-16 (Opus 4.8 1M, ★글 렌더링=카테고리 구성 통합 + 무인 골격 보강 + 품질 대수술, 회귀 873→896, main e9e3fd2·13커밋)
-
-**시작 상황**: `/honsalim-start`(#33 3a96c49). 주인 "완전 무인 가동 순서?" → 무인 골격 빠진 고리 발견 + 품질·페이지 구성 반복 개선. (상세 [확정]=DECISIONS C18)
-
-**핵심 [확정]** (main·운영 동기화·라이브 검증):
-1. **완전 무인 골격 보강**: `auto_pick_keyword`(빈 큐도 winnable 자동보충)·스케줄러가 auto_mode 따라 auto-cycle/publish-queue 래퍼 선택+`reconcile`·설정 GUI auto_mode 토글·**대시보드 시작 시 자동 마이그레이션**. Gap 라이브 실증.
-2. **품질 근본수정**: `clean_product_name`(알리 기계번역명 표시정리)·`render_body_html`(본문 참조코드 제거)·`preview_server`(file:// 무스타일 한계 해소).
-3. **★글=카테고리 구성 통합**(주인 "의자 페이지 재사용" 지시·내 SEO 오류 정정=중복은 내용+상품이지 구성 아님): 별도 article 템플릿 폐기, 키워드 글을 `category.html`로 렌더(매핑 카테고리 카탈로그/이미지/비교 물려받고 글은 H1·대가성고지·가이드만·`is_article` 조건부 additive·미매핑은 폴백). 라이브 검증=draft8 카탈로그 36·이미지 44·H1 1·office-chair 무손상. migration 008 structured_json.
-회귀 873→**896**. 13커밋(~e9e3fd2). doctor 클린.
-
-**무인·안전(§0)**: auto_mode 기본 OFF·category.html additive(카테고리 무영향 검증)·대가성/H1 컴플라이언스 유지·운영 DB 직접수정 안 함.
-
-**잔존/다음(#35)**: 완전 무인 라이브 테스트·(이월)쿠팡·성장 Tier0. → #35에서 실증·발전.
-
----
-
-> (세션 #19~#33은 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
+> (세션 #19~#34는 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)

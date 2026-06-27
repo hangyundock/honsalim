@@ -298,6 +298,17 @@
 - **W3. 빌드·배포 = refresh_cycle commit+push 재사용 (git_push stub 버그 근본 우회) [확정 #32·실증]**: `deployer.git_push`=stub(commit 안 함·push만) → 발행/배포가 build/site를 커밋 안 해 '클릭만으론 진짜 배포 안 됨'(EVENTS #30 무인 치명). `cmd_build_deploy`는 `refresh_cycle.run_refresh_cycle`(DEPLOY_PATHS=build/site·functions/go commit+push·refresh/killswitch 끔) 재사용 → 대시보드 🚀 클릭으로 라이브 도달 실증(e3a2219). 한글 커밋메시지=`git commit -m` argv 정상(Windows Unicode argv·임시저장소 검증).
 - **W4. 키워드 삭제 = 연결 미발행 draft 동반·발행글 차단 [확정 #32]**: `cmd_keyword_delete` — foreign_keys=ON이라 연결 draft 먼저 삭제 후 키워드 삭제. 발행된(`published`) draft 있으면 차단(라이브 글 보호·§0).
 
+## X. 무인 발행 블로커 근본수정·자가복원 자기보고 [확정] — 세션 #39 신규
+
+> 라이브 스케줄 테스트로 적발한 '조용한 정지' 3종 근본수정 + 비판가 5인(코드근거) 적대검증 후 채택한 자가복원 설계. 상세 EVENTS #39. [[incremental-critical-review]]·[[autonomous-safe-system]].
+
+- **X1. 쿠팡 수동배너 = 자동승인 적합성 검사 면제 [확정 #39, 라이브 적발]**: `auto_approve.eligible`이 주인이 직접 고른 쿠팡 수동배너(`source='coupang'`)까지 카테고리 `exclude_terms`로 재검사 → 무중력의자(릴클라이너형)·리클라이너 등 키워드의 진짜 상품이 거부돼 무인 발행 영구 보류. → featured off-target 검사에서 `source=coupang` 제외(수집 단계 `keyword_relevance` "사람이 고른 건 필터 대상 아님" 정책과 일치). ali 자동수집은 그대로 검사. 가드 `test_auto_approve.TestCoupangExempt`.
+- **X2. 키워드 글 SEO 대표키워드 = 그 키워드 자신 [확정 #39, 라이브 적발]**: 키워드 글이 매핑 카테고리의 광의 대표어(office-chair→'사무용 의자')를 seo primary로 받아 → '등받이의자' 글에 '사무용 의자'를 소제목까지 강요, 키워드 중심 글이 자가복원 2회로도 못 맞춰 `seo` 게이트 rejected(=`status='rejected'`라 auto_approve held에도 안 잡히는 완전 침묵 정지) + 신생 사이트가 못 이길 광의·고경쟁어 타겟하는 SEO 비효율. → `seo_keywords.keyword_gate_config(keyword, cat)`: 키워드 글은 **그 키워드(winnable 롱테일)를 primary**, 카테고리 대표어는 보조로 강등. 프롬프트 directive·seo 게이트가 같은 seo_cfg를 써 생성·검증이 함께 키워드 기준. 카테고리 페이지 빌드는 무관(`gate_config` 그대로). 가드 `test_seo_keywords.TestKeywordGateConfig`.
+- **X3. 미매핑 키워드 = 매핑 보강(입구 거부 아님) [확정 #39]**: 사무의자 키워드(메쉬·허리편한·학생용)가 `seo_keywords.yml` secondary 미등록(정확매칭)이라 auto_approve 무조건 보류 → secondary 추가. ★입구에서 '매핑 가능'만으로 거부는 **비채택**(비판가: 추천엔진의 winnable 롱테일을 입구가 전량 사살·완전무인 자동보충 붕괴·쿠팡 수동건 회귀). 진짜 근본 = **씨앗 커버리지 확장 + 가시화**.
+- **X4. 무인 자기보고 채널 = 파일/로그(대시보드 아님) + reason_code [확정 #39, 비판검증 채택]**: 무인 운영 중 대시보드(수동 PyQt GUI·폴링 없음)는 안 열려 무효 → ①`eligible`/`auto_approve`가 machine-readable `reason_code`(unmapped/offtarget/min_published/featured_zero…) 반환 — **의도된 보류(min_published) vs 문제 보류를 코드로 구분**(로그 파싱 없이·오경보 방지) ②`cmd_auto_cycle` 끝에 health 다이제스트(`data/auto_cycle_last.json`) 영속화 + '발행 0편 + (문제보류 or 큐 발행가능 0)'일 때만 `[ALERT]` 로그(`run_auto_cycle.ps1`이 `auto_cycle.log`에 남김→향후 푸시채널이 grep). 가드 `test_auto_cycle.TestAutoCycleDigest`.
+- **X5. publishability 단일판정 + 발행가능 우선선정 + 생성 예외격리 [확정 #39]**: `keyword_relevance.publishability(keyword)` = 생성 전 판정 가능한 발행가능성(매핑 필요조건·`eligible` 미매핑 보류와 정확히 일치)을 선정·가시화의 **단일 소스**로(`resolve_category` 호출 드리프트 방지). `auto_pick_keyword`는 매핑된(발행가능) 키워드 우선 — **skip·삭제 아님**(전량 미매핑이면 기존 동작 보존·큐에 남아 digest가 보고). `cmd_auto_cycle` 글생성 루프를 try로 감싸 DeepSeek 예외(429/네트워크)가 사이클을 죽이거나 `generating` 좀비를 남기지 않게 failed 복원·계속.
+- **X6. ★자가복원 = '거부/skip'보다 '강등 + 자기보고' [확정 #39, 비판가 결론·설계 원칙]**: 비판가 5인이 초기 3제안(입구차단·skip·대시보드알림)의 결함(추천엔진 자기파괴·'발행불가'는 생성前 판정 불가·무인 중 대시보드 미열람·min_published 오경보)을 코드근거로 적발. 채택 원칙: **fail-safe(나쁜 글 자동발행 안 됨)는 이미 견고 / 부족한 건 fail-loud(무인에서 작동하는 자기보고)** → 막힌 키워드를 *지우지 말고* 후순위로 두되 *왜 막혔는지* `reason_code`로 분류해 파일/로그로 보고. 잔존 Phase 2: ali off-target graceful-degrade·배포 drift 가드·능동 푸시 채널·`run_auto_cycle.ps1` git pull footgun(stderr를 예외처리하는 cosmetic — 진짜 실패도 묻힘).
+
 ## 폐기된 결정 (역사 참조용)
 
 | 폐기일 | 결정 | 폐기 사유 |

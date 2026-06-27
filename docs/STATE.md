@@ -7,19 +7,19 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#38: ★완전무인 첫 라이브 발행(0-falsy 버그 근본수정) + 빈글차단 + 무인 표준 문서화 + 글/카테고리 정형화·featured 8 통일** — ①`auto_approve_min_published=0`(완전무인)이 `0 or 5=5`로 강제돼 완전무인 영구 차단하던 치명 버그→`settings.get_int/get_float`(0 보존) ②키워드+쿠팡 적재→예약 auto-cycle→자동 생성·승인·발행→`honsallim.com/articles/kw-625b3b85` 라이브 **무인 첫 성공** ③빈 글(상품0 키워드) LLM 호출 전 차단 ④무인 표준 순서 `docs/AUTOMATION.md`·CLAUDE.md §7(★키워드 선정도 자동) ⑤글이 자기 상품 렌더(쿠팡3·상단8·비교8)·featured 8 통일(글+카테고리 6개 LLM 재빌드 라이브) ⑥무인 토글+9초 프리징·추천 다중선택·카테고리 보기 경로. 회귀 950→**961**. main 푸시. 상세 EVENTS #38 | 2026-06-27 #38 |
-| 운영 모델 | **★완전무인 가동 ON (#38 주인 결정·C13 수동운영 뒤집음)**: auto_mode ON·예약 **19:15 KST**·`auto_approve_min_published`=**0**(첫 글부터 자동승인). 키워드+쿠팡 적재→스케줄 auto-cycle 자동 생성·승인·발행→무관여. 발행글 사후 검토(발행 글 관리 탭 + monitor 자동비공개 2겹). 자동 "승인" 금지(E7)는 min_published로 완화—주인 0 선택 | #38 |
+| 진행 단계 | **#39: 무인 발행 블로커 근본수정(A·B·C 라이브검증) + 비판검증 + 자가복원 1차** — 라이브 스케줄 테스트(21:26·22:02)로 적발·수정: Ⓐ쿠팡 수동배너가 자동승인 카테고리 exclude로 거부→`source=coupang` 면제 Ⓑ사무의자 키워드 미매핑 보류→office-chair secondary 추가 Ⓒ키워드 글이 광의 카테고리어로 seo rejected→`keyword_gate_config`(키워드 자신을 primary). 무중력의자 라이브 발행(`kw-95e2ad52`·200). 이후 자가복원 3제안을 비판가 5인(코드근거)으로 적대검증→채택안 1차 구현: `publishability` 단일판정·보류 `reason_code`·사이클 health 다이제스트/[ALERT](파일·로그 채널)·생성 예외격리·발행가능 우선선정. 회귀 961→**989**. main 푸시. 상세 EVENTS #39 | 2026-06-27 #39 |
+| 운영 모델 | **★완전무인 가동 ON**: auto_mode ON·예약 **22:02 KST**·`auto_approve_min_published`=**0**. 키워드+쿠팡 적재→스케줄 auto-cycle 자동 생성·승인·발행→무관여. 발행글 사후검토(발행 글 관리 탭 + monitor 2겹) + **#39 무인 자기보고**(사이클 health 다이제스트 `data/auto_cycle_last.json` + 발행0편 위험 시 [ALERT] 로그·대시보드 미의존). 자동 "승인" 금지(E7)는 min_published로 완화—주인 0 선택 | #39 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·Secrets·main-protect)·Cloudflare(도메인·Pages·R2·D1)·Anthropic·INDEXNOW 키·secrets·Git push·pre-commit 9종·Dependabot (세부 archive) | #3 |
 | Phase 2 핵심 모듈 (#3~#5) | cli·common·validator·writer·collector·enricher·builder·deployer·tracker·workers (세부 BACKEND §2) + **#17: category_collect·category_page_builder·concept_image·category_writer** | #17 |
-| Phase 2 회귀 테스트 | **961 / 961 PASS** [확정 pytest, #38] — #38 +8(빈글차단·0-falsy 5건·글정형화 2건·featured 통일) · #37 +3 · #36 +18. black·ruff·mypy 클린 | 2026-06-27 |
-| CLI 명령 (BACKEND §9) | **29개** — doctor·db·collect·collect-products·enrich·validate·approve·promote·unapprove·deploy·sync-slugmap·build(+`--preview`)·dashboard·collect-category·build-category·approve-category·unapprove-category(킬스위치)·register-categories(+`--auto-publish`)·auto-publish·category-status(+`--monitor`)·**refresh-cycle(#23)** · **#25 운영 대시보드: keyword-add·keyword-generate·keyword-list·reject·coupang-add·publish-queue·schedule** · **#26: keyword-recommend** · **#29: unpublish-article·republish-article·monitor-articles·auto-cycle** · **#32: keyword-delete·category-coupang-add/list/remove·build-deploy** · **#35: suggest-categories·provision-category(자동 카테고리)** = **40개** | #35 |
+| Phase 2 회귀 테스트 | **989 / 989 PASS** [확정 pytest, #39] — #39 +28(A·B·C 13 + 자가복원 1차 15) · #38 +8 · #37 +3. black·ruff·mypy(75파일) 클린 | 2026-06-27 |
+| CLI 명령 (BACKEND §9) | **40개** — doctor·db·collect·enrich·validate·approve·promote·build(+`--preview`)·deploy·dashboard · 카테고리(collect/build/approve/unapprove/register-categories·suggest-categories·provision-category) · 운영(keyword-add/generate/list/recommend·coupang-add·publish-queue·schedule·auto-cycle·refresh-cycle·build-deploy·monitor-articles·unpublish/republish-article·keyword-delete·category-coupang-*) | #35 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD. 세부 DECISIONS J·O + EVENTS | #4~#16 |
 | doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **71개** + #19 LLM 키 점검. 71/71 OK [#29 +keyword_relevance·article_state×2·article_guardrail×2·auto_approve] | #29 |
 | DB 초기화 | `data/honsalim.db` **v9** + categories(**9**: +mini-rice-cooker)·category_products + products 정가/할인·판매량/만족도 + keyword_queue(#25) + articles.structured_json(#34) + **api_usage(Google Imagen 사용량·추정비용·migration 009, #36)** (migration 002~**009**) + personas 3·scenarios 10. ★**대시보드 시작 시 자동 migrate**(#34·무명령). ※DB는 gitignore — 다음 워크트리는 `db migrate`+`db seed`(+`collect-category`)로 재생성 | #36 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (docs/ 참조). 일관성 모순 0건 | #2 |
 | 메모리 시스템 | feedback 7건([[incremental-critical-review]]·[[autonomous-safe-system]] 등) + reference market_research + MEMORY.md | #12 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
-| 사이트 게시글 / 트래픽 / 수익 | **라이브 공개 카테고리=6개**(의자·컴퓨터책상·모니터받침대·모니터암·도마·미니밥솥) — **#38 전부 featured 8(추천)·비교 8 통일·LLM 재빌드·승인·라이브 검증**. **정식 글 1편**(kw-625b3b85 '모니터받침대' = #38 ★무인 자동발행 첫 성공·쿠팡3·상단8·비교8). + 쿠팡 승인용 `/reviews/`. 측정(Cloudflare·GSC·네이버). 수익=/go/→302 알리/쿠팡. 대표이미지 6/6. collector.coupang(API)=15만원 후 | #38 |
+| 사이트 게시글 / 트래픽 / 수익 | **라이브 공개 카테고리=6개**(featured 8·비교 8 통일). **정식 글 2편**: kw-625b3b85('모니터받침대'·#38) + **kw-95e2ad52('무중력의자'·#39 ★쿠팡면제 수정 후 무인 발행·라이브 200)**. + 쿠팡 승인용 `/reviews/`. 측정(Cloudflare·GSC·네이버). 수익=/go/→302. 대표이미지 6/6. ★**성장=색인·트래픽이 다음 최우선**([[growth-first-priority]]). collector.coupang(API)=15만원 후 | #39 |
 
 ## 인프라
 
@@ -58,10 +58,10 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 다음 세션 #39 — 상세 EVENTS #38
-1. **★무인 운영 지속 관찰**(핵심): auto_mode ON·예약 19:15·min_published=0 가동 중 → **매일 자동 발행되는 글 품질 사후 검토**(발행 글 관리 탭 라이브 확인·monitor 자동비공개 2겹 그물). 키워드/쿠팡 큐 적재 보충(고갈 시 추천 자동보충되나 의도 키워드 관리). 무인 표준 순서=`docs/AUTOMATION.md`(매 세션 필독·키워드 직접입력/글 먼저생성 안내 금지).
-2. (이월) `review-helpfulknow` 월 지출 한도(무인 폭주 방지·선택) · 쿠팡 수동 배너 부트스트랩(15만원→API) · `mini-dehumidifier` 점검 · ★성장=트래픽(GSC 색인·[[growth-first-priority]]).
-- 워크트리=`PYTHONPATH=src python -m cli`. DB gitignore→재생성(대시보드 시작 시 자동 migrate). main직접머지=`git push origin HEAD:main`. ★PowerShell/cmd 한글→.py·ASCII([[powershell-korean-encoding]]). 운영 DB 직접수정 불가→주인 런처(#32 패턴·`D:\honsalim_test\*.bat`).
+### ★ 다음 세션 #40 — 상세 EVENTS #39
+1. **★성장(검색노출·트래픽) 최우선**([[growth-first-priority]]·주인 #39 선택): ①**색인 토대 점검·정비**(GSC 색인·사이트맵·IndexNow·네이버 서치어드바이저가 **실제 작동 중인지** 확인하고 빈 것 정비) ②**씨앗 커버리지 확장**(seo_keywords.yml — '미매핑' 근본 해소·자동발행 산출 증가) ③E-E-A-T(about/Person Schema). + 무인 일일 발행(22:02) 품질 사후검토 + `[ALERT]` 로그·`auto_cycle_last.json` 확인. 무인 표준=`docs/AUTOMATION.md`(필독).
+2. (선택·급하지 않음) **Phase 2 자가복원**: ali off-target graceful-degrade · 배포 drift 가드 · 능동 푸시 채널 · `run_auto_cycle.ps1` git pull footgun 정정. + (이월) review-helpfulknow 월 상한 · 쿠팡 부트스트랩(15만원→API) · mini-dehumidifier.
+- 워크트리=`PYTHONPATH=src python -m cli`. DB gitignore→재생성(대시보드 시작 시 자동 migrate). main직접머지=`git push origin HEAD:main`. ★PowerShell/cmd 한글→.py·ASCII([[powershell-korean-encoding]]). 운영 DB 직접수정 불가→주인 런처. ★무인 발행이 origin 전진([[autonomous-deploy-advances-origin]])—푸시 전 ff 재동기화.
 
 ### Phase 2 진척 가능 (검토 의존 큼)
 - `src/builder/manifest.py` 증분 빌드 (ARCH §7·DB §10) · `src/collector/coupang.py` (Phase 4)
