@@ -394,6 +394,8 @@ class SettingsDialog(QDialog):
         add_combo("coupang_mode", "쿠팡 모드", ["manual", "api"])
         add_spin("coupang_threshold_krw", "쿠팡 임계(원)", 0, 100_000_000)
         add_line("coupang_tag", "쿠팡 태그")
+        # Google(Imagen) 월 지출 상한($) — ai.studio/spend에 설정한 값을 입력(0=미설정). 세션 #36
+        add_dspin("google_spend_cap_usd", "Google 월 상한($, 0=미설정)", 0.0, 1000.0)
         add_line("llm_model", "LLM 모델")
         add_line("verify_url", "검증 URL")
         add_line("default_keyword_persona", "키워드 기본 페르소나(slug)")
@@ -565,6 +567,11 @@ class DashboardWindow(QMainWindow):
         self.cycle_label.setStyleSheet("padding:6px;")
         self.cycle_label.setWordWrap(True)
         lay.addWidget(self.cycle_label)
+        # Google(Imagen) 추정 지출 — 결제 시점 예측(세션 #36). 새로고침 때 갱신.
+        self.google_label = QLabel("Google 이미지 지출: 확인 중…")
+        self.google_label.setStyleSheet("padding:6px;color:#444;")
+        self.google_label.setWordWrap(True)
+        lay.addWidget(self.google_label)
         # 카테고리 쿠팡 관리 (세션 #32) — 아래 표에서 카테고리 선택 후 사용
         bar = QHBoxLayout()
         for label, slot in [
@@ -720,6 +727,7 @@ class DashboardWindow(QMainWindow):
             )
         else:
             self.cycle_label.setText("무인 사이클: 기록 없음 (refresh-cycle 실행 후 표시)")
+        self._fill_google_usage(conn)
         health = queries.category_health(conn)
         self.tab_health.setRowCount(len(health))
         for i, h in enumerate(health):
@@ -731,6 +739,28 @@ class DashboardWindow(QMainWindow):
             self.tab_health.setItem(
                 i, 4, _cell(mark, "failed" if h.get("flagged") else "published")
             )
+
+    def _fill_google_usage(self, conn: sqlite3.Connection) -> None:
+        """Google(Imagen) 추정 지출 라벨 갱신 — 결제 시점 예측(세션 #36).
+
+        실제 구글 청구액이 아니라 우리 호출수에 단가를 곱한 추정('추정' 명시). 429/상한 임박 시 색상 경고.
+        """
+        gu = queries.google_usage(conn)
+        cap, used = gu["cap_usd"], gu["used_usd"]
+        msg = f"Google 이미지(추정): 이번 달 {gu['images']}장 · 약 ${used:.2f}"
+        if cap > 0 and gu["pct"] is not None:
+            msg += f" / 상한 ${cap:.2f} ({gu['pct']:.0f}%)"
+        else:
+            msg += " · 상한 미설정(설정에서 입력)"
+        css = "padding:6px;color:#444;"
+        if gu["last_429_at"]:
+            msg += f"  ⛔ 한도초과 발생({str(gu['last_429_at'])[:10]}) — ai.studio/spend에서 상향"
+            css = "padding:6px;color:#c0392b;font-weight:bold;"
+        elif gu["near_or_over"]:
+            msg += "  ⚠ 상한 임박 — 곧 결제 필요"
+            css = "padding:6px;color:#e67e22;font-weight:bold;"
+        self.google_label.setText(msg)
+        self.google_label.setStyleSheet(css)
 
     # ---- 로그/작업 ----
     def append_log(self, line: str) -> None:

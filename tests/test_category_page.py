@@ -318,3 +318,18 @@ class TestConceptImageReuse:
         assert rep["saved"] is True
         assert n == 1  # 파일이 없으면 신규 생성 1회
         assert rep.get("concept_image_reused") is False
+
+
+class TestImageDescFallback:
+    """#36 자가복원 — LLM이 image_prompt를 누락해도 slug 기반 묘사로 이미지 생성을 시도한다."""
+
+    def test_uses_llm_prompt_when_present(self) -> None:
+        d = {"image_prompt": "clean rice cookers on a tidy shelf"}
+        assert cpb._image_desc(d, "mini-rice-cooker") == "clean rice cookers on a tidy shelf"
+
+    def test_falls_back_to_slug_when_missing(self) -> None:
+        # 옛 동작이면 image_prompt 없을 때 이미지 자체를 건너뜀(대표 이미지 누락) → slug로 대체
+        assert cpb._image_desc({}, "mini-rice-cooker") == "mini rice cooker"
+
+    def test_falls_back_when_blank(self) -> None:
+        assert cpb._image_desc({"image_prompt": "   "}, "wireless-keyboard") == "wireless keyboard"

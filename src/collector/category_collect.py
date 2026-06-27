@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 import time
 from dataclasses import dataclass, field
@@ -55,10 +56,21 @@ def _tier_term(raw: Any) -> SearchTerm | None:
 
 
 def load_sources(path: Path = SOURCES_FILE) -> dict[str, CategorySpec]:
-    """category_sources.yml → {slug: CategorySpec}. 파일·yaml 없으면 빈 dict."""
+    """category_sources.yml → {slug: CategorySpec}. 파일·yaml 없거나 깨지면 빈 dict.
+
+    ★§0 방어(세션 #36): yml 파싱 오류(부분쓰기·잘못된 수동편집·인코딩)를 잡아 빈 dict로 폴백한다.
+    여기서 예외가 전파되면 category_guardrail.check → auto_publish.monitor 전체가 크래시해 모든
+    카테고리 검수가 마비된다. 빈 dict면 가드레일이 '정의 없음(보류)'로 안전하게 처리(미게시 우선).
+    """
     if yaml is None or not path.exists():
         return {}
-    data: Any = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    try:
+        data: Any = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception as exc:  # 깨진 yml — 크래시 대신 안전 폴백(+가시화)
+        from common.logging import get_logger
+
+        get_logger(__name__).error("category_sources.yml 파싱 실패 — 빈 정의로 폴백: %s", exc)
+        return {}
     cats = data.get("categories") if isinstance(data, dict) else None
     if not isinstance(cats, dict):
         return {}
@@ -326,3 +338,71 @@ def search_tiers(
             seen.add(key)
             rows.append(r)
     return rows, received
+
+
+def append_category_source(
+    slug: str, label_ko: str, spec: CategorySpec, *, path: Path = SOURCES_FILE
+) -> bool:
+    """자동 생성 카테고리를 category_sources.yml에 등록 (세션 #36 근본수정).
+
+    provision-category가 만든 카테고리를 category_guardrail이 검수할 수 있게 yml에 항목을 추가한다.
+    yml에 없으면 가드레일이 "정의 없음(검수 불가)"로 무조건 보류('미달')해 자동 카테고리가 영구
+    플래그·자동 비공개 위험에 놓인다(라이브 적발) → 생성 시 함께 등록해 근본 차단.
+
+    require_any=[] 로 쓴다 — 관련성 정밀 판정은 수집 시 비전 게이트(vision_relevance)가 이미 수행
+    하고, 자동 수집 상품은 이름이 제각각이라 단일 키워드로 못 묶기 때문(#36 to_spec과 동일 원칙).
+    이미 같은 slug가 정의돼 있으면 건드리지 않는다(멱등). 사람이 라이브 실측으로 다듬는다(§2-마).
+
+    반환: 새로 추가했으면 True, 이미 있거나 파일/yaml 없으면 False.
+    """
+    if yaml is None or not path.exists():
+        return False
+    from common.logging import get_logger
+
+    log = get_logger(__name__)
+    original = path.read_text(encoding="utf-8")
+    # 멱등 — 이미 같은 slug 키(2칸 들여쓰기, 인라인 주석 허용)가 있으면 그대로 둔다(사람 수정 보존).
+    if re.search(rf"^\s{{2}}{re.escape(slug)}:\s*(?:#.*)?$", original, re.MULTILINE):
+        return False
+    # 제외어·검색어 새너타이즈 — yaml 흐름 시퀀스([..])를 깨는 특수문자가 든 항목은 버린다(제외어는
+    # 비전 게이트의 보조 백스톱이라 일부 빠져도 무해). 깨진 yml은 load_sources 전체를 다운시켜 모든
+    # 카테고리 가드레일을 마비시키므로 절대 만들지 않는다(§0). 버려진 항목은 로깅(가시화).
+    bad = set(",[]{}:#\"'\\\n")
+    excl_terms = [t for t in spec.exclude_terms if t and not (bad & set(t))]
+    dropped = [t for t in spec.exclude_terms if t and (bad & set(t))]
+    excl = ", ".join(excl_terms)
+    lines = [
+        "",
+        f"  # {label_ko} — provision-category(자동 프로비저닝) 생성. "
+        "require_any=[](관련성=비전 게이트·#36).",
+        f"  {slug}:",
+        "    require_any: []",
+        f"    exclude_terms: [{excl}]",
+        "    tiers:",
+    ]
+    for tname in ("budget", "premium"):
+        term = spec.tiers.get(tname)
+        if term is None:
+            continue
+        q = term.q.replace("\\", "").replace('"', "").replace("\n", " ").strip()
+        parts = [f'q: "{q}"']
+        if term.min_price is not None:
+            parts.append(f"min: {term.min_price}")
+        if term.max_price is not None:
+            parts.append(f"max: {term.max_price}")
+        lines.append(f"      {tname}: {{{', '.join(parts)}}}")
+    block = "\n".join(lines) + "\n"
+    new_text = (original if original.endswith("\n") else original + "\n") + block
+    # 쓰기 전 검증 — 깨지면 운영 파일을 아예 안 건드린다(노출 0).
+    try:
+        yaml.safe_load(new_text)
+    except Exception as exc:  # 어떤 파싱 오류든 등록 건너뜀(가드레일 다운 방지·§0)
+        log.error("append_category_source: %s yaml 생성 실패 — 등록 건너뜀: %s", slug, exc)
+        return False
+    # 원자적 교체 — temp에 쓴 뒤 rename(부분쓰기가 운영 파일에 노출되지 않음·동시 reader 안전).
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(new_text, encoding="utf-8")
+    tmp.replace(path)
+    if dropped:
+        log.warning("append_category_source: %s 제외어 yaml특수문자로 제외됨 %r", slug, dropped)
+    return True

@@ -70,12 +70,40 @@ class TestToSpec:
     def test_builds_spec(self) -> None:
         spec = cg.to_spec("humidifier", cg.parse_config(_VALID))
         assert spec.slug == "humidifier"
-        assert spec.require_any == ("가습기",)
+        # 세션 #36 근본수정: require_any는 비운다(비전 게이트가 관련성 전담). 한글 core를 강제하면
+        # 알리 한글 기계번역 변형 때문에 사전필터가 전량 탈락시켜 비전이 굶는다(라이브 실증).
+        assert spec.require_any == ()
         assert spec.require_all == ()
         assert spec.exclude_terms == ("차량", "디퓨저")
         assert set(spec.tiers) == {"budget", "premium"}
         assert spec.tiers["premium"].q == "ultrasonic humidifier"
         assert spec.tiers["budget"].min_price == 5000
+
+    def test_require_any_empty_does_not_starve_vision(self) -> None:
+        """to_spec의 핵심어 사전필터가 실제 알리 한글명을 전량 탈락시키지 않음을 회귀로 박제(#36).
+
+        product_filter는 require_any가 비면 exclude_terms만 적용 → 모든 후보가 비전 게이트로 흘러간다.
+        한글 core를 require_any로 강제하던 옛 동작은 번역 변형 때문에 거의 0건만 통과시켜 자동 수집이
+        0편이 됐다. 알리 한글 기계번역을 본뜬 이름들이 사전필터를 통과하는지 검증한다.
+        """
+        from collector import product_filter
+
+        spec = cg.to_spec("mini-rice-cooker", cg.parse_config(_VALID))
+        assert spec.require_any == ()
+        # 알리가 돌려주는 식의 한글 기계번역 변형 상품명 — 옛 동작이면 전량 탈락했을 것
+        names = [
+            "휴대용 전기 다기능 밥솥 가정용 미니 비 스틱 조리기구",
+            "1.7L 미니 전기 밥솥 이중층 220V 멀티 쿠커 찜밥솥 가정용",
+            "전기 밥솥 1.2L 미니 밥솥 소형 자동 보온 논스틱 내솥",
+        ]
+        passed = [
+            n
+            for n in names
+            if product_filter.is_relevant(
+                n, require_any=spec.require_any, require_all=(), exclude_terms=spec.exclude_terms
+            )
+        ]
+        assert len(passed) == len(names)  # 전부 비전 게이트로 전달(굶기지 않음)
 
 
 class TestGenerateConfig:

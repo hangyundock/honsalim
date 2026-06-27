@@ -1230,6 +1230,21 @@ def cmd_provision_category(args: argparse.Namespace) -> int:
         f"{OK} provision-category {res['label']!r} → slug={res['slug']} "
         f"(수집 {res['relevant']}편·비전드롭 {res['vision_dropped']}·연결 {res['linked']}, {built})"
     )
+    # yml 등록 가시화 — '미등록'(실패)과 '이미 등록됨'(멱등)을 구분: 실제 yml 부재만 경고(#36).
+    from collector.category_collect import load_sources
+
+    if res["slug"] in load_sources():
+        if res.get("registered"):
+            print("     category_sources.yml 자동 등록됨 — 가드레일 검수 가능(미달 방지·#36)")
+    else:
+        print(
+            f"     {WARN} category_sources.yml 미등록 — 가드레일 '미달' 위험. "
+            "수동 등록 필요(§2-마)"
+        )
+    # 대표 이미지 실패 가시화(무인 흐름에서 dict가 묻히지 않게)
+    bres = res.get("build")
+    if isinstance(bres, dict) and bres.get("concept_image_error"):
+        print(f"     {WARN} 대표 이미지 생성 실패: {bres['concept_image_error']}")
     print(
         f"     status=draft(미공개) — 검토 후 'approve-category {res['slug']}'로 공개 "
         "(AI 자동승인 금지·§2-마)"

@@ -16,7 +16,7 @@ import sqlite3
 from typing import Any
 
 from collector import category_config_gen as cg
-from collector.category_collect import collect_category
+from collector.category_collect import append_category_source, collect_category
 
 
 def _slugify_en(text: str) -> str:
@@ -68,6 +68,10 @@ def provision_category(
     slug = _slugify_en(config["tiers"]["budget"]["q"])
     spec = cg.to_spec(slug, config)
     created = _ensure_category_row(conn, slug, label_ko)
+    # #36 근본수정: 가드레일이 검수할 수 있도록 category_sources.yml에 자동 등록(없으면 '미달'로 영구
+    #   보류·자동 비공개 위험 — 라이브 적발). 멱등(이미 있으면 사람 수정 보존).
+    #   dry_run에선 파일 미변경(부작용 0 계약 명시) — 라이브에서만 등록.
+    registered = append_category_source(slug, label_ko, spec) if not dry_run else False
 
     # 수집 — 비전 게이트 강제(vision=True). 자동 카테고리는 사람 단어튜닝이 없으므로 비전이 품질 보증.
     cres = collect_category(conn, slug, spec=spec, vision=True, dry_run=dry_run)
@@ -83,6 +87,7 @@ def provision_category(
         "label": label_ko,
         "slug": slug,
         "created": created,
+        "registered": registered,
         "relevant": cres.relevant,
         "vision_dropped": cres.vision_dropped,
         "linked": cres.linked,

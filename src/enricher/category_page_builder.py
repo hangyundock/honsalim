@@ -199,6 +199,15 @@ def _save(
     conn.commit()
 
 
+def _image_desc(parsed: dict[str, Any], slug: str) -> str:
+    """개념 이미지 영어 묘사 — LLM image_prompt 우선, 누락 시 slug 기반으로 대체 (#36 자가복원).
+
+    DeepSeek가 image_prompt를 비결정적으로 누락해도(자동 카테고리에서 라이브 적발) 대표 이미지가
+    빠지지 않도록 slug(영문 카테고리명)를 묘사로 쓴다. 예: 'mini-rice-cooker' → 'mini rice cooker'.
+    """
+    return str(parsed.get("image_prompt") or "").strip() or slug.replace("-", " ")
+
+
 def build_and_save(
     conn: sqlite3.Connection,
     slug: str,
@@ -351,8 +360,13 @@ def build_and_save(
     report["saved"] = True
 
     # 개념 이미지 — 게이트 통과·저장 후에만(비용 분리, AutoBlog 교훈). 실패해도 글은 그대로.
-    if generate_image and parsed.get("image_prompt"):
+    # #36 자가복원: LLM(DeepSeek)이 image_prompt를 비결정적으로 누락해도(자동 카테고리에서 라이브 적발)
+    #   slug 기반 영어 묘사로 대체해 항상 생성을 시도한다 — 자동 카테고리가 대표 이미지 없이 게시되는
+    #   누락을 막는다. 대체 alt도 카테고리명으로 채운다(접근성·SEO 빈값 방지).
+    img_desc = _image_desc(parsed, slug)
+    if generate_image and img_desc:
         from enricher import concept_image
+        from writer import api_usage
 
         try:
             out_path = CONCEPT_IMG_DIR / f"{slug}.webp"
@@ -360,14 +374,24 @@ def build_and_save(
             # 이미 생성된 개념 이미지가 있으면 재사용 — Imagen 비용 절약 + 기존 확정 이미지
             # 보존(랜덤 재생성 퇴행 방지). 재생성 강제는 해당 webp를 먼저 삭제. 세션 #21.
             reused = out_path.exists()
-            if reused or concept_image.generate_concept_image(parsed["image_prompt"], out_path):
+            generated = False
+            if not reused:  # 재사용이면 Imagen 호출·과금 없음 → 추적 안 함
+                generated = concept_image.generate_concept_image(img_desc, out_path)
+                api_usage.record_imagen(conn, ok=generated)  # Google 비용 추적(#36)
+            if reused or generated:
                 conn.execute(
                     "UPDATE categories SET concept_image = ?, concept_image_alt = ? WHERE id = ?",
-                    (rel, parsed.get("image_alt", ""), category_id),
+                    (rel, parsed.get("image_alt") or cat_name, category_id),
                 )
                 conn.commit()
                 report["concept_image"] = rel
                 report["concept_image_reused"] = reused
         except Exception as exc:  # 이미지 실패는 글 저장에 영향 없음 — 가시화만
             report["concept_image_error"] = str(exc)[:200]
+            # 429/오류도 기록(대시보드 한도초과 알림용) — record_imagen은 자체 안전(예외 미전파)
+            api_usage.record_imagen(conn, ok=False, error=str(exc))
+            # 무인 흐름(provision)에서 호출자가 dict를 안 보면 silent → 로그로도 가시화(#36).
+            from common.logging import get_logger
+
+            get_logger(__name__).warning("개념 이미지 생성 실패 %s: %s", slug, str(exc)[:200])
     return report

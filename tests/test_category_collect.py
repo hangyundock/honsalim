@@ -65,6 +65,12 @@ class TestLoadSources:
         assert any("노트북" in g for g in ls.require_all)
         assert any("거치대" in g for g in ls.require_all)
 
+    def test_corrupted_yml_returns_empty_not_crash(self, tmp_path: Any) -> None:
+        """★§0 방어(#36): 깨진 yml은 크래시(가드레일 전체 마비) 대신 빈 dict로 폴백한다."""
+        p = tmp_path / "broken.yml"
+        p.write_text("categories:\n  x: [unclosed\n    : : :\n", encoding="utf-8")
+        assert cc.load_sources(path=p) == {}  # 예외 전파 없이 안전 폴백
+
 
 class TestDryRun:
     def test_dry_run_no_db_write(self) -> None:
@@ -299,6 +305,111 @@ class TestSearchTiers:
         assert set(ids) == {"P1", "DUP", "X1"}
         # ④ received는 수신 총건(중복 포함)
         assert received == 4
+
+
+class TestAppendCategorySource:
+    """append_category_source — provision-category 자동 yml 등록 (세션 #36 근본수정)."""
+
+    def _spec(self) -> cc.CategorySpec:
+        from collector.keyword_map import SearchTerm
+
+        return cc.CategorySpec(
+            slug="mini-rice-cooker",
+            require_any=(),
+            require_all=(),
+            exclude_terms=("미니어처", "인형"),
+            tiers={
+                "budget": SearchTerm(q="mini rice cooker", min_price=15000, max_price=45000),
+                "premium": SearchTerm(q="smart rice cooker", min_price=45001, max_price=120000),
+            },
+        )
+
+    def test_appends_and_is_loadable(self, tmp_path: Any) -> None:
+        p = tmp_path / "cs.yml"
+        p.write_text(
+            "categories:\n  office-chair:\n    require_any: [의자]\n    tiers:\n"
+            '      budget: {q: "office chair", min: 1, max: 2}\n',
+            encoding="utf-8",
+        )
+        added = cc.append_category_source("mini-rice-cooker", "미니 전기밥솥", self._spec(), path=p)
+        assert added is True
+        loaded = cc.load_sources(path=p)
+        assert "office-chair" in loaded  # 기존 항목 보존
+        assert "mini-rice-cooker" in loaded
+        s = loaded["mini-rice-cooker"]
+        assert s.require_any == ()  # #36: 관련성은 비전 게이트 전담
+        assert "미니어처" in s.exclude_terms
+        assert s.tiers["budget"].q == "mini rice cooker"
+        assert s.tiers["premium"].max_price == 120000
+
+    def test_idempotent_does_not_duplicate(self, tmp_path: Any) -> None:
+        p = tmp_path / "cs.yml"
+        p.write_text("categories:\n", encoding="utf-8")
+        assert cc.append_category_source("mini-rice-cooker", "밥솥", self._spec(), path=p) is True
+        # 두 번째 호출 = 사람 수정 보존(멱등) → 추가 안 함
+        assert cc.append_category_source("mini-rice-cooker", "밥솥", self._spec(), path=p) is False
+        assert p.read_text(encoding="utf-8").count("  mini-rice-cooker:") == 1
+
+    def test_missing_file_returns_false(self, tmp_path: Any) -> None:
+        assert (
+            cc.append_category_source("x", "엑스", self._spec(), path=tmp_path / "nope.yml")
+            is False
+        )
+
+    def test_sanitizes_yaml_breaking_terms(self, tmp_path: Any) -> None:
+        """제외어·검색어의 yaml 특수문자를 걸러 깨진 yml(가드레일 전체 다운)을 막는다(#36·§0)."""
+        from collector.keyword_map import SearchTerm
+
+        spec = cc.CategorySpec(
+            slug="x",
+            require_any=(),
+            require_all=(),
+            exclude_terms=("정상어", "나쁜,콤마", "대[괄]호", "콜론:있음"),
+            tiers={"budget": SearchTerm(q='quote"here', min_price=1, max_price=2)},
+        )
+        p = tmp_path / "cs.yml"
+        p.write_text("categories:\n", encoding="utf-8")
+        assert cc.append_category_source("x", "엑스", spec, path=p) is True
+        loaded = cc.load_sources(path=p)  # 깨지지 않고 정상 로드돼야 함
+        assert "x" in loaded
+        joined = "".join(loaded["x"].exclude_terms)
+        assert "정상어" in loaded["x"].exclude_terms
+        assert not any(c in joined for c in ",[]:")  # 특수문자 제외어는 버려짐
+        assert '"' not in loaded["x"].tiers["budget"].q  # q 따옴표 제거됨
+
+    def test_idempotent_with_inline_comment(self, tmp_path: Any) -> None:
+        """슬러그 줄에 인라인 주석(# ...)이 있어도 멱등 — 중복 추가 안 함(#36 리뷰 적발)."""
+        p = tmp_path / "cs.yml"
+        p.write_text(
+            "categories:\n  mini-rice-cooker:  # 사람이 단 주석\n    require_any: []\n",
+            encoding="utf-8",
+        )
+        assert cc.append_category_source("mini-rice-cooker", "밥솥", self._spec(), path=p) is False
+        assert p.read_text(encoding="utf-8").count("  mini-rice-cooker:") == 1
+
+    def test_q_backslash_stripped(self, tmp_path: Any) -> None:
+        """q의 백슬래시를 제거해 yaml 이중따옴표 이스케이프(\\n 등) 오염을 막는다(#36 리뷰 적발)."""
+        from collector.keyword_map import SearchTerm
+
+        spec = cc.CategorySpec(
+            slug="y",
+            require_any=(),
+            require_all=(),
+            exclude_terms=(),
+            tiers={"budget": SearchTerm(q="rice\\ncooker", min_price=1, max_price=2)},
+        )
+        p = tmp_path / "cs.yml"
+        p.write_text("categories:\n", encoding="utf-8")
+        assert cc.append_category_source("y", "와이", spec, path=p) is True
+        q = cc.load_sources(path=p)["y"].tiers["budget"].q
+        assert "\\" not in q and "\n" not in q  # 백슬래시·개행 제거됨
+
+    def test_no_tmp_file_left_behind(self, tmp_path: Any) -> None:
+        """원자적 쓰기 후 .tmp 잔여 파일이 남지 않는다."""
+        p = tmp_path / "cs.yml"
+        p.write_text("categories:\n", encoding="utf-8")
+        cc.append_category_source("mini-rice-cooker", "밥솥", self._spec(), path=p)
+        assert not (tmp_path / "cs.yml.tmp").exists()
 
 
 if __name__ == "__main__":

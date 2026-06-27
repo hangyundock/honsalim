@@ -34,6 +34,12 @@ def _conn() -> sqlite3.Connection:
     return conn
 
 
+@pytest.fixture(autouse=True)
+def _no_real_yml_write(monkeypatch: pytest.MonkeyPatch) -> None:
+    """테스트 격리 — provision_category가 실제 category_sources.yml을 건드리지 않게 stub(#36)."""
+    monkeypatch.setattr(ap, "append_category_source", lambda *a, **k: True)
+
+
 class TestSlugify:
     def test_basic(self) -> None:
         assert ap._slugify_en("ultrasonic humidifier") == "ultrasonic-humidifier"
@@ -76,12 +82,13 @@ class TestProvision:
         res = ap.provision_category(conn, "가습기", client=object(), dry_run=False)
         assert res["ok"] is True and res["slug"] == "humidifier"
         assert res["created"] is True
+        assert res["registered"] is True  # #36: yml 자동 등록 호출됨(가드레일 미달 방지)
         assert res["relevant"] == 12 and res["vision_dropped"] == 3 and res["linked"] == 12
         assert res["build"] == {"saved": True}
         # 비전 강제 + 생성 spec 주입
         assert captured["vision"] is True
         assert captured["spec"].slug == "humidifier"
-        assert captured["spec"].require_any == ("가습기",)
+        assert captured["spec"].require_any == ()  # #36: 관련성은 비전 전담(사전필터가 안 굶김)
         # 카테고리 행이 draft로 생성됨(자동 공개 안 함·§2-마)
         row = conn.execute(
             "SELECT name_ko, status FROM categories WHERE slug = 'humidifier'"

@@ -111,3 +111,27 @@ def category_health(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         d["reasons"] = flags.get(r["slug"], [])
         out.append(d)
     return out
+
+
+def google_usage(conn: sqlite3.Connection) -> dict[str, Any]:
+    """Google(Imagen) 이번 달 추정 사용량 + 상한 대비 — 대시보드 표시용 (세션 #36).
+
+    구글 실제 청구액은 단순 API 키로 못 가져와 우리 호출수에 단가를 곱해 **추정**한다('추정' 명시·§0).
+    상한(설정 google_spend_cap_usd)>0이면 사용률(%)·임박(≥80%) 경고를 함께 반환. last_429_at이
+    있으면 최근 한도초과(429) 발생 = 결제/상한 상향 필요 신호.
+    """
+    from common import settings
+    from writer import api_usage
+
+    s = api_usage.month_summary(conn, "google_imagen")
+    cap = float(settings.get("google_spend_cap_usd", 0.0) or 0.0)
+    used = float(s["est_cost_usd"])
+    pct = (used / cap * 100.0) if cap > 0 else None
+    return {
+        "images": int(s["images"]),
+        "used_usd": used,
+        "cap_usd": cap,
+        "pct": pct,
+        "near_or_over": bool(pct is not None and pct >= 80.0),
+        "last_429_at": s["last_429_at"],
+    }

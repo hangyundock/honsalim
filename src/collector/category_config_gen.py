@@ -138,14 +138,22 @@ def parse_config(text: str) -> dict[str, Any]:
 
 
 def to_spec(slug: str, config: dict[str, Any]) -> CategorySpec:
-    """정규화 설정 → CategorySpec. require_any=[core], require_all=[](비전 게이트가 정밀 관련성 담당)."""
+    """정규화 설정 → CategorySpec. require_any=()(비전 게이트가 관련성 전담)·require_all=().
+
+    require_any를 비운다(세션 #36 근본수정·라이브 실증). 알리는 한글 '기계번역' 상품명을 돌려주는데,
+    core는 "미니 전기밥솥" 같은 특정 다어절 문구라 번역 변형("미니 전기 밥솥" 등)으로 통째 부분일치가
+    거의 안 된다(30건 중 0~2건만 통과 → 비전 게이트가 굶음). 그래서 한글 core를 require_any로 강제하면
+    #35 주석("관련성은 비전이 담당")과 정면으로 모순돼 자동 수집이 0편이 됐다. 키워드 사전필터는
+    exclude_terms(저렴한 명백 제외)만 적용하고, '이게 그 물건인가'의 정밀 판정은 vision_relevance가
+    이미지로 전담한다(provision은 vision=True 강제). core는 설정에 남되 사전필터엔 쓰지 않는다.
+    """
     tiers = {
         name: SearchTerm(q=t["q"], min_price=t.get("min"), max_price=t.get("max"))
         for name, t in config["tiers"].items()
     }
     return CategorySpec(
         slug=slug,
-        require_any=(config["core"],),
+        require_any=(),
         require_all=(),
         exclude_terms=tuple(config.get("exclude") or ()),
         tiers=tiers,

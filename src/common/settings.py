@@ -46,6 +46,10 @@ DEFAULTS: dict[str, Any] = {
     "coupang_mode": "manual",  # manual(수동 입력·공식 위젯) | api (15만원 후 자동 수집)
     "coupang_threshold_krw": 150000,  # 쿠팡 API 발급 기준 누적 수익 (모드 전환 안내)
     "coupang_tag": "coupang-partners",  # 쿠팡 파트너스 affiliate_tag (수동 상품 적재용)
+    # ── 외부 API 비용(세션 #36) ──
+    # Google(Imagen) 월 지출 상한($). 주인이 ai.studio/spend에 설정한 값을 여기 입력하면 대시보드가
+    # '추정 사용액 / 상한(%)'을 보여 결제 시점을 미리 알린다. 0=미설정(사용액만 표시).
+    "google_spend_cap_usd": 0.0,
     # ── LLM ──
     "llm_model": "deepseek/deepseek-v4-pro",  # 본문 생성 모델 (세션 #19)
     # ── 배포 검증 ──

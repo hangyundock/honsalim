@@ -3,12 +3,13 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #36 — (상세 EVENTS #35)
+## ★ 다음 세션 #37 — (상세 EVENTS #36)
 
-- [ ] **★비전 게이트·자동 카테고리 라이브 첫 실행** (감독 권장) — ①`D:\secrets\affiliate_hub\`에 **ANTHROPIC_API_KEY 존재 확인**(비전 게이트 필수·없으면 fail_closed 전량드롭) ②`provision-category <품목> --no-dry-run` 1개 실증(설정생성→수집(vision)→빌드 draft) ③대시보드 draft 검토→승인→배포 ④품질·비용·드롭률 확인.
-- [ ] **naver_blog 볼륨 자동화 본격** (별도 프로젝트·`/naver-start`) — 6/16 첫 무인 자동발행 결과 확인 + 키워드 7개 7일 스케줄러 테스트(주인 모델·네이버 C-Rank 권위라 honsalim보다 적합).
-- [ ] (이월) 쿠팡 카테고리 배너(카테고리·모니터링 탭) · `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장=트래픽(GSC 색인·[[growth-first-priority]]).
-- 참고: 운영 폴더=#35 동기화(fc1bf29+). 워크트리=`PYTHONPATH=src python -m cli`(대시보드 시작 시 자동 migrate)·DB gitignore→재생성. **main직접머지=`git push origin HEAD:main`**. 운영 DB 직접수정 불가→주인 런처. ★PowerShell/cmd 한글→.py·ASCII([[powershell-korean-encoding]]).
+- [ ] **★운영 동기화 (이 세션 코드 반영)** — 운영 폴더 `git pull`(#36 커밋) + **대시보드 재시작**(자동 migrate 009 → Google 지출 트래커 작동) → 설정에서 "Google 월 상한($)" 입력. ※운영 폴더엔 현재 to_spec·yml만 수동반영·나머지(append_category_source·이미지폴백·api_usage·대시보드) 미반영.
+- [ ] **★대표 이미지 채우기** — Google 월 상한(ai.studio/spend) 풀린 뒤 `D:\honsalim_test\3_run_cleanup.bat` 재실행 → 대표이미지 생성 → 대시보드 🚀 빌드·배포.
+- [ ] **리뷰 별개 개선**(적대적 16건 중 미반영) — 대시보드 카탈로그 오염 가시화(승인 전 사람검토 강화)·비전게이트 프롬프트 category_intro 주입·vision cap 커버리지 경고.
+- [ ] (이월) `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장=트래픽(GSC 색인·[[growth-first-priority]]) · naver_blog 볼륨(`/naver-start`).
+- 참고: 워크트리=`PYTHONPATH=src python -m cli`(대시보드 시작 시 자동 migrate)·DB gitignore→재생성. **main직접머지=`git push origin HEAD:main`**. 운영 DB 직접수정 불가→주인 런처(`D:\honsalim_test\*.bat`). ★PowerShell/cmd 한글→.py·ASCII([[powershell-korean-encoding]]).
 
 ## 시점 의존 잔존 (세션 #6~7)
 

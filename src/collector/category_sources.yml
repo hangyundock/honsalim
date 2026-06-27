@@ -103,3 +103,14 @@ categories:
     tiers:
       budget:  {q: "mini dehumidifier",       min: 10000, max: 40000}
       premium: {q: "small dehumidifier home", min: 40000, max: 90000}
+
+  # 미니 전기밥솥 — 세션 #36 provision-category(자동 프로비저닝) 첫 라이브 생성 카테고리.
+  #   ★require_any=[] : 관련성 정밀 판정은 수집 시 비전 게이트(vision_relevance)가 이미 수행(#36 설계).
+  #   자동 수집 상품은 이름이 제각각(밥솥·압력솥·멀티쿠커·핫팟)이라 단일 키워드로 못 묶음 → 비전이 전담.
+  #   가드레일 휴리스틱은 명백한 제외어(인형집 미니어처 등)만 적용. 라이브 실측으로 추후 다듬음(§2-마).
+  mini-rice-cooker:
+    require_any: []
+    exclude_terms: [미니어처, 인형, 하우스 장식, 마이크로 풍경, 도시락통, 전기찜기, 슬로우쿠커]
+    tiers:
+      budget:  {q: "mini rice cooker",                min: 15000, max: 45000}
+      premium: {q: "small smart rice cooker 1-2 cups", min: 45001, max: 120000}

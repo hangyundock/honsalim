@@ -81,6 +81,8 @@ wrangler.toml.local
 *.sqlite-journal
 *.sqlite-shm
 *.sqlite-wal
+*.sqlite3
+db.sqlite3
 
 # =====================================================
 # 임시 파일
