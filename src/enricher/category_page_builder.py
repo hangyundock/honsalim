@@ -105,8 +105,8 @@ def select_featured(
 
     # 미지정 시 설정값(설정창에서 편집) → 기존 기본값. 명시 인자가 있으면 그대로(호출자·테스트 우선).
     if per_tier is None:
-        per_tier = int(settings.get("featured_per_tier", 3) or 3)
-    floor = float(settings.get("satisfaction_floor", _SATISFACTION_FLOOR) or _SATISFACTION_FLOOR)
+        per_tier = settings.get_int("featured_per_tier")
+    floor = settings.get_float("satisfaction_floor")
 
     def _vol(p: dict[str, Any]) -> int:
         return int(p.get("volume") or 0)

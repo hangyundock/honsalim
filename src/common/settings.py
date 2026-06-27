@@ -78,6 +78,27 @@ def get(key: str, default: Any = None, path: Path = CONFIG_PATH) -> Any:
     return load(path).get(key, DEFAULTS.get(key, default))
 
 
+def get_int(key: str, path: Path = CONFIG_PATH) -> int:
+    """정수 설정값 — **0도 보존**(falsy `... or N` 함정 방지·#38).
+
+    `int(get(key) or N)`은 설정값이 0일 때 0을 falsy로 보고 N으로 덮어쓰는 버그가 있었다
+    (auto_approve_min_published=0=완전무인이 5로 강제돼 자동발행이 막힘). 이 헬퍼는 값이
+    None/누락일 때만 DEFAULTS로 폴백하고, 0은 그대로 0으로 돌려준다.
+    """
+    v = load(path).get(key, DEFAULTS.get(key))
+    if v is None:
+        v = DEFAULTS.get(key, 0)
+    return int(v)
+
+
+def get_float(key: str, path: Path = CONFIG_PATH) -> float:
+    """실수 설정값 — **0.0도 보존**(falsy `... or N` 함정 방지·#38). None/누락이면 DEFAULTS."""
+    v = load(path).get(key, DEFAULTS.get(key))
+    if v is None:
+        v = DEFAULTS.get(key, 0.0)
+    return float(v)
+
+
 def save(values: dict[str, Any], path: Path = CONFIG_PATH) -> Path:
     """설정 저장 — 기본값에 병합 후 기록(부분 저장도 안전). 반환: 저장 경로.
 

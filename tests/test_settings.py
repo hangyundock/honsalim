@@ -104,3 +104,41 @@ class TestSaveRoundTrip:
         settings.save({"publish_per_day": 9}, p)
         settings.ensure_config_file(p)  # 덮어쓰지 않음
         assert settings.load(p)["publish_per_day"] == 9
+
+
+class TestGetIntFloatPreserveZero:
+    """0/0.0도 보존 — `int(get() or N)` falsy 함정 회귀(#38 라이브 적발).
+
+    min_published=0(완전무인)을 0으로 설정했는데 `0 or 5 = 5`로 강제돼 자동 발행이
+    영구히 막혔다. get_int/get_float은 0을 보존하고 None/누락일 때만 DEFAULTS로 폴백한다.
+    """
+
+    def test_get_int_preserves_zero(self) -> None:
+        p = _tmp_config()
+        p.write_text(
+            json.dumps({"auto_approve_min_published": 0, "publish_per_day": 0}),
+            encoding="utf-8",
+        )
+        assert settings.get_int("auto_approve_min_published", path=p) == 0  # 옛 버그면 5
+        assert settings.get_int("publish_per_day", path=p) == 0  # 옛 버그면 1
+
+    def test_get_int_falls_back_when_missing(self) -> None:
+        p = _tmp_config()
+        assert settings.get_int("auto_approve_min_published", path=p) == 5
+
+    def test_get_int_handles_null(self) -> None:
+        p = _tmp_config()
+        p.write_text(json.dumps({"auto_approve_min_published": None}), encoding="utf-8")
+        assert settings.get_int("auto_approve_min_published", path=p) == 5
+
+    def test_get_float_preserves_zero(self) -> None:
+        p = _tmp_config()
+        p.write_text(json.dumps({"satisfaction_floor": 0.0}), encoding="utf-8")
+        assert settings.get_float("satisfaction_floor", path=p) == 0.0
+
+    def test_get_float_falls_back_when_missing(self) -> None:
+        p = _tmp_config()
+        assert (
+            settings.get_float("satisfaction_floor", path=p)
+            == settings.DEFAULTS["satisfaction_floor"]
+        )

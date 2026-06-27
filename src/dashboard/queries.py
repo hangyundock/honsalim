@@ -153,7 +153,7 @@ def google_usage(conn: sqlite3.Connection) -> dict[str, Any]:
     from writer import api_usage
 
     s = api_usage.month_summary(conn, "google_imagen")
-    cap = float(settings.get("google_spend_cap_usd", 0.0) or 0.0)
+    cap = float(settings.get("google_spend_cap_usd", 0.0) or 0.0)  # 0.0=미설정(기본도 0.0)·무해
     used = float(s["est_cost_usd"])
     pct = (used / cap * 100.0) if cap > 0 else None
     return {

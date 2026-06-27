@@ -737,7 +737,7 @@ def cmd_enrich(args: argparse.Namespace) -> int:
             )
             from validator import serialize_report, validate_all
 
-            max_attempts = int(settings.get("enrich_max_attempts", 2) or 2)
+            max_attempts = settings.get_int("enrich_max_attempts")
             feedback: list[str] | None = None
             enriched_payload = {}
             passed = False
@@ -2355,7 +2355,7 @@ def cmd_publish_queue(args: argparse.Namespace) -> int:
     E7 준수: status='approved'(사람이 1클릭 승인한) draft만 발행 — 자동 '승인'은 하지 않는다.
     기본 dry_run. 라이브(--no-dry-run)는 실제 게시·git push(외부 영향). 메인 체크아웃에서 실행.
     """
-    count = args.count if args.count is not None else int(settings.get("publish_per_day", 1) or 1)
+    count = args.count if args.count is not None else settings.get_int("publish_per_day")
     conn = db.connect(db.DB_PATH)
     try:
         rows = conn.execute(
@@ -2455,7 +2455,7 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
     if not settings.get("auto_mode", False):
         print(f"{WARN} auto_mode OFF — 자동 사이클 중단 (설정에서 켜야 동작·사람 게이트 E7 유지)")
         return 0
-    count = args.count if args.count is not None else int(settings.get("publish_per_day", 1) or 1)
+    count = args.count if args.count is not None else settings.get_int("publish_per_day")
     live = not args.dry_run
     print(f"{OK} 자동 사이클 ({'live' if live else 'dry_run'}, 상한 {count})")
 
@@ -2516,7 +2516,7 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
     conn = db.connect(db.DB_PATH)
     try:
         ar = aa.auto_approve(
-            conn, apply=live, min_published=int(settings.get("auto_approve_min_published", 5) or 5)
+            conn, apply=live, min_published=settings.get_int("auto_approve_min_published")
         )
     finally:
         conn.close()
