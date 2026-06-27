@@ -634,6 +634,7 @@ class DashboardWindow(QMainWindow):
         # 카테고리 쿠팡 관리 (세션 #32) — 아래 표에서 카테고리 선택 후 사용
         bar = QHBoxLayout()
         for label, slot in [
+            ("🌐 카테고리 보기", self._on_category_open),
             ("🛒 쿠팡 추가", self._on_category_coupang_add),
             ("🛒 쿠팡 제거", self._on_category_coupang_remove),
             ("🚀 빌드·배포", self._on_build_deploy),
@@ -645,13 +646,14 @@ class DashboardWindow(QMainWindow):
         bar.addStretch(1)
         lay.addLayout(bar)
         hint = QLabel(
-            "아래 표에서 카테고리를 먼저 선택한 뒤 쿠팡을 추가/제거하세요. "
-            "추가/제거 후 라이브 반영은 '🚀 빌드·배포'가 필요합니다."
+            "표에서 카테고리를 선택해 쿠팡을 추가/제거하거나, 행을 더블클릭(또는 '🌐 카테고리 보기')"
+            "하면 라이브 카테고리 페이지가 열립니다. 변경 후 라이브 반영은 '🚀 빌드·배포'가 필요합니다."
         )
         hint.setStyleSheet("color:#666;font-size:11px;")
         hint.setWordWrap(True)
         lay.addWidget(hint)
         self.tab_health = _read_only_table(["카테고리", "slug", "추천", "전체", "상태"])
+        self.tab_health.cellDoubleClicked.connect(lambda *_: self._on_category_open())
         lay.addWidget(self.tab_health, 1)
         return w
 
@@ -1399,6 +1401,23 @@ class DashboardWindow(QMainWindow):
 
         webbrowser.open(f"{queries.SITE_ORIGIN}/articles/{slug}/")
         self.append_log(f"[발행글] 라이브 열기: {queries.SITE_ORIGIN}/articles/{slug}/")
+
+    def _on_category_open(self) -> None:
+        """선택한 카테고리의 라이브 페이지를 브라우저로 연다(행 더블클릭도 동일·#38).
+
+        카테고리·모니터링 탭엔 카테고리 직접 페이지를 볼 경로가 없었다(주인 지적). 발행 글의
+        '라이브 보기'와 같은 방식으로 /categories/{slug}/ 를 연다.
+        """
+        slug = self._selected_category_slug()
+        if not slug:
+            QMessageBox.information(
+                self, "카테고리 선택", "라이브로 열 카테고리를 표에서 선택하세요."
+            )
+            return
+        import webbrowser
+
+        webbrowser.open(f"{queries.SITE_ORIGIN}/categories/{slug}/")
+        self.append_log(f"[카테고리] 라이브 열기: {queries.SITE_ORIGIN}/categories/{slug}/")
 
     def _on_article_unpublish(self) -> None:
         """선택한 발행 글 → 비공개 + 빌드·배포 (라이브·사이트맵에서 제거). 외부 게시(§2-라 확인)."""
