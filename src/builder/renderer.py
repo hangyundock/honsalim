@@ -539,7 +539,10 @@ def _article_page_ctx(
     catalog = [_article_catalog_item(c, "budget") for c in budget_cards] + [
         _article_catalog_item(c, "premium") for c in premium_cards
     ]
-    compare = _build_article_compare(picks_budget + picks_premium)
+    # 비교표는 추천 픽 '전부'를 열로 — picks와 항상 동수(정형성). 옛 기본 limit 6은 picks가 8(티어당
+    # 4)일 때 2열을 잘라 '비교 8개 기대 → 4~6개'의 원인이었다(세션 #38 라이브 적발).
+    _all_picks = picks_budget + picks_premium
+    compare = _build_article_compare(_all_picks, limit=len(_all_picks))
     return {
         "slug": slug,
         "title": title,
@@ -885,6 +888,21 @@ def _article_as_category_ctx(art: dict, base: dict) -> dict:
     ctx["article_checkpoints"] = art.get("checkpoints", [])
     ctx["has_article_checkpoints"] = bool(art.get("checkpoints"))
     ctx["category"] = {**base["category"], "name": art["title"]}
+    # ★세션 #38 — 글은 매핑 카테고리의 (stale·쿠팡없는) 데이터가 아니라 자기 상품으로 렌더한다.
+    # 옛 코드는 base(카테고리)의 picks/쿠팡/비교/카탈로그를 통째로 물려받아, 글이 수집한 쿠팡·
+    # 추천 픽·비교·카탈로그가 전부 폐기됐다(라이브 적발: 쿠팡 0·상단 4·비교 4). 정형 구성(같은
+    # category.html·동일 섹션 순서)은 그대로 유지하되 데이터만 글 고유로 교체 — 키워드별 쿠팡 첨부
+    # (무인 운영 모델·docs/AUTOMATION.md)가 글에 그대로 반영된다.
+    ctx["picks_budget"] = art["picks_budget"]
+    ctx["picks_premium"] = art["picks_premium"]
+    ctx["has_picks"] = art["has_picks"]
+    ctx["coupang_picks"] = art["coupang_picks"]
+    ctx["has_coupang"] = bool(art["coupang_picks"])
+    ctx["compare"] = art["compare"]
+    ctx["has_compare"] = art["has_compare"]
+    ctx["products"] = art["catalog"]  # 글 자신의 카탈로그(키워드 수집분)
+    ctx["catalog_types"] = []  # 글 카탈로그는 타입 미도출 → 필터 칩 숨김(category.html graceful)
+    ctx["data_summary"] = art["art_data_summary"]  # 개수·가격대를 글 상품 기준으로(정직성)
     return ctx
 
 

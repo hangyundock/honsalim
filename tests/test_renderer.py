@@ -1043,13 +1043,26 @@ class TestArticleAsCategory:
         )
         assert renderer._cat_slug_from_concept("") == ""
 
-    def test_article_as_category_ctx_merges(self) -> None:
+    def test_article_uses_own_products_not_category(self) -> None:
+        """세션 #38: 글은 매핑 카테고리의 (stale·쿠팡없는) 데이터가 아니라 자기 상품으로 렌더한다.
+
+        옛 동작(#34)은 글이 base(카테고리)의 picks/쿠팡/비교/카탈로그를 통째로 물려받아, 글이
+        수집한 쿠팡·픽·비교가 전부 폐기됐다(라이브 적발: 쿠팡 0·상단 4·비교 4). 정형 구성(메타·
+        섹션 순서)은 유지하되 데이터는 글 고유여야 한다.
+        """
         base = {
-            "slug": "office-chair",
-            "category": {"name": "의자", "lead": "L"},
-            "products": [{"name": "P"}],  # 카테고리 전체 카탈로그 — 글이 그대로 물려받음
-            "picks_budget": [],
-            "data_summary": {},
+            "slug": "monitor-stand",
+            "category": {"name": "모니터 받침대", "lead": "L"},
+            "products": [{"name": "CAT_PROD"}],  # 카테고리 카탈로그 — 글은 이걸 안 쓴다
+            "picks_budget": [{"name": "CAT_PICK"}],
+            "picks_premium": [],
+            "has_picks": True,
+            "coupang_picks": [],  # 카테고리엔 쿠팡 0
+            "has_coupang": False,
+            "compare": {"cols": [], "rows": []},
+            "has_compare": False,
+            "catalog_types": ["서랍형"],
+            "data_summary": {"count": 99},
         }
         art = {
             "slug": "kw-x",
@@ -1062,14 +1075,47 @@ class TestArticleAsCategory:
                 "guide_pre": "PRE",
                 "guide_post": "POST",
             },
+            "picks_budget": [{"name": "ART_B1"}, {"name": "ART_B2"}],
+            "picks_premium": [{"name": "ART_P1"}, {"name": "ART_P2"}],
+            "has_picks": True,
+            "coupang_picks": [{"name": "CP1"}, {"name": "CP2"}, {"name": "CP3"}],
+            "compare": {"cols": [1, 2, 3], "rows": ["할인"]},
+            "has_compare": True,
+            "catalog": [{"name": "ART_CAT1"}],
+            "art_data_summary": {"count": 5},
         }
         ctx = renderer._article_as_category_ctx(art, base)
+        # 정형 구성·메타는 유지
         assert ctx["is_article"] is True
         assert ctx["is_draft"] is True
         assert ctx["slug"] == "kw-x"  # URL은 글 slug
         assert ctx["category"]["name"] == "키워드 글 제목"  # H1 = 글 제목(SEO)
-        assert ctx["products"] == [{"name": "P"}]  # 카테고리 제품 그대로(이미지·전체 카탈로그)
         assert ctx["article_intro_html"] == "<h1>키워드 글 제목</h1>"  # 대가성 고지 포함 intro
         assert ctx["quick_verdict"] == "QV"
         assert ctx["article_guide_pre"] == "PRE"
-        assert ctx["article_guide_post"] == "POST"
+        # ★데이터는 글 자신의 것 (base 카테고리가 아님) — 회귀 가드
+        assert ctx["products"] == art["catalog"]  # 글 카탈로그 (CAT_PROD 아님)
+        assert ctx["picks_budget"] == art["picks_budget"]
+        assert ctx["picks_premium"] == art["picks_premium"]
+        assert ctx["coupang_picks"] == art["coupang_picks"]  # 글 쿠팡 3개
+        assert ctx["has_coupang"] is True  # 카테고리는 False였지만 글엔 쿠팡 있음
+        assert ctx["compare"] == art["compare"]
+        assert ctx["has_compare"] is True
+        assert ctx["data_summary"] == art["art_data_summary"]
+        assert ctx["catalog_types"] == []  # 글 카탈로그는 타입 미도출 → 필터 칩 숨김
+
+    def test_compare_columns_match_picks_count(self) -> None:
+        """세션 #38: 비교표 열 수 == 추천 픽 수(정형성). 옛 기본 limit 6은 picks 8을 6으로 잘랐다."""
+        picks = [
+            {
+                "name": f"P{i}",
+                "type": "t",
+                "tier": "budget",
+                "price": "1만",
+                "disc": "10%",
+                "volume": "100",
+            }
+            for i in range(8)
+        ]
+        cmp = renderer._build_article_compare(picks, limit=len(picks))
+        assert len(cmp["cols"]) == 8  # 8개 픽 → 8열 (옛 limit 6이면 6)
