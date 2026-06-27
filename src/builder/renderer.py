@@ -503,6 +503,7 @@ def _article_page_ctx(
     products: list[dict],
     is_draft: bool = False,
     structured: dict | None = None,
+    published_at: str | None = None,
 ) -> dict:
     """article.html 렌더 컨텍스트 (published·draft 공용). is_draft=True면 검토용 배너 표시.
 
@@ -587,6 +588,7 @@ def _article_page_ctx(
         "has_checkpoints": bool((structured or {}).get("checkpoints")),
         "concept_image": str((structured or {}).get("concept_image") or ""),  # 글 히어로(세션 #34)
         "concept_image_alt": str((structured or {}).get("concept_image_alt") or ""),
+        "published_at": str(published_at or ""),  # sitemap lastmod·JSON-LD datePublished(#40)
     }
 
 
@@ -620,6 +622,7 @@ def _load_article_pages(conn: sqlite3.Connection, include_drafts: bool = False) 
                 budget_max=row["budget_max_krw"],
                 products=_article_product_cards(prods),
                 structured=structured,
+                published_at=row["published_at"],
             )
         )
         seen_slugs.add(row["slug"])
@@ -864,6 +867,17 @@ def _md_mistakes(text: str) -> Markup:
     return Markup(_CIRCLED_RE.sub("<br><br>", str(_md_inline(text))))  # noqa: S704
 
 
+def _abs_url(path: str | None) -> str:
+    """상대 경로(/static/...) → 절대 URL. 이미 절대(http)면 그대로. 빈 값은 ''."""
+    if not path:
+        return ""
+    return path if path.startswith("http") else f"{SITE_ORIGIN}{path}"
+
+
+# 글 Article JSON-LD image 폴백 — concept_image가 없는 글용(항상 존재하는 홈 히어로).
+ARTICLE_OG_FALLBACK = f"{SITE_ORIGIN}/static/images/concepts/home-hero.webp"
+
+
 def _cat_slug_from_concept(concept_image: str) -> str:
     """글의 개념 이미지 경로 → 매핑 카테고리 slug (세션 #34).
 
@@ -871,6 +885,34 @@ def _cat_slug_from_concept(concept_image: str) -> str:
     concept_image를 저장하므로(structured) 별도 컬럼 없이 카테고리를 역추적한다. 없으면 ''.
     """
     return Path(concept_image).stem if concept_image else ""
+
+
+def _article_guide_cards(article_pages: list[dict]) -> list[dict]:
+    """published(비-draft) 글 → 가이드 카드 (홈·구매가이드·매핑 카테고리 내부링크용).
+
+    세션 #40 근본 수정: 발행 글이 '시나리오 카드(active=1 시나리오에 글 연결됨)'로만 닿도록
+    설계돼, 글이 묶인 시나리오가 비활성(active=0)이면 어떤 페이지에서도 링크되지 않는 고아
+    페이지가 됐다(사이트맵에만 존재 → 색인돼도 크롤·트래픽 거의 0). 시나리오 데이터 상태와
+    무관하게 홈·구매가이드 허브·토픽 매핑 카테고리에서 '항상' 글로 닿는 안정 통로를 만든다.
+    draft 글은 제외(공개 색인·카운트 누출 방지, sitemap과 동일 기준). 정렬은 article_pages가
+    따르는 published_at DESC(최신 우선)를 그대로 유지한다.
+    """
+    cards: list[dict] = []
+    for pg in article_pages:
+        if pg.get("is_draft"):
+            continue
+        a = pg.get("article") or {}
+        cards.append(
+            {
+                "title": pg["title"],
+                "intro": pg.get("meta_description") or a.get("summary") or "",
+                "url": f"/articles/{pg['slug']}/",
+                "concept_image": pg.get("concept_image") or "",
+                "concept_image_alt": pg.get("concept_image_alt") or pg["title"],
+                "cat_slug": _cat_slug_from_concept(pg.get("concept_image", "")),
+            }
+        )
+    return cards
 
 
 def _article_as_category_ctx(art: dict, base: dict) -> dict:
@@ -1432,8 +1474,20 @@ def _load_pillar_spokes(
     return spokes, total
 
 
-def _sitemap(urls: list[str]) -> str:
-    items = "\n".join(f"  <url><loc>{SITE_ORIGIN}{u}</loc></url>" for u in urls)
+def _sitemap(urls: list[tuple[str, str | None]]) -> str:
+    """sitemap.xml 생성. 각 항목 = (경로, lastmod|None). lastmod 있으면 <lastmod> 출력.
+
+    lastmod는 발행 글(published_at)처럼 '실제 변경일'이 있는 페이지에만 넣는다 — 무인 일일
+    발행 사이트에서 검색엔진 재크롤 우선순위 신호(세션 #40 SITEMAP-02). 날짜가 모호한
+    정적·카테고리 페이지는 lastmod를 생략한다(부정확한 lastmod는 오히려 신뢰를 떨군다).
+    """
+
+    def _line(u: str, lastmod: str | None) -> str:
+        loc = f"<loc>{SITE_ORIGIN}{u}</loc>"
+        mod = f"<lastmod>{lastmod}</lastmod>" if lastmod else ""
+        return f"  <url>{loc}{mod}</url>"
+
+    items = "\n".join(_line(u, lastmod) for u, lastmod in urls)
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
@@ -1491,6 +1545,14 @@ def render_site(
         )
     finally:
         conn.close()
+
+    # 발행 글 내부링크(고아 방지·세션 #40) — 시나리오 활성과 무관하게 홈·구매가이드·매핑
+    # 카테고리에서 항상 글로 닿도록. guides_by_cat = 카테고리 slug → 그 카테고리에 매핑된 글 카드.
+    article_guides = _article_guide_cards(article_pages)
+    guides_by_cat: dict[str, list[dict]] = {}
+    for _gc in article_guides:
+        if _gc["cat_slug"]:
+            guides_by_cat.setdefault(_gc["cat_slug"], []).append(_gc)
 
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
@@ -1553,6 +1615,9 @@ def render_site(
             home_best=home_best,
             home_deals=home_deals,
             home_themes=home_themes,
+            # 홈 '추천 가이드' — 발행 글 내부링크(고아 방지·#40). 최신 8편만(무인 일일 발행
+            # 누적 시 홈 비대화 방지) — 전체는 /guides/ 허브에서 노출.
+            home_guides=article_guides[:8],
             **common,
         ),
     )
@@ -1690,6 +1755,20 @@ def render_site(
     cat_by_slug = {cpg["slug"]: cpg for cpg in category_pages}
     for pg in article_pages:
         slug = pg["slug"]
+        # 발행 글 Article JSON-LD는 렌더 시점에 재생성(단일 진실원) — 저장본의 mainEntityOfPage
+        # 슬래시 누락(IDX-04)·headline이 페이지 제목과 다른 3중 분산(IDX-03)을 기존·미래 글 모두에서
+        # 일관 교정한다. headline=글 제목·datePublished=발행일·image=글 히어로(없으면 폴백).
+        # draft(미리보기)는 발행 전 데이터라 저장본 유지.
+        if pg.get("is_draft"):
+            article_ld = pg["schema_raw"]
+        else:
+            article_ld = jsonld.build_article_jsonld(
+                meta={"title": pg["title"], "meta_description": pg["meta_description"]},
+                scenario={"slug": slug},
+                site_base_url=SITE_ORIGIN,
+                image_url=_abs_url(pg.get("concept_image")) or ARTICLE_OG_FALLBACK,
+                published_at=pg.get("published_at") or "",
+            )
         schema = jsonld.as_script_tags(
             [
                 jsonld.build_breadcrumb_jsonld(
@@ -1700,7 +1779,7 @@ def render_site(
                     ],
                     SITE_ORIGIN,
                 ),
-                pg["schema_raw"],
+                article_ld,
             ]
         )
         base = cat_by_slug.get(_cat_slug_from_concept(pg.get("concept_image", "")))
@@ -1735,6 +1814,7 @@ def render_site(
                     quick_verdict=actx["quick_verdict"],
                     article_checkpoints=actx["article_checkpoints"],
                     has_article_checkpoints=actx["has_article_checkpoints"],
+                    article_guides=[],  # 글 페이지(is_article)에는 글 가이드 블록 미표시
                     **common,
                 ),
             )
@@ -1807,6 +1887,8 @@ def render_site(
                 ]
             ),
             guides=guides,
+            # 발행 글 가이드(고아 방지·#40) — 카테고리 '고르는 법'과 별도 섹션으로 노출.
+            article_guides=article_guides,
             **common,
         ),
     )
@@ -1850,6 +1932,8 @@ def render_site(
                 compare=pg["compare"],
                 has_compare=pg["has_compare"],
                 related=pg["related"],
+                # 이 카테고리에 매핑된 발행 글 가이드(토픽 클러스터·고아 방지·#40)
+                article_guides=guides_by_cat.get(cslug, []),
                 **common,
             ),
         )
@@ -1871,13 +1955,20 @@ def render_site(
             ),
         )
 
-    # sitemap.xml
-    urls = (
-        ["/", "/scenarios/", "/about/", "/method/", "/categories/", "/guides/"]
-        + ([f"/{PILLAR_HOME_OFFICE['slug']}/"] if pillar_rendered else [])
-        + [f"/categories/{slug}/" for slug in category_slugs]
-        + [f"/personas/{p['id']}/" for p in personas]
-        + [f"/articles/{slug}/" for slug in article_slugs]
+    # sitemap.xml — (경로, lastmod). 발행 글만 lastmod(published_at 날짜)를 넣어 재크롤 신호를
+    # 준다(SITEMAP-02·#40). 정적·카테고리·페르소나는 변경일이 모호해 lastmod 생략(부정확 신호 회피).
+    art_lastmod = {
+        pg["slug"]: (pg.get("published_at") or "")[:10]
+        for pg in article_pages
+        if not pg.get("is_draft") and pg.get("published_at")
+    }
+    static_urls = ["/", "/scenarios/", "/about/", "/method/", "/categories/", "/guides/"]
+    urls: list[tuple[str, str | None]] = (
+        [(u, None) for u in static_urls]
+        + ([(f"/{PILLAR_HOME_OFFICE['slug']}/", None)] if pillar_rendered else [])
+        + [(f"/categories/{slug}/", None) for slug in category_slugs]
+        + [(f"/personas/{p['id']}/", None) for p in personas]
+        + [(f"/articles/{slug}/", art_lastmod.get(slug) or None) for slug in article_slugs]
     )
     w("sitemap.xml", _sitemap(urls))
 

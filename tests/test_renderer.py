@@ -410,6 +410,63 @@ class TestRenderArticleDetail:
         assert '"@type": "BreadcrumbList"' in html
         assert html.count('rel="canonical"') == 1
 
+    def test_jsonld_main_entity_matches_canonical(self, built_with_article: dict) -> None:
+        # 렌더 시점 재생성된 Article JSON-LD의 mainEntityOfPage가 canonical과 끝슬래시까지
+        # 일치(세션 #40 IDX-04) — 자기참조 URL 불일치 제거.
+        html = self._html(built_with_article)
+        slug = built_with_article["slug"]
+        assert f'"mainEntityOfPage": "https://honsallim.com/articles/{slug}/"' in html
+        assert f'rel="canonical" href="https://honsallim.com/articles/{slug}/"' in html
+
+    def test_jsonld_headline_matches_title(self, built_with_article: dict) -> None:
+        # JSON-LD headline = 글 제목(페이지 제목과 동일 소스) — 3중 분산 제거(세션 #40 IDX-03).
+        html = self._html(built_with_article)
+        assert '"headline": "홈오피스 50만원 세팅"' in html
+
+    def test_sitemap_article_has_lastmod_static_does_not(self, built_with_article: dict) -> None:
+        # 발행 글은 lastmod(published_at)로 재크롤 신호 / 정적 페이지는 lastmod 생략(부정확 신호
+        # 회피) — 세션 #40 SITEMAP-02.
+        slug = built_with_article["slug"]
+        xml = (built_with_article["out"] / "sitemap.xml").read_text(encoding="utf-8")
+        art_line = next(ln for ln in xml.splitlines() if f"/articles/{slug}/" in ln)
+        assert "<lastmod>" in art_line
+        home_line = next(ln for ln in xml.splitlines() if "<loc>https://honsallim.com/</loc>" in ln)
+        assert "<lastmod>" not in home_line
+
+
+class TestArticleInternalLinks:
+    """발행 글 내부링크 — 고아(orphan) 방지(세션 #40).
+
+    발행 글이 '시나리오 카드(active=1 시나리오에 글 연결)'로만 닿도록 설계돼, 글이 묶인
+    시나리오가 비활성이면 어떤 페이지에서도 링크되지 않는 고아가 됐다(사이트맵에만 존재 →
+    색인돼도 크롤·트래픽 0). 근본 수정: 시나리오 상태와 무관하게 홈·구매가이드 허브에서 항상
+    글로 닿는다. 이 불변식을 회귀 가드로 고정한다.
+    """
+
+    def test_article_linked_from_home(self, built_with_article: dict) -> None:
+        slug = built_with_article["slug"]
+        home = (built_with_article["out"] / "index.html").read_text(encoding="utf-8")
+        assert f"/articles/{slug}/" in home, "홈 '추천 가이드'에서 발행 글로 링크되지 않음"
+
+    def test_article_linked_from_guides_hub(self, built_with_article: dict) -> None:
+        slug = built_with_article["slug"]
+        guides = (built_with_article["out"] / "guides" / "index.html").read_text(encoding="utf-8")
+        assert f"/articles/{slug}/" in guides, "구매가이드 허브에서 발행 글로 링크되지 않음"
+
+    def test_article_not_orphan(self, built_with_article: dict) -> None:
+        # 사이트맵·글 자신을 제외한 '탐색 가능한 페이지' 중 최소 1곳이 글로 링크해야 한다
+        # (감사 #40의 grep 방법론을 회귀 가드로 고정 — 고아면 inbound=0).
+        out: Path = built_with_article["out"]
+        slug = built_with_article["slug"]
+        needle = f"/articles/{slug}/"
+        own = out / "articles" / slug / "index.html"
+        inbound = [
+            path.relative_to(out).as_posix()
+            for path in out.rglob("*.html")
+            if path != own and needle in path.read_text(encoding="utf-8")
+        ]
+        assert inbound, "발행 글이 어떤 탐색 페이지에서도 링크되지 않는 고아 상태"
+
 
 @pytest.fixture()
 def built_with_draft(tmp_path: Path) -> dict:

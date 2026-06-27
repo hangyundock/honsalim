@@ -80,7 +80,9 @@ def build_article_jsonld(
     _validate_inputs(meta, scenario)
 
     base = site_base_url.rstrip("/")
-    main_entity_url = f"{base}/articles/{scenario['slug']}"
+    # 끝 슬래시 — 페이지 canonical(/articles/<slug>/)과 정확히 일치시켜 자기참조 URL 불일치
+    # 제거(세션 #40 IDX-04). 슬래시 누락 시 검색엔진이 별개 URL로 오인할 수 있다.
+    main_entity_url = f"{base}/articles/{scenario['slug']}/"
 
     doc: dict[str, Any] = {
         "@context": SCHEMA_CONTEXT,

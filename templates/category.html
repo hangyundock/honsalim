@@ -209,6 +209,21 @@
   {# 글(키워드): 키워드 가이드 後(예산표·함께보기·FAQ) — 상품 아래 SEO 텍스트(세션 #34) #}
   {% if is_article and article_guide_post %}<div class="cat-guide art-guide">{{ article_guide_post | safe }}</div>{% endif %}
 
+  {% if article_guides and not is_article %}
+  {# 이 카테고리 추천 가이드 글 — 토픽 클러스터·발행 글 내부링크(고아 방지·세션 #40).
+     글 페이지(is_article)는 자기 자신이므로 미표시. #}
+  <div class="sechead"><div class="eb">자세한 추천</div><h2>이 품목 추천 가이드</h2></div>
+  <div class="related-grid">
+    {% for g in article_guides %}
+    <a class="rel-card" href="{{ g.url }}">
+      <div class="rel-name">{{ g.title }}</div>
+      <div class="rel-intro">{{ g.intro }}</div>
+      <div class="rel-go">가이드 보기 →</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   {% if related %}
   {# 연관 카테고리 크로스링크 — 같은 홈오피스 그룹 (체류시간·내부링크·SEO) #}
   <div class="sechead"><div class="eb">함께 보면 좋은</div><h2>관련 카테고리</h2></div>

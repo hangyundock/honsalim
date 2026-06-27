@@ -103,11 +103,12 @@ class TestFieldMapping:
         assert doc["description"].startswith("30만원 예산으로")
 
     def test_main_entity_url_from_slug(self) -> None:
+        # 끝 슬래시 — 페이지 canonical(/articles/<slug>/)과 정확히 일치(세션 #40 IDX-04)
         doc = json.loads(_build_default())
-        assert doc["mainEntityOfPage"] == "https://honsallim.com/articles/wonroom-30man"
+        assert doc["mainEntityOfPage"] == "https://honsallim.com/articles/wonroom-30man/"
 
     def test_base_url_trailing_slash_stripped(self) -> None:
-        """site_base_url 끝 / 자동 제거."""
+        """site_base_url 끝 / 자동 제거 + mainEntityOfPage 끝 슬래시(canonical 일치)."""
         jsonld = build_article_jsonld(
             meta=_minimal_meta(),
             scenario=_scenario(),
@@ -116,7 +117,7 @@ class TestFieldMapping:
             published_at="2026-05-28",
         )
         doc = json.loads(jsonld)
-        assert doc["mainEntityOfPage"] == "https://honsallim.com/articles/wonroom-30man"
+        assert doc["mainEntityOfPage"] == "https://honsallim.com/articles/wonroom-30man/"
 
     def test_modified_at_defaults_to_published_at(self) -> None:
         doc = json.loads(_build_default())

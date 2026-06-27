@@ -110,6 +110,32 @@
   </div>
 </section>
 
+{# ===== 추천 가이드 글 (B-2) — 발행 글 내부링크(고아 방지·세션 #40) ===== #}
+{% if home_guides %}
+<section class="section">
+  <div class="wrap">
+    {{ section_head(
+        '추천 가이드',
+        '품목별 추천을 글로 정리했어요',
+        '예산·상황에 맞춘 추천을 한 편의 가이드로 모았습니다.',
+        action_label='구매가이드 전체', action_url='/guides/'
+    ) }}
+    <div class="home-cats">
+      {% for g in home_guides %}
+      <a class="hcat" href="{{ g.url }}">
+        <div class="hcat-img"{% if g.concept_image %} style="background-image:url('{{ g.concept_image }}')"{% endif %} role="img" aria-label="{{ g.concept_image_alt }}"></div>
+        <div class="hcat-body">
+          <h3>{{ g.title }}</h3>
+          <p>{{ g.intro }}</p>
+          <span class="hcat-meta">가이드 보기 {{ icon('arrow', 14) }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
 {# ===== 판매량 BEST (C) ===== #}
 {% if home_best %}
 <section class="section">
