@@ -2078,6 +2078,17 @@ def cmd_keyword_generate(args: argparse.Namespace) -> int:
             print(f"{FAIL} 상품 확보 실패: {e}")
             return 3
         print(f"     {note}")
+        # 상품 후보 0개 = 어필리에이트 링크·상품 이미지가 없는 '빈 글' → LLM 본문 생성(비용)을
+        # 쓰기 전에 중단하고 키워드를 failed로 빼낸다. 무인 auto-cycle도 이 함수를 거치므로
+        # 빈 글 양산이 한 곳에서 차단된다. (EVENTS #38 라이브 적발: '책거치대' 미매핑·쿠팡 미선택 →
+        # 후보 0개인데 enrich까지 돌아 이미지·수익링크 없는 글이 validated된 갭)
+        if not candidates:
+            kq.set_status(conn, args.id, "failed", f"상품 0개 — 빈 글 방지로 생성 중단: {note}")
+            print(
+                f"{FAIL} 상품 후보 0개 — 어필리에이트 링크 없는 빈 글이라 생성 중단(LLM 비용 0). "
+                "키워드를 카테고리에 매핑하거나 쿠팡 배너를 첨부하세요."
+            )
+            return 3
         draft_id = article_writer.record_scenario_candidates(
             conn, scenario_id, candidates, working_title=kw["keyword"]
         )
@@ -2481,10 +2492,13 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
             print(
                 f"     글 생성 — 키워드 #{pick['keyword_id']} {pick['keyword']!r} ({pick['source']})"
             )
-            cmd_keyword_generate(
+            rc = cmd_keyword_generate(
                 argparse.Namespace(id=int(pick["keyword_id"]), page_size=20, dry_run=False)
             )
-            made += 1
+            if (
+                rc == 0
+            ):  # 상품 0개(빈 글 차단·rc=3) 등 실패는 세지 않음 — 다음 회차가 다른 키워드를 집는다
+                made += 1
         print(f"     글 생성 {made}편 완료")
     else:
         conn = db.connect(db.DB_PATH)

@@ -383,3 +383,36 @@ class TestGatherCandidatesHybrid:
         cands, note = cli._gather_keyword_candidates(db.connect(migrated_db), kw, 20)
         assert [c["source"] for c in cands] == ["coupang"]  # 알리 건너뜀 — 쿠팡 단독
         assert "건너뜀" in note
+
+
+class TestKeywordGenerateEmptyGuard:
+    """상품 0개 키워드는 LLM 비용을 쓰기 전에 생성 중단(빈 글 방지·EVENTS #38).
+
+    '책거치대'처럼 카테고리 미매핑 + 쿠팡 미선택이면 후보가 0개인데, 옛 코드는 그대로
+    draft를 만들고 enrich(LLM 본문)까지 돌려 이미지·수익링크 없는 빈 글이 validated 됐다.
+    무인 auto-cycle도 cmd_keyword_generate를 거치므로 이 한 곳에서 차단된다.
+    """
+
+    def test_zero_candidates_blocks_before_enrich(
+        self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from writer import keyword_queue as kq
+
+        def boom_enrich(*a: object, **k: object) -> object:
+            raise AssertionError("상품 0개인데 enrich(LLM 본문 생성)를 호출하면 안 됨")
+
+        monkeypatch.setattr(cli, "cmd_enrich", boom_enrich)
+
+        conn = db.connect(migrated_db)
+        kid = kq.add_keyword(conn, "강아지 사료", channel="ali")  # 미매핑·쿠팡 미선택 → 후보 0
+        conn.close()
+
+        rc = cli.cmd_keyword_generate(_ns(id=kid, page_size=20, dry_run=False))
+
+        assert rc == 3  # 빈 글 차단 종료 코드
+        conn = db.connect(migrated_db)
+        kw = kq.get_keyword(conn, kid)
+        n_drafts = int(conn.execute("SELECT COUNT(*) FROM drafts").fetchone()[0])
+        conn.close()
+        assert kw is not None and kw["status"] == "failed"  # 키워드는 failed로 빠짐
+        assert n_drafts == 0  # 빈 draft가 생기지 않음
