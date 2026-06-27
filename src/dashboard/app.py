@@ -679,8 +679,9 @@ class DashboardWindow(QMainWindow):
             self.append_log(f"[DB 오류] {e}")
             return None
 
-    def refresh(self) -> None:
-        cfg = settings.load()
+    def _paint_unmanned(self, cfg: dict[str, Any] | None = None) -> None:
+        """배너·무인 토글 버튼을 config만 읽어 즉시 갱신(schtasks 호출 없음 — 토글 즉각 반응용·#38)."""
+        cfg = cfg if cfg is not None else settings.load()
         unmanned_on = bool(cfg.get("auto_mode"))
         unmanned = "🟢 완전 무인 ON" if unmanned_on else "⚪ 무인 OFF(사람 검수)"
         self.banner.setText(
@@ -696,6 +697,10 @@ class DashboardWindow(QMainWindow):
                 else "background:#f5f5f5;color:#444;border:1px solid #bbb;"
             )
         )
+
+    def refresh(self) -> None:
+        cfg = settings.load()
+        self._paint_unmanned(cfg)
         self.settings_view.setText(json.dumps(cfg, ensure_ascii=False, indent=2))
         self._refresh_schedule_label()
 
@@ -742,16 +747,24 @@ class DashboardWindow(QMainWindow):
                 return
         cfg["auto_mode"] = turning_on
         settings.save(cfg)
-        # 예약이 등록돼 있으면 새 모드에 맞는 wrapper(auto-cycle/publish-queue)로 재등록(§0·#35).
-        try:
+        # ★배너/버튼은 config만 읽어 즉시 갱신(schtasks 없음) — 토글이 바로 반응한다.
+        self._paint_unmanned(cfg)
+        self.append_log(f"[OK] 완전 무인 {'ON' if turning_on else 'OFF'}")
+        # 예약 재등록(schtasks query+create)은 이 환경에서 호출당 수초 → 메인 스레드에서 돌리면
+        # UI가 9초 얼어붙는다(#38 주인 지적). 백그라운드 스레드로 옮겨 UI 프리징을 없앤다.
+        new_time = str(cfg.get("schedule_time") or "").strip() or None
+
+        def _reconcile_task() -> Any:
             from deployer import scheduler
 
-            new_time = str(cfg.get("schedule_time") or "").strip() or None
-            scheduler.reconcile(turning_on, new_time)
-        except Exception:  # noqa: S110 — 재조정 실패가 설정 저장을 막지 않음(베스트에포트·§0)
-            pass
-        self.append_log(f"[OK] 완전 무인 {'ON' if turning_on else 'OFF'}")
-        self.refresh()
+            r = scheduler.reconcile(turning_on, new_time)  # 미등록이면 None(무동작)
+            if isinstance(r, tuple):
+                print(f"[예약] {r[1]}")
+            elif r is None:
+                print("[예약] 예약 미등록 — '예약 켜기'를 누르면 이 모드로 등록됩니다")
+            return r
+
+        self.run_task(_reconcile_task, label="예약 재등록")
 
     def _has_schema(self, conn: sqlite3.Connection) -> None:
         """스키마 없으면 안내(무인 환경 친화)."""
