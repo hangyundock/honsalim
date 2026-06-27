@@ -280,58 +280,91 @@ class RecommendDialog(QDialog):
         self.setWindowTitle("추천 키워드 — 선택")
         self.resize(640, 480)
         self.recs = recs
-        self._choice: dict[str, Any] | None = None
+        self._choices: list[dict[str, Any]] = []
         lay = QVBoxLayout(self)
         info = QLabel(
-            "검색량순 추천입니다. 한 행을 선택해 추가하거나, '1순위 자동 추가'를 누르세요.\n"
+            "검색량순 추천입니다. 맨 앞 체크박스로 여러 개를 한꺼번에 고른 뒤 "
+            "'체크한 키워드 추가'를 누르세요(행을 클릭해도 체크됩니다).\n"
             "(월검색량=네이버 실데이터 · '캐시'=검색량 미상 보조키워드)"
         )
         info.setStyleSheet("color:#555;")
         info.setWordWrap(True)
         lay.addWidget(info)
-        self.table = _read_only_table(["키워드", "월검색량", "경쟁도", "씨앗", "출처"])
+        # 맨 앞 체크박스 컬럼 — 여러 키워드를 한 번에 골라 일괄 등록(#38 주인 요청).
+        self.table = _read_only_table(["✓", "키워드", "월검색량", "경쟁도", "씨앗", "출처"])
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.setRowCount(len(recs))
         for i, r in enumerate(recs):
             vol = f"{r['volume']:,}" if r.get("volume") is not None else "—"
             src = "네이버" if r.get("source") == "naver" else "캐시"
-            self.table.setItem(i, 0, _cell(str(r.get("keyword") or "")))
-            self.table.setItem(i, 1, _cell(vol))
-            self.table.setItem(i, 2, _cell(str(r.get("competition") or "")))
-            self.table.setItem(i, 3, _cell(str(r.get("seed") or "")))
-            self.table.setItem(i, 4, _cell(src))
-        if recs:
-            self.table.selectRow(0)
+            chk = QTableWidgetItem()
+            chk.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+            chk.setCheckState(Qt.Unchecked)
+            self.table.setItem(i, 0, chk)
+            self.table.setItem(i, 1, _cell(str(r.get("keyword") or "")))
+            self.table.setItem(i, 2, _cell(vol))
+            self.table.setItem(i, 3, _cell(str(r.get("competition") or "")))
+            self.table.setItem(i, 4, _cell(str(r.get("seed") or "")))
+            self.table.setItem(i, 5, _cell(src))
+        # 키워드 등 다른 칸을 클릭해도 그 행 체크가 토글되게(체크박스 칸을 정확히 안 눌러도 편하게).
+        self.table.cellClicked.connect(self._toggle_row)
         lay.addWidget(self.table, 1)
         bar = QHBoxLayout()
-        b_sel = QPushButton("✅ 선택한 키워드 추가")
+        b_all = QPushButton("전체 선택")
+        b_all.clicked.connect(lambda: self._set_all(Qt.Checked))
+        b_none = QPushButton("전체 해제")
+        b_none.clicked.connect(lambda: self._set_all(Qt.Unchecked))
+        b_sel = QPushButton("✅ 체크한 키워드 추가")
         b_sel.clicked.connect(self._choose_selected)
-        b_top = QPushButton("⭐ 1순위 자동 추가")
+        b_top = QPushButton("⭐ 1순위만 추가")
         b_top.clicked.connect(self._choose_top)
         b_cancel = QPushButton("취소")
         b_cancel.clicked.connect(self.reject)
+        bar.addWidget(b_all)
+        bar.addWidget(b_none)
+        bar.addStretch(1)
         bar.addWidget(b_sel)
         bar.addWidget(b_top)
-        bar.addStretch(1)
         bar.addWidget(b_cancel)
         lay.addLayout(bar)
 
+    def _toggle_row(self, row: int, col: int) -> None:
+        if col == 0:
+            return  # 체크박스 칸은 Qt가 직접 토글 — 중복 방지
+        it = self.table.item(row, 0)
+        if it is not None:
+            it.setCheckState(Qt.Unchecked if it.checkState() == Qt.Checked else Qt.Checked)
+
+    def _set_all(self, state: Qt.CheckState) -> None:
+        for i in range(len(self.recs)):
+            it = self.table.item(i, 0)
+            if it is not None:
+                it.setCheckState(state)
+
+    def _checked_indices(self) -> list[int]:
+        out = []
+        for i in range(len(self.recs)):
+            it = self.table.item(i, 0)
+            if it is not None and it.checkState() == Qt.Checked:
+                out.append(i)
+        return out
+
     def _choose_selected(self) -> None:
-        idx = self.table.currentRow()
-        if idx < 0 or idx >= len(self.recs):
+        idxs = self._checked_indices()
+        if not idxs:
             QMessageBox.information(
-                self, "선택 필요", "키워드를 한 행 선택하거나 '1순위 자동 추가'를 누르세요."
+                self, "선택 필요", "체크박스로 키워드를 1개 이상 고르세요(또는 '1순위만 추가')."
             )
             return
-        self._choice = self.recs[idx]
+        self._choices = [self.recs[i] for i in idxs]
         self.accept()
 
     def _choose_top(self) -> None:
-        if self.recs:
-            self._choice = self.recs[0]
+        self._choices = [self.recs[0]] if self.recs else []
         self.accept()
 
-    def chosen(self) -> dict[str, Any] | None:
-        return self._choice
+    def chosen_list(self) -> list[dict[str, Any]]:
+        return self._choices
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1019,30 +1052,36 @@ class DashboardWindow(QMainWindow):
         dlg = RecommendDialog(result, self)
         if dlg.exec_() != QDialog.Accepted:
             return
-        rec = dlg.chosen()
-        if not rec:
+        chosen = dlg.chosen_list()
+        if not chosen:
             return
-        kw = str(rec["keyword"])
-        channel = str(rec.get("channel") or "ali")
-        vol = int(rec.get("volume") or 0)
-        note = f"추천(검색량 {vol}·씨앗 {rec.get('seed')})"
 
         def add_task() -> int:
             import cli
 
-            return cli.cmd_keyword_add(
-                argparse.Namespace(
-                    keyword=kw,
-                    channel=channel,
-                    slug=None,
-                    budget_min=None,
-                    budget_max=None,
-                    note=note,
-                    score=float(vol),
+            n = 0
+            for rec in chosen:
+                kw = str(rec["keyword"])
+                channel = str(rec.get("channel") or "ali")
+                vol = int(rec.get("volume") or 0)
+                note = f"추천(검색량 {vol}·씨앗 {rec.get('seed')})"
+                cli.cmd_keyword_add(
+                    argparse.Namespace(
+                        keyword=kw,
+                        channel=channel,
+                        slug=None,
+                        budget_min=None,
+                        budget_max=None,
+                        note=note,
+                        score=float(vol),
+                    )
                 )
-            )
+                print(f"[추천] 추가: {kw} (검색량 {vol})")
+                n += 1
+            print(f"[추천] {n}개 키워드 일괄 추가 완료")
+            return 0
 
-        self.run_task(add_task, label="키워드 추가")
+        self.run_task(add_task, label=f"키워드 {len(chosen)}개 추가")
 
     def _on_add_keyword(self) -> None:
         text, ok = QInputDialog.getText(
