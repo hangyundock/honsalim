@@ -120,3 +120,40 @@ class TestCategoryHealth:
     def test_empty_when_no_published(self) -> None:
         conn = _full_db()  # categories 테이블 있으나 published 없음
         assert queries.category_health(conn) == []
+
+
+class TestListArticles:
+    _COLS = (
+        "slug, scenario_id, title, summary, body_md, body_html, meta_description, "
+        "schema_jsonld, disclosure_first, status, published_at, content_hash, "
+        "truth_check_passed_at, user_approved_at"
+    )
+
+    def test_no_articles_table_is_safe(self) -> None:
+        conn = sqlite3.connect(":memory:")  # 테이블 전무 → [] (마이그레이션 전 안전·§0)
+        assert queries.list_articles(conn) == []
+
+    def test_empty_when_no_rows(self) -> None:
+        assert queries.list_articles(_full_db()) == []  # articles 있으나 0편
+
+    def test_published_first_then_unpublished_with_live_url(self) -> None:
+        conn = _full_db()
+        conn.execute(
+            f"INSERT INTO articles ({self._COLS}) VALUES "  # noqa: S608
+            "('pub-a', 1, '공개글', '요', '본', '<p>본</p>', '메', '{}', '고', "
+            "'published', '2026-06-20T00:00:00Z', 'h1', '2026-06-20T00:00:00Z', "
+            "'2026-06-20T00:00:00Z')"
+        )
+        conn.execute(
+            f"INSERT INTO articles ({self._COLS}) VALUES "  # noqa: S608
+            "('unp-b', 1, '비공개글', '요', '본', '<p>본</p>', '메', '{}', '고', "
+            "'unpublished', NULL, 'h2', '2026-06-19T00:00:00Z', '2026-06-19T00:00:00Z')"
+        )
+        conn.commit()
+        arts = queries.list_articles(conn)
+        assert [a["slug"] for a in arts] == ["pub-a", "unp-b"]  # published 먼저
+        assert arts[0]["status"] == "published"
+        assert arts[0]["live_url"] == "https://honsallim.com/articles/pub-a/"
+        # 상태 필터 — 비공개만
+        only_unp = queries.list_articles(conn, statuses=("unpublished",))
+        assert [a["slug"] for a in only_unp] == ["unp-b"]

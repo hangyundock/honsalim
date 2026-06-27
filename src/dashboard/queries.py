@@ -90,6 +90,35 @@ def list_queue(
     return [dict(r) for r in rows]
 
 
+SITE_ORIGIN = "https://honsallim.com"
+
+
+def list_articles(
+    conn: sqlite3.Connection,
+    statuses: tuple[str, ...] = ("published", "unpublished", "archived"),
+    limit: int = 500,
+) -> list[dict[str, Any]]:
+    """발행 글 관리 목록 — articles(공개/비공개/보관) + 라이브 URL. 공개 먼저·최신 발행순 (세션 #37).
+
+    완전 무인 발행의 '사후 검토' 화면용: 자동 발행된 글을 사람이 목록·링크로 확인하고
+    비공개(내리기)/재공개한다. 렌더러는 published만 렌더하므로 unpublished는 라이브에 없다
+    (live_url은 published 글의 실제 주소, 비공개 글은 참고용). 테이블 없으면 [] (안전·§0).
+    """
+    if not _table_exists(conn, "articles"):
+        return []
+    conn.row_factory = sqlite3.Row
+    qmarks = ",".join("?" * len(statuses))
+    # 보간되는 qmarks는 상태 수만큼의 '?'(값 주입 아님)·값은 파라미터로 — list_queue와 동일 안전 패턴.
+    sql = f"SELECT id, slug, title, status, published_at, updated_at FROM articles WHERE status IN ({qmarks}) ORDER BY (status = 'published') DESC, COALESCE(published_at, updated_at) DESC, id DESC LIMIT ?"  # noqa: S608
+    rows = conn.execute(sql, (*statuses, limit)).fetchall()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        d = dict(r)
+        d["live_url"] = f"{SITE_ORIGIN}/articles/{r['slug']}/"
+        out.append(d)
+    return out
+
+
 def category_health(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     """공개 카테고리 건강 — 추천수/전체수 + 가드레일 미달 사유(휴리스틱·무비용)."""
     if not _table_exists(conn, "categories"):

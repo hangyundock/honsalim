@@ -82,6 +82,8 @@ STATUS_LABELS: dict[str, str] = {
     "rejected": "반려됨",
     "disabled": "비활성",
     "failed": "실패",
+    "unpublished": "비공개",
+    "archived": "보관됨",
 }
 
 
@@ -487,6 +489,9 @@ class DashboardWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.tab_queue = _read_only_table(["ID", "상태", "키워드/제목", "생성일"])
         self.tab_keywords = _read_only_table(["ID", "키워드", "채널", "상태", "점수", "미리선택"])
+        # 발행 글 관리(세션 #37) — 완전 무인 발행의 사후 검토: 발행된 글을 목록·링크로 보고 비공개/재공개.
+        self.tab_articles = _read_only_table(["제목", "상태", "발행일", "라이브 URL"])
+        self.tab_articles.cellDoubleClicked.connect(lambda *_: self._on_article_open())
         # 메뉴 순서 = 운영 작업 순서 (세션 #26): 키워드(추천·추가·생성) → 발행 큐(검토·승인·발행)
         # → 카테고리·모니터링 → 설정. 시작점인 '키워드'가 맨 왼쪽.
         self.tabs.addTab(
@@ -514,6 +519,17 @@ class DashboardWindow(QMainWindow):
                 ],
             ),
             "발행 큐 (글)",
+        )
+        self.tabs.addTab(
+            self._panel(
+                self.tab_articles,
+                [
+                    ("🌐 라이브 보기", self._on_article_open),
+                    ("🚫 비공개(내리기)", self._on_article_unpublish),
+                    ("♻ 재공개", self._on_article_republish),
+                ],
+            ),
+            "발행 글 관리",
         )
         self.tabs.addTab(self._build_monitor_tab(), "카테고리·모니터링")
         self.tabs.addTab(self._build_settings_tab(), "설정")
@@ -673,6 +689,7 @@ class DashboardWindow(QMainWindow):
                 card.set_value(stats.get(key, 0))
             self._fill_queue(queries.list_queue(conn))
             self._fill_keywords(queries.list_keywords(conn))
+            self._fill_articles(queries.list_articles(conn))
             self._fill_health(conn)
         finally:
             conn.close()
@@ -695,6 +712,19 @@ class DashboardWindow(QMainWindow):
             self.tab_queue.setItem(i, 1, _cell(_status_label(st), st))
             self.tab_queue.setItem(i, 2, _cell(str(title)))
             self.tab_queue.setItem(i, 3, _cell(str(r.get("created_at") or "")))
+
+    def _fill_articles(self, rows: list[dict[str, Any]]) -> None:
+        """발행 글 관리 표 채우기(세션 #37). slug는 제목 셀 데이터(UserRole)에 보관 — 작업 시 사용."""
+        self.tab_articles.setRowCount(len(rows))
+        for i, r in enumerate(rows):
+            st = str(r.get("status") or "")
+            title = r.get("title") or f"(제목 없음) #{r['id']}"
+            title_cell = _cell(str(title))
+            title_cell.setData(Qt.UserRole, str(r.get("slug") or ""))
+            self.tab_articles.setItem(i, 0, title_cell)
+            self.tab_articles.setItem(i, 1, _cell(_status_label(st), st))
+            self.tab_articles.setItem(i, 2, _cell(str(r.get("published_at") or "—")))
+            self.tab_articles.setItem(i, 3, _cell(str(r.get("live_url") or "")))
 
     def _fill_keywords(self, rows: list[dict[str, Any]]) -> None:
         self.tab_keywords.setRowCount(len(rows))
@@ -865,6 +895,19 @@ class DashboardWindow(QMainWindow):
             return int(item.text()) if item else None
         except ValueError:
             return None
+
+    def _selected_article_slug(self) -> str | None:
+        """발행 글 관리 표에서 선택(없으면 맨 위) 행의 slug — 제목 셀 데이터(UserRole)에서 읽음."""
+        items = self.tab_articles.selectedItems()
+        if items:
+            row = items[0].row()
+        elif self.tab_articles.rowCount() > 0:
+            row = 0
+        else:
+            return None
+        cell = self.tab_articles.item(row, 0)
+        slug = cell.data(Qt.UserRole) if cell else None
+        return str(slug) if slug else None
 
     def _on_recommend(self) -> None:
         """추천 키워드 생성 → 선택 창 → 큐 추가. 정의된 선정 방식(keyword_research)을 SEO 씨앗에 적용."""
@@ -1233,6 +1276,78 @@ class DashboardWindow(QMainWindow):
             return cli.cmd_build_deploy(argparse.Namespace(dry_run=False, message=None))
 
         self.run_task(task, label="빌드·배포")
+
+    # ---- 발행 글 사후 관리 (세션 #37) — 무인 발행 후 검토·내리기·되돌리기 ----
+    def _on_article_open(self) -> None:
+        """선택한 발행 글의 라이브 페이지를 브라우저로 연다(행 더블클릭도 동일)."""
+        slug = self._selected_article_slug()
+        if not slug:
+            QMessageBox.information(self, "글 선택", "라이브로 열 글을 표에서 선택하세요.")
+            return
+        import webbrowser
+
+        webbrowser.open(f"{queries.SITE_ORIGIN}/articles/{slug}/")
+        self.append_log(f"[발행글] 라이브 열기: {queries.SITE_ORIGIN}/articles/{slug}/")
+
+    def _on_article_unpublish(self) -> None:
+        """선택한 발행 글 → 비공개 + 빌드·배포 (라이브·사이트맵에서 제거). 외부 게시(§2-라 확인)."""
+        slug = self._selected_article_slug()
+        if not slug:
+            QMessageBox.information(self, "글 선택", "비공개로 내릴 글을 표에서 선택하세요.")
+            return
+        resp = QMessageBox.question(
+            self,
+            "글 비공개(내리기)",
+            f"글 '{slug}'을(를) 라이브에서 내릴까요?\n\n"
+            "· 비공개 처리 후 빌드·배포로 honsallim.com에서 사라집니다(외부 게시).\n"
+            "· 사이트맵에서도 제외됩니다(색인 제거 신호).\n"
+            "· '재공개'로 언제든 되돌릴 수 있습니다.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if resp != QMessageBox.Yes:
+            return
+
+        def task() -> int:
+            import cli
+
+            rc = cli.cmd_unpublish_article(
+                argparse.Namespace(slug=slug, note="대시보드 사후검토 비공개")
+            )
+            if rc != 0:
+                return rc
+            print("[발행글] 비공개 완료 — 라이브 반영 위해 빌드·배포 진행")
+            return cli.cmd_build_deploy(argparse.Namespace(dry_run=False, message=None))
+
+        self.run_task(task, label="글 비공개+배포")
+
+    def _on_article_republish(self) -> None:
+        """선택한 비공개 글 → 재공개 + 빌드·배포 (라이브 복원). 외부 게시(§2-라 확인)."""
+        slug = self._selected_article_slug()
+        if not slug:
+            QMessageBox.information(self, "글 선택", "재공개할 글을 표에서 선택하세요.")
+            return
+        resp = QMessageBox.question(
+            self,
+            "글 재공개",
+            f"글 '{slug}'을(를) 다시 공개할까요?\n\n"
+            "· 재공개 후 빌드·배포로 honsallim.com에 다시 올라갑니다(외부 게시).",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if resp != QMessageBox.Yes:
+            return
+
+        def task() -> int:
+            import cli
+
+            rc = cli.cmd_republish_article(argparse.Namespace(slug=slug))
+            if rc != 0:
+                return rc
+            print("[발행글] 재공개 완료 — 라이브 반영 위해 빌드·배포 진행")
+            return cli.cmd_build_deploy(argparse.Namespace(dry_run=False, message=None))
+
+        self.run_task(task, label="글 재공개+배포")
 
     def _on_preview(self) -> None:
         # 선택(없으면 맨 위) 발행 큐 글 → 빌드 후 그 글 상세로 바로 이동 (검토 동선·§2-마, 세션 #29)
