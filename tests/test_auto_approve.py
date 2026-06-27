@@ -22,17 +22,22 @@ def _make_validated_draft(
     featured_names: tuple[str, ...] = (),
     *,
     set_validated: bool = True,
+    sources: tuple[str, ...] | None = None,
 ) -> int:
-    """validated(또는 enriched) draft + enriched_payload featured + 선택 키워드 생성."""
+    """validated(또는 enriched) draft + enriched_payload featured + 선택 키워드 생성.
+
+    sources: featured별 제휴처(aliexpress/coupang). None이면 전부 aliexpress(기존 호환).
+    """
     sid = conn.execute("SELECT id FROM scenarios ORDER BY id LIMIT 1").fetchone()[0]
     did = article_writer.create_draft(conn, scenario_id=sid)
     if keyword is not None:
         kid = kq.get_or_create(conn, keyword, channel="ali")
         conn.execute("UPDATE drafts SET keyword_id=? WHERE id=?", (kid, did))
     state_machine.transition(conn, did, "enriched")
+    srcs = sources if sources is not None else tuple("aliexpress" for _ in featured_names)
     ep = {
         "products": [
-            {"name": n, "source_product_id": f"sp{i}", "source": "aliexpress"}
+            {"name": n, "source_product_id": f"sp{i}", "source": srcs[i]}
             for i, n in enumerate(featured_names)
         ]
     }
@@ -101,3 +106,66 @@ class TestAutoApprove:
         res = aa.auto_approve(conn, apply=False)
         assert good in res["approved"]
         assert state_machine.current_status(conn, good) == "validated"  # apply=False면 전이 없음
+
+
+class TestCoupangExempt:
+    """세션 #39: 수동 쿠팡 배너는 사람이 고른 것이라 자동승인 적합성 검사 면제(수집 단계 정책과 일치).
+
+    무중력의자·리클라이너처럼 카테고리 exclude_terms(리클라이너·쿠션·소파)와 충돌하는 키워드의
+    주인 큐레이션 쿠팡 상품이 거부돼 무인 발행이 영구 보류되던 문제(라이브 적발) 근본 수정.
+    """
+
+    # 카테고리 exclude(리클라이너·쿠션)에 걸리는, 진짜 무중력의자(릴클라이너형) 상품명
+    OFFTARGET = "홈스퍼니처 접이식 무중력 리클라이너 의자 + 헤드 쿠션 풀세트"
+
+    def test_offtarget_coupang_banner_is_exempt(self, conn: sqlite3.Connection) -> None:
+        did = _make_validated_draft(conn, "무중력의자", (self.OFFTARGET,), sources=("coupang",))
+        ok, reason = aa.eligible(conn, did)
+        assert ok is True, reason
+
+    def test_same_name_aliexpress_still_held(self, conn: sqlite3.Connection) -> None:
+        # ali 자동수집은 면제 아님 — 동일 상품명이라도 적합성 검사로 보류돼야 함
+        did = _make_validated_draft(conn, "무중력의자", (self.OFFTARGET,), sources=("aliexpress",))
+        ok, reason = aa.eligible(conn, did)
+        assert ok is False
+        assert "off-target" in reason
+
+    def test_mixed_coupang_offtarget_plus_ali_ontarget_eligible(
+        self, conn: sqlite3.Connection
+    ) -> None:
+        # 실제 draft #12 재현: 쿠팡 off-target + ali on-target → 쿠팡 면제 후 off-target 0 → eligible
+        did = _make_validated_draft(
+            conn,
+            "무중력의자",
+            (self.OFFTARGET, "인체공학 사무용 의자"),
+            sources=("coupang", "aliexpress"),
+        )
+        ok, reason = aa.eligible(conn, did)
+        assert ok is True, reason
+
+    def test_mixed_coupang_exempt_but_ali_offtarget_still_held(
+        self, conn: sqlite3.Connection
+    ) -> None:
+        # 쿠팡은 면제돼도 ali가 off-target이면 여전히 보류 — 면제가 ali 안전망을 무력화하지 않음
+        did = _make_validated_draft(
+            conn,
+            "무중력의자",
+            (self.OFFTARGET, "캠핑 낚시 야외 접이식 푸프"),
+            sources=("coupang", "aliexpress"),
+        )
+        ok, reason = aa.eligible(conn, did)
+        assert ok is False
+        assert "off-target" in reason
+
+
+class TestNewlyMappedKeywords:
+    """세션 #39: 무인 큐에 있으나 미매핑(cat=None)이라 자동승인이 무조건 보류하던 사무의자 키워드를
+    office-chair secondary에 추가 → 매핑되어 정상 적합성 검사·발행 가능."""
+
+    @pytest.mark.parametrize("kw", ["메쉬의자", "허리편한의자", "학생용의자"])
+    def test_newly_mapped_office_chair_keyword_eligible(
+        self, conn: sqlite3.Connection, kw: str
+    ) -> None:
+        did = _make_validated_draft(conn, kw, ("인체공학 사무용 의자",))
+        ok, reason = aa.eligible(conn, did)
+        assert ok is True, reason

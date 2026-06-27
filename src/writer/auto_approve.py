@@ -4,7 +4,8 @@ E7(사람 1클릭 승인)을 'fail-closed 자동 승인'으로 대체 — **auto
 자동 승인 조건(전부 충족해야 approved 전이):
   1. status='validated' (5게이트 truth/schema/disclosure/links/seo 전부 통과)
   2. 키워드가 카테고리에 매핑됨 — 매핑 없으면 적합성 검증 불가 → 보류(사람)
-  3. featured 상품이 전부 키워드-카테고리 적합(off-target 0)
+  3. 자동수집(ali) featured 상품이 전부 키워드-카테고리 적합(off-target 0).
+     수동 쿠팡 배너는 사람이 고른 것이라 적합성 검사 면제(수집 단계 정책과 일치, 세션 #39).
 하나라도 불충족이면 보류(validated 유지·사람 검토). 미탐<오탐 — 나쁜 글 자동발행보다 좋은 글 보류.
 
 비용 0(DB·문자열만). 자동 승인된 글은 publish-queue가 promote→build→deploy 한다.
@@ -60,7 +61,12 @@ def eligible(conn: sqlite3.Connection, draft_id: int) -> tuple[bool, str]:
     offtarget = [
         str(p.get("name") or "")
         for p in featured
-        if not product_filter.is_relevant(
+        # 수동 쿠팡 배너(source='coupang')는 사람이 직접 고른 것이라 적합성 필터 면제 —
+        # 수집 단계(_gather_keyword_candidates·keyword_relevance.filter_products)와 동일 정책.
+        # 무중력의자·리클라이너처럼 카테고리 exclude_terms와 충돌하는 키워드의 주인 큐레이션
+        # 상품이 거부돼 무인 발행이 막히던 문제를 근본 해결(세션 #39). ali 자동수집은 그대로 검사.
+        if str(p.get("source") or "").lower() != "coupang"
+        and not product_filter.is_relevant(
             str(p.get("name") or ""),
             require_any=require_any,
             require_all=require_all,
