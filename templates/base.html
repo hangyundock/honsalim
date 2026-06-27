@@ -8,6 +8,10 @@
 
   <title>{% block title %}혼살림{% endblock %}</title>
 
+  {# 파비콘 — /favicon.ico 부재 시 빈 200(소프트 404)로 색인 제외되던 문제 해소(세션 #40). #}
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+
   {% block meta %}
     {% from "_macros/meta.html" import meta_tags %}
     {{ meta_tags(

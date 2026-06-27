@@ -219,6 +219,17 @@ class TestRenderSite:
         # 더 구체적 경로(/static/*) 규칙이 /*(HTML) 규칙보다 먼저 와야 정적 1년 캐시가 우선 적용됨
         assert headers.index("max-age=31536000") < headers.index("s-maxage=300")
 
+    def test_favicon_at_root_and_referenced(self, built: dict) -> None:
+        """파비콘 루트 배포 + 전 페이지 참조 — /favicon.ico 부재 시 빈 200(소프트 404)으로
+        네이버 색인 제외되던 문제 해소(세션 #40)."""
+        out: Path = built["out"]
+        assert (
+            out / "favicon.ico"
+        ).exists(), "favicon.ico 루트 미배포 → /favicon.ico 소프트404 재발"
+        assert (out / "favicon.svg").exists(), "favicon.svg 루트 미배포"
+        html = (out / "index.html").read_text(encoding="utf-8")
+        assert 'href="/favicon.ico"' in html  # base.html 전 페이지 참조
+
     def test_home_meta_and_schema(self, built: dict) -> None:
         html = (built["out"] / "index.html").read_text(encoding="utf-8")
         assert 'property="og:title"' in html

@@ -1982,6 +1982,15 @@ def render_site(
     # static 복사
     shutil.copytree(STATIC_DIR, out_dir / "static", dirs_exist_ok=True)
 
+    # 루트 파비콘 — 브라우저·검색봇은 /favicon.ico를 기본 요청한다. 파일이 없으면 Cloudflare가
+    # 빈 200을 돌려줘 네이버가 '소프트 404'로 색인 제외했다(세션 #40 적발). 루트에 실제 아이콘을
+    # 둬 해소 + 브랜드 노출. .svg는 현대 브라우저용(고해상도).
+    for fav in ("favicon.ico", "favicon.svg"):
+        fav_src = STATIC_DIR / fav
+        if fav_src.exists():
+            shutil.copy2(fav_src, out_dir / fav)
+            written.append(fav)
+
     return {
         "out_dir": str(out_dir),
         "pages": len(written),
