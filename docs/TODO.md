@@ -3,12 +3,11 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #37 — (상세 EVENTS #36)
+## ★ 다음 세션 #38 — (상세 EVENTS #37)
 
-- [ ] **★운영 동기화 (이 세션 코드 반영)** — 운영 폴더 `git pull`(#36 커밋) + **대시보드 재시작**(자동 migrate 009 → Google 지출 트래커 작동) → 설정에서 "Google 월 상한($)" 입력. ※운영 폴더엔 현재 to_spec·yml만 수동반영·나머지(append_category_source·이미지폴백·api_usage·대시보드) 미반영.
-- [ ] **★대표 이미지 채우기** — Google 월 상한(ai.studio/spend) 풀린 뒤 `D:\honsalim_test\3_run_cleanup.bat` 재실행 → 대표이미지 생성 → 대시보드 🚀 빌드·배포.
-- [ ] **리뷰 별개 개선**(적대적 16건 중 미반영) — 대시보드 카탈로그 오염 가시화(승인 전 사람검토 강화)·비전게이트 프롬프트 category_intro 주입·vision cap 커버리지 경고.
-- [ ] (이월) `mini-dehumidifier` 점검 · 쿠팡 본격(15만원 후) · ★성장=트래픽(GSC 색인·[[growth-first-priority]]) · naver_blog 볼륨(`/naver-start`).
+- [ ] **★무인 가동 결정·실행**(핵심) — 대기 키워드/쿠팡 배너 적재 → 자동 생성 몇 편으로 품질 직접 확인 → 좋으면 `auto_mode` ON + 스케줄러 등록(주인 결정·C13 '수동운영' 뒤집기). 무인 모델은 **이미 코드 완비**(#37 검증·끊김 없음). 첫 `min_published`(5)편 사람검수.
+- [ ] **★발행 글 관리 탭 운영 동기화** — 운영 폴더 `git pull`(#37 a5930c6) + 대시보드 재시작 → '발행 글 관리' 탭(발행글 사후 검토·비공개/재공개·라이브링크) 노출.
+- [ ] (이월) `review-helpfulknow` 월 지출 한도(무인 폭주 방지·선택) · 쿠팡 수동 배너 부트스트랩(15만원→API) · 적대적 별개개선(카탈로그 오염 가시화·비전 intro 주입) · `mini-dehumidifier` 점검 · ★성장=트래픽(GSC 색인·[[growth-first-priority]]) · naver_blog 볼륨(`/naver-start`).
 - 참고: 워크트리=`PYTHONPATH=src python -m cli`(대시보드 시작 시 자동 migrate)·DB gitignore→재생성. **main직접머지=`git push origin HEAD:main`**. 운영 DB 직접수정 불가→주인 런처(`D:\honsalim_test\*.bat`). ★PowerShell/cmd 한글→.py·ASCII([[powershell-korean-encoding]]).
 
 ## 시점 의존 잔존 (세션 #6~7)

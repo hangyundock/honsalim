@@ -20,6 +20,7 @@
   - 세션 #29 (2026-06-14~15 ★B-i 무인 자동발행 전체(article_state·guardrail·auto_approve·auto-cycle·auto_mode OFF)+naver_blog 흐름 GUI+미리보기 버그수정+PR 자동머지·구글정책 정정·회귀 806→846)
   - 세션 #30 (2026-06-15 A 키워드 알리 영어검색 근본수정+doctor 게이트 복구+B 진행표시+★첫 라이브 글 발행(게이밍의자)+발행 build/site 커밋버그 적발+글 레이아웃 Tier2 재설계·회귀 846→851)
   - 세션 #31 (2026-06-15 ★카테고리 분류체계(대/중/소)+게이밍의자→'의자' 타입흡수+쿠팡 운영자추천 zone·정식 대가성+추천 8선+라이브 배포·회귀 851 유지·main ea2460e)
+  - 세션 #32 (2026-06-15 운영 DB 반영(#31 미완·주인 런처 이식)+쿠팡 카드 광고차단 폴백+운영 대시보드 4기능(키워드삭제·카테고리쿠팡·원스톱 빌드배포·쿠팡존)+쿠팡 3선 균형 라이브·회귀 851→865·main e3a2219)
 - [EVENTS_202605.md](archive/EVENTS_202605.md):
   - 세션 #1 (2026-05-27 프로젝트 신규 셋업·정밀 조사·5파일 시스템·슬래시 명령 등록)
   - 세션 #2 (2026-05-27~28 Phase 0 설계 12/12 + Phase 1 외부 작업: GitHub·Cloudflare·도메인·R2·D1·Git push)
@@ -39,6 +40,23 @@
   - 세션 #18 (2026-05-31 운영자 1클릭 승인 게이트(O21·build-category draft 고정)·doctor §10 64진입점·★카테고리 페이지 디자인 디버깅(글씨 흐림 진짜원인=backdrop-filter 제거)·회귀 569→590)
 
 ## 최근 5세션
+
+### 세션 #37 — 2026-06-27 (Opus 4.8, ★Google 프로젝트 분리(티스토리 한도 탈출) + 대표이미지 라이브 + 무인 운영모델 정밀검증(이미 구현 확인) + 발행 글 관리 탭, 회귀 950→953, main 푸시)
+
+**시작 상황**: `/honsalim-start`(#36 1608d95). #37-1 운영 동기화 착수 → git은 이미 #36에 동기화돼 있었고(문서가 stale) 대시보드 재시작으로 migration 009 적용. 이후 주인 질문 흐름으로 Google 분리·운영모델 검증·신규 기능까지 확대.
+
+**핵심 [확정]** (검증·main):
+1. **운영 동기화 실태 확정**: 운영 폴더 = origin/main = 1608d95(=#36 전체 코드) **이미 동기화**·STATE의 "미반영"은 stale. 대시보드 재시작→migration 009 적용(`api_usage` 생성). **GOOGLE_API_KEY 실제 경로 정정 = `D:\secrets\affiliate_hub\GOOGLE.env`**(STATE의 honsalim.env는 코드가 안 읽음·`config.load_secrets`가 affiliate_hub\*.env만 로드).
+2. **★Google 프로젝트 분리(근본 해결)**: 혼살림 Imagen이 티스토리와 한 프로젝트(Tstory Gemini·₩40,000 한도)를 공유 → 티스토리가 한도 소진 시 혼살림 이미지 429(=#36 대표이미지 막힘 원인). → 빈 `review-helpfulknow` 프로젝트(이미 Tier1 후불=결제 연결)로 키 발급·GOOGLE.env 교체 → 실제 이미지 1장 생성으로 **429 없이** end-to-end 입증. 티스토리와 한도 독립.
+3. **#37-2 대표 이미지 라이브**: mini-rice-cooker 히어로 생성(`3_run_cleanup.bat`·새 키)→빌드·배포→`honsallim.com/categories/mini-rice-cooker/` 라이브 검증(이미지 HTTP 200·50KB webp·페이지 히어로 참조). main **3b6d46c**.
+4. **★무인 운영모델 정밀검증(워크플로우 6지점)**: 주인 모델(대기키워드+쿠팡 배너 저장→스케줄 자동 생성·발행→무관여)이 **이미 코드 전부 구현**됨 확인 — `target_products` 저장→auto-cycle(쿠팡첨부 우선)→`auto_approve`(fail-closed)→발행, 저장 쿠팡 **항상** 글 포함(끊김 없음). **코드 수정 불요·설정/운영만**(auto_mode ON+스케줄러+키워드/쿠팡+첫 5편 사람검수). 메모리 [[autopublish-operational-model]]·상세 DECISIONS C21.
+5. **★발행 글 관리 탭(주인 역제안 채택)**: SEO 안전=사전 클릭 아닌 '품질 검수'가 본질(클릭은 구글 신호 0)→내 과잉권고 정정. → 완전 무인 + **발행 글 사후 검토**(AutoBlog식). 대시보드 '발행 글 관리' 탭(목록·라이브링크·비공개/재공개·행더블클릭)+`queries.list_articles`, 기존 `unpublish/republish`(#29) UI 연결·비공개 시 sitemap 제외. 수정 미구현(=비공개+재생성). 회귀 950→**953**. main **a5930c6**.
+
+**무인·안전(§0)**: auto_mode 기본 OFF·자동승인 fail-closed·첫 5편 사람검수·발행글 2겹 그물(monitor 자동비공개+사람). Google 분리로 티스토리 한도 영향 제거.
+
+**잔존/다음(#38)**: ①**무인 가동 결정·실행**: 키워드/쿠팡 적재→자동 생성 몇 편으로 품질 확인→좋으면 auto_mode ON+스케줄러 등록(주인 결정·C13 수동운영 뒤집기). ②발행 글 관리 탭 **운영 동기화**(운영 폴더 `git pull`(#37 a5930c6)+대시보드 재시작). ③(이월) review-helpfulknow 월 상한(안전)·쿠팡 수동 배너 부트스트랩·★성장=트래픽(GSC 색인).
+
+---
 
 ### 세션 #36 — 2026-06-27 (Opus 4.8, ★provision-category 첫 라이브 실증 + 라이브 버그3종 근본수정 + 근본자동화 + 적대적리뷰 7건 보강 + Google지출 트래커, 회귀 932→950, main 푸시)
 
@@ -106,22 +124,4 @@
 
 ---
 
-### 세션 #32 — 2026-06-15 (Opus 4.8 1M, ★운영 DB 반영 + 쿠팡 카드 광고차단 폴백 + 운영 대시보드 4기능 + 쿠팡 3선 균형 라이브, 회귀 851→865, main e3a2219)
-
-**시작 상황**: `/honsalim-start`(워크트리 tender-jennings·#31 da4f7eb). #31 최우선 미완='운영 DB 반영'. 라이브 검증 중 추가 요청 누적.
-
-**핵심 [확정]** (전부 라이브 배포·검증):
-1. **★운영 DB 반영(#31 미완 해소)**: #31 승인 상태(의자·8선·가이드)가 워크트리 복사본 DB(upbeat-davinci)에만·운영 DB 미반영. ★**운영 DB 직접수정=Claude 불가**(deny rule + auto-mode 분류기 + 권한 자기부여 하드차단) → **주인 실행 원클릭 런처**(★ASCII 경로/.bat — 한글이면 cmd 코드페이지 깨짐)로 백업→sqlite backup 이식→검증→실패 시 자동복구. 감지함수 자기오인 버그(검사 powershell이 'dashboard.app' 자기매칭)+대시보드 닫힘 대기형 근본수정. 운영 DB ALL_PASS 이식.
-2. **★쿠팡 카드 광고차단 폴백**: 라이브 쿠팡 이미지 빈 박스=주인 uBlock이 `coupangcdn /affiliate/banner/` URL 차단(이미지·CSP·핫링크는 정상 확인). 빈 박스→플레이스홀더(쿠팡="🛒 쿠팡 추천 상품"/알리="🛒 상품 보기"·`p.coupang` 구분·매크로 onerror→`.timg.noimg` + `category.css .timg-ph`). 커밋 **c27c3c2** 라이브 검증(css 해시 e4ccd0fb).
-3. **★운영 대시보드 4기능**(주인 요청·main **4118551**): **키워드 삭제**(키워드 탭 🗑·`cmd_keyword_delete`·연결 미발행 draft 동반·발행글 차단=라이브보호) · **카테고리 쿠팡 추가/제거**(`collector.category_coupang` 배너→products 업서트→category_products 링크·`cmd_category_coupang_*`·카테고리·모니터링 탭) · **원스톱 빌드·배포**(🚀·`cmd_build_deploy`=`refresh_cycle` 검증 로직 재사용·refresh/killswitch 끔) · **쿠팡존 레이아웃**(grid→flex+폭제한·1~3개 균형). 회귀 851→**865**(+14)·black/ruff/mypy·doctor 0.
-4. **★EVENTS #30 배포 버그 근본 우회 [확정·실증]**: `deployer.git_push`=stub(commit 안 함·push만)→'클릭만으론 build/site 미커밋'(무인 치명). 빌드·배포 버튼은 `refresh_cycle`(DEPLOY_PATHS=build/site·functions/go commit+push) 사용 → 주인이 직접 클릭해 **쿠팡 3선+레이아웃 라이브 도달**(main **e3a2219**·go-링크 3개)로 실증.
-
-**운영 롤아웃 [확정]**: 신규 대시보드 코드는 운영 폴더(D:\affiliate_hub) **git pull(clean FF)+대시보드 재시작** 후 노출(원클릭 UPDATE.bat 제공). 주인 실사용: 중복 키워드 2개 삭제(연결 draft 3건 동반)→office-chair 쿠팡 2개 추가(총 3)→🚀 빌드·배포→라이브 3선 균형 검증 완료.
-
-**무인·안전(§0)**: 운영 DB 보호 가드 끝까지 유지(우회 안 함·주인=실행 주체). 빌드·배포 killswitch 끔(카테고리 임의 비공개 방지). 가짜 데이터 0(쿠팡=주인 진짜 배너).
-
-**잔존/다음(#33)**: ①**★실제 제품 추가 배포 테스트(주인 명시)**: 실제 쿠팡 제품을 카테고리에 추가→빌드·배포로 이번 기능 동작 검증. ②부산물: `category_products.product_type` 컬럼(운영 DB·미사용)·옛 워크트리·바탕화면 런처 3폴더(`honsalim_db_apply`·`honsalim_update`·`혼살림DB반영`) 정리(주인). ③(이월) PartC 키워드 틈점수·mini-dehumidifier·★성장 Tier0([[growth-first-priority]]). ★워크트리=`PYTHONPATH=src python -m cli`·DB gitignore·main직접머지=`git push origin HEAD:main`·★PowerShell/cmd 한글 깨짐→.py·ASCII([[powershell-korean-encoding]]).
-
----
-
-> (세션 #19~#31은 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
+> (세션 #19~#32은 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
