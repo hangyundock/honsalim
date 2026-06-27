@@ -7,11 +7,11 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#39: 무인 발행 블로커 근본수정(A·B·C 라이브검증) + 비판검증 + 자가복원 1차** — 라이브 스케줄 테스트(21:26·22:02)로 적발·수정: Ⓐ쿠팡 수동배너가 자동승인 카테고리 exclude로 거부→`source=coupang` 면제 Ⓑ사무의자 키워드 미매핑 보류→office-chair secondary 추가 Ⓒ키워드 글이 광의 카테고리어로 seo rejected→`keyword_gate_config`(키워드 자신을 primary). 무중력의자 라이브 발행(`kw-95e2ad52`·200). 이후 자가복원 3제안을 비판가 5인(코드근거)으로 적대검증→채택안 1차 구현: `publishability` 단일판정·보류 `reason_code`·사이클 health 다이제스트/[ALERT](파일·로그 채널)·생성 예외격리·발행가능 우선선정. 회귀 961→**989**. main 푸시. 상세 EVENTS #39 | 2026-06-27 #39 |
+| 진행 단계 | **#40: 성장 — 색인 토대 감사·정비(라이브 검증)** — 6차원 감사(코드+라이브)+적대검증. 근본수정: ①**발행 글 고아 해소**(시나리오 active=0 의존 깨짐→홈·가이드·토픽카테고리 내부링크) ②**Article JSON-LD 렌더 재생성**(canonical 끝슬래시·headline 일관) ③**사이트맵 lastmod**(발행글) ④**파비콘**(네이버 소프트404 `/favicon.ico`) ⑤**robots `/cdn-cgi/` 제외**(GSC 404). build-deploy 라이브 + curl 전수 검증. ★**GSC·네이버 둘 다 등록·사이트맵·크롤링 정상 확정**(감사 [확인불가] 해소)—병목=색인 커버리지. 회귀 989→**996**. main **a8697b8**. 상세 EVENTS #40 | 2026-06-28 #40 |
 | 운영 모델 | **★완전무인 가동 ON**: auto_mode ON·예약 **22:02 KST**·`auto_approve_min_published`=**0**. 키워드+쿠팡 적재→스케줄 auto-cycle 자동 생성·승인·발행→무관여. 발행글 사후검토(발행 글 관리 탭 + monitor 2겹) + **#39 무인 자기보고**(사이클 health 다이제스트 `data/auto_cycle_last.json` + 발행0편 위험 시 [ALERT] 로그·대시보드 미의존). 자동 "승인" 금지(E7)는 min_published로 완화—주인 0 선택 | #39 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·Secrets·main-protect)·Cloudflare(도메인·Pages·R2·D1)·Anthropic·INDEXNOW 키·secrets·Git push·pre-commit 9종·Dependabot (세부 archive) | #3 |
 | Phase 2 핵심 모듈 (#3~#5) | cli·common·validator·writer·collector·enricher·builder·deployer·tracker·workers (세부 BACKEND §2) + **#17: category_collect·category_page_builder·concept_image·category_writer** | #17 |
-| Phase 2 회귀 테스트 | **989 / 989 PASS** [확정 pytest, #39] — #39 +28(A·B·C 13 + 자가복원 1차 15) · #38 +8 · #37 +3. black·ruff·mypy(75파일) 클린 | 2026-06-27 |
+| Phase 2 회귀 테스트 | **996 / 996 PASS** [확정 pytest, #40] — #40 +7(고아·JSON-LD/lastmod·favicon·robots) · #39 +28 · #38 +8. black·ruff·mypy 클린 | 2026-06-28 |
 | CLI 명령 (BACKEND §9) | **40개** — doctor·db·collect·enrich·validate·approve·promote·build(+`--preview`)·deploy·dashboard · 카테고리(collect/build/approve/unapprove/register-categories·suggest-categories·provision-category) · 운영(keyword-add/generate/list/recommend·coupang-add·publish-queue·schedule·auto-cycle·refresh-cycle·build-deploy·monitor-articles·unpublish/republish-article·keyword-delete·category-coupang-*) | #35 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD. 세부 DECISIONS J·O + EVENTS | #4~#16 |
 | doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **71개** + #19 LLM 키 점검. 71/71 OK [#29 +keyword_relevance·article_state×2·article_guardrail×2·auto_approve] | #29 |
@@ -19,7 +19,7 @@
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (docs/ 참조). 일관성 모순 0건 | #2 |
 | 메모리 시스템 | feedback 7건([[incremental-critical-review]]·[[autonomous-safe-system]] 등) + reference market_research + MEMORY.md | #12 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
-| 사이트 게시글 / 트래픽 / 수익 | **라이브 공개 카테고리=6개**(featured 8·비교 8 통일). **정식 글 2편**: kw-625b3b85('모니터받침대'·#38) + **kw-95e2ad52('무중력의자'·#39 ★쿠팡면제 수정 후 무인 발행·라이브 200)**. + 쿠팡 승인용 `/reviews/`. 측정(Cloudflare·GSC·네이버). 수익=/go/→302. 대표이미지 6/6. ★**성장=색인·트래픽이 다음 최우선**([[growth-first-priority]]). collector.coupang(API)=15만원 후 | #39 |
+| 사이트 게시글 / 트래픽 / 수익 | **라이브 카테고리 6개** + **정식 글 2편**(kw-625b3b85 모니터받침대·kw-95e2ad52 무중력의자). #40 색인 토대 정비 라이브: 글 내부링크(고아 해소)·파비콘·JSON-LD·사이트맵 lastmod. ★**색인 현황(#40 확인)**: GSC 색인 **4**/미색인 29(robots 16=의도된 `/go/`·404 1=cdn-cgi 무해·**발견-미색인 12**=신생 정상·내부링크가 레버), 네이버 색인 4·**16노출/0클릭**(롱테일이 콘텐츠와 일치). ★**다음 레버=색인 커버리지↑**([[growth-first-priority]])—URL 색인 요청·내부링크 효과 1~2주 관찰 | #40 |
 
 ## 인프라
 
@@ -28,7 +28,7 @@
 | 프로젝트 폴더 | `D:\affiliate_hub\` (docs·archive·.claude/commands 하위) |
 | 사이트 / 도메인 | 혼살림 / **honsallim.com**(신·겹ㄹ·알리 'ali' 차단 회피·Cloudflare Pages 커스텀도메인 연결·SSL Active·**라이브**, 만료 2027-06-01·Auto Renew) + honsalim.com(구·만료 2027-05-28·**→honsallim 301 Page Rule** 적용·경로보존) |
 | 호스팅 | **Cloudflare Pages `honsalim`** + Custom domain (Dugi2020@naver.com) |
-| GitHub | **`hangyundock/honsalim` Public** — origin/main = **#37 (a5930c6 · 발행 글 관리 탭=무인 발행 사후검토)**, CI green. **build-and-deploy: main push → 커밋된 build/site Cloudflare Pages 배포 (CI 재빌드 없음, 글 DB 로컬)**. ★**빌드·배포는 `cmd_build_deploy`(refresh_cycle)가 build/site·functions/go를 commit+push** — `deployer.git_push` stub의 '미커밋' 버그 근본 우회(#32). wrangler `--commit-message`(ASCII)+`--commit-dirty` 유지. ※**운영 폴더(D:\affiliate_hub)는 #34(e9e3fd2)로 git pull 동기화함**(이번 세션·clean FF·13커밋). 워크트리는 origin/main 기준 |
+| GitHub | **`hangyundock/honsalim` Public** — origin/main = **#40 (a8697b8 · 색인 토대 정비)**, CI green. **build-and-deploy: main push → 커밋된 build/site Cloudflare Pages 배포 (CI 재빌드 없음, 글 DB 로컬)**. ★**빌드·배포는 `cmd_build_deploy`(refresh_cycle)가 build/site·functions/go를 commit+push** — `deployer.git_push` stub의 '미커밋' 버그 근본 우회(#32). wrangler `--commit-message`(ASCII)+`--commit-dirty` 유지. ※**운영 폴더(D:\affiliate_hub)=#40 a8697b8 동기화**(빌드·배포가 origin 전진→병합 후 ff pull). 워크트리는 origin/main 기준 |
 | GitHub Secrets / Branch Protection | CF_API_TOKEN · CF_ACCOUNT_ID · INDEXNOW_KEY 등록 / ruleset `main-protect` Active |
 | R2 / D1 | `honsalim-images` (APAC) / `honsalim-clicks` ID `9bae858e-456f-40e7-8084-c3b90e4ec3ca` |
 | Python | 3.10 32-bit (TIMA·AutoBlog 시스템 공유) |
@@ -58,10 +58,11 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 다음 세션 #40 — 상세 EVENTS #39
-1. **★성장(검색노출·트래픽) 최우선**([[growth-first-priority]]·주인 #39 선택): ①**색인 토대 점검·정비**(GSC 색인·사이트맵·IndexNow·네이버 서치어드바이저가 **실제 작동 중인지** 확인하고 빈 것 정비) ②**씨앗 커버리지 확장**(seo_keywords.yml — '미매핑' 근본 해소·자동발행 산출 증가) ③E-E-A-T(about/Person Schema). + 무인 일일 발행(22:02) 품질 사후검토 + `[ALERT]` 로그·`auto_cycle_last.json` 확인. 무인 표준=`docs/AUTOMATION.md`(필독).
-2. (선택·급하지 않음) **Phase 2 자가복원**: ali off-target graceful-degrade · 배포 drift 가드 · 능동 푸시 채널 · `run_auto_cycle.ps1` git pull footgun 정정. + (이월) review-helpfulknow 월 상한 · 쿠팡 부트스트랩(15만원→API) · mini-dehumidifier.
-- 워크트리=`PYTHONPATH=src python -m cli`. DB gitignore→재생성(대시보드 시작 시 자동 migrate). main직접머지=`git push origin HEAD:main`. ★PowerShell/cmd 한글→.py·ASCII([[powershell-korean-encoding]]). 운영 DB 직접수정 불가→주인 런처. ★무인 발행이 origin 전진([[autonomous-deploy-advances-origin]])—푸시 전 ff 재동기화.
+### ★ 다음 세션 #41 — 상세 EVENTS #40
+1. **★성장 — 색인 커버리지 관찰·가속**([[growth-first-priority]]): #40 배포(내부링크·favicon·robots)로 GSC/네이버 색인 페이지가 **4→증가**하는지 1~2주 관찰. 핵심 페이지 URL 색인 요청(GSC `URL 검사`·네이버 `웹 페이지 수집`). robots `/cdn-cgi/` 라이브 반영=다음 빌드·배포 시(무해·급하지 않음).
+2. **[관찰] 무인 스케줄러 실작동 점검** — 대시보드 '무인 사이클 마지막 실행=**2026-06-06**' 표시. 22:02 자동 발행이 **실제 매일 도는지** 확인(미작동이면 '완전무인'인데 발행 0). #40 미점검.
+3. (이월) 씨앗 커버리지 확장(seo_keywords.yml 미매핑)·E-E-A-T(about/Person Schema)·Phase 2 자가복원(ali off-target·배포 drift·푸시채널·git pull footgun)·review-helpfulknow 월상한·쿠팡 부트스트랩(15만원→API).
+- 워크트리=`PYTHONPATH=src python -m cli`(자동 migrate). main직접머지=`git push origin HEAD:main`. ★PowerShell/cmd 한글→.py·ASCII([[powershell-korean-encoding]]). 운영 DB 직접수정 불가→주인 런처. ★무인 발행이 origin 전진([[autonomous-deploy-advances-origin]])—푸시 전 ff/merge. ★Edit 절대경로 = 운영 폴더(워크트리 아님) 주의([[worktree-edit-path-footgun]]).
 
 ### Phase 2 진척 가능 (검토 의존 큼)
 - `src/builder/manifest.py` 증분 빌드 (ARCH §7·DB §10) · `src/collector/coupang.py` (Phase 4)

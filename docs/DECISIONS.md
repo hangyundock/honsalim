@@ -309,6 +309,17 @@
 - **X5. publishability 단일판정 + 발행가능 우선선정 + 생성 예외격리 [확정 #39]**: `keyword_relevance.publishability(keyword)` = 생성 전 판정 가능한 발행가능성(매핑 필요조건·`eligible` 미매핑 보류와 정확히 일치)을 선정·가시화의 **단일 소스**로(`resolve_category` 호출 드리프트 방지). `auto_pick_keyword`는 매핑된(발행가능) 키워드 우선 — **skip·삭제 아님**(전량 미매핑이면 기존 동작 보존·큐에 남아 digest가 보고). `cmd_auto_cycle` 글생성 루프를 try로 감싸 DeepSeek 예외(429/네트워크)가 사이클을 죽이거나 `generating` 좀비를 남기지 않게 failed 복원·계속.
 - **X6. ★자가복원 = '거부/skip'보다 '강등 + 자기보고' [확정 #39, 비판가 결론·설계 원칙]**: 비판가 5인이 초기 3제안(입구차단·skip·대시보드알림)의 결함(추천엔진 자기파괴·'발행불가'는 생성前 판정 불가·무인 중 대시보드 미열람·min_published 오경보)을 코드근거로 적발. 채택 원칙: **fail-safe(나쁜 글 자동발행 안 됨)는 이미 견고 / 부족한 건 fail-loud(무인에서 작동하는 자기보고)** → 막힌 키워드를 *지우지 말고* 후순위로 두되 *왜 막혔는지* `reason_code`로 분류해 파일/로그로 보고. 잔존 Phase 2: ali off-target graceful-degrade·배포 drift 가드·능동 푸시 채널·`run_auto_cycle.ps1` git pull footgun(stderr를 예외처리하는 cosmetic — 진짜 실패도 묻힘).
 
+## Y. 색인 토대 정비 (성장) [확정] — 세션 #40 신규
+
+> 6차원 색인 토대 감사(코드+라이브)+적대검증으로 적발한 결함을 근본수정·라이브 검증. 상세 EVENTS #40. [[growth-first-priority]].
+
+- **Y1. 검색엔진 토대 = 구글·네이버 둘 다 정상 [확정 #40, 주인 콘솔 확인]**: GSC=도메인속성(DNS 인증)·sitemap.xml 제출(6/3)·상태 성공(15발견)·색인 4. 네이버 서치어드바이저=등록·소유확인(meta 토큰 base.html)·sitemap 제출·색인 4·16노출. **토대(등록·사이트맵·크롤링)는 처음부터 문제 아님** — 병목은 색인 커버리지(신생 사이트·내부링크 약함). IndexNow는 전체 미구현(never-written)이나 Bing/Yandex용이라 구글·네이버 색인과 무관.
+- **Y2. 발행 글 = 시나리오 무관 내부링크 필수 (고아 방지) [확정 #40, 근본수정]**: 글이 시나리오 카드(active=1 시나리오에 글 연결)로만 닿도록 설계 → 묶인 시나리오가 active=0이면 사이트맵에만 존재하는 고아(색인돼도 크롤·트래픽 0). 시나리오 상태와 무관하게 항상 글로 닿는 통로 — 홈 '추천 가이드' 섹션·구매가이드 허브 글 섹션·토픽 매핑 카테고리 글 링크(`_article_guide_cards`·`guides_by_cat`·홈 8편 cap). 라이브 검증 inbound 0→복수. 가드 `TestArticleInternalLinks`.
+- **Y3. Article JSON-LD = 렌더 시점 재생성(단일 진실원) [확정 #40]**: 저장본(`articles.schema_jsonld`)을 그대로 쓰면 생성기 수정이 기존 글에 반영 안 됨 → 발행 글은 렌더 시점에 `build_article_jsonld` 재생성(draft는 저장본). mainEntityOfPage 끝슬래시=canonical 일치(IDX-04), headline=글 제목(title·h1·headline 3중 분산 해소, IDX-03), datePublished=발행일·image=히어로. jsonld.py 생성기도 끝슬래시.
+- **Y4. 사이트맵 lastmod = 발행 글만(정적·카테고리 생략) [확정 #40]**: 발행 글 published_at→`<lastmod>`(무인 일일 발행 재크롤 신호). 정적·카테고리는 변경일 모호 → **부정확 lastmod는 신뢰 떨구므로 생략**. `_sitemap`이 (url,lastmod) 튜플 수용.
+- **Y5. 파비콘 루트 배포 = 소프트404 방지 [확정 #40, 네이버 적발]**: `/favicon.ico` 부재 → Cloudflare 빈 200 → 네이버·GSC가 소프트404로 색인 제외. 브랜드 파비콘(녹색+흰집·폰트 의존 없는 도형·Pillow 멀티사이즈 .ico + .svg) 루트 배포(renderer가 static→루트 복사) + base.html `<link rel=icon>`. 라이브 image/x-icon 200 확인.
+- **Y6. robots.txt `Disallow: /cdn-cgi/` [확정 #40]**: Cloudflare 이메일 보호(`/cdn-cgi/l/email-protection`)가 GSC 404로 잡힘 — 무해하나 검색봇 크롤 제외로 정리(이메일 보호·실사용자 동작 무영향). `/go/`(제휴) 차단과 한 줄로.
+
 ## 폐기된 결정 (역사 참조용)
 
 | 폐기일 | 결정 | 폐기 사유 |
