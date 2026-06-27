@@ -209,6 +209,7 @@ class TestRenderSite:
         robots = (built["out"] / "robots.txt").read_text(encoding="utf-8")
         assert "Sitemap: https://honsallim.com/sitemap.xml" in robots
         assert "Disallow: /go/" in robots  # 제휴 redirect 색인 제외
+        assert "Disallow: /cdn-cgi/" in robots  # Cloudflare 내부(이메일 보호) 크롤 제외(#40)
         headers = (built["out"] / "_headers").read_text(encoding="utf-8")
         # 정적 자산: 1년 immutable (성능)
         assert "Cache-Control: public, max-age=31536000, immutable" in headers

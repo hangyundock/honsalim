@@ -69,8 +69,12 @@ def clean_product_name(raw: str, max_len: int = 44, max_parts: int = 3) -> str:
     return name or "추천 상품"
 
 
-# robots.txt — /go/ 게이트웨이(제휴 redirect)는 색인 제외, sitemap 안내
-ROBOTS_TXT = f"User-agent: *\nAllow: /\nDisallow: /go/\n\nSitemap: {SITE_ORIGIN}/sitemap.xml\n"
+# robots.txt — /go/ 게이트웨이(제휴 redirect) 색인 제외, /cdn-cgi/(Cloudflare 내부·이메일
+# 보호 등) 크롤 제외(GSC 404 'cdn-cgi/l/email-protection' 정리·세션 #40), sitemap 안내.
+ROBOTS_TXT = (
+    f"User-agent: *\nAllow: /\nDisallow: /go/\nDisallow: /cdn-cgi/\n\n"
+    f"Sitemap: {SITE_ORIGIN}/sitemap.xml\n"
+)
 
 # Cloudflare Pages _headers — 정적 자산 장기 캐시 + 기본 보안 헤더 (FRONTEND §9 / POLICY §6)
 HEADERS_FILE = (
