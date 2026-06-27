@@ -1119,3 +1119,9 @@ class TestArticleAsCategory:
         ]
         cmp = renderer._build_article_compare(picks, limit=len(picks))
         assert len(cmp["cols"]) == 8  # 8개 픽 → 8열 (옛 limit 6이면 6)
+
+    def test_article_featured_follows_per_tier(self) -> None:
+        """글 픽 개수 = featured_per_tier (글·카테고리 통일·#38). 옛 k=4 하드코딩이면 항상 4였다."""
+        cards = [{"volume": i, "disc_num": 0} for i in range(10)]
+        assert len(renderer._article_featured(cards, 4)) == 4  # 티어당 4 → 총 8
+        assert len(renderer._article_featured(cards, 3)) == 3  # 티어당 3 → 총 6 (설정 따라감)

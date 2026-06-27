@@ -29,7 +29,7 @@ from markupsafe import Markup
 
 from builder import jsonld
 from collector import product_filter
-from common import db
+from common import db, settings
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 TEMPLATES_DIR = PROJECT_ROOT / "templates"
@@ -527,11 +527,16 @@ def _article_page_ctx(
     ali_cards = [p for p in products if p["source"] != "coupang"]
     # 알리 2티어(💰실속/⭐고급) 분할 + 티어별 추천 featured (CATEGORY_PAGE §2-7)
     budget_cards, premium_cards = _article_tier_split(ali_cards)
+    # 글·카테고리 동일 개수(정형성)로 — featured_per_tier 단일 소스(#38). 옛 k=4 하드코딩은 설정
+    # 변경 시 글만 8 고정돼 카테고리와 어긋났다. 이제 둘 다 featured_per_tier를 따른다.
+    _per_tier = settings.get_int("featured_per_tier")
     picks_budget = [
-        _article_pick_item(c, "budget", "💰 실속형") for c in _article_featured(budget_cards)
+        _article_pick_item(c, "budget", "💰 실속형")
+        for c in _article_featured(budget_cards, _per_tier)
     ]
     picks_premium = [
-        _article_pick_item(c, "premium", "⭐ 고급형") for c in _article_featured(premium_cards)
+        _article_pick_item(c, "premium", "⭐ 고급형")
+        for c in _article_featured(premium_cards, _per_tier)
     ]
     # 쿠팡 = 상단 별도 '운영자 추천' zone (주인 결정 #31)
     coupang_picks = [_article_coupang_pick(c) for c in coupang_cards]

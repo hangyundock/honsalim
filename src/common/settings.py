@@ -32,7 +32,7 @@ DEFAULTS: dict[str, Any] = {
     # 사람이 N편 직접 승인·발행해 품질을 확인한 뒤 자동 승인으로 전환(autonomous-safe-system).
     "auto_approve_min_published": 5,
     # ── 추천/품질 ──
-    "featured_per_tier": 3,  # 티어별 추천 수 (실속+고급 = 총 6). category_page_builder 정합
+    "featured_per_tier": 4,  # 티어별 추천 수 (실속+고급 = 총 8·#38 글/카테고리 통일). builder·renderer 공용
     "satisfaction_floor": 80.0,  # 알리 긍정 피드백율 하한 % (006 신호 필터)
     "seo_max_attempts": 2,  # SEO 게이트 재생성 상한 (카테고리 페이지 — 비용 방지 CLAUDE §6)
     "enrich_max_attempts": 2,  # 키워드 글 5게이트 재생성 상한 (세션 #33 무인 자가복원 — 비용 방지)
