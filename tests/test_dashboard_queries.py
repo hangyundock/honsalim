@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+from typing import ClassVar
 
 from dashboard import queries
 
@@ -103,6 +104,117 @@ class TestStats:
         assert stats["keywords_gate_failed"] == 1  # '반려' 격리만(상품확보 실패 failed는 제외)
         assert stats["keywords_retrying"] == 1  # pending + fail_count>0
         assert stats["articles_unpublished"] == 1
+
+
+class TestAutoForecastAndBanner:
+    """★세션 #41 — 무인 발행 예측(쿠팡 재고 런웨이) + 3줄 안내 배너 (naver_blog UX 미러)."""
+
+    CFG: ClassVar[dict[str, object]] = {
+        "auto_mode": True,
+        "publish_per_day": 1,
+        "schedule_time": "11:11",
+        "coupang_mode": "manual",
+        "coupang_low_threshold": 2,
+    }
+
+    def _seed(self, conn: sqlite3.Connection) -> None:
+        # 쿠팡 첨부 2개('의자' = office-chair 매핑) + 미첨부 1개
+        conn.executescript("""
+            INSERT INTO keyword_queue (keyword, slug, status, score, target_products)
+              VALUES ('등받이의자','a','pending',500,'[{"source":"coupang"}]');
+            INSERT INTO keyword_queue (keyword, slug, status, score, target_products)
+              VALUES ('메쉬의자','b','pending',300,'[{"source":"coupang"}]');
+            INSERT INTO keyword_queue (keyword, slug, status, score, fail_count)
+              VALUES ('서재책상','c','pending',100,1);
+            """)
+        conn.commit()
+
+    def test_forecast_counts_and_order(self) -> None:
+        from datetime import datetime
+
+        conn = _full_db()
+        self._seed(conn)
+        now = datetime(2026, 7, 3, 9, 0)  # 예약(11:11) 전 → 오늘부터
+        fc = queries.auto_forecast(conn, self.CFG, now)
+        assert fc["pending"] == 3
+        assert fc["coupang_pending"] == 2
+        assert fc["retrying"] == 1
+        # 소비 순서: 쿠팡 첨부(점수순) 먼저 → 미첨부
+        names = [p["keyword"] for p in fc["picks"]]
+        assert names[:2] == ["등받이의자", "메쉬의자"]
+        # 예약 전이므로 첫 발행일 = 오늘
+        assert fc["dates"][0].date() == now.date()
+
+    def test_forecast_after_schedule_starts_tomorrow(self) -> None:
+        from datetime import datetime, timedelta
+
+        conn = _full_db()
+        self._seed(conn)
+        now = datetime(2026, 7, 3, 12, 0)  # 예약(11:11) 지남 → 내일부터
+        fc = queries.auto_forecast(conn, self.CFG, now)
+        assert fc["dates"][0].date() == (now + timedelta(days=1)).date()
+
+    def test_banner_ok_when_stock_sufficient(self) -> None:
+        from datetime import datetime
+
+        conn = _full_db()
+        self._seed(conn)
+        conn.execute(
+            "INSERT INTO keyword_queue (keyword, slug, status, score, target_products) "
+            "VALUES ('허리편한의자','d','pending',200,'[{\"source\":\"coupang\"}]')"
+        )
+        conn.commit()  # 쿠팡 3편 > 기준 2 → ok
+        lines, level = queries.banner_lines(conn, self.CFG, datetime(2026, 7, 3, 9, 0))
+        assert level == "ok"
+        assert len(lines) == 3
+        assert "완전 무인 ON" in lines[0]
+        assert "3편" in lines[1] and "수익 링크" in lines[1]
+        assert "충분" in lines[2]
+
+    def test_banner_caution_when_stock_low(self) -> None:
+        from datetime import datetime
+
+        conn = _full_db()
+        self._seed(conn)  # 쿠팡 2편 <= 기준 2 → caution
+        lines, level = queries.banner_lines(conn, self.CFG, datetime(2026, 7, 3, 9, 0))
+        assert level == "caution"
+        assert "쿠팡 첨부(저장)" in lines[2]
+
+    def test_banner_alert_when_no_coupang(self) -> None:
+        from datetime import datetime
+
+        conn = _full_db()
+        conn.execute(
+            "INSERT INTO keyword_queue (keyword, slug, status, score) "
+            "VALUES ('서재책상','x','pending',100)"
+        )
+        conn.commit()
+        lines, level = queries.banner_lines(conn, self.CFG, datetime(2026, 7, 3, 9, 0))
+        assert level == "alert"
+        assert "쿠팡" in lines[2]
+
+    def test_banner_alert_on_gate_failed(self) -> None:
+        from datetime import datetime
+
+        conn = _full_db()
+        self._seed(conn)
+        conn.execute(
+            "INSERT INTO keyword_queue (keyword, slug, status, status_reason) "
+            "VALUES ('게이밍책상','y','failed','검증 반려 3회(상한 도달) — 수동 검토 필요')"
+        )
+        conn.commit()
+        lines, level = queries.banner_lines(conn, self.CFG, datetime(2026, 7, 3, 9, 0))
+        assert level == "alert"
+        assert "반려" in lines[2] and "재시도" in lines[2]
+
+    def test_banner_off_mode(self) -> None:
+        from datetime import datetime
+
+        conn = _full_db()
+        cfg = dict(self.CFG, auto_mode=False)
+        lines, level = queries.banner_lines(conn, cfg, datetime(2026, 7, 3, 9, 0))
+        assert level == "caution"
+        assert "무인 OFF" in lines[0]
 
 
 class TestListKeywords:

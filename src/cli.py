@@ -2614,6 +2614,11 @@ def _auto_cycle_digest_and_alert(
     retrying = conn.execute(
         "SELECT COUNT(*) FROM keyword_queue WHERE status='pending' AND fail_count > 0"
     ).fetchone()[0]
+    # 쿠팡 첨부 대기 재고(세션 #41) — 소진 전 미리 알림용(수익 링크가 끊기지 않게·주인 지시).
+    coupang_pending = conn.execute(
+        "SELECT COUNT(*) FROM keyword_queue WHERE status='pending' "
+        "AND target_products IS NOT NULL AND target_products NOT IN ('','[]')"
+    ).fetchone()[0]
     gate_failed_kws = [str(k[0]) for k in gate_failed]
     abnormal = approved_n == 0 and (problem_held > 0 or (len(pend) > 0 and publishable == 0))
     digest: dict[str, Any] = {
@@ -2626,6 +2631,7 @@ def _auto_cycle_digest_and_alert(
         "queue_publishable": publishable,
         "queue_blocked_by_code": dict(blocked),
         "queue_retrying": int(retrying),
+        "queue_coupang_pending": int(coupang_pending),
         "queue_gate_failed": len(gate_failed_kws),
         "gate_failed_keywords": gate_failed_kws,
         "abnormal": abnormal,
@@ -2650,6 +2656,73 @@ def _auto_cycle_digest_and_alert(
             "대시보드에서 검토·수정 후 재생성(pending 복귀)하세요."
         )
     return digest
+
+
+def _auto_cycle_notify(digest: dict[str, Any], publish_rc: int | None) -> None:
+    """무인 사이클 결과를 텔레그램으로 발송 (세션 #41 푸시 채널 — #39 이월 과제).
+
+    두 종류를 한 메시지로: ①일일 리포트(telegram_daily_report=True일 때 매일 — 하트비트 겸용:
+    예약 시각 후 안 오면 스케줄러/PC 죽음 신호) ②경보(발행 0 위험·게이트 반려 상한·쿠팡 첨부
+    소진 임박·발행 실패 — 리포트 OFF여도 발송). secrets 미설정이면 조용히 무동작.
+    발송 실패는 사이클에 절대 영향 없음(§0 격리 — notify가 예외를 삼킴).
+    """
+    from datetime import date
+
+    from common import config, notify
+
+    try:
+        config.load_secrets()
+    except Exception:  # secrets 로드 실패도 사이클을 막지 않음(§0)
+        return
+    if not notify.telegram_ready():
+        return
+
+    cp = int(digest.get("queue_coupang_pending", 0))
+    low = settings.get_int("coupang_low_threshold")
+    alerts: list[str] = []
+    if digest.get("abnormal"):
+        alerts.append(
+            f"🚨 발행 0편 위험 — 발행대기 {digest.get('approved_pending_publish', 0)}편·"
+            f"큐 발행가능 {digest.get('queue_publishable', 0)}/{digest.get('queue_pending', 0)}"
+        )
+    if digest.get("queue_gate_failed"):
+        kws = ", ".join(digest.get("gate_failed_keywords", [])[:5])
+        alerts.append(
+            f"🚨 반려(검토 필요) {digest['queue_gate_failed']}건: {kws}"
+            " → 대시보드 키워드 탭 [🔁 반려 재시도] 또는 검토"
+        )
+    if cp == 0:
+        alerts.append(
+            "⚠️ 쿠팡 첨부 대기 0편 — 지금부터 쿠팡 수익 없는 글로 발행됩니다."
+            " 대시보드 [🛒 쿠팡 첨부(저장)]로 보충하세요"
+        )
+    elif cp <= low:
+        alerts.append(
+            f"⚠️ 쿠팡 첨부 대기 {cp}편뿐(약 {cp}일분) — 소진 전 [🛒 쿠팡 첨부(저장)]로"
+            " 보충하면 수익 링크가 끊기지 않습니다"
+        )
+    if publish_rc is not None and publish_rc != 0:
+        alerts.append(f"🚨 발행 단계 실패(rc={publish_rc}) — 로그 확인 필요")
+
+    daily = bool(settings.get("telegram_daily_report", True))
+    if not daily and not alerts:
+        return  # 리포트 OFF + 경보 없음 = 무발송
+
+    retry_n = int(digest.get("queue_retrying", 0))
+    queue_line = f"대기 키워드 {digest.get('queue_pending', 0)}개 (쿠팡 첨부 {cp}개"
+    if retry_n:
+        queue_line += f" · 재시도 대기 {retry_n}건"
+    queue_line += ")"
+    lines = [
+        f"🏠 혼살림 무인 사이클 — {date.today().isoformat()}",
+        f"생성 {digest.get('made', 0)}편 · 자동승인 {digest.get('approved_this_run', 0)}편 · "
+        f"발행 {'완료' if publish_rc == 0 else ('없음' if publish_rc is None else '실패')}",
+        queue_line,
+    ]
+    lines.extend(alerts)
+    if not alerts:
+        lines.append("✅ 조치 필요 없음")
+    notify.send_telegram("\n".join(lines))
 
 
 def cmd_auto_cycle(args: argparse.Namespace) -> int:
@@ -2752,20 +2825,26 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
             conn.execute("SELECT COUNT(*) FROM drafts WHERE status='approved'").fetchone()[0]
         )
         # 무인 자기보고(세션 #39): 사이클 결과·큐 건강을 영속화하고 조용한 정지 위험 시 [ALERT].
-        _auto_cycle_digest_and_alert(conn, made=made, ar=ar, approved_n=approved_n)
+        digest = _auto_cycle_digest_and_alert(conn, made=made, ar=ar, approved_n=approved_n)
     finally:
         conn.close()
+    # 텔레그램 자기보고(세션 #41 푸시 채널) — 모든 종료 경로에서 1회 발송. 실패해도 사이클 무영향.
     if approved_n:
-        return cmd_publish_queue(
+        rc = cmd_publish_queue(
             argparse.Namespace(count=count, dry_run=False, no_deploy=args.no_deploy)
         )
+        _auto_cycle_notify(digest, rc)
+        return rc
     if mr["unpublished"] and not args.no_deploy:
         print("     발행 대상 없음 — 비공개 반영 위해 재빌드·배포")
         rc = cmd_build(
             argparse.Namespace(manifest=None, full=True, preview=False, save_empty=False)
         )
-        return rc if rc != 0 else cmd_deploy(_deploy_ns())
+        rc = rc if rc != 0 else cmd_deploy(_deploy_ns())
+        _auto_cycle_notify(digest, None)
+        return rc
     print("     발행/비공개 변경 없음 — 빌드 생략")
+    _auto_cycle_notify(digest, None)
     return 0
 
 

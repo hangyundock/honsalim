@@ -50,6 +50,12 @@ DEFAULTS: dict[str, Any] = {
     "coupang_mode": "manual",  # manual(수동 입력·공식 위젯) | api (15만원 후 자동 수집)
     "coupang_threshold_krw": 150000,  # 쿠팡 API 발급 기준 누적 수익 (모드 전환 안내)
     "coupang_tag": "coupang-partners",  # 쿠팡 파트너스 affiliate_tag (수동 상품 적재용)
+    # ── 알림·재고(세션 #41) ──
+    # 쿠팡 첨부 대기 키워드가 이 수 이하로 남으면 배너 경고 + 텔레그램 알림(소진 전 보충 유도).
+    "coupang_low_threshold": 2,
+    # 무인 사이클 결과를 매일 텔레그램으로 발송(하트비트 겸용 — 안 오면 스케줄러 죽음 신호).
+    # secrets(D:\\secrets\\affiliate_hub\\telegram.env) 미설정이면 자동 무동작.
+    "telegram_daily_report": True,
     # ── 외부 API 비용(세션 #36) ──
     # Google(Imagen) 월 지출 상한($). 주인이 ai.studio/spend에 설정한 값을 여기 입력하면 대시보드가
     # '추정 사용액 / 상한(%)'을 보여 결제 시점을 미리 알린다. 0=미설정(사용액만 표시).

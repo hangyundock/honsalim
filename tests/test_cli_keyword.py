@@ -634,6 +634,118 @@ class TestKeywordRequeue:
         assert cli.cmd_keyword_requeue(_ns(id=999)) == 2
 
 
+class TestAutoCycleNotify:
+    """★세션 #41 — 무인 사이클 텔레그램 자기보고(일일 리포트+경보·하트비트 겸용)."""
+
+    @staticmethod
+    def _digest(**over: object) -> dict[str, object]:
+        d: dict[str, object] = {
+            "made": 1,
+            "approved_this_run": 1,
+            "approved_pending_publish": 1,
+            "queue_pending": 3,
+            "queue_publishable": 3,
+            "queue_retrying": 0,
+            "queue_coupang_pending": 3,
+            "queue_gate_failed": 0,
+            "gate_failed_keywords": [],
+            "abnormal": False,
+        }
+        d.update(over)
+        return d
+
+    def _capture(self, monkeypatch: pytest.MonkeyPatch, *, ready: bool = True) -> list[str]:
+        from common import config, notify
+
+        sent: list[str] = []
+
+        def _fake_send(text: str) -> bool:
+            sent.append(text)
+            return True
+
+        monkeypatch.setattr(config, "load_secrets", lambda: {})
+        monkeypatch.setattr(notify, "telegram_ready", lambda: ready)
+        monkeypatch.setattr(notify, "send_telegram", _fake_send)
+        return sent
+
+    def test_daily_report_sent(self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        sent = self._capture(monkeypatch)
+        cli._auto_cycle_notify(self._digest(), publish_rc=0)
+        assert len(sent) == 1
+        assert "발행 완료" in sent[0]
+        assert "조치 필요 없음" in sent[0]
+
+    def test_unconfigured_no_send(self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        sent = self._capture(monkeypatch, ready=False)
+        cli._auto_cycle_notify(self._digest(), publish_rc=0)
+        assert sent == []
+
+    def test_coupang_low_alert(self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """쿠팡 첨부 소진 임박 미리 알림 — 수익 링크 끊김 방지(주인 지시·세션 #41)."""
+        sent = self._capture(monkeypatch)
+        cli._auto_cycle_notify(self._digest(queue_coupang_pending=1), publish_rc=0)
+        assert "쿠팡 첨부 대기 1편뿐" in sent[0]
+
+    def test_coupang_zero_alert(self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        sent = self._capture(monkeypatch)
+        cli._auto_cycle_notify(self._digest(queue_coupang_pending=0), publish_rc=0)
+        assert "쿠팡 첨부 대기 0편" in sent[0]
+
+    def test_gate_failed_alert(self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        sent = self._capture(monkeypatch)
+        cli._auto_cycle_notify(
+            self._digest(queue_gate_failed=1, gate_failed_keywords=["메쉬의자"]),
+            publish_rc=0,
+        )
+        assert "반려(검토 필요) 1건" in sent[0]
+        assert "메쉬의자" in sent[0]
+
+    def test_alerts_sent_even_when_daily_off(
+        self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """일일 리포트 OFF여도 경보(조치 필요)는 발송 — 무인 fail-loud 유지(§0)."""
+        from common import settings as st
+
+        sent = self._capture(monkeypatch)
+        monkeypatch.setattr(
+            st, "get", lambda k, d=None, **kw: False if k == "telegram_daily_report" else d
+        )
+        cli._auto_cycle_notify(self._digest(abnormal=True), publish_rc=None)
+        assert len(sent) == 1
+        assert "발행 0편 위험" in sent[0]
+
+    def test_daily_off_no_alerts_no_send(
+        self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from common import settings as st
+
+        sent = self._capture(monkeypatch)
+        monkeypatch.setattr(
+            st, "get", lambda k, d=None, **kw: False if k == "telegram_daily_report" else d
+        )
+        cli._auto_cycle_notify(self._digest(), publish_rc=0)
+        assert sent == []
+
+    def test_publish_fail_alert(self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        sent = self._capture(monkeypatch)
+        cli._auto_cycle_notify(self._digest(), publish_rc=2)
+        assert "발행 단계 실패" in sent[0]
+
+    def test_digest_includes_coupang_pending(self, migrated_db: Path) -> None:
+        """digest에 쿠팡 첨부 재고 집계 포함 — 알림·배너의 단일 소스."""
+        from writer import keyword_queue as kq
+
+        conn = db.connect(migrated_db)
+        kq.add_keyword(conn, "메쉬의자", channel="both", target_products=[{"source": "coupang"}])
+        kq.add_keyword(conn, "서재책상", channel="ali")
+        digest = cli._auto_cycle_digest_and_alert(
+            conn, made=0, ar={"held": [], "approved": []}, approved_n=0
+        )
+        conn.close()
+        assert digest["queue_coupang_pending"] == 1
+        assert digest["queue_pending"] == 2
+
+
 class TestActionableFeedback:
     """★세션 #41 — 게이트 issue를 '어떻게 고칠지' 실행지시로 변환(재생성 성공률↑·무한 반려 방지)."""
 

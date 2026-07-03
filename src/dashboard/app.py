@@ -18,7 +18,8 @@ import sqlite3
 import sys
 import traceback
 from collections.abc import Callable
-from typing import Any
+from datetime import datetime
+from typing import Any, ClassVar
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QFont
@@ -422,6 +423,10 @@ class SettingsDialog(QDialog):
         add_check("auto_mode", "완전 무인 모드 (생성·승인·발행 자동)")
         add_spin("auto_approve_min_published", "자동승인 전 사람 검수 편수", 0, 50)
         add_spin("enrich_max_attempts", "글 5게이트 재생성 상한", 1, 5)
+        # 세션 #41 — 반려 자가복원·재고 알림·텔레그램
+        add_spin("keyword_max_gate_retries", "반려 키워드 자동 재시도 상한(일)", 1, 10)
+        add_spin("coupang_low_threshold", "쿠팡 첨부 부족 경고 기준(편)", 0, 20)
+        add_check("telegram_daily_report", "텔레그램 일일 리포트 (하트비트 겸용)")
         add_spin("featured_per_tier", "티어별 추천 수", 1, 10)
         add_dspin("satisfaction_floor", "만족도 하한(%)", 0.0, 100.0)
         add_spin("seo_max_attempts", "SEO 재생성 상한", 1, 5)
@@ -699,18 +704,52 @@ class DashboardWindow(QMainWindow):
         info = QLabel(
             "예약을 켜면 매일 설정 시각에 '승인된 글'을 자동 발행합니다 "
             "(E7 준수 — 자동 승인은 하지 않음).\n"
-            "전체 설정 편집 창은 Phase F에서 연결됩니다. 현재 값은 data/config.json에서 읽습니다."
+            "전체 설정 편집 창은 Phase F에서 연결됩니다. 현재 값은 data/config.json에서 읽습니다.\n"
+            "📨 텔레그램 알림: D:\\secrets\\affiliate_hub\\telegram.env에 TELEGRAM_BOT_TOKEN·"
+            "TELEGRAM_CHAT_ID를 넣으면 무인 사이클 결과·경고가 휴대폰으로 옵니다(미설정 시 무동작)."
         )
         info.setStyleSheet("color:#555;")
         lay.addWidget(info, 1, 0)
+
+        # 텔레그램 테스트 발송 (세션 #41) — 주인이 설정 직후 즉시 확인할 수 있게.
+        tg_row = QHBoxLayout()
+        b_tg = QPushButton("📨 텔레그램 테스트 발송")
+        b_tg.clicked.connect(self._on_telegram_test)
+        self._action_buttons.append(b_tg)
+        tg_row.addWidget(b_tg)
+        tg_row.addStretch(1)
+        tg_box = QWidget()
+        tg_box.setLayout(tg_row)
+        lay.addWidget(tg_box, 3, 0)
         self.settings_view = QLabel()
         self.settings_view.setStyleSheet(
             "font-family:Consolas,monospace;background:#fafafa;border:1px solid #eee;padding:8px;"
         )
         self.settings_view.setTextInteractionFlags(Qt.TextSelectableByMouse)
         lay.addWidget(self.settings_view, 2, 0)
-        lay.setRowStretch(3, 1)
+        lay.setRowStretch(4, 1)
         return w
+
+    def _on_telegram_test(self) -> None:
+        """텔레그램 테스트 발송 (세션 #41) — secrets 설정 확인용."""
+
+        def task() -> int:
+            from common import config, notify
+
+            config.load_secrets()
+            if not notify.telegram_ready():
+                print(
+                    "[텔레그램] 미설정 — D:\\secrets\\affiliate_hub\\telegram.env에 "
+                    "TELEGRAM_BOT_TOKEN과 TELEGRAM_CHAT_ID를 넣어주세요."
+                )
+                return 1
+            ok = notify.send_telegram(
+                "📨 혼살림 텔레그램 테스트 — 이 메시지가 보이면 설정 완료입니다."
+            )
+            print("[텔레그램] 발송 성공 ✅" if ok else "[텔레그램] 발송 실패 — 토큰/챗ID 확인")
+            return 0 if ok else 1
+
+        self.run_task(task, label="텔레그램 테스트")
 
     # ---- 데이터 새로고침 ----
     def _open_conn(self) -> sqlite3.Connection | None:
@@ -757,8 +796,34 @@ class DashboardWindow(QMainWindow):
             self._fill_keywords(queries.list_keywords(conn))
             self._fill_articles(queries.list_articles(conn))
             self._fill_health(conn)
+            self._paint_banner_rich(conn, cfg)
         finally:
             conn.close()
+
+    # 배너 심각도별 색 (세션 #41 — naver_blog 대시보드 UX 미러·주인 지시)
+    _BANNER_CSS: ClassVar[dict[str, str]] = {
+        "ok": "background:#e8f5e9;border:1px solid #a5d6a7;color:#1b5e20;",
+        "caution": "background:#fff8e1;border:1px solid #ffe082;color:#7a5b00;",
+        "alert": "background:#ffebee;border:1px solid #ef9a9a;color:#b71c1c;",
+    }
+
+    def _paint_banner_rich(self, conn: sqlite3.Connection, cfg: dict[str, Any]) -> None:
+        """상단 배너를 3줄 안내(상태/예정/다음 할 일)로 갱신 (세션 #41).
+
+        어쩌다 대시보드를 열어도 ①무인이 도는지 ②쿠팡 첨부 재고로 언제까지 수익 글이
+        나가는지 ③다음에 뭘 해야 하는지가 한눈에 보인다. 실패 시 _paint_unmanned의
+        한 줄 배너가 그대로 남는다(안전 폴백·§0).
+        """
+        try:
+            lines, level = queries.banner_lines(conn, cfg, datetime.now())
+        except Exception as e:  # 배너는 보조 정보 — 실패가 새로고침을 막지 않음
+            self.append_log(f"[배너] 갱신 실패(무시): {e}")
+            return
+        self.banner.setText("<br>".join(lines))
+        self.banner.setStyleSheet(
+            self._BANNER_CSS.get(level, self._BANNER_CSS["ok"])
+            + "border-radius:6px;padding:6px 10px;"
+        )
 
     def _on_toggle_unmanned(self) -> None:
         """상단 배너의 무인 ON/OFF 토글(세션 #38). 켤 때 확인창 + 예약 작업 재등록.

@@ -63,8 +63,12 @@ def test_window_builds_and_populates(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert win.tab_queue.rowCount() == 1
     # 키워드 탭: 1건
     assert win.tab_keywords.rowCount() == 1
-    # 배너에 설정 요약 표시
-    assert "자동발행" in win.banner.text()
+    # 배너: 3줄 안내(세션 #41 — 상태/예정/다음 할 일)로 갱신됨. 테스트 config는 auto_mode
+    # 기본 OFF → '무인 OFF' 상태줄 + 예정/할 일 줄이 포함돼야 한다(naver_blog UX 미러).
+    banner = win.banner.text()
+    assert "무인" in banner  # 상태줄 (ON/OFF 공통)
+    assert "예정" in banner  # 런웨이줄
+    assert "다음 할 일" in banner  # 행동 지시줄
 
     win.close()
 
