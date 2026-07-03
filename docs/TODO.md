@@ -3,12 +3,12 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #41 — (상세 EVENTS #40)
+## ★ 다음 세션 #42 — (상세 EVENTS #41)
 
-- [ ] **★성장 — 색인 커버리지 관찰·가속**([[growth-first-priority]]) — #40 배포(내부링크·favicon·robots) 효과로 GSC/네이버 **색인 4→증가** 1~2주 추이 확인. 핵심 페이지 **URL 색인 요청**(GSC `URL 검사`·네이버 `웹 페이지 수집`: 글 2편→의자·모니터받침대 카테고리). robots `/cdn-cgi/`는 다음 빌드·배포 시 라이브(무해·급하지 않음).
-- [ ] **[관찰] 무인 스케줄러 실작동 점검** — 대시보드 '무인 사이클 마지막 실행 **2026-06-06**' 표시. 22:02 자동 발행이 **실제 매일 도는지** 확인(미작동이면 완전무인인데 발행 0). 스케줄러 등록/로그 점검.
-- [ ] (이월·성장) **씨앗 커버리지 확장**(seo_keywords.yml '미매핑' 해소) · **E-E-A-T**(M2 Person Schema+about 운영자) · (선택) IndexNow 구현(Bing/Yandex·#39 감사 미구현 확인).
-- [ ] (이월) Phase 2 자가복원(ali off-target·배포 drift·푸시채널·git pull footgun) · `review-helpfulknow` 월상한 · 쿠팡 부트스트랩(15만원→API) · naver_blog 볼륨.
+- [ ] **[관찰] 무인 재생성 실발행 추적**(#41 자가복원 검증) — pending 복귀한 4개(등받이·메쉬·허리편한·게이밍책상)+서재책상이 **개선된 재생성으로 실제 발행되는지** 매일 확인(하루 1편·나흘 순차). 재반려 시 자동 재시도(상한3)·상한 도달 failed 격리+[ALERT]/텔레그램 오는지. **텔레그램 일일 리포트(하트비트)가 11:11 후 실제 오는지** 첫날 확인.
+- [ ] **미발행 승인글 2편 검토·결정**(게이밍의자·노트북받침대) — 라이브 미리보기로 품질 확인 후 발행/유지(주인 "검토 후 결정" 선택).
+- [ ] **★성장 — 색인 커버리지 관찰·가속**([[growth-first-priority]]) — GSC/네이버 **색인 4→증가** 1~2주 추이. 핵심 URL 색인 요청. **씨앗 커버리지 확장**(seo_keywords.yml 미매핑) · **E-E-A-T**(M2 Person Schema+about).
+- [ ] (이월) Phase 2 자가복원(ali off-target·배포 drift·git pull footgun) · IndexNow(Bing/Yandex) · `review-helpfulknow` 월상한 · 쿠팡 부트스트랩(15만원→API) · naver_blog 볼륨.
 - 참고: 워크트리=`PYTHONPATH=src python -m cli`(자동 migrate). **main직접머지=`git push origin HEAD:main`**. 운영 DB 직접수정 불가→주인 런처. ★한글→.py·ASCII([[powershell-korean-encoding]]). ★무인 발행이 origin 전진([[autonomous-deploy-advances-origin]])—푸시 전 ff/merge. ★Edit 절대경로=운영 폴더 주의([[worktree-edit-path-footgun]]).
 
 ## 시점 의존 잔존 (세션 #6~7)
