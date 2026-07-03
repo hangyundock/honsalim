@@ -583,6 +583,56 @@ class TestKeywordRequeue:
         assert cli.cmd_keyword_requeue(_ns(id=None)) == 0
         assert "없음" in capsys.readouterr().out
 
+    def _publish_article_for(self, dbpath: Path, kid: int, slug: str) -> None:
+        """키워드에 발행된 글 연결 (promoted draft → published article)."""
+        conn = db.connect(dbpath)
+        sid = conn.execute("SELECT scenario_id FROM keyword_queue WHERE id=?", (kid,)).fetchone()[0]
+        conn.execute(
+            "INSERT INTO articles (slug, scenario_id, title, summary, body_md, body_html, "
+            "meta_description, schema_jsonld, disclosure_first, content_hash, "
+            "truth_check_passed_at, user_approved_at, status, published_at) VALUES "
+            "(?, ?, 'T', 's', 'm', 'h', 'd', '{}', 'disc', 'hash', "
+            "'2026-01-01', '2026-01-01', 'published', '2026-01-01')",
+            (slug, sid),
+        )
+        aid = conn.execute("SELECT id FROM articles ORDER BY id DESC LIMIT 1").fetchone()[0]
+        conn.execute(
+            "INSERT INTO drafts (scenario_id, status, status_reason, keyword_id, "
+            "promoted_article_id) VALUES (?, 'published', 'promoted to articles', ?, ?)",
+            (sid, kid, aid),
+        )
+        conn.commit()
+        conn.close()
+
+    def test_requeue_by_id_blocked_when_published(self, migrated_db: Path) -> None:
+        """발행된 글이 있는 키워드는 --id 재시도 차단 — 같은 주제 중복 글 방지(라이브 보호·§0)."""
+        from writer import keyword_queue as kq
+
+        kid = self._stuck(migrated_db, draft_reason="validate_and_save → rejected")
+        self._publish_article_for(migrated_db, kid, "kw-pub-1")
+
+        assert cli.cmd_keyword_requeue(_ns(id=kid)) == 2  # 차단
+        conn = db.connect(migrated_db)
+        kw = kq.get_keyword(conn, kid)
+        conn.close()
+        assert kw is not None and kw["status"] == "drafted"  # 상태 불변
+
+    def test_requeue_bulk_skips_when_latest_draft_published(self, migrated_db: Path) -> None:
+        """과거 반려 이력이 있어도 최신 draft가 발행 성공이면 일괄 재시도 대상 아님(재트리거 방지)."""
+        from writer import keyword_queue as kq
+
+        kid = self._stuck(migrated_db, draft_reason="validate_and_save → rejected")
+        self._publish_article_for(migrated_db, kid, "kw-pub-2")  # 최신 draft = published
+
+        assert cli.cmd_keyword_requeue(_ns(id=None)) == 0
+        conn = db.connect(migrated_db)
+        kw = kq.get_keyword(conn, kid)
+        conn.close()
+        assert kw is not None and kw["status"] == "drafted"  # 발행 성공 키워드는 건드리지 않음
+
+    def test_requeue_by_id_missing_returns_2(self, migrated_db: Path) -> None:
+        assert cli.cmd_keyword_requeue(_ns(id=999)) == 2
+
 
 class TestActionableFeedback:
     """★세션 #41 — 게이트 issue를 '어떻게 고칠지' 실행지시로 변환(재생성 성공률↑·무한 반려 방지)."""

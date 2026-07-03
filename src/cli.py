@@ -2200,17 +2200,37 @@ def cmd_keyword_requeue(args: argparse.Namespace) -> int:
     되살린다. 쿠팡 배너(target_products)는 보존하고 fail_count만 0으로 리셋(Fix B 반영된 재생성에
     새 재시도 예산 부여). --id로 하나, 미지정이면 '게이트 반려'만 일괄(사람이 직접 반려한 것은 제외).
 
-    게이트 반려 판별: 연결 draft가 rejected + draft.status_reason에 'validate'(=validate_and_save
-    → rejected). 대시보드 수동 반려('cli reject — dashboard 반려')는 의도적이므로 건드리지 않는다.
+    게이트 반려 판별: **최신** draft가 rejected + status_reason에 'validate'(=validate_and_save
+    → rejected). 최신만 보는 이유 — 과거 반려 이력이 있어도 이후 재생성이 성공(발행)했으면
+    재트리거하면 안 됨(중복 글 방지). 대시보드 수동 반려('cli reject')는 의도적이므로 제외.
+    --id 모드도 발행된 글이 연결돼 있으면 차단(라이브 보호 — keyword-delete와 동일 원칙).
     """
     conn = db.connect(db.DB_PATH)
     try:
         if getattr(args, "id", None):
-            ids = [int(args.id)]
+            kid = int(args.id)
+            row = conn.execute("SELECT keyword FROM keyword_queue WHERE id = ?", (kid,)).fetchone()
+            if row is None:
+                print(f"{FAIL} 키워드 #{kid} 없음")
+                return 2
+            # 라이브 보호(§0): 발행된 글이 있는 키워드를 재생성하면 같은 주제 중복 글이 생긴다.
+            pub = conn.execute(
+                "SELECT COUNT(*) FROM drafts d JOIN articles a ON a.id = d.promoted_article_id "
+                "WHERE d.keyword_id = ? AND a.status = 'published'",
+                (kid,),
+            ).fetchone()[0]
+            if pub:
+                print(
+                    f"{FAIL} 키워드 #{kid} {row[0]!r}은 발행된 글이 있음 — "
+                    "재시도 차단(중복 글 방지·라이브 보호)"
+                )
+                return 2
+            ids = [kid]
         else:
             rows = conn.execute(
-                "SELECT DISTINCT k.id FROM keyword_queue k JOIN drafts d ON d.keyword_id = k.id "
-                "WHERE d.status = 'rejected' AND d.status_reason LIKE '%validate%' "
+                "SELECT k.id FROM keyword_queue k JOIN drafts d ON d.keyword_id = k.id "
+                "WHERE d.id = (SELECT MAX(d2.id) FROM drafts d2 WHERE d2.keyword_id = k.id) "
+                "AND d.status = 'rejected' AND d.status_reason LIKE '%validate%' "
                 "AND k.status IN ('drafted', 'failed')"
             ).fetchall()
             ids = [int(r[0]) for r in rows]

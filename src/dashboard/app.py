@@ -551,6 +551,7 @@ class DashboardWindow(QMainWindow):
                     ("🛒 쿠팡 첨부(저장)", self._on_coupang_attach),
                     ("🛒 쿠팡 배너→글 생성", self._on_coupang_generate),
                     ("✨ 글 생성", self._on_generate),
+                    ("🔁 반려 재시도", self._on_keyword_requeue),
                     ("🗑 키워드 삭제", self._on_keyword_delete),
                 ],
             ),
@@ -1123,6 +1124,44 @@ class DashboardWindow(QMainWindow):
             )
 
         self.run_task(task, label="키워드 추가")
+
+    def _on_keyword_requeue(self) -> None:
+        """게이트 반려로 막힌 키워드를 재시도 큐(대기)로 복귀 (★세션 #41 자가복원 remediation).
+
+        행을 선택했으면 그 키워드만(발행 글 있으면 CLI가 차단·라이브 보호), 선택 없으면
+        '최신 글이 게이트 반려'인 키워드 일괄. 쿠팡 배너는 보존되고 다음 예약 사이클이
+        개선된 재생성(실행지시 피드백)으로 다시 시도한다.
+        """
+        kid = self._selected_id(self.tab_keywords)
+        if kid is not None:
+            row = self.tab_keywords.currentRow()
+            kw_item = self.tab_keywords.item(row, 1) if row >= 0 else None
+            kw = kw_item.text() if kw_item else str(kid)
+            msg = (
+                f"키워드 #{kid} '{kw}'을(를) 재시도 큐(대기)로 되돌릴까요?\n\n"
+                "· 다음 예약 시각에 자동으로 글을 다시 생성·검증합니다.\n"
+                "· 저장된 쿠팡 배너는 그대로 유지됩니다.\n"
+                "· 발행된 글이 있는 키워드는 안전하게 차단됩니다(중복 글 방지)."
+            )
+        else:
+            msg = (
+                "검증에서 반려돼 막혀 있는 키워드 전체를 재시도 큐(대기)로 되돌릴까요?\n\n"
+                "· 대상: 최신 글이 '검증 반려'인 키워드만 (직접 반려하신 글은 제외)\n"
+                "· 다음 예약 시각에 자동으로 다시 생성·검증·발행됩니다.\n"
+                "· 저장된 쿠팡 배너는 그대로 유지됩니다."
+            )
+        resp = QMessageBox.question(
+            self, "반려 재시도", msg, QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if resp != QMessageBox.Yes:
+            return
+
+        def task() -> int:
+            import cli
+
+            return cli.cmd_keyword_requeue(argparse.Namespace(id=kid))
+
+        self.run_task(task, label="반려 재시도")
 
     def _on_keyword_delete(self) -> None:
         """선택한 키워드 삭제 (연결 미발행 글 동반). 발행된 글 있으면 차단(라이브 보호)."""
