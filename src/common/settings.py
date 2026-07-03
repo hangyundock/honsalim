@@ -36,6 +36,10 @@ DEFAULTS: dict[str, Any] = {
     "satisfaction_floor": 80.0,  # 알리 긍정 피드백율 하한 % (006 신호 필터)
     "seo_max_attempts": 2,  # SEO 게이트 재생성 상한 (카테고리 페이지 — 비용 방지 CLAUDE §6)
     "enrich_max_attempts": 2,  # 키워드 글 5게이트 재생성 상한 (세션 #33 무인 자가복원 — 비용 방지)
+    # 게이트 반려 키워드 자가복원 상한(세션 #41): enrich N회 재생성으로도 게이트 미달이면 키워드를
+    # pending으로 되돌려 다음 사이클이 재생성한다. 이 횟수(일수)까지 재시도하고, 도달하면 failed로
+    # 격리(자동 재시도 중단·digest/ALERT·대시보드 노출). 조용한 방치(silent dead-end) 제거.
+    "keyword_max_gate_retries": 3,
     # 비전 관련성 게이트(세션 #35): 수집 상품 이미지를 Haiku가 보고 카테고리 적합성 판정 → 오염 드롭.
     # 기본 OFF(기존 카테고리 무영향·키워드 필터만). 자동 카테고리 생성 시 ON으로 사람 단어튜닝 대체.
     "vision_gate": False,

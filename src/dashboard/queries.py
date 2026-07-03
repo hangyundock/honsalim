@@ -44,6 +44,17 @@ def dashboard_stats(conn: sqlite3.Connection) -> dict[str, int]:
         "drafts_approved": _count("SELECT COUNT(*) FROM drafts WHERE status='approved'"),
         "articles_published": _count("SELECT COUNT(*) FROM articles WHERE status='published'"),
         "categories_published": _count("SELECT COUNT(*) FROM categories WHERE status='published'"),
+        # ★세션 #41 — 반려/미발행 가시화(옛 '조용한 데드엔드'가 어느 카운터에도 안 잡혀 무인
+        # 운영 중 사람이 문제를 못 보던 근본 문제 해소). 게이트 반려 상한 도달로 격리된 키워드,
+        # 자동 재생성 대기 중(pending·fail_count>0), 승인됐으나 미발행인 글을 각각 노출한다.
+        "keywords_gate_failed": _count(
+            "SELECT COUNT(*) FROM keyword_queue WHERE status='failed' "
+            "AND status_reason LIKE '%반려%'"
+        ),
+        "keywords_retrying": _count(
+            "SELECT COUNT(*) FROM keyword_queue WHERE status='pending' AND fail_count > 0"
+        ),
+        "articles_unpublished": _count("SELECT COUNT(*) FROM articles WHERE status='unpublished'"),
     }
 
 

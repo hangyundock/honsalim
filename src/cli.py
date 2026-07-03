@@ -545,6 +545,55 @@ def cmd_db_seed(args: argparse.Namespace) -> int:
     return 0
 
 
+def _actionable_feedback(report: dict[str, Any], primary: str | None) -> list[str]:
+    """게이트 미달 issues를 '무엇을 어떻게 고쳐라'는 실행지시로 변환(★세션 #41 근본수정).
+
+    옛 코드는 issue 문자열(예 'headings_keyword_low: 소제목 내 대표키워드 0개 < 1개')을 그대로
+    재생성 피드백으로 넘겨, LLM이 '무엇이 틀렸는지'는 알아도 '어떻게 고칠지' 지시가 없어 복합
+    키워드('허리편한의자'·'게이밍책상')를 2회 재생성해도 못 맞추고 영구 반려됐다(라이브 적발).
+    대표 코드에 구체 지시(소제목에 키워드 넣기·1인칭 제거 등)를 앞에 붙여 재생성 성공률을
+    끌어올린다. ★게이트 기준은 낮추지 않는다 — 생성 품질만 끌어올리는 자가복원.
+    """
+    kw = (primary or "").strip()
+    out: list[str] = []
+    seen: set[str] = set()
+    for gate in report.get("gates", {}).values():
+        for issue in gate.get("issues", []):
+            issue = str(issue)
+            code = issue.split(":", 1)[0].strip()
+            detail = issue.split(":", 1)[-1].strip() if ":" in issue else ""
+            directive: str | None = None
+            if code == "headings_keyword_low" and kw:
+                directive = (
+                    f"소제목(## 또는 ###) 중 최소 1개에 대표키워드 '{kw}'를 글자 그대로 포함하세요"
+                    f"(띄어쓰기는 무방·글자는 그대로 유지). 예: '## {kw} 고르는 법' · '## {kw} 추천 정리'."
+                )
+            elif code == "first_person_forbidden":
+                directive = (
+                    f"1인칭·직접 사용경험 표현('{detail}' 등)을 모두 삭제하고 객관적 설명으로 "
+                    "바꾸세요. 예: 'N년 사용'→'N년 내구성', '써보니'→'실측 기준'. 직접 촬영 사진이 "
+                    "없으므로 사용후기·체험 톤을 쓰지 마세요."
+                )
+            elif code == "density_low" and kw:
+                directive = (
+                    f"대표키워드 '{kw}'를 본문에 조금 더 자연스럽게 반복해 밀도를 목표(~1.7%)로 "
+                    "높이세요(도배는 금지)."
+                )
+            elif code == "density_high" and kw:
+                directive = (
+                    f"대표키워드 '{kw}' 반복이 과합니다 — 자연스럽게 줄이세요(도배=스팸/어뷰징)."
+                )
+            elif code == "intro_no_keyword" and kw:
+                directive = f"도입부 첫 문단에 대표키워드 '{kw}'를 자연스럽게 포함하세요."
+            elif code in ("title_no_keyword", "title_missing") and kw:
+                directive = f"제목 앞부분에 대표키워드 '{kw}'를 포함하세요."
+            msg = f"{directive} (원인: {issue})" if directive else issue
+            if msg not in seen:
+                seen.add(msg)
+                out.append(msg)
+    return out
+
+
 def cmd_enrich(args: argparse.Namespace) -> int:
     """Claude API로 본문 생성 (BACKEND §3).
 
@@ -782,7 +831,8 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                     passed = True
                     print(f"     게이트 통과 (시도 {attempt}/{max_attempts})")
                     break
-                feedback = [i for g in report["gates"].values() for i in g.get("issues", [])]
+                # ★세션 #41 — issue를 실행지시로 변환(어떻게 고칠지)해 재생성 성공률↑(무한 반려 방지).
+                feedback = _actionable_feedback(report, (seo_cfg or {}).get("primary"))
                 print(
                     f"     게이트 미달 (시도 {attempt}/{max_attempts}) — 재생성: "
                     f"{'; '.join(feedback)[:140]}"
@@ -2115,11 +2165,69 @@ def cmd_keyword_generate(args: argparse.Namespace) -> int:
         print(f"{OK} 키워드 #{args.id} → drafted. 대시보드에서 미리보기→1클릭 승인→발행 (E7)")
         return 0
     if rc == 1:
-        _set_keyword_status(args.id, "drafted", "검증 rejected — 검토 필요")
-        print(f"{WARN} 검증 실패(rejected) — 대시보드에서 검토 필요")
+        # ★세션 #41 근본수정 — 게이트 반려 키워드 자가복원(§0). 옛 코드는 status='drafted'로만 두어
+        # auto_pick_keyword(pending만 픽)가 다시 보지 않아 '조용한 데드엔드'(무인인데 영구 방치·
+        # 대시보드엔 '글 생성됨'으로 정상처럼 보임)였다. 이제 fail_count를 올리고: 상한 미만이면
+        # pending으로 되돌려 다음 사이클이 자동 재생성(자가복원), 상한 도달이면 failed로 격리해
+        # 자동 재시도를 멈추고 digest/ALERT·대시보드에 노출(fail-loud). 조용한 방치 제거.
+        conn2 = db.connect(db.DB_PATH)
+        try:
+            n_fail = kq.bump_fail_count(conn2, args.id)
+        finally:
+            conn2.close()
+        max_retry = settings.get_int("keyword_max_gate_retries")
+        if n_fail < max_retry:
+            _set_keyword_status(
+                args.id, "pending", f"검증 반려 {n_fail}/{max_retry}회 — 자동 재생성 대기"
+            )
+            print(f"{WARN} 검증 반려({n_fail}/{max_retry}) — pending 복귀·다음 사이클 자동 재생성")
+        else:
+            _set_keyword_status(
+                args.id, "failed", f"검증 반려 {n_fail}회(상한 도달) — 수동 검토 필요"
+            )
+            print(
+                f"{FAIL} 검증 반려 {n_fail}회 상한 도달 — 자동 재시도 중단(failed)·수동 검토 필요"
+            )
         return 0
     _set_keyword_status(args.id, "failed", f"validate rc={rc}")
     return rc
+
+
+def cmd_keyword_requeue(args: argparse.Namespace) -> int:
+    """게이트 반려로 막힌 키워드를 pending으로 되돌려 재생성 대상에 복귀(★세션 #41 remediation).
+
+    옛 버그로 status='drafted'(또는 상한 도달 failed)로 굳어 auto_pick이 다시 보지 않던 키워드를
+    되살린다. 쿠팡 배너(target_products)는 보존하고 fail_count만 0으로 리셋(Fix B 반영된 재생성에
+    새 재시도 예산 부여). --id로 하나, 미지정이면 '게이트 반려'만 일괄(사람이 직접 반려한 것은 제외).
+
+    게이트 반려 판별: 연결 draft가 rejected + draft.status_reason에 'validate'(=validate_and_save
+    → rejected). 대시보드 수동 반려('cli reject — dashboard 반려')는 의도적이므로 건드리지 않는다.
+    """
+    conn = db.connect(db.DB_PATH)
+    try:
+        if getattr(args, "id", None):
+            ids = [int(args.id)]
+        else:
+            rows = conn.execute(
+                "SELECT DISTINCT k.id FROM keyword_queue k JOIN drafts d ON d.keyword_id = k.id "
+                "WHERE d.status = 'rejected' AND d.status_reason LIKE '%validate%' "
+                "AND k.status IN ('drafted', 'failed')"
+            ).fetchall()
+            ids = [int(r[0]) for r in rows]
+        if not ids:
+            print(f"{WARN} 재시도할 게이트 반려 키워드 없음")
+            return 0
+        for kid in ids:
+            conn.execute(
+                "UPDATE keyword_queue SET status='pending', "
+                "status_reason='수동 재시도 — 재생성 대기', fail_count=0 WHERE id=?",
+                (kid,),
+            )
+        conn.commit()
+        print(f"{OK} {len(ids)}개 키워드 pending 복귀(fail_count 리셋) — 다음 사이클 재생성: {ids}")
+        return 0
+    finally:
+        conn.close()
 
 
 def cmd_keyword_list(args: argparse.Namespace) -> int:
@@ -2476,6 +2584,17 @@ def _auto_cycle_digest_and_alert(
     held_codes: Counter[str] = Counter(str(h.get("code") or "?") for h in ar["held"])
     problem_codes = {k: v for k, v in held_codes.items() if k != "min_published"}
     problem_held = sum(problem_codes.values())
+    # ★세션 #41 — 게이트 반려 상한 도달로 격리된 키워드(status=failed·사유에 '반려')와 자동
+    # 재생성 대기 중(pending·fail_count>0)을 집계·노출한다. 옛 '조용한 데드엔드'가 여기 안 잡혀
+    # 무인 운영 중 사람이 영영 몰랐던 근본 문제의 가시화(fail-loud). '반려'는 게이트 미달만 세고
+    # 상품확보/enrich 하드 에러 failed는 제외한다(사유 문자열로 구분).
+    gate_failed = conn.execute(
+        "SELECT keyword FROM keyword_queue WHERE status='failed' AND status_reason LIKE '%반려%'"
+    ).fetchall()
+    retrying = conn.execute(
+        "SELECT COUNT(*) FROM keyword_queue WHERE status='pending' AND fail_count > 0"
+    ).fetchone()[0]
+    gate_failed_kws = [str(k[0]) for k in gate_failed]
     abnormal = approved_n == 0 and (problem_held > 0 or (len(pend) > 0 and publishable == 0))
     digest: dict[str, Any] = {
         "made": made,
@@ -2486,6 +2605,9 @@ def _auto_cycle_digest_and_alert(
         "queue_pending": len(pend),
         "queue_publishable": publishable,
         "queue_blocked_by_code": dict(blocked),
+        "queue_retrying": int(retrying),
+        "queue_gate_failed": len(gate_failed_kws),
+        "gate_failed_keywords": gate_failed_kws,
         "abnormal": abnormal,
     }
     try:
@@ -2499,6 +2621,13 @@ def _auto_cycle_digest_and_alert(
             f"{problem_held}편 {dict(problem_codes) or ''} · 큐 발행가능 {publishable}/{len(pend)} "
             f"(막힘 {dict(blocked) or '없음'}). 막힌 키워드를 카테고리에 매핑(seo_keywords.yml "
             "secondary)하거나 쿠팡 배너 첨부 또는 큐에서 제거하세요."
+        )
+    # 게이트 반려 상한 도달 격리 키워드는 발행 여부와 무관하게 항상 경보(사람이 손봐야 재생성됨).
+    if gate_failed_kws:
+        print(
+            f"{FAIL} [ALERT] 게이트 반려 상한 도달 {len(gate_failed_kws)}건 — "
+            f"{', '.join(gate_failed_kws[:8])}{' …' if len(gate_failed_kws) > 8 else ''}. "
+            "대시보드에서 검토·수정 후 재생성(pending 복귀)하세요."
         )
     return digest
 
@@ -3057,6 +3186,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_kw_del.add_argument("id", type=int, help="삭제할 키워드 id")
     p_kw_del.set_defaults(func=cmd_keyword_delete)
+
+    p_kw_requeue = sub.add_parser(
+        "keyword-requeue",
+        help="게이트 반려로 막힌 키워드를 pending으로 복귀 (쿠팡 배너 보존·fail_count 리셋)",
+    )
+    p_kw_requeue.add_argument(
+        "--id", type=int, default=None, help="특정 키워드 id (미지정 시 게이트 반려 일괄)"
+    )
+    p_kw_requeue.set_defaults(func=cmd_keyword_requeue)
 
     p_kw_rec = sub.add_parser(
         "keyword-recommend",

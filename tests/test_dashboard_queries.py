@@ -82,6 +82,28 @@ class TestStats:
         assert stats["drafts_validated"] == 1
         assert stats["drafts_approved"] == 1
 
+    def test_gate_failed_and_unpublished_counters(self) -> None:
+        """★세션 #41 — 반려/미발행 가시화: 게이트 반려 격리·재생성 대기·미발행 글 카운트."""
+        conn = _full_db()
+        conn.executescript("""
+            INSERT INTO keyword_queue (keyword, slug, status, status_reason, fail_count)
+              VALUES ('gf','gf','failed','검증 반려 3회(상한 도달) — 수동 검토 필요',3);
+            INSERT INTO keyword_queue (keyword, slug, status, status_reason)
+              VALUES ('he','he','failed','상품 확보 실패: x');
+            INSERT INTO keyword_queue (keyword, slug, status, fail_count)
+              VALUES ('rt','rt','pending',1);
+            INSERT INTO articles (slug, scenario_id, title, summary, body_md, body_html,
+              meta_description, schema_jsonld, disclosure_first, content_hash,
+              truth_check_passed_at, user_approved_at, status)
+              VALUES ('u1',1,'T','s','m','h','d','{}','disc','hash','2026-01-01','2026-01-01',
+                      'unpublished');
+            """)
+        conn.commit()
+        stats = queries.dashboard_stats(conn)
+        assert stats["keywords_gate_failed"] == 1  # '반려' 격리만(상품확보 실패 failed는 제외)
+        assert stats["keywords_retrying"] == 1  # pending + fail_count>0
+        assert stats["articles_unpublished"] == 1
+
 
 class TestListKeywords:
     def test_filter_by_status(self) -> None:

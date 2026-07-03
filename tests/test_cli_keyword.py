@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import sqlite3
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -248,6 +249,7 @@ class TestParserRegistration:
             "keyword-generate",
             "keyword-list",
             "keyword-delete",
+            "keyword-requeue",
             "reject",
         } <= names
 
@@ -416,3 +418,208 @@ class TestKeywordGenerateEmptyGuard:
         conn.close()
         assert kw is not None and kw["status"] == "failed"  # 키워드는 failed로 빠짐
         assert n_drafts == 0  # 빈 draft가 생기지 않음
+
+
+class TestGateRejectSelfHeal:
+    """★세션 #41 — 게이트 반려 키워드 자가복원(§0 조용한 데드엔드 제거).
+
+    옛 코드: 반려 시 status='drafted'로만 둬 auto_pick_keyword(pending만 픽)가 다시 보지 않아
+    영구 방치·대시보드엔 '글 생성됨'으로 정상처럼 보임. 이제 상한 미만이면 pending 복귀(다음
+    사이클 자동 재생성), 상한 도달이면 failed로 격리(자동 재시도 중단·digest/ALERT 노출).
+    """
+
+    _CAND: ClassVar[dict[str, object]] = {
+        "source": "aliexpress",
+        "source_product_id": "A1",
+        "name": "메쉬 사무용 의자",
+        "deeplink_url": "https://s.click.ali/A1",
+        "deeplink_slug": "ali-A1",
+        "affiliate_tag": "honsallim",
+        "price_krw": 89000,
+    }
+
+    def _stub_pipeline(self, monkeypatch: pytest.MonkeyPatch, *, validate_rc: int) -> None:
+        # 상품 확보·enrich(LLM 비용)를 우회하고 validate 결과만 강제 — 반려 분기만 검증.
+        monkeypatch.setattr(
+            cli, "_gather_keyword_candidates", lambda *a, **k: ([self._CAND], "후보 1개(테스트)")
+        )
+        monkeypatch.setattr(cli, "cmd_enrich", lambda *a, **k: 0)
+        monkeypatch.setattr(cli, "cmd_validate", lambda *a, **k: validate_rc)
+
+    def test_reject_requeues_to_pending_under_cap(
+        self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from writer import keyword_queue as kq
+
+        self._stub_pipeline(monkeypatch, validate_rc=1)
+        conn = db.connect(migrated_db)
+        kid = kq.add_keyword(conn, "메쉬의자", channel="ali")
+        conn.close()
+
+        rc = cli.cmd_keyword_generate(_ns(id=kid, page_size=20, dry_run=False))
+        assert rc == 0
+        conn = db.connect(migrated_db)
+        kw = kq.get_keyword(conn, kid)
+        conn.close()
+        assert kw is not None
+        assert kw["status"] == "pending"  # 데드엔드 아님 — 다음 사이클이 재생성한다
+        assert kw["fail_count"] == 1
+
+    def test_reject_escalates_to_failed_at_cap(
+        self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from writer import keyword_queue as kq
+
+        self._stub_pipeline(monkeypatch, validate_rc=1)
+        conn = db.connect(migrated_db)
+        kid = kq.add_keyword(conn, "메쉬의자", channel="ali")
+        conn.close()
+
+        for _ in range(3):  # keyword_max_gate_retries 기본 3
+            cli.cmd_keyword_generate(_ns(id=kid, page_size=20, dry_run=False))
+
+        conn = db.connect(migrated_db)
+        kw = kq.get_keyword(conn, kid)
+        conn.close()
+        assert kw is not None
+        assert kw["status"] == "failed"  # 상한 도달 — 자동 재시도 중단(fail-loud)
+        assert kw["fail_count"] == 3
+
+    def test_pass_keeps_drafted(self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        from writer import keyword_queue as kq
+
+        self._stub_pipeline(monkeypatch, validate_rc=0)  # 게이트 통과
+        conn = db.connect(migrated_db)
+        kid = kq.add_keyword(conn, "메쉬의자", channel="ali")
+        conn.close()
+
+        assert cli.cmd_keyword_generate(_ns(id=kid, page_size=20, dry_run=False)) == 0
+        conn = db.connect(migrated_db)
+        kw = kq.get_keyword(conn, kid)
+        conn.close()
+        assert kw is not None
+        assert kw["status"] == "drafted"  # 통과는 검토 대기(변경 없음)
+        assert kw["fail_count"] == 0
+
+    def test_digest_surfaces_gate_failed(self, migrated_db: Path) -> None:
+        from writer import keyword_queue as kq
+
+        conn = db.connect(migrated_db)
+        kid = kq.add_keyword(conn, "메쉬의자", channel="ali")
+        kq.set_status(conn, kid, "failed", "검증 반려 3회(상한 도달) — 수동 검토 필요")
+        digest = cli._auto_cycle_digest_and_alert(
+            conn, made=0, ar={"held": [], "approved": []}, approved_n=0
+        )
+        conn.close()
+        assert digest["queue_gate_failed"] == 1
+        assert "메쉬의자" in digest["gate_failed_keywords"]
+
+
+class TestKeywordRequeue:
+    """★세션 #41 — 게이트 반려로 막힌 키워드 재시도 복구(remediation·쿠팡 배너 보존)."""
+
+    def _stuck(self, dbpath: Path, *, draft_reason: str, kw_status: str = "drafted") -> int:
+        """반려 draft가 걸린 키워드 생성. draft_reason으로 게이트/수동 반려 구분."""
+        from writer import keyword_queue as kq
+
+        conn = db.connect(dbpath)
+        kid = kq.add_keyword(conn, "등받이의자", channel="both")
+        sid = kq.ensure_scenario_for_keyword(conn, kid)
+        conn.execute(
+            "INSERT INTO drafts (scenario_id, status, status_reason, keyword_id) "
+            "VALUES (?, 'rejected', ?, ?)",
+            (sid, draft_reason, kid),
+        )
+        conn.execute("UPDATE keyword_queue SET status=? WHERE id=?", (kw_status, kid))
+        conn.commit()
+        conn.close()
+        return int(kid)
+
+    def test_requeue_by_id_resets_to_pending(self, migrated_db: Path) -> None:
+        from writer import keyword_queue as kq
+
+        kid = self._stuck(migrated_db, draft_reason="validate_and_save → rejected")
+        conn = db.connect(migrated_db)
+        kq.bump_fail_count(conn, kid)  # fail_count=1
+        conn.close()
+
+        assert cli.cmd_keyword_requeue(_ns(id=kid)) == 0
+        conn = db.connect(migrated_db)
+        kw = kq.get_keyword(conn, kid)
+        conn.close()
+        assert kw is not None
+        assert kw["status"] == "pending"  # 재생성 대상 복귀
+        assert kw["fail_count"] == 0  # 새 재시도 예산
+
+    def test_requeue_bulk_only_gate_rejected(self, migrated_db: Path) -> None:
+        """일괄 모드는 게이트 반려만 — 사람이 직접 반려한 키워드는 건드리지 않는다."""
+        from writer import keyword_queue as kq
+
+        gate = self._stuck(migrated_db, draft_reason="validate_and_save → rejected")
+        conn = db.connect(migrated_db)
+        # 사람이 대시보드에서 직접 반려한 키워드(의도적)는 제외돼야
+        manual = kq.add_keyword(conn, "책상의자", channel="ali")
+        sid = kq.ensure_scenario_for_keyword(conn, manual)
+        conn.execute(
+            "INSERT INTO drafts (scenario_id, status, status_reason, keyword_id) "
+            "VALUES (?, 'rejected', 'cli reject — dashboard 반려', ?)",
+            (sid, manual),
+        )
+        conn.execute("UPDATE keyword_queue SET status='drafted' WHERE id=?", (manual,))
+        conn.commit()
+        conn.close()
+
+        assert cli.cmd_keyword_requeue(_ns(id=None)) == 0
+        conn = db.connect(migrated_db)
+        gate_kw = kq.get_keyword(conn, gate)
+        manual_kw = kq.get_keyword(conn, manual)
+        conn.close()
+        assert gate_kw is not None and gate_kw["status"] == "pending"  # 게이트 반려 → 복귀
+        assert manual_kw is not None and manual_kw["status"] == "drafted"  # 수동 반려 → 유지
+
+    def test_requeue_none_found(
+        self, migrated_db: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert cli.cmd_keyword_requeue(_ns(id=None)) == 0
+        assert "없음" in capsys.readouterr().out
+
+
+class TestActionableFeedback:
+    """★세션 #41 — 게이트 issue를 '어떻게 고칠지' 실행지시로 변환(재생성 성공률↑·무한 반려 방지)."""
+
+    @staticmethod
+    def _report(gate: str, issues: list[str]) -> dict[str, object]:
+        return {"overall_pass": False, "gates": {gate: {"issues": issues}}}
+
+    def test_headings_directive_includes_keyword(self) -> None:
+        fb = cli._actionable_feedback(
+            self._report("seo", ["headings_keyword_low: 소제목 내 대표키워드 0개 < 1개"]),
+            "허리편한의자",
+        )
+        assert len(fb) == 1
+        assert "허리편한의자" in fb[0]  # 어떤 키워드를 소제목에 넣을지 명시
+        assert "소제목" in fb[0]
+        assert "원인:" in fb[0]  # 원본 issue도 보존
+
+    def test_first_person_directive(self) -> None:
+        fb = cli._actionable_feedback(
+            self._report("truth", ["first_person_forbidden: 2년 사용"]), "메쉬의자"
+        )
+        assert "삭제" in fb[0]
+        assert "2년 사용" in fb[0]  # 문제 표현을 짚어줌
+
+    def test_unknown_issue_passthrough(self) -> None:
+        fb = cli._actionable_feedback(self._report("links", ["broken_link: /go/x"]), "x")
+        assert fb == ["broken_link: /go/x"]  # 미지 코드는 원본 유지
+
+    def test_no_primary_falls_back_raw(self) -> None:
+        fb = cli._actionable_feedback(
+            self._report("seo", ["headings_keyword_low: 소제목 내 대표키워드 0개 < 1개"]), ""
+        )
+        assert fb == ["headings_keyword_low: 소제목 내 대표키워드 0개 < 1개"]
+
+    def test_dedupes(self) -> None:
+        fb = cli._actionable_feedback(
+            self._report("seo", ["density_high: 밀도 5%", "density_high: 밀도 5%"]), "kw"
+        )
+        assert len(fb) == 1

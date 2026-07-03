@@ -127,6 +127,20 @@ def set_status(
     conn.commit()
 
 
+def bump_fail_count(conn: sqlite3.Connection, keyword_id: int) -> int:
+    """키워드 실패 카운터 +1 하고 갱신된 값을 반환 (세션 #41 자가복원).
+
+    게이트 반려 시마다 호출해 '이 키워드가 몇 번 실패했는가'를 추적한다(007 스키마의 fail_count
+    컬럼이 그동안 미사용=사문화였음). 이 값으로 재시도(pending 복귀) vs 격리(failed)를 판정한다.
+    """
+    conn.execute("UPDATE keyword_queue SET fail_count = fail_count + 1 WHERE id = ?", (keyword_id,))
+    conn.commit()
+    row = conn.execute(
+        "SELECT fail_count FROM keyword_queue WHERE id = ?", (keyword_id,)
+    ).fetchone()
+    return int(row[0]) if row else 0
+
+
 def get_keyword(conn: sqlite3.Connection, keyword_id: int) -> dict[str, Any] | None:
     """단일 키워드 행 → dict (없으면 None)."""
     conn.row_factory = sqlite3.Row

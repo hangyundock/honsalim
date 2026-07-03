@@ -501,6 +501,9 @@ class DashboardWindow(QMainWindow):
             ("drafts_approved", "승인(발행 대기)"),
             ("articles_published", "게시 글"),
             ("categories_published", "공개 카테고리"),
+            # ★세션 #41 — 반려/미발행 가시화(옛 '조용한 데드엔드'가 어느 카드에도 안 잡히던 문제).
+            ("keywords_gate_failed", "반려(검토 필요)"),
+            ("articles_unpublished", "미발행 글"),
         ]:
             c = StatCard(label)
             self.cards[key] = c
@@ -531,7 +534,9 @@ class DashboardWindow(QMainWindow):
         # 탭
         self.tabs = QTabWidget()
         self.tab_queue = _read_only_table(["ID", "상태", "키워드/제목", "생성일"])
-        self.tab_keywords = _read_only_table(["ID", "키워드", "채널", "상태", "점수", "미리선택"])
+        self.tab_keywords = _read_only_table(
+            ["ID", "키워드", "채널", "상태", "점수", "미리선택", "사유"]
+        )
         # 발행 글 관리(세션 #37) — 완전 무인 발행의 사후 검토: 발행된 글을 목록·링크로 보고 비공개/재공개.
         self.tab_articles = _read_only_table(["제목", "상태", "발행일", "라이브 URL"])
         self.tab_articles.cellDoubleClicked.connect(lambda *_: self._on_article_open())
@@ -851,6 +856,9 @@ class DashboardWindow(QMainWindow):
             self.tab_keywords.setItem(i, 3, _cell(_status_label(st), st))
             self.tab_keywords.setItem(i, 4, _cell(str(r.get("score") or 0)))
             self.tab_keywords.setItem(i, 5, _cell(str(n_products)))
+            # 사유(세션 #41) — 반려/재생성 대기 등 상태 이유를 노출해 '글 생성됨' 뭉뚱그림 해소.
+            reason = str(r.get("status_reason") or "")
+            self.tab_keywords.setItem(i, 6, _cell(reason[:60]))
 
     def _fill_health(self, conn: sqlite3.Connection) -> None:
         cycle = queries.load_last_cycle(db.DB_PATH.parent / "refresh_cycle_last.json")
