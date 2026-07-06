@@ -2658,13 +2658,54 @@ def _auto_cycle_digest_and_alert(
     return digest
 
 
-def _auto_cycle_notify(digest: dict[str, Any], publish_rc: int | None) -> None:
+def _published_article_ids() -> set[int]:
+    """현재 published 상태 글 id 집합 (발행 전후 비교용 — 세션 #42). 조회 실패는 빈 집합(§0)."""
+    try:
+        conn = db.connect(db.DB_PATH)
+        try:
+            return {
+                int(r[0])
+                for r in conn.execute("SELECT id FROM articles WHERE status='published'").fetchall()
+            }
+        finally:
+            conn.close()
+    except Exception:
+        return set()
+
+
+def _newly_published_articles(pre_ids: set[int]) -> list[dict[str, str]]:
+    """발행 후 새로 published된 글의 제목+URL 목록 (세션 #42 — 텔레그램 발행 알림).
+
+    pre_ids(발행 전 집합)에 없던 published 글만 = 이번 회차 발행분(race-free). 실패는 빈 목록(§0)."""
+    try:
+        conn = db.connect(db.DB_PATH)
+        try:
+            rows = conn.execute(
+                "SELECT id, slug, title FROM articles WHERE status='published' ORDER BY id"
+            ).fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        return []
+    return [
+        {"title": str(r[2] or r[1]), "url": f"{SITE_ORIGIN}/articles/{r[1]}/"}
+        for r in rows
+        if int(r[0]) not in pre_ids
+    ]
+
+
+def _auto_cycle_notify(
+    digest: dict[str, Any],
+    publish_rc: int | None,
+    published: list[dict[str, str]] | None = None,
+) -> None:
     """무인 사이클 결과를 텔레그램으로 발송 (세션 #41 푸시 채널 — #39 이월 과제).
 
     두 종류를 한 메시지로: ①일일 리포트(telegram_daily_report=True일 때 매일 — 하트비트 겸용:
     예약 시각 후 안 오면 스케줄러/PC 죽음 신호) ②경보(발행 0 위험·게이트 반려 상한·쿠팡 첨부
     소진 임박·발행 실패 — 리포트 OFF여도 발송). secrets 미설정이면 조용히 무동작.
-    발송 실패는 사이클에 절대 영향 없음(§0 격리 — notify가 예외를 삼킴).
+    published(세션 #42): 이번에 발행된 글의 제목+URL — 있으면 메시지에 링크로 붙여 핸드폰에서
+    바로 확인. 발송 실패는 사이클에 절대 영향 없음(§0 격리 — notify가 예외를 삼킴).
     """
     from datetime import date
 
@@ -2705,8 +2746,9 @@ def _auto_cycle_notify(digest: dict[str, Any], publish_rc: int | None) -> None:
         alerts.append(f"🚨 발행 단계 실패(rc={publish_rc}) — 로그 확인 필요")
 
     daily = bool(settings.get("telegram_daily_report", True))
-    if not daily and not alerts:
-        return  # 리포트 OFF + 경보 없음 = 무발송
+    # 발행이 실제로 일어난 회차는 리포트 OFF여도 발송(주인이 원한 '발행 결과 알림'·세션 #42).
+    if not daily and not alerts and not published:
+        return  # 리포트 OFF + 경보 없음 + 발행 없음 = 무발송
 
     retry_n = int(digest.get("queue_retrying", 0))
     queue_line = f"대기 키워드 {digest.get('queue_pending', 0)}개 (쿠팡 첨부 {cp}개"
@@ -2719,8 +2761,11 @@ def _auto_cycle_notify(digest: dict[str, Any], publish_rc: int | None) -> None:
         f"발행 {'완료' if publish_rc == 0 else ('없음' if publish_rc is None else '실패')}",
         queue_line,
     ]
+    # ★발행된 글 제목+URL(세션 #42) — 핸드폰에서 탭해서 바로 확인. 텔레그램이 URL 자동 링크화.
+    for a in published or []:
+        lines.append(f"📄 {a['title']}\n{a['url']}")
     lines.extend(alerts)
-    if not alerts:
+    if not alerts and not published:
         lines.append("✅ 조치 필요 없음")
     notify.send_telegram("\n".join(lines))
 
@@ -2855,10 +2900,15 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
         conn.close()
     # 텔레그램 자기보고(세션 #41 푸시 채널) — 모든 종료 경로에서 1회 발송. 실패해도 사이클 무영향.
     if approved_n:
+        # ★세션 #42(주인 지시): 발행된 글의 제목+URL을 텔레그램으로 — 핸드폰에서 바로 확인.
+        # 발행 전후 published 글 id 집합을 비교해 '이번에 새로 나간 글'만 정확히 잡는다(시간창·중복
+        # 없이 race-free). 실패해도 발행에 영향 없음(§0 — 조회 예외는 빈 목록으로 흡수).
+        pre_ids = _published_article_ids()
         rc = cmd_publish_queue(
             argparse.Namespace(count=count, dry_run=False, no_deploy=args.no_deploy)
         )
-        _auto_cycle_notify(digest, rc)
+        published = _newly_published_articles(pre_ids)
+        _auto_cycle_notify(digest, rc, published)
         return rc
     if mr["unpublished"] and not args.no_deploy:
         print("     발행 대상 없음 — 비공개 반영 위해 재빌드·배포")
