@@ -1113,16 +1113,19 @@ class TestArticleAsCategory:
         assert renderer._cat_slug_from_concept("") == ""
 
     def test_article_uses_own_products_not_category(self) -> None:
-        """세션 #38: 글은 매핑 카테고리의 (stale·쿠팡없는) 데이터가 아니라 자기 상품으로 렌더한다.
+        """세션 #38+#42: 픽·쿠팡·비교·요약은 글 고유, 전체 카탈로그는 글 상품 우선+카테고리 광폭.
 
-        옛 동작(#34)은 글이 base(카테고리)의 picks/쿠팡/비교/카탈로그를 통째로 물려받아, 글이
-        수집한 쿠팡·픽·비교가 전부 폐기됐다(라이브 적발: 쿠팡 0·상단 4·비교 4). 정형 구성(메타·
-        섹션 순서)은 유지하되 데이터는 글 고유여야 한다.
+        #38은 base(카테고리) 통째 상속으로 글이 수집한 쿠팡·픽·비교가 폐기되던 것을 바로잡았고,
+        #42는 그 과교정(카탈로그까지 글 수집분 3~8개로 축소 → '고를 게 없는' 페이지, 라이브 적발:
+        메쉬의자 글 전체 3개 vs 참조 카테고리 23~46개)을 바로잡는다 — 주인 지시 "참조 페이지 수준
+        제품 구색으로 정형화". 카탈로그 = 글 상품(키워드 적합, 앞) + base 전체(중복 slug 제외, 뒤).
         """
         base = {
             "slug": "monitor-stand",
             "category": {"name": "모니터 받침대", "lead": "L"},
-            "products": [{"name": "CAT_PROD"}],  # 카테고리 카탈로그 — 글은 이걸 안 쓴다
+            # 카테고리 카탈로그 — 글 카탈로그 '뒤에' 광폭 구색으로 이어붙는다(#42).
+            # DUP은 글 상품과 같은 slug — 중복 제거 검증용.
+            "products": [{"name": "CAT_PROD", "slug": "cat-1"}, {"name": "DUP", "slug": "art-1"}],
             "picks_budget": [{"name": "CAT_PICK"}],
             "picks_premium": [],
             "has_picks": True,
@@ -1150,7 +1153,7 @@ class TestArticleAsCategory:
             "coupang_picks": [{"name": "CP1"}, {"name": "CP2"}, {"name": "CP3"}],
             "compare": {"cols": [1, 2, 3], "rows": ["할인"]},
             "has_compare": True,
-            "catalog": [{"name": "ART_CAT1"}],
+            "catalog": [{"name": "ART_CAT1", "slug": "art-1"}],
             "art_data_summary": {"count": 5},
         }
         ctx = renderer._article_as_category_ctx(art, base)
@@ -1162,8 +1165,7 @@ class TestArticleAsCategory:
         assert ctx["article_intro_html"] == "<h1>키워드 글 제목</h1>"  # 대가성 고지 포함 intro
         assert ctx["quick_verdict"] == "QV"
         assert ctx["article_guide_pre"] == "PRE"
-        # ★데이터는 글 자신의 것 (base 카테고리가 아님) — 회귀 가드
-        assert ctx["products"] == art["catalog"]  # 글 카탈로그 (CAT_PROD 아님)
+        # ★추천·비교·요약은 글 자신의 것 (base 카테고리가 아님) — #38 회귀 가드
         assert ctx["picks_budget"] == art["picks_budget"]
         assert ctx["picks_premium"] == art["picks_premium"]
         assert ctx["coupang_picks"] == art["coupang_picks"]  # 글 쿠팡 3개
@@ -1171,7 +1173,9 @@ class TestArticleAsCategory:
         assert ctx["compare"] == art["compare"]
         assert ctx["has_compare"] is True
         assert ctx["data_summary"] == art["art_data_summary"]
-        assert ctx["catalog_types"] == []  # 글 카탈로그는 타입 미도출 → 필터 칩 숨김
+        # ★전체 카탈로그 = 글 상품 먼저 + 카테고리 광폭 구색(같은 slug 중복 제거) — #42 회귀 가드
+        assert [it["name"] for it in ctx["products"]] == ["ART_CAT1", "CAT_PROD"]
+        assert ctx["catalog_types"] == ["서랍형"]  # 타입 필터 칩 복원(참조 페이지와 동일 UX)
 
     def test_compare_columns_match_picks_count(self) -> None:
         """세션 #38: 비교표 열 수 == 추천 픽 수(정형성). 옛 기본 limit 6은 picks 8을 6으로 잘랐다."""

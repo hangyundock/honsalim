@@ -951,8 +951,18 @@ def _article_as_category_ctx(art: dict, base: dict) -> dict:
     ctx["has_coupang"] = bool(art["coupang_picks"])
     ctx["compare"] = art["compare"]
     ctx["has_compare"] = art["has_compare"]
-    ctx["products"] = art["catalog"]  # 글 자신의 카탈로그(키워드 수집분)
-    ctx["catalog_types"] = []  # 글 카탈로그는 타입 미도출 → 필터 칩 숨김(category.html graceful)
+    # ★세션 #42 — 전체 카탈로그 = 글 상품(키워드 적합, 앞) + 매핑 카테고리 전체 구색(뒤).
+    # #38이 'base 통째 상속'을 '글 고유 데이터'로 바로잡으며 카탈로그까지 글 수집분(3~8개)으로
+    # 좁혀, 무인 발행 글이 '고를 게 없는' 페이지가 됐다(라이브 적발: 메쉬의자 글 전체 3개 vs
+    # 참조 카테고리 23~46개 — 주인 지시 "참조 페이지 수준 제품 구색으로 정형화").
+    # 추천 픽·쿠팡존·비교표·데이터 요약은 #38대로 글 고유 유지(키워드 적합·정직성), 소비자가
+    # 훑어보며 고르는 '전체 보기'만 카테고리 광폭으로 — 참조 페이지와 동일한 구성이 된다.
+    art_items = list(art["catalog"])
+    art_slugs = {it.get("slug") for it in art_items if it.get("slug")}
+    base_items = [it for it in (base.get("products") or []) if it.get("slug") not in art_slugs]
+    ctx["products"] = art_items + base_items
+    # 타입 필터 칩 복원(카테고리와 동일 UX) — 글 상품은 type 미도출이라 '전체'에서만 보인다.
+    ctx["catalog_types"] = list(base.get("catalog_types") or [])
     ctx["data_summary"] = art["art_data_summary"]  # 개수·가격대를 글 상품 기준으로(정직성)
     return ctx
 
