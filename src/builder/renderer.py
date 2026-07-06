@@ -908,7 +908,11 @@ def _article_guide_cards(article_pages: list[dict]) -> list[dict]:
         a = pg.get("article") or {}
         cards.append(
             {
+                "slug": pg["slug"],
                 "title": pg["title"],
+                # 칩용 짧은 라벨 — 기본은 제목 앞부분(':' 전). 빌드가 키워드 큐 매칭 시
+                # 키워드('메쉬의자' 등)로 교체(세션 #42 카테고리 인덱스 세부 가이드 칩).
+                "label": (pg["title"].split(":", 1)[0]).strip(),
                 "intro": pg.get("meta_description") or a.get("summary") or "",
                 "url": f"/articles/{pg['slug']}/",
                 "concept_image": pg.get("concept_image") or "",
@@ -917,6 +921,23 @@ def _article_guide_cards(article_pages: list[dict]) -> list[dict]:
             }
         )
     return cards
+
+
+def _attach_guides_to_groups(
+    groups: list[dict], guides_by_cat: dict[str, list[dict]], *, cap: int = 4
+) -> None:
+    """카테고리 인덱스 카드에 '세부 가이드'(매핑 발행 글) 칩을 부착 (세션 #42 — 좀비 페이지 방지).
+
+    상단 메뉴 '카테고리'(인덱스)에서 발행 글로 가는 링크가 0이라 새 글이 카테고리 탐색
+    경로에서 고아가 됐다(주인 적발: 메쉬의자 글). 대분류→카테고리→**세부 가이드(키워드 글)**
+    3층 탐색을 인덱스에서 완성한다. 렌더 시 DB 파생 — 새 글 발행 시 자동 반영(무인·§0).
+    cap개까지만 노출(무인 일일 발행 누적 대비), 초과분은 '+N개'로 카테고리 상세에 위임.
+    """
+    for grp in groups:
+        for card in grp.get("cards", []):
+            gs = guides_by_cat.get(card.get("slug", ""), [])
+            card["guides"] = gs[:cap]
+            card["guides_more"] = max(0, len(gs) - cap)
 
 
 def _article_as_category_ctx(art: dict, base: dict) -> dict:
@@ -938,6 +959,11 @@ def _article_as_category_ctx(art: dict, base: dict) -> dict:
     ctx["quick_verdict"] = art.get("quick_verdict", "")
     ctx["article_checkpoints"] = art.get("checkpoints", [])
     ctx["has_article_checkpoints"] = bool(art.get("checkpoints"))
+    # 화면 빵부스러기용 상위 카테고리(세션 #42) — 홈>카테고리>{의자}>글제목 탐색·SEO 계층
+    ctx["parent_category"] = {
+        "name": base["category"]["name"],
+        "url": f"/categories/{base['slug']}/",
+    }
     ctx["category"] = {**base["category"], "name": art["title"]}
     # ★세션 #38 — 글은 매핑 카테고리의 (stale·쿠팡없는) 데이터가 아니라 자기 상품으로 렌더한다.
     # 옛 코드는 base(카테고리)의 picks/쿠팡/비교/카탈로그를 통째로 물려받아, 글이 수집한 쿠팡·
@@ -1557,16 +1583,29 @@ def render_site(
         pillar_spokes, pillar_total = _load_pillar_spokes(
             conn, PILLAR_HOME_OFFICE["group_slug"], include_drafts
         )
+        # 글 slug → 키워드 라벨(세부 가이드 칩용, 세션 #42). 키워드 큐에 없는 글은 제목 축약 유지.
+        kw_labels = {
+            r["slug"]: r["keyword"]
+            for r in conn.execute(
+                "SELECT slug, keyword FROM keyword_queue WHERE slug IS NOT NULL"
+            ).fetchall()
+        }
     finally:
         conn.close()
 
     # 발행 글 내부링크(고아 방지·세션 #40) — 시나리오 활성과 무관하게 홈·구매가이드·매핑
     # 카테고리에서 항상 글로 닿도록. guides_by_cat = 카테고리 slug → 그 카테고리에 매핑된 글 카드.
     article_guides = _article_guide_cards(article_pages)
+    for _gc in article_guides:
+        _kw = kw_labels.get(_gc["slug"])
+        if _kw:
+            _gc["label"] = _kw  # 칩 = 키워드(소분류처럼 스캔 가능 — 세션 #42)
     guides_by_cat: dict[str, list[dict]] = {}
     for _gc in article_guides:
         if _gc["cat_slug"]:
             guides_by_cat.setdefault(_gc["cat_slug"], []).append(_gc)
+    # 카테고리 인덱스 카드에 세부 가이드 칩 부착 — 대분류→카테고리→키워드 글 3층 완성(세션 #42)
+    _attach_guides_to_groups(category_groups, guides_by_cat)
 
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
@@ -1783,20 +1822,28 @@ def render_site(
                 image_url=_abs_url(pg.get("concept_image")) or ARTICLE_OG_FALLBACK,
                 published_at=pg.get("published_at") or "",
             )
+        base = cat_by_slug.get(_cat_slug_from_concept(pg.get("concept_image", "")))
+        # 빵부스러기 = 실제 탐색 계층(세션 #42 SEO): 카테고리 매핑 글은 홈>카테고리>{카테고리}>글.
+        # 옛 '내맘대로 세팅' 고정은 글이 시나리오 허브 소속으로 잘못 신호돼 카테고리 클러스터가 끊겼다.
+        if base is not None:
+            crumb_items = [
+                {"name": "홈", "url": "/"},
+                {"name": "카테고리", "url": "/categories/"},
+                {"name": base["category"]["name"], "url": f"/categories/{base['slug']}/"},
+                {"name": pg["title"]},
+            ]
+        else:
+            crumb_items = [
+                {"name": "홈", "url": "/"},
+                {"name": "내맘대로 세팅", "url": "/scenarios/"},
+                {"name": pg["title"]},
+            ]
         schema = jsonld.as_script_tags(
             [
-                jsonld.build_breadcrumb_jsonld(
-                    [
-                        {"name": "홈", "url": "/"},
-                        {"name": "내맘대로 세팅", "url": "/scenarios/"},
-                        {"name": pg["title"]},
-                    ],
-                    SITE_ORIGIN,
-                ),
+                jsonld.build_breadcrumb_jsonld(crumb_items, SITE_ORIGIN),
                 article_ld,
             ]
         )
-        base = cat_by_slug.get(_cat_slug_from_concept(pg.get("concept_image", "")))
         if base is not None:
             actx = _article_as_category_ctx(pg, base)
             w(
@@ -1808,6 +1855,7 @@ def render_site(
                     meta_description=pg["meta_description"],
                     schema_jsonld=schema,
                     category=actx["category"],
+                    parent_category=actx["parent_category"],
                     data_summary=actx["data_summary"],
                     pillar_link=actx["pillar_link"],
                     products=actx["products"],

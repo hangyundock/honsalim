@@ -22,14 +22,25 @@
   <div class="grid">
     {% for c in group.cards %}
       {% if c.available %}
-      <a class="ccard" href="{{ c.url }}">
-        <div class="cc-thumb">{% if c.thumb %}<img loading="lazy" decoding="async" src="{{ c.thumb }}" alt="{{ c.name }}">{% endif %}</div>
-        <div class="cc-body">
-          <div class="cn">{{ c.name }}</div>
-          {% if c.types %}<div class="cc-types">{% for t in c.types %}<span class="tp{{ ' new' if t == '게이밍' else '' }}">{{ t }}</span>{% endfor %}</div>{% else %}<div class="ci">{{ c.intro }}</div>{% endif %}
-          <div class="cmeta">제품 {{ c.count }}개 보기 →</div>
+      {# 세션 #42 — 카드 = 카테고리 링크(상단) + 세부 가이드 칩(하단, 발행 글 자동 링크).
+         옛 구조는 카드 전체가 <a> 하나라 발행 글로 가는 링크가 인덱스에 0개(좀비 경로). #}
+      <div class="ccard">
+        <a class="cc-main" href="{{ c.url }}">
+          <div class="cc-thumb">{% if c.thumb %}<img loading="lazy" decoding="async" src="{{ c.thumb }}" alt="{{ c.name }}">{% endif %}</div>
+          <div class="cc-body">
+            <div class="cn">{{ c.name }}</div>
+            {% if c.types %}<div class="cc-types">{% for t in c.types %}<span class="tp{{ ' new' if t == '게이밍' else '' }}">{{ t }}</span>{% endfor %}</div>{% else %}<div class="ci">{{ c.intro }}</div>{% endif %}
+            <div class="cmeta">제품 {{ c.count }}개 보기 →</div>
+          </div>
+        </a>
+        {% if c.guides %}
+        <div class="cc-guides">
+          <span class="cg-label">세부 가이드</span>
+          {% for g in c.guides %}<a class="cg" href="{{ g.url }}" title="{{ g.title }}">{{ g.label }}</a>{% endfor %}
+          {% if c.guides_more %}<a class="cg more" href="{{ c.url }}">+{{ c.guides_more }}개 →</a>{% endif %}
         </div>
-      </a>
+        {% endif %}
+      </div>
       {% else %}
       <div class="ccard soon">
         <div class="cc-thumb">{% if c.thumb %}<img loading="lazy" decoding="async" src="{{ c.thumb }}" alt="{{ c.name }}">{% endif %}</div>

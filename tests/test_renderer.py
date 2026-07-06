@@ -1176,6 +1176,31 @@ class TestArticleAsCategory:
         # ★전체 카탈로그 = 글 상품 먼저 + 카테고리 광폭 구색(같은 slug 중복 제거) — #42 회귀 가드
         assert [it["name"] for it in ctx["products"]] == ["ART_CAT1", "CAT_PROD"]
         assert ctx["catalog_types"] == ["서랍형"]  # 타입 필터 칩 복원(참조 페이지와 동일 UX)
+        # ★화면 빵부스러기용 상위 카테고리(#42) — 홈>카테고리>{카테고리}>글 탐색·SEO 계층
+        assert ctx["parent_category"] == {
+            "name": "모니터 받침대",
+            "url": "/categories/monitor-stand/",
+        }
+
+    def test_attach_guides_to_groups(self) -> None:
+        """세션 #42: 카테고리 인덱스 카드에 세부 가이드(발행 글) 칩 자동 부착 — 좀비 경로 차단.
+
+        상단 메뉴 '카테고리' 인덱스에서 발행 글 링크가 0이라(라이브 적발: 메쉬의자 글)
+        cap개까지 칩 노출 + 초과분 '+N개'. 새 글 발행 시 렌더가 자동 반영(무인)."""
+        groups: list[dict] = [
+            {
+                "name": "홈오피스",
+                "cards": [{"slug": "office-chair"}, {"slug": "desk"}],
+            }
+        ]
+        guides: dict[str, list[dict]] = {
+            "office-chair": [{"label": f"가이드{i}", "url": f"/articles/kw-{i}/"} for i in range(5)]
+        }
+        renderer._attach_guides_to_groups(groups, guides, cap=4)
+        chair, desk = groups[0]["cards"]
+        assert len(chair["guides"]) == 4  # cap 초과분 절단
+        assert chair["guides_more"] == 1  # '+1개 →' 링크
+        assert desk["guides"] == [] and desk["guides_more"] == 0  # 글 없는 카테고리 graceful
 
     def test_compare_columns_match_picks_count(self) -> None:
         """세션 #38: 비교표 열 수 == 추천 픽 수(정형성). 옛 기본 limit 6은 picks 8을 6으로 잘랐다."""

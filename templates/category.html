@@ -20,7 +20,12 @@
 </div>
 
 <div class="wrap catpage">
+  {# 글 페이지는 매핑 카테고리를 링크 계층으로(세션 #42) — 탐색·SEO 클러스터. 카테고리 페이지는 기존 유지. #}
+  {% if is_article and parent_category %}
+  <div class="crumb">홈 › <a href="/categories/">카테고리</a> › <a href="{{ parent_category.url }}">{{ parent_category.name }}</a> › {{ category.name }}</div>
+  {% else %}
   <div class="crumb">홈 › 카테고리 › {{ category.name }}</div>
+  {% endif %}
 
   {# 공정위 고지 — 최상단 (2024.12 개정) #}
   <div class="disc">
