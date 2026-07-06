@@ -15,6 +15,8 @@
 /* 본문 — 좌우 여백은 .wrap(24px)에 위임. padding shorthand는 .wrap 좌우를 0으로 덮어 헤더와 어긋남(세션 #18) */
 .catpage { padding-top: 24px; padding-bottom: 70px; }
 .catpage .crumb { font-size: 14px; color: var(--meta); margin-bottom: 12px; }
+.catpage .crumb a { color: var(--meta); text-decoration: none; }
+.catpage .crumb a:hover { color: var(--accent-ink); text-decoration: underline; }
 .catpage .disc { display: flex; gap: 9px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 11px 14px; font-size: 12.5px; color: var(--sub); margin-bottom: 16px; }
 .catpage .disc b { color: var(--text); }
 .catpage h1 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; line-height: 1.3; margin: 6px 0 10px; color: var(--text); }
@@ -96,6 +98,16 @@
 .catindex .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 12px 0 4px; }
 .catindex .ccard { display: flex; gap: 13px; align-items: center; border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: #fff; text-decoration: none; }
 .catindex a.ccard:hover { border-color: var(--accent); }
+/* 세션 #42 — 카드 = 카테고리 링크(cc-main) + 세부 가이드 칩(cc-guides, 발행 글 자동 링크).
+   :not(.soon) — '준비 중' 카드는 옛 가로 레이아웃 유지(적대검증 적발: 세로 스택·패딩0 잠복 결함) */
+.catindex div.ccard:not(.soon) { flex-direction: column; align-items: stretch; gap: 0; padding: 0; }
+.catindex div.ccard:not(.soon):hover { border-color: var(--accent); }
+.catindex .cc-main { display: flex; gap: 13px; align-items: center; padding: 12px; text-decoration: none; min-width: 0; }
+.catindex .cc-guides { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 9px 12px 11px; border-top: 1px dashed var(--border); }
+.catindex .cg-label { font-size: 11px; font-weight: 800; color: var(--meta); margin-right: 2px; }
+.catindex .cg { font-size: 12px; font-weight: 700; color: var(--accent-ink); background: #f2f9f5; border: 1px solid #d7ebe1; border-radius: 999px; padding: 4px 10px; text-decoration: none; white-space: nowrap; }
+.catindex .cg:hover { border-color: var(--accent); background: #eaf5f0; }
+.catindex .cg.more { color: var(--sub); background: #f6f7f8; border-color: var(--border); }
 .catindex .cc-thumb { width: 66px; height: 66px; flex: 0 0 auto; border-radius: 9px; background: var(--wood-3); border: 1px solid var(--border); overflow: hidden; display: flex; align-items: center; justify-content: center; }
 .catindex .cc-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .catindex .cc-body { min-width: 0; flex: 1; }
