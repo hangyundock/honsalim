@@ -102,3 +102,68 @@ class TestSend:
         assert notify.send_telegram("a" * 5000) is True
         assert len(captured["text"]) <= 4096  # 텔레그램 상한 이하
         assert captured["text"].endswith("…(잘림)")
+
+
+class TestAutoCycleNotifyPublishedUrls:
+    """세션 #42 — 무인 사이클 텔레그램에 발행 글 제목+URL 포함(주인 지시). send_telegram만 몽키패치."""
+
+    def _capture(self, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+        import cli
+
+        sent: list[str] = []
+        monkeypatch.setattr(cli.settings, "get", lambda k, d=None: d)  # 기본값 사용
+        monkeypatch.setattr(cli.settings, "get_int", lambda k: 2)
+        from common import config as _cfg
+        from common import notify as _nt
+
+        monkeypatch.setattr(_cfg, "load_secrets", lambda: None)
+        monkeypatch.setattr(_nt, "telegram_ready", lambda: True)
+
+        def _fake_send(t: str) -> bool:
+            sent.append(t)
+            return True
+
+        monkeypatch.setattr(_nt, "send_telegram", _fake_send)
+        return sent
+
+    def test_published_urls_in_message(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import cli
+
+        sent = self._capture(monkeypatch)
+        digest = {"queue_coupang_pending": 3, "queue_pending": 3, "made": 1, "approved_this_run": 1}
+        published = [
+            {"title": "허리편한의자 추천", "url": "https://honsallim.com/articles/kw-abc/"}
+        ]
+        cli._auto_cycle_notify(digest, 0, published)
+        assert len(sent) == 1
+        assert "허리편한의자 추천" in sent[0]
+        assert "https://honsallim.com/articles/kw-abc/" in sent[0]
+        assert "발행 완료" in sent[0]
+
+    def test_publish_notifies_even_if_daily_report_off(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import cli
+
+        sent = self._capture(monkeypatch)
+        # telegram_daily_report=False여도 발행이 있으면 발송(주인이 원한 발행 결과 알림)
+        monkeypatch.setattr(
+            cli.settings, "get", lambda k, d=None: False if k == "telegram_daily_report" else d
+        )
+        digest = {"queue_coupang_pending": 3, "queue_pending": 3}
+        published = [{"title": "글", "url": "https://honsallim.com/articles/kw-x/"}]
+        cli._auto_cycle_notify(digest, 0, published)
+        assert len(sent) == 1 and "kw-x" in sent[0]
+
+    def test_no_publish_no_alert_report_off_is_silent(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import cli
+
+        sent = self._capture(monkeypatch)
+        monkeypatch.setattr(
+            cli.settings, "get", lambda k, d=None: False if k == "telegram_daily_report" else d
+        )
+        digest = {"queue_coupang_pending": 3, "queue_pending": 3}
+        cli._auto_cycle_notify(digest, None, None)
+        assert sent == []  # 발행·경보·리포트 모두 없음 = 무발송
