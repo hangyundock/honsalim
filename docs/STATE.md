@@ -7,19 +7,19 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#41: 무인 발행 자가복원 근본수정 + 재고 알림(라이브)** — 주인 "쿠팡 키워드 무인 발행 안 됨" 지적 → '반려 글이 조용히 죽고 화면에 안 보이는' §0 위반 적발. 근본수정 5종: ①반려 자가복원(fail_count·자동 pending 복귀·상한 초과 failed 격리+[ALERT]) ②재생성 실행지시화 ③반려 재시도 원클릭([🔁]+`update_and_requeue.bat`) ④3줄 배너(쿠팡 재고 런웨이) ⑤텔레그램(하트비트+경보). 회귀 996→**1037**. main **1a8ed39**. 상세 EVENTS #41·DECISIONS Z | 2026-07-03 #41 |
-| 운영 모델 | **★완전무인 가동 ON**: auto_mode ON·예약 **11:11 KST**·`min_published`=**0**. 키워드+쿠팡 적재→auto-cycle 자동 생성·승인·발행→무관여. 발행글 사후검토(발행 글 관리 탭+monitor) + 무인 자기보고 **3겹**(①`auto_cycle_last.json` ②[ALERT] 로그 ③**#41 텔레그램**=하트비트+쿠팡소진/반려/발행0 경보·TIMA 봇 재사용). **#41 반려 자가복원**(재시도 상한3·실패 failed 격리+가시화). 자동 "승인" 금지(E7)는 min_published로 완화 | #41 |
+| 진행 단계 | **#42: 무인 발행 글 제품 구색 확장 + 좀비 페이지 차단 + 견고화 + 발행 알림(라이브)** — 주인 "메쉬의자 글 제품 3개뿐·이 글로 가는 링크 없음(좀비)" 지적. 근본수정 4종: ①전체 카탈로그=글 상품+매핑 카테고리 광폭 구색(3→24개·#38 과교정 정정) ②좀비 차단=카테고리 인덱스 세부 가이드 칩+글 빵부스러기(홈>카테고리>{카테고리}>글·JSON-LD) ③견고화 3(제공자 403 재시도·생성예외 자가복원·키워드 탭 발행예정/용어정리) ④텔레그램 발행 알림(제목+URL). 회귀 1037→**1043**. 상세 EVENTS #42·DECISIONS AA | 2026-07-06 #42 |
+| 운영 모델 | **★완전무인 가동 ON**: auto_mode ON·예약 (주인 통제·테스트로 변동)·`min_published`=**0**. 키워드+쿠팡 적재→auto-cycle 자동 생성·승인·발행→무관여. 발행글 사후검토(발행 글 관리 탭+monitor) + 무인 자기보고 **3겹**(①`auto_cycle_last.json` ②[ALERT] 로그 ③텔레그램=하트비트+쿠팡소진/반려/발행0 경보+**#42 발행 글 제목·URL**·TIMA 봇 재사용). 자가복원 2겹(#41 게이트 반려 + **#42 생성 예외**·재시도 상한3·초과 failed 격리+가시화). 자동 "승인" 금지(E7)는 min_published로 완화 | #42 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·Secrets·main-protect)·Cloudflare(도메인·Pages·R2·D1)·Anthropic·INDEXNOW 키·secrets·Git push·pre-commit 9종·Dependabot (세부 archive) | #3 |
 | Phase 2 핵심 모듈 (#3~#5) | cli·common·validator·writer·collector·enricher·builder·deployer·tracker·workers (세부 BACKEND §2) + **#17: category_collect·category_page_builder·concept_image·category_writer** | #17 |
-| Phase 2 회귀 테스트 | **1037 / 1037 PASS** [확정 pytest, #41] — #41 +41(자가복원·requeue 안전가드·notify 9·forecast/banner 8·alert 8) · #40 +7 · #39 +28. black·ruff·mypy 클린 | 2026-07-03 |
-| CLI 명령 (BACKEND §9) | **41개** — doctor·db·collect·enrich·validate·approve·promote·build(+`--preview`)·deploy·dashboard · 카테고리(collect/build/approve/unapprove/register-categories·suggest-categories·provision-category) · 운영(keyword-add/generate/list/recommend·**keyword-requeue(#41)**·coupang-add·publish-queue·schedule·auto-cycle·refresh-cycle·build-deploy·monitor-articles·unpublish/republish-article·keyword-delete·category-coupang-*) | #41 |
+| Phase 2 회귀 테스트 | **1043 / 1043 PASS** [확정 pytest, #42] — #42 +6(카탈로그 광폭·세부가이드 칩·발행 예정·제공자403 재시도×2·발행알림×3) · #41 +41 · #40 +7. black·ruff·mypy 클린 | 2026-07-06 |
+| CLI 명령 (BACKEND §9) | **41개** — 코어(doctor·db·collect·enrich·validate·approve·promote·build·deploy·dashboard) + 카테고리(collect/build/approve·provision-category 등) + 운영(keyword-*·**keyword-requeue #41**·coupang-add·publish-queue·schedule·auto-cycle·refresh-cycle·build-deploy·monitor-articles·un/republish-article) | #41 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD. 세부 DECISIONS J·O + EVENTS | #4~#16 |
 | doctor (BACKEND §9) | §1~§14 + §10 모듈 진입점 **71개** + #19 LLM 키 점검. 71/71 OK [#29 +keyword_relevance·article_state×2·article_guardrail×2·auto_approve] | #29 |
 | DB 초기화 | `data/honsalim.db` **v9** + categories(**9**: +mini-rice-cooker)·category_products + products 정가/할인·판매량/만족도 + keyword_queue(#25) + articles.structured_json(#34) + **api_usage(Google Imagen 사용량·추정비용·migration 009, #36)** (migration 002~**009**) + personas 3·scenarios 10. ★**대시보드 시작 시 자동 migrate**(#34·무명령). ※DB는 gitignore — 다음 워크트리는 `db migrate`+`db seed`(+`collect-category`)로 재생성 | #36 |
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (docs/ 참조). 일관성 모순 0건 | #2 |
 | 메모리 시스템 | feedback 7건([[incremental-critical-review]]·[[autonomous-safe-system]] 등) + reference market_research + MEMORY.md | #12 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
-| 사이트 게시글 / 트래픽 / 수익 | **라이브 카테고리 6개** + **정식 글 4편**(모니터받침대·무중력·학생용의자·1인용컴퓨터책상 — 무인 발행 누적). #41: 쿠팡 저장 7키워드 중 3라이브·3반려(자가복원 재시도 복귀). ★**색인(#40)**: GSC 4/네이버 4·16노출. ★**다음 레버=색인 커버리지↑**([[growth-first-priority]]) | #41 |
+| 사이트 게시글 / 트래픽 / 수익 | **라이브 카테고리 6개** + **정식 글 6편**(+#42: 등받이의자 7/5·**허리편한의자 7/6밤** 무인 발행). #42 발행 글 전부 **넓은 카탈로그(제품 24~41개)+빵부스러기+세부 가이드 칩** 라이브 반영. ★**색인(#40)**: GSC 4/네이버 4·16노출. ★**다음 레버=색인 커버리지↑**([[growth-first-priority]]) | #42 |
 
 ## 인프라
 
@@ -58,10 +58,10 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 다음 세션 #42 — 상세 EVENTS #41
-1. **[관찰] 무인 재생성 실발행 추적**(#41 자가복원 검증): pending 복귀한 4개(등받이·메쉬·허리편한·게이밍책상)+서재책상이 **개선된 재생성(실행지시 피드백)으로 실제 발행되는지** 매일 확인(하루 1편·나흘 순차). 재반려 시 자동 재시도(상한3)·상한 도달 시 failed 격리 + [ALERT]/텔레그램 경보 오는지 확인. **무인 스케줄러 실작동=07-02·06-29 publish-queue 커밋으로 확인됨**(#40 의문 해소).
-2. **★성장 — 색인 커버리지 관찰·가속**([[growth-first-priority]]): #40 배포 효과로 GSC/네이버 색인 **4→증가** 1~2주 관찰. 핵심 URL 색인 요청. 씨앗 커버리지 확장(seo_keywords.yml 미매핑)·E-E-A-T(about/Person Schema).
-3. **미발행 승인글 2편**(게이밍의자·노트북받침대) 검토 후 발행/유지 결정(주인 "검토 후 결정" 선택 — 라이브 미리보기로 품질 확인).
+### ★ 다음 세션 #43 — 상세 EVENTS #42
+1. **[관찰] #42 라이브 효과 확인**: ①발행 글 넓은 카탈로그(24~41개)·빵부스러기·세부 가이드 칩이 honsallim.com에 실제 반영됐는지 curl/브라우저 ②텔레그램 발행 알림이 매일 예약 후 제목+URL로 오는지 ③제공자 403 재시도·생성 예외 자가복원이 실전에서 무인 사이클을 안 죽이는지(로그).
+2. **★성장 — 색인 커버리지 관찰·가속**([[growth-first-priority]]): GSC/네이버 색인 **4→증가** 관찰. #42 내부링크 대폭 강화(세부 가이드 칩·빵부스러기·광폭 카탈로그)로 크롤 경로 개선 효과 기대. 핵심 URL 색인 요청. 씨앗 커버리지 확장·E-E-A-T(about/Person Schema).
+3. **미발행 승인글 2편**(게이밍의자·노트북받침대) 검토 후 발행/유지 결정(주인 "검토 후 결정").
 4. (이월) Phase 2 자가복원(ali off-target·배포 drift·git pull footgun)·review-helpfulknow 월상한·쿠팡 부트스트랩(15만원→API).
 - 워크트리=`PYTHONPATH=src python -m cli`(자동 migrate). main직접머지=`git push origin HEAD:main`. ★PowerShell/cmd 한글→.py·ASCII([[powershell-korean-encoding]]). 운영 DB 직접수정 불가→주인 런처. ★무인 발행이 origin 전진([[autonomous-deploy-advances-origin]])—푸시 전 ff/merge. ★Edit 절대경로 = 운영 폴더(워크트리 아님) 주의([[worktree-edit-path-footgun]]).
 
