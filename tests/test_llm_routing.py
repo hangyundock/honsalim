@@ -151,6 +151,59 @@ class TestOpenRouterBackend:
         assert resp.content[0].text == "재시도성공"
         assert calls["n"] == 2
 
+    def test_retries_on_provider_403_then_succeeds(self, monkeypatch) -> None:
+        """세션 #42: OpenRouter 제공자 풀 403('Provider returned error')은 일시 오류 — 재시도.
+
+        라이브 적발: DigitalOcean 제공자 403으로 무인 사이클 0편·쿠팡 키워드 격리.
+        재시도하면 다른 제공자로 라우팅돼 성공하는 게 보통이라 429와 동일 취급."""
+        seq = [
+            _FakeResp(
+                403,
+                text='{"error":{"message":"Provider returned error","code":403,'
+                '"metadata":{"provider_name":"DigitalOcean"}}}',
+            ),
+            _FakeResp(200, _ok_payload("제공자재시도성공")),
+        ]
+        calls = {"n": 0}
+
+        def fake_post(*a: Any, **k: Any) -> _FakeResp:
+            r = seq[calls["n"]]
+            calls["n"] += 1
+            return r
+
+        monkeypatch.setattr(requests, "post", fake_post)
+        monkeypatch.setattr("time.sleep", lambda *_a, **_k: None)
+        be = _OpenRouterBackend(key_loader=lambda: "KEY")
+        resp = be.create(
+            model="deepseek/deepseek-v4-pro",
+            max_tokens=10,
+            temperature=0.4,
+            system=None,
+            messages=_MSG,
+        )
+        assert resp.content[0].text == "제공자재시도성공"
+        assert calls["n"] == 2
+
+    def test_plain_403_auth_fails_fast(self, monkeypatch) -> None:
+        """진짜 인증 403(키 폐기 등)은 재시도 없이 즉시 실패 — 비용·무한루프 안전 유지."""
+        calls = {"n": 0}
+
+        def fake_post(*a: Any, **k: Any) -> _FakeResp:
+            calls["n"] += 1
+            return _FakeResp(403, text='{"error":{"message":"Invalid API key"}}')
+
+        monkeypatch.setattr(requests, "post", fake_post)
+        be = _OpenRouterBackend(key_loader=lambda: "KEY")
+        with pytest.raises(RuntimeError, match="OpenRouter 403"):
+            be.create(
+                model="deepseek/deepseek-v4-pro",
+                max_tokens=10,
+                temperature=0.4,
+                system=None,
+                messages=_MSG,
+            )
+        assert calls["n"] == 1  # 재시도 없음
+
     def test_http_4xx_raises(self, monkeypatch) -> None:
         monkeypatch.setattr(
             requests,

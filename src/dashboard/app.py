@@ -539,8 +539,10 @@ class DashboardWindow(QMainWindow):
         # 탭
         self.tabs = QTabWidget()
         self.tab_queue = _read_only_table(["ID", "상태", "키워드/제목", "생성일"])
+        # ★세션 #42(주인 지적 "발행 순서를 알 수 없다"): '발행 예정' 컬럼 — 대기 키워드가
+        # 몇 번째로·언제 나가는지 표시(배너 예측 auto_forecast와 동일 소스·동일 순서).
         self.tab_keywords = _read_only_table(
-            ["ID", "키워드", "채널", "상태", "점수", "미리선택", "사유"]
+            ["ID", "제품 키워드", "채널", "상태", "발행 예정", "점수", "쿠팡첨부", "사유"]
         )
         # 발행 글 관리(세션 #37) — 완전 무인 발행의 사후 검토: 발행된 글을 목록·링크로 보고 비공개/재공개.
         self.tab_articles = _read_only_table(["제목", "상태", "발행일", "라이브 URL"])
@@ -560,7 +562,7 @@ class DashboardWindow(QMainWindow):
                     ("🗑 키워드 삭제", self._on_keyword_delete),
                 ],
             ),
-            "키워드",
+            "제품 키워드",
         )
         self.tabs.addTab(
             self._panel(
@@ -585,7 +587,10 @@ class DashboardWindow(QMainWindow):
             ),
             "발행 글 관리",
         )
-        self.tabs.addTab(self._build_monitor_tab(), "카테고리·모니터링")
+        # ★세션 #42(주인 지적 "카테고리와 제품 키워드가 혼동됨"): 용어 확정 —
+        # '제품 키워드' = 글 1편의 주제(메쉬의자 등, 키워드 탭), '카테고리' = 그 글들이
+        # 소속되는 제품 묶음 페이지(의자·컴퓨터 책상 등, 이 탭). 탭 이름으로 구분을 명시.
+        self.tabs.addTab(self._build_monitor_tab(), "카테고리(제품 묶음)")
         self.tabs.addTab(self._build_settings_tab(), "설정")
         outer.addWidget(self.tabs, 1)
 
@@ -657,6 +662,9 @@ class DashboardWindow(QMainWindow):
         bar.addStretch(1)
         lay.addLayout(bar)
         hint = QLabel(
+            "[안내] 카테고리 = 제품 키워드 글들이 소속되는 '묶음 페이지'(의자·컴퓨터 책상 등 사이트 상단 메뉴의 "
+            "카테고리)입니다. 새 키워드 글은 여기 등록되지 않고 [발행 글 관리] 탭에서 보며, 매핑된 카테고리의 "
+            "'세부 가이드' 링크로 자동 연결됩니다. 이 표는 각 카테고리의 상품 재고(추천/전체)와 상태를 점검합니다.\n"
             "표에서 카테고리를 선택해 쿠팡을 추가/제거하거나, 행을 더블클릭(또는 '🌐 카테고리 보기')"
             "하면 라이브 카테고리 페이지가 열립니다. 변경 후 라이브 반영은 '🚀 빌드·배포'가 필요합니다."
         )
@@ -793,7 +801,12 @@ class DashboardWindow(QMainWindow):
             for key, card in self.cards.items():
                 card.set_value(stats.get(key, 0))
             self._fill_queue(queries.list_queue(conn))
-            self._fill_keywords(queries.list_keywords(conn))
+            # 발행 예정 순서(#42) — 배너 예측과 같은 계산을 재사용(순서 로직 단일 소스)
+            try:
+                forecast = queries.auto_forecast(conn, cfg, datetime.now())
+            except Exception:  # 예측은 보조 정보 — 실패해도 목록은 그대로
+                forecast = None
+            self._fill_keywords(queries.list_keywords(conn), forecast)
             self._fill_articles(queries.list_articles(conn))
             self._fill_health(conn)
             self._paint_banner_rich(conn, cfg)
@@ -904,7 +917,22 @@ class DashboardWindow(QMainWindow):
             self.tab_articles.setItem(i, 2, _cell(str(r.get("published_at") or "—")))
             self.tab_articles.setItem(i, 3, _cell(str(r.get("live_url") or "")))
 
-    def _fill_keywords(self, rows: list[dict[str, Any]]) -> None:
+    def _fill_keywords(
+        self, rows: list[dict[str, Any]], forecast: dict[str, Any] | None = None
+    ) -> None:
+        # ★세션 #42(주인 지적 "리스트 순서 기준을 알 수 없다"): 발행 예정(대기) 키워드를
+        # 실제 선정 순서로 맨 위에 + '발행 예정' 컬럼(①7/7(화) 식). 순서는 배너 예측
+        # auto_forecast(=auto_pick_keyword와 동일 규칙)를 그대로 써 화면·실제가 항상 일치.
+        order: dict[int, str] = {}
+        if forecast:
+            marks = "①②③④⑤⑥⑦⑧⑨⑩"
+            for n, (p, d) in enumerate(zip(forecast["picks"], forecast["dates"], strict=False)):
+                mark = marks[n] if n < len(marks) else f"{n + 1}."
+                order[int(p["id"])] = f"{mark} {queries._fmt_day(d)}"
+            pos = {int(p["id"]): n for n, p in enumerate(forecast["picks"])}
+            rows = sorted(
+                rows, key=lambda r: pos.get(int(r["id"]), len(pos) + 1)
+            )  # 예정 순서 → 나머지는 기존 순서(안정 정렬)
         self.tab_keywords.setRowCount(len(rows))
         for i, r in enumerate(rows):
             st = str(r.get("status") or "")
@@ -920,11 +948,12 @@ class DashboardWindow(QMainWindow):
             self.tab_keywords.setItem(i, 1, _cell(str(r.get("keyword") or "")))
             self.tab_keywords.setItem(i, 2, _cell(str(r.get("channel") or "")))
             self.tab_keywords.setItem(i, 3, _cell(_status_label(st), st))
-            self.tab_keywords.setItem(i, 4, _cell(str(r.get("score") or 0)))
-            self.tab_keywords.setItem(i, 5, _cell(str(n_products)))
+            self.tab_keywords.setItem(i, 4, _cell(order.get(int(r["id"]), "—")))
+            self.tab_keywords.setItem(i, 5, _cell(str(r.get("score") or 0)))
+            self.tab_keywords.setItem(i, 6, _cell(str(n_products)))
             # 사유(세션 #41) — 반려/재생성 대기 등 상태 이유를 노출해 '글 생성됨' 뭉뚱그림 해소.
             reason = str(r.get("status_reason") or "")
-            self.tab_keywords.setItem(i, 6, _cell(reason[:60]))
+            self.tab_keywords.setItem(i, 7, _cell(reason[:60]))
 
     def _fill_health(self, conn: sqlite3.Connection) -> None:
         cycle = queries.load_last_cycle(db.DB_PATH.parent / "refresh_cycle_last.json")

@@ -318,7 +318,12 @@ class _OpenRouterBackend:
                 raise RuntimeError(f"OpenRouter 타임아웃 — 다음 실행 재시도 권장: {e}") from e
             except requests.exceptions.RequestException as e:
                 raise RuntimeError(f"OpenRouter 연결 오류: {e}") from e
-            if resp.status_code == 429 or resp.status_code >= 500:
+            # ★세션 #42: 제공자 풀 오류(403 'Provider returned error' — OpenRouter가 라우팅한
+            # 특정 제공자의 거부)는 일시적 — 재시도하면 다른 제공자로 붙어 성공하는 게 보통.
+            # 라이브 적발: DigitalOcean 403으로 무인 사이클 0편·키워드 격리. 진짜 인증 오류
+            # (401·키 폐기)는 이 조건에 안 걸려 기존 fail-fast 유지(비용·무한루프 안전).
+            provider_err = resp.status_code == 403 and "Provider returned error" in resp.text
+            if resp.status_code == 429 or resp.status_code >= 500 or provider_err:
                 if attempt < len(cfg.rate_limit_backoffs):
                     time.sleep(_with_jitter(cfg.rate_limit_backoffs[attempt], cfg.jitter_factor))
                     attempt += 1

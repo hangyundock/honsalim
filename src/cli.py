@@ -2779,10 +2779,35 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
                     argparse.Namespace(id=int(pick["keyword_id"]), page_size=20, dry_run=False)
                 )
             except Exception as e:  # 한 키워드 생성 예외(DeepSeek 429/네트워크 등)가 무인 사이클
-                # 전체를 죽이지 않게 격리(세션 #39). generating에 끼인 좀비 키워드를 failed로
-                # 복원하고 다음 회차로 — 사이클 사망·좀비 누적 방지.
-                _set_keyword_status(int(pick["keyword_id"]), "failed", f"생성 예외 격리: {e}")
-                print(f"{WARN} 키워드 #{pick['keyword_id']} 생성 예외 — 격리·계속: {e}")
+                # 전체를 죽이지 않게 격리(세션 #39). ★세션 #42: 1회 예외로 영구 failed 격리하던
+                # 것을 게이트 반려와 동일한 자가복원(fail_count·상한, #41)으로 통일 — 라이브 적발:
+                # OpenRouter 제공자 일시 403에 쿠팡 첨부 키워드가 영구 격리돼 무인 재시도 0.
+                # 상한 미만이면 pending 복귀(다음 사이클 자동 재시도), 상한 도달 시에만 failed.
+                from writer import keyword_queue as kq
+
+                _kid = int(pick["keyword_id"])
+                conn2 = db.connect(db.DB_PATH)
+                try:
+                    n_fail = kq.bump_fail_count(conn2, _kid)
+                finally:
+                    conn2.close()
+                max_retry = settings.get_int("keyword_max_gate_retries")
+                err = str(e)[:140]
+                if n_fail < max_retry:
+                    _set_keyword_status(
+                        _kid,
+                        "pending",
+                        f"생성 예외 {n_fail}/{max_retry}회 — 자동 재시도 대기: {err}",
+                    )
+                    print(
+                        f"{WARN} 키워드 #{_kid} 생성 예외({n_fail}/{max_retry}) — "
+                        f"pending 복귀·다음 사이클 재시도: {e}"
+                    )
+                else:
+                    _set_keyword_status(
+                        _kid, "failed", f"생성 예외 {n_fail}회(상한 도달) 격리: {err}"
+                    )
+                    print(f"{WARN} 키워드 #{_kid} 생성 예외 상한({n_fail}회) — 격리·계속: {e}")
                 rc = 3
             if (
                 rc == 0
