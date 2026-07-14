@@ -476,6 +476,131 @@ class SettingsDialog(QDialog):
             pass
 
 
+# 사용법 단계 안내(네이버 블로그 대시보드에서 이식) — 한 단계씩 진행, "tab"은 그 단계에서
+# 자동 전환할 탭 인덱스(0=제품 키워드, 1=발행 큐(글), 2=발행 글 관리, 3=카테고리, 4=설정).
+# None이면 전환 없음. ★순서 = 이 프로그램 실제 작업 순서(키워드→생성→미리보기→승인→발행→자동화).
+GUIDE_STEPS = [
+    {
+        "tab": 0,
+        "title": "1단계 · 제품 키워드 고르기",
+        "body": "🔑 <b>제품 키워드</b> 탭에서 글로 쓸 키워드를 준비합니다.<br><br>"
+        "<b>[🎯 추천 키워드]</b>로 네이버 검색량 기반 후보를 불러와 체크해 한꺼번에 "
+        "추가하거나, <b>[🆕 키워드 추가]</b>로 직접 넣으세요.<br>"
+        "💡 <b>경쟁도</b>가 낮고 <b>점수</b>가 높을수록 상위 노출에 유리합니다.",
+    },
+    {
+        "tab": 0,
+        "title": "2단계 · (선택) 쿠팡 배너 저장",
+        "body": "수익을 높이려면 <b>1단계에서 고른 키워드 행을 클릭</b>해 선택한 뒤 "
+        "<b>[🛒 쿠팡 첨부(저장)]</b>를 누르세요.<br><br>브라우저에서 <b>쿠팡 파트너스</b>의 "
+        "'블로그용' 배너 HTML을 복사해 붙여넣으면 재료로 저장됩니다.<br>"
+        "쿠팡 미사용이면 건너뛰어도 됩니다 — 알리(AliExpress) 데이터로 글이 만들어집니다.",
+    },
+    {
+        "tab": 0,
+        "title": "3단계 · 글 생성",
+        "body": "키워드 행을 선택한 채 <b>[✨ 글 생성]</b>을 누르세요(선택 안 하면 자동 선정).<br><br>"
+        "확인창에서 <b>예</b>를 누르면 1~2분 뒤 <b>'검토 대기'</b> 글이 만들어집니다"
+        "(상품·비교표 자동 구성, 자동 발행 안 함).<br>⚠️ 본문 생성 LLM 비용이 발생합니다.",
+    },
+    {
+        "tab": 1,
+        "title": "4단계 · 미리보기로 확인",
+        "body": "📝 <b>발행 큐 (글)</b> 탭에서 방금 생긴 글을 <b>클릭</b> → <b>[👁 미리보기]</b>로 "
+        "내용·비교표를 브라우저에서 확인하세요.<br><br>"
+        "(배너는 미리보기에선 카드로 보이고, 실제 발행 땐 진짜 이미지로 나옵니다.)",
+    },
+    {
+        "tab": 1,
+        "title": "5단계 · 승인",
+        "body": "내용이 괜찮으면 그 글을 <b>클릭</b> → <b>[✅ 승인]</b>.<br><br>"
+        "상태가 <b>'승인됨(발행 대기)'</b>로 바뀌고 위 <b>승인(발행 대기)</b> 카드 숫자가 "
+        "올라갑니다.<br>아쉬우면 <b>[🚫 반려]</b>로 되돌릴 수 있습니다.",
+    },
+    {
+        "tab": 1,
+        "title": "6단계 · 발행(라이브 게시)",
+        "body": "승인된 글을 <b>[🚀 발행(승인된 글)]</b>으로 실제 사이트에 올립니다.<br><br>"
+        "⚠️ 빌드 후 <b>honsallim.com</b>에 git push로 배포되는 <b>외부 게시</b>입니다"
+        "(약 1~2분 후 반영).<br>발행한 글은 <b>[발행 글 관리]</b> 탭에서 🌐 라이브 보기·"
+        "🚫 비공개·♻ 재공개로 관리하세요.",
+    },
+    {
+        "tab": 4,
+        "title": "끝 · 예약·무인으로 자동화",
+        "body": "🎉 반복 작업은 자동으로 맡기세요.<br><br>"
+        "• <b>설정</b> 탭 <b>[⏰ 예약 켜기]</b> → 매일 지정 시각에 '승인된 글'을 자동 발행<br>"
+        "• 상단 <b>[🟢 무인 ON]</b> 토글 → 키워드 선정·생성·승인·발행까지 완전 자동<br>"
+        "• <b>[⚙ 설정 편집]</b>에서 발행 시각·하루 편수를 조절합니다.",
+    },
+]
+
+
+class GuideDialog(QDialog):
+    """사용법 단계별 안내(네이버 대시보드에서 이식) — 한 단계씩 [다음]으로 진행. 비모달·항상 위.
+
+    각 단계를 열 때 관련 탭으로 대시보드를 자동 전환해 '안내자' 역할을 한다."""
+
+    def __init__(self, steps, on_tab=None, parent=None) -> None:
+        super().__init__(parent)
+        self.steps = steps
+        self.on_tab = on_tab  # 콜백(tab_index) — 대시보드 탭 전환
+        self.i = 0
+        self.setWindowTitle("📖 사용법 안내")
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.resize(470, 320)
+        lay = QVBoxLayout(self)
+        self.progress = QLabel()
+        self.progress.setStyleSheet("color:#2f6fed;font-weight:bold;font-size:13px;")
+        lay.addWidget(self.progress)
+        self.title = QLabel()
+        self.title.setWordWrap(True)
+        self.title.setStyleSheet("font-size:15px;font-weight:bold;padding:2px 0 6px 0;")
+        lay.addWidget(self.title)
+        self.body = QLabel()
+        self.body.setWordWrap(True)
+        self.body.setTextFormat(Qt.RichText)
+        self.body.setAlignment(Qt.AlignTop)
+        self.body.setStyleSheet(
+            "font-size:13px;padding:10px;background:#f5f7fa;"
+            "border:1px solid #e2e6ea;border-radius:8px;line-height:160%;"
+        )
+        lay.addWidget(self.body, 1)
+        btns = QHBoxLayout()
+        self.b_prev = QPushButton("◀ 이전")
+        self.b_prev.clicked.connect(self._prev)
+        btns.addWidget(self.b_prev)
+        btns.addStretch()
+        self.b_next = QPushButton("다음 ▶")
+        self.b_next.clicked.connect(self._next)
+        btns.addWidget(self.b_next)
+        lay.addLayout(btns)
+        self._render()
+
+    def _render(self) -> None:
+        s = self.steps[self.i]
+        n = len(self.steps)
+        self.progress.setText(f"단계 {self.i + 1} / {n}")
+        self.title.setText(s["title"])
+        self.body.setText(s["body"])
+        self.b_prev.setEnabled(self.i > 0)
+        self.b_next.setText("닫기 ✓" if self.i == n - 1 else "다음 ▶")
+        if s.get("tab") is not None and self.on_tab:
+            self.on_tab(s["tab"])  # 해당 단계 탭으로 자동 이동
+
+    def _prev(self) -> None:
+        if self.i > 0:
+            self.i -= 1
+            self._render()
+
+    def _next(self) -> None:
+        if self.i < len(self.steps) - 1:
+            self.i += 1
+            self._render()
+        else:
+            self.accept()
+
+
 # ─────────────────────────────────────────────────────────────
 # 메인 윈도우
 # ─────────────────────────────────────────────────────────────
@@ -513,6 +638,18 @@ class DashboardWindow(QMainWindow):
             c = StatCard(label)
             self.cards[key] = c
             cards_row.addWidget(c)
+        # 사용법 안내 — 작업 중에도 열 수 있도록 _action_buttons에 넣지 않음(비활성화 제외)
+        btn_guide = QPushButton("📖 사용법 안내")
+        btn_guide.setToolTip(
+            "글 만들어 발행하는 순서를 한 단계씩 안내합니다(해당 탭으로 자동 이동)."
+        )
+        btn_guide.setStyleSheet(
+            "QPushButton{background:#2f6fed;color:#fff;font-weight:bold;"
+            "border-radius:6px;padding:6px 10px;}"
+            "QPushButton:hover{background:#255bd0;}"
+        )
+        btn_guide.clicked.connect(self._on_open_guide)
+        cards_row.addWidget(btn_guide)
         btn_refresh = QPushButton("🔄 새로고침")
         btn_refresh.clicked.connect(self.refresh)
         cards_row.addWidget(btn_refresh)
@@ -1805,6 +1942,16 @@ class DashboardWindow(QMainWindow):
             dlg.save()
             self.append_log("[OK] 설정 저장됨 (data/config.json)")
             self.refresh()
+
+    def _on_open_guide(self) -> None:
+        """사용법 안내 창(비모달) — 이미 떠 있으면 앞으로만 가져온다(중복 방지)."""
+        dlg = getattr(self, "_guide", None)
+        if dlg is not None and dlg.isVisible():
+            dlg.raise_()
+            dlg.activateWindow()
+            return
+        self._guide = GuideDialog(GUIDE_STEPS, self.tabs.setCurrentIndex, self)
+        self._guide.show()  # 비모달 — 창을 띄운 채 대시보드에서 각 단계 수행 가능
 
 
 def main() -> int:
