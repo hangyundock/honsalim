@@ -46,6 +46,23 @@
 
 ## 최근 5세션
 
+### 세션 #43 — 2026-07-14 (Opus 4.8, ★[📖 사용법 안내] 단계별 가이드 이식 — naver_blog 대시보드에서 크로스 프로젝트) ※naver_blog 세션에서 진행
+
+**시작 상황**: 별개 프로젝트 D:\naver_blog 세션에서 대시보드에 '📖 사용법 안내'(단계별 안내창)를 만든 뒤, 주인이 "티스토리·혼살림 대시보드에도 같은 안내 시스템을 적용해달라" 지시 → **naver_blog 세션이 크로스 프로젝트로 혼살림 `src/dashboard/app.py`에 이식**. ⚠️ **혼살림 자체 세션이 한 작업 아님.**
+
+**무엇 [확정 — 커밋·라이브]**:
+- `app.py`: 모듈 레벨 `GUIDE_STEPS`(7단계) + `GuideDialog`(QDialog·비모달·항상 위·이전/다음·'단계 n/N'·각 단계에서 관련 탭 자동 전환) + 카드바 `cards_row`에 **[📖 사용법 안내]** 버튼(★`self._action_buttons`에 넣지 않음 = 작업 중에도 열림) + `_on_open_guide` 슬롯. Qt import 변경 없음(QDialog 등 이미 있음).
+- **단계(네이버 복사 아님 — 혼살림 실제 흐름으로 새로 작성)**: 1 제품 키워드(🎯추천/🆕추가) → 2 (선택)🛒 쿠팡 첨부 → 3 ✨글 생성 → 4 👁미리보기 → 5 ✅승인 → 6 🚀발행(**honsallim.com git push 외부게시**) → 7 설정 예약·무인. 탭 인덱스 [0,0,0,1,1,1,4].
+- 신규 `tests/test_dashboard_guide.py`(네비게이션·탭전환·단계 필드).
+
+**git [확정]**: 커밋 **`de74afc [2026-07-14 #43]`** (app.py +147·test +48, 순수 추가). **브랜치 `guide-usage-port`로 앵커**(운영 폴더 detached HEAD 유지·de74afc). pre-commit(detect-secrets·black·ruff·mypy) **전부 통과**. 백업 `app.py.bak_20260714_pre_guide`(gitignore). ★**push 안 함 — 로컬만**(main 보호·push 승인필요 + 주인 "로컬만 두기" 결정). **origin/main 미반영**.
+
+**검증**: py_compile OK · `from dashboard import app` OK(GuideDialog 정의) · GUIDE_STEPS 구조·탭 [0,0,0,1,1,1,4] · 네이티브 디스플레이 렌더 OK(단계 1·3·6 확인). 오프스크린 pytest는 그 샌드박스의 Qt 네이티브 크래시(-1073740791)로 미실행 — 환경 이슈이지 편집 무관(혼살림 자체 환경은 1043/1043).
+
+**주의(다음 세션)**: ①`app.py` 상단에 `GUIDE_STEPS`/`GuideDialog`가 새로 있어도 정상(놀라지 말 것). ②git에 `de74afc #43`·브랜치 `guide-usage-port`가 보이면 이 작업분. **origin/main 반영하려면 정식 병합·push(승인) 필요** — 문서(이 항목·STATE)는 이미 갱신됨. ③버튼·탭 라벨을 바꾸면 `GUIDE_STEPS` 문구·탭 인덱스도 함께 갱신. ④대시보드 재시작해야 버튼 보임.
+
+---
+
 ### 세션 #42 — 2026-07-06 (Fable 5 / Opus 4.8, ★무인 발행 글 제품 구색 확장(3→24)+좀비 페이지 차단(세부 가이드 칩·빵부스러기)+견고화 3+텔레그램 발행 알림, 회귀 1037→1043, main·라이브 반영)
 
 **시작 상황**: `/honsalim-start`(#41 1a8ed39). 세션 초반은 별개 프로젝트 D:

@@ -2,6 +2,8 @@
 
 > 현재 진실만 기록. 이력은 EVENTS.md / DECISIONS.md 참조.
 > 매 세션 종료 시 변경 영역만 갱신. Cap 10KB.
+>
+> ⚠️ **2026-07-14 외부(naver_blog) 세션 변경 — 혼살림 세션이 한 작업 아님**: `src/dashboard/app.py`에 [📖 사용법 안내] 단계별 가이드 이식(GUIDE_STEPS+GuideDialog+카드바 버튼). 커밋 `de74afc [2026-07-14 #43]`·브랜치 `guide-usage-port`(★**로컬만·push 안 함·origin/main 미반영**·주인 결정). 운영 폴더 라이브(detached de74afc)·백업 `app.py.bak_20260714_pre_guide`. git에 이게 보이면 이 작업분 — 상세 EVENTS #43.
 
 ## 운영 현황 (Live)
 
