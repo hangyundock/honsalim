@@ -167,3 +167,72 @@ class TestAutoCycleNotifyPublishedUrls:
         digest = {"queue_coupang_pending": 3, "queue_pending": 3}
         cli._auto_cycle_notify(digest, None, None)
         assert sent == []  # 발행·경보·리포트 모두 없음 = 무발송
+
+
+class TestNotifyAlertCommand:
+    """세션 #44 — 무인 래퍼 안전 정지 통지(cli notify-alert). fail-loud지만 래퍼는 절대 안 막음."""
+
+    def _patch(self, monkeypatch: pytest.MonkeyPatch, ready: bool = True) -> list[str]:
+        from common import config as _cfg
+        from common import notify as _nt
+
+        sent: list[str] = []
+        monkeypatch.setattr(_cfg, "load_secrets", lambda: None)
+        monkeypatch.setattr(_nt, "telegram_ready", lambda: ready)
+
+        def _fake_send(t: str) -> bool:
+            sent.append(t)
+            return True
+
+        monkeypatch.setattr(_nt, "send_telegram", _fake_send)
+        return sent
+
+    def _run(self, msg: str) -> int:
+        import argparse
+
+        import cli
+
+        return cli.cmd_notify_alert(argparse.Namespace(message=msg))
+
+    def test_sends_message_and_exit_0(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        sent = self._patch(monkeypatch, ready=True)
+        rc = self._run("브랜치 X — 안전 정지")
+        assert rc == 0
+        assert len(sent) == 1
+        assert "브랜치 X — 안전 정지" in sent[0]
+
+    def test_empty_message_no_send_exit_0(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        sent = self._patch(monkeypatch, ready=True)
+        assert self._run("   ") == 0
+        assert sent == []
+
+    def test_not_ready_no_send_exit_0(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        sent = self._patch(monkeypatch, ready=False)
+        assert self._run("정지 사유") == 0
+        assert sent == []
+
+    def test_send_failure_still_exit_0(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """발송 실패(False)여도 래퍼를 막지 않도록 반드시 exit 0."""
+        import argparse
+
+        import cli
+        from common import config as _cfg
+        from common import notify as _nt
+
+        monkeypatch.setattr(_cfg, "load_secrets", lambda: None)
+        monkeypatch.setattr(_nt, "telegram_ready", lambda: True)
+        monkeypatch.setattr(_nt, "send_telegram", lambda t: False)
+        assert cli.cmd_notify_alert(argparse.Namespace(message="x")) == 0
+
+    def test_secrets_load_error_swallowed_exit_0(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """secrets 로드 예외도 삼키고 exit 0 (§0 — 래퍼 보호)."""
+        import argparse
+
+        import cli
+        from common import config as _cfg
+
+        def _boom() -> None:
+            raise RuntimeError("secrets down")
+
+        monkeypatch.setattr(_cfg, "load_secrets", _boom)
+        assert cli.cmd_notify_alert(argparse.Namespace(message="x")) == 0

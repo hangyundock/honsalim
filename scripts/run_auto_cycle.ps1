@@ -18,18 +18,32 @@ function Write-Log($msg) {
     Add-Content -Path $Log -Value "[$ts] $msg" -Encoding UTF8
 }
 
+# ★안전 정지 시 주인 휴대폰으로 통지(세션 #44 — fail-loud, §0). 무인 중엔 대시보드를 안 보므로
+#   조용한 정지가 며칠씩 방치되던 문제(2026-07-08~17 실제 10일 침묵) 근본 대책. 발송은 best-effort —
+#   실패해도 래퍼 흐름에 영향 없음(cli notify-alert가 항상 exit 0).
+function Send-Alert($msg) {
+    try {
+        & python -m cli notify-alert "$msg" 2>&1 | ForEach-Object { Write-Log "alert: $_" }
+    } catch {
+        Write-Log "alert 발송 시도 실패(무시): $_"
+    }
+}
+
 Write-Log "=== auto-cycle 시작 (root=$Root) ==="
 Set-Location $Root
+$env:PYTHONPATH = "src"  # notify-alert(common import) + 아래 auto-cycle 공용
 
 # 1) 안전 점검 — 메인 브랜치
 try {
     $branch = (& git rev-parse --abbrev-ref HEAD).Trim()
 } catch {
     Write-Log "git 사용 불가 — 안전 정지(exit 0)"
+    Send-Alert "무인 자동 발행이 멈췄습니다: 운영 폴더에서 git 사용 불가. 자동 발행이 안 됩니다 — PC/저장소 상태 확인이 필요합니다."
     exit 0
 }
 if ($branch -ne "main") {
     Write-Log "현재 브랜치=$branch (main 아님) — 안전 정지(exit 0)"
+    Send-Alert "무인 자동 발행이 멈췄습니다: 운영 폴더가 'main'이 아닌 '$branch' 브랜치입니다. 'main'으로 복귀하기 전까지 매일 발행이 건너뜁니다."
     exit 0
 }
 
@@ -37,6 +51,7 @@ if ($branch -ne "main") {
 $Db = Join-Path $Root "data\honsalim.db"
 if (-not (Test-Path $Db)) {
     Write-Log "DB 없음($Db) — 안전 정지(exit 0)"
+    Send-Alert "무인 자동 발행이 멈췄습니다: DB 파일이 없습니다($Db). 자동 발행이 안 됩니다 — 복구가 필요합니다."
     exit 0
 }
 
@@ -48,7 +63,6 @@ try {
 }
 
 # 4) 자동 사이클 (auto_mode ON일 때만 생성·승인·발행 — OFF면 cli가 즉시 중단)
-$env:PYTHONPATH = "src"
 Write-Log "auto-cycle --no-dry-run 실행"
 $out = & python -m cli auto-cycle --no-dry-run 2>&1
 $code = $LASTEXITCODE

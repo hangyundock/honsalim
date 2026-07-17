@@ -2770,6 +2770,34 @@ def _auto_cycle_notify(
     notify.send_telegram("\n".join(lines))
 
 
+def cmd_notify_alert(args: argparse.Namespace) -> int:
+    """무인 래퍼의 '안전 정지'를 텔레그램으로 즉시 통지 (세션 #44 — fail-loud, §0).
+
+    스케줄러 래퍼(run_auto_cycle.ps1 등)가 브랜치 이탈·DB 없음·git 불가로 조용히 멈추면,
+    무인 중엔 대시보드를 안 보므로(#39) 며칠씩 방치된다(2026-07-08~17 실제 10일 침묵 재발
+    사례). 이 명령으로 정지 사유를 주인 휴대폰에 밀어 올려 '조용한 죽음'을 막는다.
+
+    ★래퍼를 절대 막지 않는다 — 미설정·발송 실패·secrets 오류 어떤 경우든 항상 exit 0.
+    """
+    from common import config, notify
+
+    msg = (args.message or "").strip()
+    if not msg:
+        print("[notify-alert] 빈 메시지 — 발송 생략")
+        return 0
+    try:
+        config.load_secrets()
+    except Exception:  # secrets 로드 실패도 래퍼를 막지 않음(§0)
+        print("[notify-alert] secrets 로드 실패 — 발송 생략")
+        return 0
+    if not notify.telegram_ready():
+        print("[notify-alert] 텔레그램 미설정 — 발송 생략")
+        return 0
+    sent = notify.send_telegram(f"🚨 혼살림 무인 정지 알림\n{msg}")
+    print(f"[notify-alert] 발송 {'성공' if sent else '실패'}")
+    return 0
+
+
 def cmd_auto_cycle(args: argparse.Namespace) -> int:
     """★무인 자동 사이클 (B-i·세션 #29): auto_mode ON일 때만 — 사후모니터→생성→자동승인→발행.
 
@@ -3481,6 +3509,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--time", type=str, default=None, help="set 시각 HH:MM (기본 config schedule_time)"
     )
     p_sched.set_defaults(func=cmd_schedule)
+
+    p_alert = sub.add_parser(
+        "notify-alert",
+        help="무인 래퍼 안전 정지 사유를 텔레그램으로 통지 (fail-loud·항상 exit 0)",
+    )
+    p_alert.add_argument("message", type=str, help="보낼 알림 본문")
+    p_alert.set_defaults(func=cmd_notify_alert)
 
     return parser
 
