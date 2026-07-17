@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}{{ category.guide_title or category.name + ' 고르는 법' }} | 혼살림{% endblock %}
+{# 글(is_article) <title>=글 제목 — 카테고리 guide_title 상속 시 같은 카테고리 글 전부가 동일
+   <title>이 돼(중복 제목·검색결과 제목 불일치) og:title·JSON-LD headline(글 제목)과도 어긋났다
+   (세션 #44 근본수정). category.name은 글 렌더 시 글 제목으로 덮임(_article_as_category_ctx). #}
+{% block title %}{% if is_article %}{{ category.name }} | 혼살림{% else %}{{ category.guide_title or category.name + ' 고르는 법' }} | 혼살림{% endif %}{% endblock %}
 
 {% block head_extra %}
   <link rel="stylesheet" href="{{ asset_base | default('/static') }}/css/category.css?v={{ asset_version | default('') }}">

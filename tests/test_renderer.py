@@ -41,9 +41,13 @@ _ARTICLE_BODY = (
 )
 
 
-@pytest.fixture()
-def built_with_article(tmp_path: Path) -> dict:
-    """seed + 게시 article 1편(+상품 2건·article_products) 후 렌더 (상세글 경로)."""
+def _build_article_site(tmp_path: Path, *, publish_category: bool = False) -> dict:
+    """seed + 게시 article 1편(+상품 2건·article_products) 후 렌더 헬퍼.
+
+    publish_category=True면 office-chair 카테고리에 제품 연결·승인(published) — 글의
+    concept_image(office-chair)가 매핑돼 카테고리 경로(category.html 재사용·세션 #34)로
+    렌더된다. 기본 False는 매핑 없음(article.html 폴백) — 기존 테스트 동작 유지.
+    """
     import markdown as md_lib
 
     db_path = tmp_path / "test.db"
@@ -119,12 +123,30 @@ def built_with_article(tmp_path: Path) -> dict:
                 {"source": "aliexpress", "source_product_id": "p222"},
             ],
         )
+        if publish_category:
+            pid = conn.execute("SELECT id FROM products WHERE source_product_id='p111'").fetchone()[
+                0
+            ]
+            cid = conn.execute("SELECT id FROM categories WHERE slug='office-chair'").fetchone()[0]
+            conn.execute(
+                "INSERT INTO category_products (category_id, product_id, tier) "
+                "VALUES (?,?,'budget')",
+                (cid, pid),
+            )
+            category_state.approve(conn, "office-chair")
+            conn.commit()
     finally:
         conn.close()
 
     out = tmp_path / "site"
     summary = renderer.render_site(out_dir=out, db_path=db_path)
     return {"summary": summary, "out": out, "slug": slug}
+
+
+@pytest.fixture()
+def built_with_article(tmp_path: Path) -> dict:
+    """seed + 게시 article 1편(+상품 2건·article_products) 후 렌더 (상세글 경로)."""
+    return _build_article_site(tmp_path)
 
 
 class TestRenderSite:
@@ -1223,3 +1245,30 @@ class TestArticleAsCategory:
         cards = [{"volume": i, "disc_num": 0} for i in range(10)]
         assert len(renderer._article_featured(cards, 4)) == 4  # 티어당 4 → 총 8
         assert len(renderer._article_featured(cards, 3)) == 3  # 티어당 3 → 총 6 (설정 따라감)
+
+
+class TestArticleTitleTag:
+    """세션 #44: 카테고리 매핑 글의 <title> = 글 제목 — 근본수정 가드.
+
+    category.html의 title 블록이 카테고리 guide_title을 상속해, 같은 카테고리의 발행 글
+    전부가 동일 <title>이 됐다(중복 제목·og:title/JSON-LD headline과 불일치 — 라이브 적발:
+    서재책상 글 <title>=컴퓨터 책상 고르는 법…). 글은 글 제목, 카테고리 페이지는 기존 그대로.
+    """
+
+    def test_mapped_article_title_is_article_title(self, tmp_path: Path) -> None:
+        built = _build_article_site(tmp_path, publish_category=True)
+        html = (built["out"] / "articles" / built["slug"] / "index.html").read_text(
+            encoding="utf-8"
+        )
+        # 카테고리 매핑 경로로 렌더됐는지(빵부스러기 상위 카테고리 존재) 먼저 보장
+        assert "/categories/office-chair/" in html
+        assert "<title>홈오피스 50만원 세팅 | 혼살림</title>" in html  # 글 제목
+        assert "고르는 법 | 혼살림</title>" not in html  # 카테고리 제목 상속 아님
+
+    def test_category_page_title_unchanged(self, tmp_path: Path) -> None:
+        # 카테고리 페이지 <title>은 기존 그대로(guide_title 폴백) — 이미 색인된 제목 불변
+        built = _build_article_site(tmp_path, publish_category=True)
+        cat = (built["out"] / "categories" / "office-chair" / "index.html").read_text(
+            encoding="utf-8"
+        )
+        assert "<title>사무용 의자 고르는 법 | 혼살림</title>" in cat
