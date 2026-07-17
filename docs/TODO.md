@@ -3,14 +3,13 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #43 — (상세 EVENTS #42)
+## ★ 다음 세션 #45 — (상세 EVENTS #44)
 
-- [ ] **[관찰] #42 라이브 효과 확인** — ①발행 글 넓은 카탈로그(24~41개)·빵부스러기·세부 가이드 칩이 honsallim.com 실반영 curl/브라우저 ②텔레그램 발행 알림(제목+URL)이 매일 예약 후 오는지 ③제공자 403 재시도·생성 예외 자가복원이 실전 무인 사이클을 안 죽이는지(로그).
-- [ ] **미발행 승인글 2편 검토·결정**(게이밍의자·노트북받침대) — 라이브 미리보기로 품질 확인 후 발행/유지(주인 "검토 후 결정" 선택).
-- [ ] **★성장 — 색인 커버리지 관찰·가속**([[growth-first-priority]]) — GSC/네이버 **색인 4→증가** 추이. #42 내부링크 대폭 강화 효과 기대. 핵심 URL 색인 요청. **씨앗 커버리지 확장**(seo_keywords.yml 미매핑) · **E-E-A-T**(M2 Person Schema+about).
+- [ ] **[관찰] #44 무인·경보 실전 확인** — ①내일(07-18) 11:11 auto-cycle이 `main`에서 정상 발행되는지(auto_cycle.log·텔레그램) ②안전 정지 경보가 실제 정지 시 텔레그램으로 오는지 ③새 무인 글도 `<title>`=글 제목 유지되는지.
+- [ ] **★성장 — 색인 커버리지 관찰·가속**([[growth-first-priority]]) — GSC/네이버 **색인 4→증가** 추이. #44 title 정합·내부링크 효과 기대. 핵심 URL 색인 요청. **씨앗 커버리지 확장**(seo_keywords.yml 미매핑) · **E-E-A-T**(M2 Person Schema+about).
+- [ ] **(선택) 게이밍의자 글 구조 이관** — 옛 article.html 렌더(빵부스러기 '내맘대로 세팅')를 신규 글식 카테고리 구조(28개 광폭·홈>카테고리>의자)로. 발행·기능엔 문제없음(주인 원하면).
 - [ ] (이월) Phase 2 자가복원(ali off-target·배포 drift·git pull footgun) · IndexNow(Bing/Yandex) · `review-helpfulknow` 월상한 · 쿠팡 부트스트랩(15만원→API).
-- [ ] **[별개 프로젝트] D:\naver_blog #11 미커밋** — 이번 세션에 리치 글 엔진(post 13)·알리 연동 작업 후 문서 갱신했으나 **커밋 안 됨**. `/naver-end`로 별도 마무리 필요(회귀 152).
-- 참고: 워크트리=`PYTHONPATH=src python -m cli`(자동 migrate). **main직접머지=`git push origin HEAD:main`**. 운영 DB 직접수정 불가→주인 런처. ★한글→.py·ASCII([[powershell-korean-encoding]]). ★무인 발행이 origin 전진([[autonomous-deploy-advances-origin]])—푸시 전 ff/merge. ★Edit 절대경로=운영 폴더 주의([[worktree-edit-path-footgun]]).
+- 참고: ★**매 세션 시작 시 운영 폴더 브랜치 확인**(`git -C D:\affiliate_hub branch --show-current`==main·[[autonomous-detached-head-silent-stop]]). 워크트리=`PYTHONPATH=src python -m cli`(자동 migrate). **main직접머지=cherry-pick 또는 `git push origin HEAD:main`**. 운영 DB 직접수정 불가→주인 런처. ★한글→.py·ASCII([[powershell-korean-encoding]]). ★무인 발행이 origin 전진([[autonomous-deploy-advances-origin]]). ★Edit 절대경로=운영 폴더 주의([[worktree-edit-path-footgun]]).
 
 ## 시점 의존 잔존 (세션 #6~7)
 

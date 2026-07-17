@@ -26,6 +26,8 @@
   - 세션 #35 (2026-06-16 무인 발행 라이브 실증+글=카테고리 흡수(고아·중복 해소)+채널 역할분리(naver_blog 볼륨/honsalim 허브)+비전 게이트·자동 카테고리 생성·회귀 896→932)
   - 세션 #36 (2026-06-27 provision-category 첫 라이브 실증+라이브 버그3종 근본수정+자동 카테고리 등록+적대적리뷰 7건 보강+Google지출 트래커(migration 009)·회귀 932→950)
   - 세션 #37 (2026-06-27 Google 프로젝트 분리(티스토리 한도 탈출)·대표이미지 라이브·무인 운영모델 정밀검증(이미 구현)·발행 글 관리 탭·회귀 950→953)
+  - 세션 #38 (2026-06-27 완전무인 첫 라이브 발행 성공(0-falsy 버그 근본수정)·빈글차단·무인 표준 문서화(AUTOMATION.md)·글/카테고리 정형화·featured 8·회귀 950→961)
+  - 세션 #39 (2026-06-27 무인 발행 블로커 A·B·C 근본수정(쿠팡 자동승인 면제·사무의자 매핑·키워드 SEO primary)·비판가 5인 적대검증·자가복원 1차(publishability·reason_code·health digest)·회귀 961→989)
 - [EVENTS_202605.md](archive/EVENTS_202605.md):
   - 세션 #1 (2026-05-27 프로젝트 신규 셋업·정밀 조사·5파일 시스템·슬래시 명령 등록)
   - 세션 #2 (2026-05-27~28 Phase 0 설계 12/12 + Phase 1 외부 작업: GitHub·Cloudflare·도메인·R2·D1·Git push)
@@ -46,20 +48,28 @@
 
 ## 최근 5세션
 
+### 세션 #44 — 2026-07-17 (Opus 4.8 / Fable 5, ★무인 발행 10일 침묵 정지 복구 + 안전정지 텔레그램 경보(fail-loud) + 발행 글 title 근본수정 + 게이밍의자 재발행, 회귀 1043→1051, main·라이브 반영)
+
+**시작 상황**: `/honsalim-start`(#43 491eb85). start 브리핑 중 **무인 발행이 07-08~17 10일간 침묵 정지**한 것을 적발 — 원인=#43 크로스 프로젝트 가이드 작업이 07-07 운영 폴더를 **detached HEAD로 이탈**시켜, auto-cycle 래퍼의 `main 아님` 가드가 매일 조용히 안전 정지(마지막 발행 07-07). 주인 승인으로 복구+재발방지+주인 지시 3건(title·쓰레기파일·미발행 2편) 처리.
+
+**핵심 [확정]** (검증·main·라이브. 상세 DECISIONS BB):
+1. **★무인 복구(A안)**: 운영 폴더 `main` 복귀(가이드 #43 ff 병합·origin 반영) → 가드 통과·무인 재개. 오늘 회차 수동 1편 발행=**서재책상**(article 11 `kw-55b77838`·5게이트 PASS·제품 28개·빵부스러기·**텔레그램 발행 알림 실발송**).
+2. **★BB1 안전정지 텔레그램 경보(fail-loud·§0)**: `cli notify-alert`(항상 exit 0·래퍼 안 막음) + `run_auto_cycle.ps1` 3개 정지지점(git 불가·main 아님·DB 없음)에서 `Send-Alert`. '조용한 죽음' → 즉시 통지. 부수: #43 가이드 Qt 테스트가 오프스크린 네이티브 크래시(0xC0000005)로 pytest 전체 중단시키던 것 → 위젯 테스트만 opt-in(HONSALIM_QT_WIDGET_TESTS) gate.
+3. **★BB2 발행 글 `<title>` = 글 제목**: 카테고리 매핑 글이 category.html의 guide_title을 상속해 같은 카테고리 글 전부 동일 `<title>`(중복·검색결과 제목 불일치·라이브 적발: 서재책상 글 title=컴퓨터 책상 고르는 법)·og:title/JSON-LD headline(#40)과 어긋남 → is_article이면 글 제목 사용. 카테고리 페이지는 불변.
+4. **★BB3 게이밍의자 재발행(주인 결정)**: #31의 `kw-e3d08a2c→의자 카테고리` 301은 키워드 글이 카테고리와 공존하는 현행 모델(#39~)에서 승인 콘텐츠를 좀비화(slug=sha1 결정적) → 301 폐기+republish. 라이브 200·글 제목 정상. 노트북받침대(`kw-4d525971`)는 카테고리와 100% 중복+같은 주제 글 이미 라이브 → 301 유지(주인 '유지' 결정).
+**부수**: mini-rice-cooker 개념 이미지(라이브 히어로 참조인데 untracked) 소스 커밋. 쓰레기 파일 `main'` 주인 직접 삭제. 회귀 1043→**1051**(+8), 1 skip(위젯 Qt). 클린. main 5커밋(배포 8629c62).
+
+**무인·안전(§0)**: 자가복원 3겹(게이트 반려 #41 + 생성 예외 #42 + 안전정지 경보 #44). detached HEAD 침묵 정지를 fail-loud로 전환. 경보 실패는 사이클 무영향. 메모리 [[autonomous-detached-head-silent-stop]] 신설.
+
+**잔존/다음(#45)**: ①#44 경보 실전 통지 관찰·내일 11:11 무인 발행 확인 ②★성장 색인 커버리지(title 정합 효과) ③(선택)게이밍의자 글 카테고리 구조 이관 ④(이월) Phase 2 자가복원·E-E-A-T·쿠팡 부트스트랩.
+
+---
+
 ### 세션 #43 — 2026-07-14 (Opus 4.8, ★[📖 사용법 안내] 단계별 가이드 이식 — naver_blog 대시보드에서 크로스 프로젝트) ※naver_blog 세션에서 진행
 
-**시작 상황**: 별개 프로젝트 D:\naver_blog 세션에서 대시보드에 '📖 사용법 안내'(단계별 안내창)를 만든 뒤, 주인이 "티스토리·혼살림 대시보드에도 같은 안내 시스템을 적용해달라" 지시 → **naver_blog 세션이 크로스 프로젝트로 혼살림 `src/dashboard/app.py`에 이식**. ⚠️ **혼살림 자체 세션이 한 작업 아님.**
+**시작 상황**: 별개 프로젝트 D:\naver_blog 세션에서 '📖 사용법 안내' 안내창을 만든 뒤, 주인 "혼살림 대시보드에도 적용" 지시 → naver_blog 세션이 크로스 프로젝트로 혼살림 `src/dashboard/app.py`에 이식. ⚠️ 혼살림 자체 세션이 한 작업 아님.
 
-**무엇 [확정 — 커밋·라이브]**:
-- `app.py`: 모듈 레벨 `GUIDE_STEPS`(7단계) + `GuideDialog`(QDialog·비모달·항상 위·이전/다음·'단계 n/N'·각 단계에서 관련 탭 자동 전환) + 카드바 `cards_row`에 **[📖 사용법 안내]** 버튼(★`self._action_buttons`에 넣지 않음 = 작업 중에도 열림) + `_on_open_guide` 슬롯. Qt import 변경 없음(QDialog 등 이미 있음).
-- **단계(네이버 복사 아님 — 혼살림 실제 흐름으로 새로 작성)**: 1 제품 키워드(🎯추천/🆕추가) → 2 (선택)🛒 쿠팡 첨부 → 3 ✨글 생성 → 4 👁미리보기 → 5 ✅승인 → 6 🚀발행(**honsallim.com git push 외부게시**) → 7 설정 예약·무인. 탭 인덱스 [0,0,0,1,1,1,4].
-- 신규 `tests/test_dashboard_guide.py`(네비게이션·탭전환·단계 필드).
-
-**git [확정]**: 커밋 **`de74afc [2026-07-14 #43]`** (app.py +147·test +48, 순수 추가). **브랜치 `guide-usage-port`로 앵커**(운영 폴더 detached HEAD 유지·de74afc). pre-commit(detect-secrets·black·ruff·mypy) **전부 통과**. 백업 `app.py.bak_20260714_pre_guide`(gitignore). ★**push 안 함 — 로컬만**(main 보호·push 승인필요 + 주인 "로컬만 두기" 결정). **origin/main 미반영**.
-
-**검증**: py_compile OK · `from dashboard import app` OK(GuideDialog 정의) · GUIDE_STEPS 구조·탭 [0,0,0,1,1,1,4] · 네이티브 디스플레이 렌더 OK(단계 1·3·6 확인). 오프스크린 pytest는 그 샌드박스의 Qt 네이티브 크래시(-1073740791)로 미실행 — 환경 이슈이지 편집 무관(혼살림 자체 환경은 1043/1043).
-
-**주의(다음 세션)**: ①`app.py` 상단에 `GUIDE_STEPS`/`GuideDialog`가 새로 있어도 정상(놀라지 말 것). ②git에 `de74afc #43`·브랜치 `guide-usage-port`가 보이면 이 작업분. **origin/main 반영하려면 정식 병합·push(승인) 필요** — 문서(이 항목·STATE)는 이미 갱신됨. ③버튼·탭 라벨을 바꾸면 `GUIDE_STEPS` 문구·탭 인덱스도 함께 갱신. ④대시보드 재시작해야 버튼 보임.
+**무엇 [확정]**: `app.py`에 `GUIDE_STEPS`(7단계·혼살림 실제 흐름) + `GuideDialog`(QDialog·비모달·이전/다음·각 단계 관련 탭 자동 전환·탭 [0,0,0,1,1,1,4]) + 카드바 [📖 사용법 안내] 버튼(작업 중에도 열림) + `test_dashboard_guide.py`. 커밋 `de74afc`(순수 추가·pre-commit 통과). ※**#44에서 origin/main 병합됨**(당시엔 로컬 detached만 — 이게 무인 10일 침묵 정지의 원인이 됨, EVENTS #44). Qt 가이드 테스트는 오프스크린서 네이티브 크래시(#44 opt-in gate).
 
 ---
 
@@ -110,27 +120,4 @@ aver_blog #11 미커밋**(리치 엔진·알리 연동·회귀 152 — `/naver-e
 
 **잔존/다음(#41)**: ①색인 커버리지 관찰(4→증가)·핵심 URL 색인 요청 ②**[관찰] 무인 스케줄러 실작동**(대시보드 마지막 실행 '2026-06-06'—22:02 실제 도는지) ③(이월) 씨앗 커버리지·E-E-A-T·IndexNow.
 
----
-
-### 세션 #39 — 2026-06-27 (Opus 4.8, 무인 발행 블로커 근본수정(A·B·C 라이브) + 비판가 5인 적대검증 + 자가복원 1차, 회귀 961→989, main 푸시)
-
-**시작 상황**: `/honsalim-start`(#38 48ac85a). 주인 "무인 단계 테스트가 이전 세션 성공 못 함 → 실제 스케줄에 맞춰 재테스트". 예약을 21:26·22:02로 직접 바꿔 라이브로 돌리는 과정에서 '글은 생성·5게이트 통과하나 발행 0편'을 연쇄 적발·근본수정(§0 fail-fast). 운영 폴더(D:\affiliate_hub)=main 48ac85a.
-
-**핵심 [확정]** (검증·main·일부 라이브):
-1. **Ⓐ 쿠팡 수동배너 자동승인 면제**(라이브 적발·DECISIONS X1): 21:26 회차 '무중력의자'(쿠팡3)가 생성·5게이트 통과하나 자동승인 보류 — 원인=주인이 고른 쿠팡 배너를 office-chair `exclude_terms`(리클라이너·쿠션·소파)로 재검사해 거부(featured off-target 3=전부 쿠팡). → `eligible`이 `source=coupang` 면제. 22:02 재테스트로 **무중력의자 무인 발행→`honsallim.com/articles/kw-95e2ad52` 라이브 200**(사람 개입 0).
-2. **Ⓑ 미매핑 사무의자 키워드 매핑**(X3): 메쉬·허리편한·학생용 의자가 secondary 미등록→무조건 보류 → office-chair secondary 추가. 입구 거부는 비채택.
-3. **Ⓒ 키워드 글 SEO primary = 키워드 자신**(X2): 22:02 새 글 '등받이의자'가 seo `headings_keyword_low`로 rejected(광의 '사무용 의자'를 소제목 강요·rejected는 held에도 안 잡히는 침묵 정지). → `keyword_gate_config`로 키워드 자신을 primary·카테고리어는 보조. dry-run으로 draft #12 eligible False→True 실증.
-4. **★자가복원 1차**(비판검증 후·X4·X5·X6): 주인 "근본적으로 막을 수 있나?" → 내 3제안(입구차단·skip·대시보드알림)을 비판가 5인(워크플로우·코드근거)으로 적대검증 → 결함 적발(추천엔진 자기파괴·생성前 판정불가·무인 중 대시보드 미열람·min_published 오경보) → 채택안 구현: `publishability` 단일판정·보류 `reason_code`·사이클 health 다이제스트(`auto_cycle_last.json`)/[ALERT](파일·로그)·생성 예외격리·발행가능 우선선정. 실 운영 큐에 dry-run 실증(발행가능 3/3·abnormal=false·오경보 없음).
-회귀 961→**989**(+28). black·ruff·mypy(75파일) 클린. main 푸시(A·B·C **aaad6cb·b2933ff**·자가복원 **5774c50**).
-
-**무인·안전(§0)**: fail-safe(나쁜 글 자동발행 안 됨)는 견고 유지 / 새로 fail-loud(자기보고) 추가. 막힌 키워드는 지우지 말고 강등+reason_code로 파일/로그 보고. 운영 배포=로컬 ff-merge(외부 push는 무인 발행이 자동 수행 — [[autonomous-deploy-advances-origin]]).
-
-**잔존/다음(#40)**: ①**★성장 최우선**(주인 선택·[[growth-first-priority]]): 색인 토대 점검(GSC·사이트맵·IndexNow·네이버)·씨앗 커버리지 확장·E-E-A-T. ②무인 일일 발행(22:02) 관찰+자기보고 확인. ③(선택)Phase 2 자가복원: ali off-target·배포 drift·푸시 채널·git pull footgun.
-
----
-
-### 세션 #38 — 2026-06-27 (Opus 4.8, ★완전무인 첫 라이브 발행 성공(0-falsy 버그) + 빈글차단 + 무인 표준 문서화 + 글/카테고리 정형화·featured 8, 회귀 950→961, main 푸시) — *상세 DECISIONS C21~C24*
-
-**핵심 [확정]**(검증·main·라이브): ①**0-falsy 버그 근본수정**(치명): `min_published=0`이 `0 or 5=5`로 강제돼 자동승인 영구 보류→`settings.get_int/get_float`(0 보존) 신설. 주인이 직접 무인 켜서 적발. ②**무인 첫 라이브 발행 성공**(고용량멀티탭→`kw-625b3b85` 사람개입 0). ③빈 글 차단(상품 0 키워드 LLM 전 중단). ④**무인 표준 문서화**(`docs/AUTOMATION.md`·키워드 선정도 자동·주인 강한 비판). ⑤글 정형화(글이 매핑 카테고리 stale 상속→자기 상품 렌더). ⑥featured 8 통일(단일소스). ⑦무인 토글+9초 프리징 수정. 회귀 950→**961**. main f026492·5405caf·e4dda08·0e46125·678f55a 등.
-
-> (세션 #19~#36은 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
+> (세션 #19~#39는 docs/archive/EVENTS_202606.md로 회전됨 — ARCHIVE 인덱스 참조)
