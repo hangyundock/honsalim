@@ -53,7 +53,13 @@ def conn(tmp_path: Path) -> sqlite3.Connection:
     p = tmp_path / "test.db"
     db.migrate(db_path=p)
     db.seed(db_path=p)
-    return db.connect(p)
+    c = db.connect(p)
+    # ★세션 #45: 자동 승인은 '공개 카테고리' 전제(category_draft 보류) — seed는 §2-마에 따라
+    # 전부 draft로 만들므로, 운영 현실(매핑 카테고리=published)을 반영해 공개로 올려 둔다.
+    # draft 보류 동작 자체는 TestEligible.test_draft_category_held가 별도 검증.
+    c.execute("UPDATE categories SET status='published'")
+    c.commit()
+    return c
 
 
 class TestEligible:
@@ -86,6 +92,30 @@ class TestEligible:
         ok, reason, _code = aa.eligible(conn, did)
         assert ok is False
         assert "off-target" in reason
+
+    def test_draft_category_held(self, conn: sqlite3.Connection) -> None:
+        # ★세션 #45: 매핑돼도 카테고리가 draft(비공개)면 보류 — 공개 허브 없는 고아 글이
+        # 완전무인으로 발행되는 것 차단. 카테고리 공개 승인(사람 게이트) 후 자동 해소.
+        conn.execute("UPDATE categories SET status='draft' WHERE slug='office-chair'")
+        conn.commit()
+        did = _make_validated_draft(conn, "컴퓨터의자", ("인체공학 사무용 의자",))
+        ok, reason, code = aa.eligible(conn, did)
+        assert ok is False
+        assert code == "category_draft"
+        assert "비공개" in reason
+        # 카테고리를 공개하면 같은 draft가 자동 승인 가능해진다(보류 해소 경로)
+        conn.execute("UPDATE categories SET status='published' WHERE slug='office-chair'")
+        conn.commit()
+        ok2, _r, code2 = aa.eligible(conn, did)
+        assert ok2 is True and code2 == "ok"
+
+    def test_missing_category_row_fail_open(self, conn: sqlite3.Connection) -> None:
+        # 행이 아예 없으면(미프로비저닝 DB) 막지 않음 — 과차단은 무인 승인 흐름을 죽인다(§0)
+        conn.execute("DELETE FROM categories WHERE slug='office-chair'")
+        conn.commit()
+        did = _make_validated_draft(conn, "컴퓨터의자", ("인체공학 사무용 의자",))
+        ok, _reason, code = aa.eligible(conn, did)
+        assert ok is True and code == "ok"
 
 
 class TestAutoApprove:

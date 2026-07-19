@@ -237,3 +237,40 @@ class TestAutoCycleDigest:
         assert d["abnormal"] is True
         assert d["queue_blocked_by_code"]["unmapped"] == 1
         conn.close()
+
+    def test_zero_made_with_target_is_abnormal(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """★세션 #45: 생성 목표(target>0)인데 made=0 — 큐 비고 보류 없어도 abnormal(경보).
+
+        옛 식은 '문제보류·큐 막힘'만 봐서 refill 고갈·전건 failed(상품 0)의 '조용한 0편'을
+        놓쳤다(pend=0·held=0이면 무경보). 발행할 것도 없으면(approved_n=0) 그날 발행 0 확정."""
+        conn = self._conn(tmp_path, monkeypatch)
+        d = cli._auto_cycle_digest_and_alert(
+            conn, made=0, ar={"approved": [], "held": []}, approved_n=0, target=1
+        )
+        assert d["abnormal"] is True
+        assert d["target"] == 1
+        conn.close()
+
+    def test_zero_made_but_pending_publish_not_abnormal(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # 생성 0이어도 발행대기(approved_n>0)가 있으면 그날 발행은 됨 — 오경보 방지
+        conn = self._conn(tmp_path, monkeypatch)
+        d = cli._auto_cycle_digest_and_alert(
+            conn, made=0, ar={"approved": [], "held": []}, approved_n=2, target=1
+        )
+        assert d["abnormal"] is False
+        conn.close()
+
+    def test_target_zero_keeps_legacy_behavior(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # target 미지정(0·기존 호출) — made=0만으로는 abnormal 아님(하위호환·의도적 일시정지 무경보)
+        conn = self._conn(tmp_path, monkeypatch)
+        d = cli._auto_cycle_digest_and_alert(
+            conn, made=0, ar={"approved": [], "held": []}, approved_n=0
+        )
+        assert d["abnormal"] is False
+        conn.close()

@@ -221,6 +221,83 @@ class TestAutoPick:
         assert picked["keyword"] == "상대성이론책"  # score 최고(기존 정렬 보존)
 
 
+class TestRefillPublishableOnly:
+    """★세션 #45: 추천 자동 보충(refill)은 '매핑 + 공개 카테고리' 후보만 큐에 넣는다.
+
+    미매핑 추천을 넣으면 ali 수집 skip→상품 0→failed = 그날 무인 발행 0(여름이불 실사고),
+    draft 카테고리 추천은 공개 허브 없는 고아 글이 된다. 사람 경로(수동 추가)는 제한 없음.
+    """
+
+    def test_refill_skips_unmapped_picks_mapped(self) -> None:
+        conn = _db()
+        seeds: list[dict[str, Any]] = [
+            {
+                "seed": "잡동사니",
+                "core": None,
+                "exclude_terms": (),
+                "require_terms": (),
+                "category": None,
+                "cached_secondary": [],
+            }
+        ]
+        rows = {
+            "잡동사니": [
+                # winnable 1위지만 미매핑 — 큐 투입 금지(여름이불류 데드엔드)
+                {"keyword": "여름이불", "volume": 50000, "competition": "낮음"},
+                # 매핑(office-chair·행 없음=fail-open) — 이것이 선택돼야
+                {"keyword": "컴퓨터의자", "volume": 3000, "competition": "중간"},
+            ]
+        }
+        picked = kr.auto_pick_keyword(
+            conn, seeds=seeds, fetch=lambda s, dry_run=False: list(rows.get(s, []))
+        )
+        assert picked is not None
+        assert picked["keyword"] == "컴퓨터의자"
+        assert picked["source"] == "recommend"
+        # 미매핑 추천이 큐에 추가되지 않았는지(부작용 0)
+        kws = [r[0] for r in conn.execute("SELECT keyword FROM keyword_queue").fetchall()]
+        assert "여름이불" not in kws
+
+    def test_refill_none_when_all_unmapped(self) -> None:
+        conn = _db()
+        seeds: list[dict[str, Any]] = [
+            {
+                "seed": "잡동사니",
+                "core": None,
+                "exclude_terms": (),
+                "require_terms": (),
+                "category": None,
+                "cached_secondary": [],
+            }
+        ]
+        rows = {"잡동사니": [{"keyword": "여름이불", "volume": 50000, "competition": "낮음"}]}
+        picked = kr.auto_pick_keyword(
+            conn, seeds=seeds, fetch=lambda s, dry_run=False: list(rows.get(s, []))
+        )
+        assert picked is None  # auto-cycle이 '생성 0'으로 abnormal→경보(fail-loud)
+        assert conn.execute("SELECT COUNT(*) FROM keyword_queue").fetchone()[0] == 0
+
+    def test_refill_skips_draft_category(self) -> None:
+        # 행이 있는데 draft(비공개) — laptop-stand 실사례형. 자동 경로에선 건너뛴다.
+        conn = _db()
+        conn.execute(
+            "INSERT INTO categories (slug, name_ko, status) VALUES ('office-chair','의자','draft')"
+        )
+        conn.commit()
+        assert kr.auto_pick_keyword(conn, seeds=SEED, fetch=_fetch) is None
+
+    def test_refill_allows_published_category_row(self) -> None:
+        conn = _db()
+        conn.execute(
+            "INSERT INTO categories (slug, name_ko, status) "
+            "VALUES ('office-chair','의자','published')"
+        )
+        conn.commit()
+        picked = kr.auto_pick_keyword(conn, seeds=SEED, fetch=_fetch)
+        assert picked is not None
+        assert picked["keyword"] == "책상의자"  # 기존 winnable 1위 그대로(공개면 제한 없음)
+
+
 class TestWinnableScore:
     def test_lower_competition_ranks_higher(self) -> None:
         # 같은 검색량이면 경쟁 낮을수록 '틈' 점수가 높다(낮음 > 중간 > 높음).

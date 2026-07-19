@@ -69,15 +69,22 @@ def exclusion_reason(
     transactional: tuple[str, ...],
     seed_ns: str = "",
     exclude_terms: tuple[str, ...] = (),
+    require_terms: tuple[str, ...] = (),
 ) -> str | None:
     """제외 사유 반환 (없으면 None = 채택 후보).
 
-    순서: 핵심어→중복→off-target→브랜드→거래성→검색량.
+    순서: 핵심어→세그먼트(require)→중복→off-target→브랜드→거래성→검색량.
     exclude_terms: 대상 부적합(off-target) 단어 — 예 책상 카테고리에서 학생·유아 책상 제외
     (검색량은 높아도 1인가구 홈오피스와 대상이 달라 헛 트래픽·Helpful Content 저품질 위험).
+    require_terms: 니치 한정어 — 하나라도 포함해야 채택(예 미니밥솥 카테고리의 미니·1인·소형).
+    core만으로 니치를 못 좁히는 카테고리(밥솥 전체 ≠ 미니밥솥)에서 이길 수 없는 헤드·
+    세그먼트 이탈(6인용 등) 연관검색어가 씨앗·추천을 오염시키는 것을 구조로 차단(세션 #45).
+    빈 튜플이면 미적용(기존 카테고리 동작 불변).
     """
     if core_ns and core_ns not in keyword_ns:
         return "no_core"
+    if require_terms and not any(_ns(r) in keyword_ns for r in require_terms):
+        return "no_require"
     # 대표키워드에 통째로 포함된 부분문자열(예 "의자" ⊂ "사무용의자")은 본문에 자동 포함 →
     # 타겟 가치 없는 중복이라 제외 (세션 #15: 바로 그 "의자" 사례).
     if seed_ns and keyword_ns in seed_ns:
@@ -105,6 +112,7 @@ def research_keywords(
     brand_block: tuple[str, ...] | None = None,
     transactional_block: tuple[str, ...] | None = None,
     exclude_terms: tuple[str, ...] = (),
+    require_terms: tuple[str, ...] = (),
     fetch: Callable[..., list[dict[str, Any]]] | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
@@ -113,6 +121,7 @@ def research_keywords(
     매개변수:
     - core: 카테고리 핵심어(예 "의자"). 포함 안 한 연관어는 타 카테고리로 보고 제외. None이면 미적용.
     - exclude_terms: 대상 부적합 단어(예 책상 카테고리의 학생·유아). 포함 시 off_target 제외.
+    - require_terms: 니치 한정어(예 미니밥솥의 미니·1인·소형) — 하나라도 포함해야 채택. 빈 튜플=미적용.
     - fetch: 의존성 주입용(테스트). 기본 naver_searchad.fetch_related_keywords.
     - dry_run: True면 네트워크 없이 빈 결과 + dry_run 표식.
 
@@ -162,6 +171,7 @@ def research_keywords(
             transactional=transactional,
             seed_ns=seed_ns,
             exclude_terms=exclude_terms,
+            require_terms=require_terms,
         )
         if reason:
             excluded.append({"keyword": kw, "volume": vol, "reason": reason})

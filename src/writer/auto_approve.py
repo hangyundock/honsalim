@@ -39,7 +39,8 @@ def eligible(conn: sqlite3.Connection, draft_id: int) -> tuple[bool, str, str]:
 
     code = machine-readable 보류 사유(영문 enum) — 무인 가시화·알림이 '문제 보류'를 분류·집계하는
     단일 소스(세션 #39). 사람용 reason과 분리해 로그 문자열 파싱 없이 코드로 판정한다.
-    값: ok / no_draft / not_validated / no_keyword / unmapped / payload_error / featured_zero / offtarget.
+    값: ok / no_draft / not_validated / no_keyword / unmapped / category_draft / payload_error /
+    featured_zero / offtarget.
     """
     row = conn.execute(
         "SELECT status, keyword_id, enriched_payload FROM drafts WHERE id = ?", (draft_id,)
@@ -55,7 +56,16 @@ def eligible(conn: sqlite3.Connection, draft_id: int) -> tuple[bool, str, str]:
     terms = keyword_relevance.relevance_terms(keyword)
     if terms is None:
         return False, f"키워드 {keyword!r} 카테고리 미매핑(적합성 검증 불가→보류)", "unmapped"
-    require_any, require_all, exclude, _slug = terms
+    require_any, require_all, exclude, slug = terms
+    # ★세션 #45: 매핑됐어도 카테고리가 비공개(draft)면 보류 — 공개 허브 없는 고아 글(빵부스러기·
+    # 내부링크 폴백 강등)이 완전무인으로 발행되는 것을 차단. 카테고리를 공개 승인하면 자동 해소.
+    # 행 없음·구 스키마는 막지 않음(fail-open — category_blocked 참조).
+    if keyword_relevance.category_blocked(conn, slug):
+        return (
+            False,
+            f"카테고리 {slug!r} 비공개(draft) — 카테고리 공개 승인 후 자동 발행",
+            "category_draft",
+        )
     try:
         ep = json.loads(ep_json) if ep_json else {}
     except (json.JSONDecodeError, TypeError):

@@ -387,6 +387,113 @@ class TestGatherCandidatesHybrid:
         assert "건너뜀" in note
 
 
+class TestGatherCandidatesVisionCatalog:
+    """★세션 #45 근본수정 회귀: require 없는(비전 전담) 카테고리는 fresh 알리 검색 대신
+    비전 검증 카탈로그(category_products)를 재사용한다.
+
+    mini-rice-cooker(require_any=[])에서 fresh 검색을 쓰면 keyword_relevance.filter_products가
+    사실상 무필터(전량 통과)라 오염 상품이 완전무인 발행까지 직행하던 구멍의 재발 방지.
+    """
+
+    @staticmethod
+    def _seed_catalog(path: Path, *, products: int = 2, coupang: bool = False) -> None:
+        conn = sqlite3.connect(str(path))
+        conn.execute(
+            "INSERT INTO categories (slug, name_ko, status) "
+            "VALUES ('mini-rice-cooker', '미니 전기밥솥', 'published')"
+        )
+        cat_id = conn.execute("SELECT id FROM categories WHERE slug='mini-rice-cooker'").fetchone()[
+            0
+        ]
+
+        def _add(pid_suffix: str, source: str, name: str, order: int) -> None:
+            conn.execute(
+                "INSERT INTO products (source, source_product_id, name, price_krw, "
+                "deeplink_url, deeplink_slug, affiliate_tag) VALUES (?, ?, ?, ?, ?, ?, 'honsallim')",
+                (
+                    source,
+                    pid_suffix,
+                    name,
+                    30000 + order,
+                    f"https://link.example/{pid_suffix}",
+                    f"{source[:4]}-{pid_suffix}",
+                ),
+            )
+            pid = conn.execute(
+                "SELECT id FROM products WHERE source=? AND source_product_id=?",
+                (source, pid_suffix),
+            ).fetchone()[0]
+            conn.execute(
+                "INSERT INTO category_products (category_id, product_id, tier, is_featured, "
+                "display_order) VALUES (?, ?, 'budget', 0, ?)",
+                (cat_id, pid, order),
+            )
+
+        for i in range(products):
+            _add(f"R{i}", "aliexpress", f"미니 전기밥솥 {i}호 1.6L", i)
+        if coupang:
+            _add("C1", "coupang", "쿠팡존 밥솥(카테고리 페이지 전용)", 99)
+        conn.commit()
+        conn.close()
+
+    def test_require_empty_category_reuses_catalog_not_fresh_search(
+        self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import collector.aliexpress as ali
+        from writer import keyword_queue as kq
+
+        def boom(*a: object, **k: object) -> object:
+            raise AssertionError("require 없는 카테고리는 fresh 알리 검색을 호출하면 안 됨(#45)")
+
+        monkeypatch.setattr(ali, "query_products", boom)
+        self._seed_catalog(migrated_db, products=2, coupang=True)
+        conn = db.connect(migrated_db)
+        kid = kq.add_keyword(conn, "미니압력밥솥", channel="ali")  # mini-rice-cooker 매핑
+        kw = kq.get_keyword(conn, kid)
+        conn.close()
+        assert kw is not None
+        cands, note = cli._gather_keyword_candidates(db.connect(migrated_db), kw, 20)
+        # 알리 카탈로그만 재사용 — 쿠팡 zone(카테고리 페이지 전용·수동 큐레이션)은 제외
+        assert [c["source"] for c in cands] == ["aliexpress", "aliexpress"]
+        assert all(str(c["deeplink_slug"]).startswith("alie-R") for c in cands)
+        assert "카탈로그 재사용 2개" in note
+
+    def test_empty_catalog_fails_closed_no_candidates(
+        self, migrated_db: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """카탈로그 0개 — fresh 검색으로 대체하지 않고 후보 0(빈 글 차단이 LLM 비용 전 중단)."""
+        import collector.aliexpress as ali
+        from writer import keyword_queue as kq
+
+        def boom(*a: object, **k: object) -> object:
+            raise AssertionError("카탈로그가 비어도 fresh 검색 폴백 금지(무필터 오염 방지)")
+
+        monkeypatch.setattr(ali, "query_products", boom)
+        self._seed_catalog(migrated_db, products=0)
+        conn = db.connect(migrated_db)
+        kid = kq.add_keyword(conn, "1인용밥솥", channel="ali")
+        kw = kq.get_keyword(conn, kid)
+        conn.close()
+        assert kw is not None
+        cands, note = cli._gather_keyword_candidates(db.connect(migrated_db), kw, 20)
+        assert cands == []
+        assert "재사용 0개" in note
+
+    def test_catalog_reuse_caps_at_double_page_size(self, migrated_db: Path) -> None:
+        """상한 = page_size*2 — 검색 경로(티어 2 x page_size)와 동일 규모(프롬프트 과대 방지)."""
+        from writer import keyword_queue as kq
+
+        self._seed_catalog(migrated_db, products=3)
+        conn = db.connect(migrated_db)
+        kid = kq.add_keyword(conn, "미니전기밥솥", channel="ali")
+        kw = kq.get_keyword(conn, kid)
+        conn.close()
+        assert kw is not None
+        cands, note = cli._gather_keyword_candidates(db.connect(migrated_db), kw, 1)  # cap=2
+        assert len(cands) == 2
+        assert "상한" in note
+
+
 class TestKeywordGenerateEmptyGuard:
     """상품 0개 키워드는 LLM 비용을 쓰기 전에 생성 중단(빈 글 방지·EVENTS #38).
 

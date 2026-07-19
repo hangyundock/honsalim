@@ -440,6 +440,39 @@ def _check_size_caps() -> bool:
     return code != 2  # 파일 누락만 게이트, cap 초과는 WARN
 
 
+def _check_seed_alignment() -> bool:
+    """§15 씨앗 정합 — seo_keywords ↔ category_sources ↔ 공개 카테고리 (세션 #45 재발방지).
+
+    drift·dup = FAIL(저장소 데이터 결함 — 오매핑·침묵 실패 체인). published_no_seed = WARN
+    (운영 상태 가시화 — provision→공개 후 씨앗 누락이 그 클러스터의 추천·키워드 글을 조용히
+    막던 갭. 도마·미니밥솥이 이 상태로 방치됐었다). DB 없으면(fresh checkout) 파일 점검만.
+    """
+    from collector import seo_keywords
+
+    conn: sqlite3.Connection | None = None
+    try:
+        if db.DB_PATH.exists():
+            conn = db.connect(db.DB_PATH)
+    except Exception:  # DB 열기 실패 — 파일 점검만(§0 doctor는 멈추지 않는다)
+        conn = None
+    try:
+        issues = seo_keywords.lint_alignment(conn)
+    finally:
+        if conn is not None:
+            conn.close()
+    hard = [(c, m) for c, m in issues if c in ("drift", "dup")]
+    soft = [(c, m) for c, m in issues if c not in ("drift", "dup")]
+    for _c, msg in hard:
+        print(f"{FAIL} {msg}")
+    for _c, msg in soft:
+        print(f"{WARN} {msg}")
+    if not issues:
+        print(f"{OK} 씨앗 정합 — 드리프트 0 · 교차 중복 0 · 공개 카테고리 전부 씨앗 보유")
+    elif not hard:
+        print(f"{OK} 씨앗 파일 정합(드리프트·중복 0) — 공개 카테고리 씨앗 누락 {len(soft)}건 경고")
+    return not hard
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     """secrets·DB·외부 API 헬스 체크 (BACKEND §9 [확정])."""
     print("혼살림 doctor — Phase 1 인프라 헬스 체크")
@@ -487,8 +520,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _print_section("14. docs/ size cap (CLAUDE.md §3)")
     caps_ok = _check_size_caps()
 
+    _print_section("15. 씨앗 정합 (seo_keywords ↔ category_sources, #45)")
+    seeds_ok = _check_seed_alignment()
+
     _print_section("종합")
-    phase2_ok = tmpl_ok and mod_ok and sm_ok and tests_ok and workers_ok and caps_ok
+    phase2_ok = tmpl_ok and mod_ok and sm_ok and tests_ok and workers_ok and caps_ok and seeds_ok
     if py_ok and sec_ok and sql_ok and tools_ok and dep_found == dep_total and phase2_ok:
         print(f"{OK} 모든 필수 체크 통과 — Phase 2 진입 가능")
         return 0
@@ -2048,15 +2084,50 @@ def _gather_keyword_candidates(
 
         slug = keyword_relevance.resolve_category(kw["keyword"])
         spec = category_collect.load_sources().get(slug) if slug else None
-        if spec is None or not spec.tiers:
-            # 미매핑/티어 없음 — 알리 영어 검색어가 없다. 한글 직접검색은 off-target만 와서 건너뛴다
+        if spec is None:
+            # 미매핑 — 알리 영어 검색어가 없다. 한글 직접검색은 off-target만 와서 건너뛴다
             # (쿠팡 수동분만 또는 보류 — fail-closed 자동승인이 미매핑을 별도 처리).
-            if slug is None:
-                notes.append(
-                    "ali 건너뜀(카테고리 미매핑 — 영어 검색어 없음·한글 직접검색은 off-target)"
-                )
-            else:
-                notes.append(f"ali 건너뜀(카테고리 {slug} 티어 미정의)")
+            notes.append(
+                "ali 건너뜀(카테고리 미매핑 — 영어 검색어 없음·한글 직접검색은 off-target)"
+            )
+        elif not spec.require_any and not spec.require_all:
+            # ★세션 #45 근본수정: require 없는 카테고리(예 mini-rice-cooker)는 관련성 판정을
+            # 수집 시점 비전 게이트가 전담한다(#36 설계 — 상품명이 제각각이라 문자열로 못 묶음).
+            # 이런 카테고리에서 fresh 알리 검색을 쓰면 keyword_relevance.filter_products가
+            # 사실상 무필터(전량 통과)라 오염 상품이 완전무인(min_published=0) 발행까지 직행하는
+            # 구멍이 된다 → 비전 검증을 거쳐 카테고리에 연결된 카탈로그(category_products)를
+            # 재사용한다(비용 0·검증 재사용·쿠팡 zone 제외). 카탈로그가 비면 후보 없음(fail-closed)
+            # — 빈 글 차단(#38)이 LLM 비용을 쓰기 전에 중단한다.
+            rows = conn.execute(
+                """
+                SELECT p.source, p.source_product_id, p.deeplink_slug, p.name, p.price_krw
+                FROM category_products cp
+                JOIN products p ON p.id = cp.product_id
+                JOIN categories c ON c.id = cp.category_id
+                WHERE c.slug = ? AND p.source != 'coupang'
+                ORDER BY CASE cp.tier WHEN 'budget' THEN 0 WHEN 'premium' THEN 1 ELSE 2 END,
+                         cp.display_order, p.id
+                """,
+                (slug,),
+            ).fetchall()
+            cap = max(1, page_size * 2)  # 검색 경로 규모(티어 2 x page_size)와 동일 상한
+            reused = [
+                {
+                    "source": r[0],
+                    "source_product_id": r[1],
+                    "deeplink_slug": r[2],
+                    "name": r[3],
+                    "price_krw": r[4],
+                }
+                for r in rows[:cap]
+            ]
+            candidates.extend(reused)
+            note = f"ali 카테고리({slug}) 비전 검증 카탈로그 재사용 {len(reused)}개"
+            if len(rows) > cap:
+                note += f"(전체 {len(rows)}개 중 상한)"
+            notes.append(note)
+        elif not spec.tiers:
+            notes.append(f"ali 건너뜀(카테고리 {slug} 티어 미정의)")
         else:
             config.load_secrets()
             # 카테고리 영어 티어 검색(검증된 라이브 경로) → 키워드-적합성 필터(키워드-인지 유효 제외어).
@@ -2072,7 +2143,14 @@ def _gather_keyword_candidates(
             notes.append(note)
 
     if not candidates:
-        return [], "상품 없음 — 쿠팡 단독 채널은 수동 미리선택(target_products)이 필요합니다"
+        # 실제 사유(미매핑 건너뜀·카탈로그 0개 등)를 버리지 않고 반환 — failed 사유·digest에
+        # 근본 원인이 남아야 무인 운영자가 조치할 수 있다(§0 가시화, 세션 #45).
+        detail = (
+            " · ".join(notes)
+            if notes
+            else "쿠팡 단독 채널은 수동 미리선택(target_products)이 필요합니다"
+        )
+        return [], f"상품 없음 — {detail}"
     return candidates, " · ".join(notes)
 
 
@@ -2109,14 +2187,17 @@ def cmd_keyword_generate(args: argparse.Namespace) -> int:
             # ali 수집 여부는 채널뿐 아니라 카테고리 매핑에도 달림(미매핑이면 영어 검색어가 없어 건너뜀)
             ali_preview = "아니오(채널=쿠팡 단독)"
             if kw["channel"] in ("ali", "both"):
-                from collector import keyword_relevance
+                from collector import category_collect, keyword_relevance
 
                 slug = keyword_relevance.resolve_category(kw["keyword"])
-                ali_preview = (
-                    f"예(카테고리 {slug} 영어검색)"
-                    if slug
-                    else "아니오(카테고리 미매핑 — 알리 영어 검색어 없음·건너뜀)"
-                )
+                spec = category_collect.load_sources().get(slug) if slug else None
+                if slug is None:
+                    ali_preview = "아니오(카테고리 미매핑 — 알리 영어 검색어 없음·건너뜀)"
+                elif spec is not None and not spec.require_any and not spec.require_all:
+                    # require 없는(비전 전담) 카테고리 — 검증된 카탈로그 재사용(#45)
+                    ali_preview = f"예(카테고리 {slug} 비전 검증 카탈로그 재사용)"
+                else:
+                    ali_preview = f"예(카테고리 {slug} 영어검색)"
             print(f"     수동 미리선택 {tp_n}개 · ali 수집 {ali_preview}")
             return 0
 
@@ -2578,7 +2659,7 @@ def _deploy_ns() -> argparse.Namespace:
 
 
 def _auto_cycle_digest_and_alert(
-    conn: sqlite3.Connection, *, made: int, ar: dict[str, Any], approved_n: int
+    conn: sqlite3.Connection, *, made: int, ar: dict[str, Any], approved_n: int, target: int = 0
 ) -> dict[str, Any]:
     """무인 사이클 결과를 구조화 JSON으로 영속화 + 비정상 시 [ALERT] 로그(세션 #39 자기보고).
 
@@ -2620,9 +2701,16 @@ def _auto_cycle_digest_and_alert(
         "AND target_products IS NOT NULL AND target_products NOT IN ('','[]')"
     ).fetchone()[0]
     gate_failed_kws = [str(k[0]) for k in gate_failed]
-    abnormal = approved_n == 0 and (problem_held > 0 or (len(pend) > 0 and publishable == 0))
+    # ★세션 #45: live 사이클이 생성 목표(target>0)를 갖고 돌았는데 made==0이면 그 자체로 비정상 —
+    # 옛 식은 '문제 보류·큐 막힘'만 봐서 refill 고갈·전건 failed(상품 0)의 '조용한 0편'을 놓쳤다
+    # (pend=0·held=0이면 abnormal=False로 무경보). 발행대기(approved_n)가 있으면 그날 발행은
+    # 되므로 비정상 아님 — 기존 오경보 방지 설계 유지.
+    abnormal = approved_n == 0 and (
+        problem_held > 0 or (len(pend) > 0 and publishable == 0) or (target > 0 and made == 0)
+    )
     digest: dict[str, Any] = {
         "made": made,
+        "target": target,
         "approved_this_run": len(ar["approved"]),
         "approved_pending_publish": approved_n,
         "held_total": len(ar["held"]),
@@ -2643,10 +2731,11 @@ def _auto_cycle_digest_and_alert(
         print(f"{WARN} 사이클 다이제스트 기록 실패(무시): {e}")
     if abnormal:
         print(
-            f"{FAIL} [ALERT] 무인 발행 0편 위험 — 발행대기 {approved_n}편 · 문제보류 "
-            f"{problem_held}편 {dict(problem_codes) or ''} · 큐 발행가능 {publishable}/{len(pend)} "
-            f"(막힘 {dict(blocked) or '없음'}). 막힌 키워드를 카테고리에 매핑(seo_keywords.yml "
-            "secondary)하거나 쿠팡 배너 첨부 또는 큐에서 제거하세요."
+            f"{FAIL} [ALERT] 무인 발행 0편 위험 — 생성 {made}/{target}편 · 발행대기 {approved_n}편 · "
+            f"문제보류 {problem_held}편 {dict(problem_codes) or ''} · 큐 발행가능 "
+            f"{publishable}/{len(pend)} (막힘 {dict(blocked) or '없음'}). 막힌 키워드를 카테고리에 "
+            "매핑(seo_keywords.yml secondary)하거나 쿠팡 배너 첨부, 카테고리 공개 승인, 또는 큐에서 "
+            "제거하세요. 생성 0편이면 씨앗·네이버 키·auto_cycle.log를 확인하세요."
         )
     # 게이트 반려 상한 도달 격리 키워드는 발행 여부와 무관하게 항상 경보(사람이 손봐야 재생성됨).
     if gate_failed_kws:
@@ -2723,7 +2812,8 @@ def _auto_cycle_notify(
     alerts: list[str] = []
     if digest.get("abnormal"):
         alerts.append(
-            f"🚨 발행 0편 위험 — 발행대기 {digest.get('approved_pending_publish', 0)}편·"
+            f"🚨 발행 0편 위험 — 생성 {digest.get('made', 0)}/{digest.get('target', 0)}편·"
+            f"발행대기 {digest.get('approved_pending_publish', 0)}편·"
             f"큐 발행가능 {digest.get('queue_publishable', 0)}/{digest.get('queue_pending', 0)}"
         )
     if digest.get("queue_gate_failed"):
@@ -2923,7 +3013,10 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
             conn.execute("SELECT COUNT(*) FROM drafts WHERE status='approved'").fetchone()[0]
         )
         # 무인 자기보고(세션 #39): 사이클 결과·큐 건강을 영속화하고 조용한 정지 위험 시 [ALERT].
-        digest = _auto_cycle_digest_and_alert(conn, made=made, ar=ar, approved_n=approved_n)
+        # target=count(#45) — 생성 목표 대비 0편이면 보류·큐 상태와 무관하게 abnormal(fail-loud).
+        digest = _auto_cycle_digest_and_alert(
+            conn, made=made, ar=ar, approved_n=approved_n, target=count
+        )
     finally:
         conn.close()
     # 텔레그램 자기보고(세션 #41 푸시 채널) — 모든 종료 경로에서 1회 발송. 실패해도 사이클 무영향.

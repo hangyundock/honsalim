@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from typing import Any
 
 from collector import category_collect, product_filter, seo_keywords
@@ -59,6 +60,22 @@ def relevance_terms(keyword: str) -> RelevanceTerms | None:
     kw = _despace(keyword)
     eff_exclude = tuple(t for t in spec.exclude_terms if _despace(t) not in kw)
     return spec.require_any, spec.require_all, eff_exclude, slug
+
+
+def category_blocked(conn: sqlite3.Connection, slug: str) -> bool:
+    """slug 카테고리가 '행이 있는데 비공개(draft)'면 True — 무인 자동 경로 차단용 (세션 #45).
+
+    draft 카테고리에 매핑된 글은 공개 카테고리 페이지가 없어 빵부스러기·내부링크가 폴백으로
+    강등된 고아 글이 된다(laptop-stand가 실제 이 상태). 행이 아예 없거나(미프로비저닝 DB·테스트)
+    categories 테이블이 없으면(구 스키마) 막지 않는다(fail-open) — 운영 위험은 '행이 있는데
+    draft'뿐이고, 과차단은 완전무인 자동보충·기존 승인 흐름을 죽인다(§0 멈추지 않음).
+    소비처: keyword_recommender.auto_pick_keyword(추천 보충) · auto_approve.eligible(자동 승인).
+    """
+    try:
+        row = conn.execute("SELECT status FROM categories WHERE slug = ?", (slug,)).fetchone()
+    except sqlite3.OperationalError:  # categories 없음(구 스키마)
+        return False
+    return bool(row) and str(row[0]) != "published"
 
 
 def publishability(keyword: str) -> tuple[bool, str]:

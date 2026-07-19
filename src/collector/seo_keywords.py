@@ -10,6 +10,9 @@
 
 from __future__ import annotations
 
+import re
+import sqlite3
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -89,3 +92,75 @@ def keyword_gate_config(
 def all_category_keys(path: Path = SEO_KEYWORDS_FILE) -> list[str]:
     """정의된 카테고리 key 정렬 목록."""
     return sorted(load_all(path).keys())
+
+
+def _norm_kw(text: Any) -> str:
+    """교차 중복 비교용 정규화 — writer.keyword_recommender._norm과 동일 규칙(NFKC+공백 제거+소문자)."""
+    return re.sub(r"\s", "", unicodedata.normalize("NFKC", str(text or ""))).lower()
+
+
+def lint_alignment(
+    conn: sqlite3.Connection | None = None,
+    *,
+    path: Path = SEO_KEYWORDS_FILE,
+    sources_path: Path | None = None,
+) -> list[tuple[str, str]]:
+    """씨앗 데이터 정합 lint — [(code, 문제설명)] 반환(빈 리스트=정상). 세션 #45 재발방지 가드.
+
+    code:
+    - 'drift'             씨앗 키 ∉ category_sources — 키 오타면 resolve_category까지만 되고 수집
+                          정의가 없어 relevance_terms=None → 자동승인 'unmapped' 보류·ali 건너뜀의
+                          침묵 실패 체인이 된다.
+    - 'dup'               같은 정규화 키워드(primary/core/secondary)가 두 카테고리에 존재 —
+                          resolve_category가 yml 순서 first-match라 뒤 카테고리 키워드를 앞
+                          카테고리로 오매핑(#45 실증: 모니터암이 monitor-stand로 흡수).
+    - 'published_no_seed' (conn 제공 시) published 카테고리에 씨앗 없음 — 그 클러스터는 추천·
+                          키워드 글이 구조적으로 불가능(#45 도마·미니밥솥 갭의 재발 방지).
+                          provision-category가 씨앗을 만들지 않으므로 공개 시 사람이 씨앗을
+                          투입해야 하며, 누락 시 doctor가 경고로 가시화한다.
+    """
+    from collector import category_collect  # 지연 임포트(순환 회피)
+
+    issues: list[tuple[str, str]] = []
+    entries = load_all(path)
+    if sources_path is not None:
+        sources = category_collect.load_sources(sources_path)
+    else:
+        sources = category_collect.load_sources()
+
+    for key in entries:  # yml 순서 유지 — 보고 순서도 사람이 파일에서 찾기 쉽게
+        if key not in sources:
+            issues.append(
+                ("drift", f"씨앗 {key!r}가 category_sources.yml에 없음(키 오타·수집 정의 누락)")
+            )
+
+    owner: dict[str, str] = {}
+    for key, entry in entries.items():  # yml 순서 = resolve_category first-match 순서
+        for kw in [entry.get("primary"), entry.get("core"), *(entry.get("secondary") or [])]:
+            norm = _norm_kw(kw)
+            if not norm:
+                continue
+            prev = owner.get(norm)
+            if prev is None:
+                owner[norm] = key
+            elif prev != key:
+                issues.append(
+                    ("dup", f"{kw!r}가 {prev}·{key} 양쪽에 있음 — first-match로 {prev}에 오매핑")
+                )
+
+    if conn is not None:
+        try:
+            rows = conn.execute(
+                "SELECT slug FROM categories WHERE status = 'published' ORDER BY slug"
+            ).fetchall()
+        except sqlite3.OperationalError:  # categories 없음(구 스키마·빈 DB) — 점검 생략
+            rows = []
+        for (slug,) in rows:
+            if str(slug) not in entries:
+                issues.append(
+                    (
+                        "published_no_seed",
+                        f"공개 카테고리 {slug!r}에 씨앗 없음 — 추천·키워드 글 불가(공개 시 씨앗 투입 필요)",
+                    )
+                )
+    return issues

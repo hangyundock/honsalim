@@ -171,6 +171,121 @@ class TestBuildEntry:
         assert "source" in entry
 
 
+class TestSession45Seeds:
+    """세션 #45 씨앗 확장 — 도마·미니밥솥 엔트리와 require_terms 파이프라인."""
+
+    def test_cutting_board_seed_loaded(self) -> None:
+        entry = sk.get("cutting-board")
+        assert entry is not None
+        assert entry["primary"] == "도마"
+        assert "나무도마" in entry["secondary"]
+        # 씨앗 exclude가 category_sources 제외 정책을 미러(자기해제 우회 차단)
+        assert "캠핑" in entry["exclude_terms"] and "업소" in entry["exclude_terms"]
+
+    def test_mini_rice_cooker_seed_niche_only(self) -> None:
+        entry = sk.get("mini-rice-cooker")
+        assert entry is not None
+        assert entry["primary"] == "미니밥솥"
+        assert entry["require_terms"] == ["미니", "1인", "2인", "소형", "자취"]
+        # ★핵심: 세그먼트 이탈 헤드(압력밥솥·전기밥솥·6인용)와 브랜드(쿠쿠 등)가 secondary에 없어야
+        niche = ("미니", "1인", "2인", "소형", "자취")
+        for kw2 in entry["secondary"]:
+            assert any(n in kw2 for n in niche), f"니치 한정어 없는 secondary: {kw2}"
+            assert "쿠쿠" not in kw2 and "쿠첸" not in kw2
+
+    def test_require_terms_filter_in_research(self) -> None:
+        rows = [
+            {"keyword": "압력밥솥", "volume": 40870, "competition": "중간"},  # 헤드 — 차단
+            {"keyword": "미니압력밥솥", "volume": 4190, "competition": "높음"},  # 니치 — 채택
+            {"keyword": "전기밥솥6인용", "volume": 3010, "competition": "높음"},  # 세그 이탈 — 차단
+        ]
+        out = kr.research_keywords(
+            "미니밥솥",
+            core="밥솥",
+            require_terms=("미니", "1인"),
+            fetch=lambda *_a, **_k: [dict(r) for r in rows],
+        )
+        assert out["secondary"] == ["미니압력밥솥"]
+        reasons = {x["keyword"]: x["reason"] for x in out["excluded"]}
+        assert reasons["압력밥솥"] == "no_require"
+        assert reasons["전기밥솥6인용"] == "no_require"
+
+    def test_recommender_passes_require_terms(self) -> None:
+        # default_seeds가 yml require_terms를 추천 리서치로 전달하는지(엔드투엔드 배선)
+        from writer import keyword_recommender as krec
+
+        seeds = krec.default_seeds()
+        rice = next(s for s in seeds if s["category"] == "mini-rice-cooker")
+        assert rice["require_terms"] == ("미니", "1인", "2인", "소형", "자취")
+        board = next(s for s in seeds if s["category"] == "cutting-board")
+        assert board["require_terms"] == ()  # 미지정 카테고리는 미적용(기존 동작 불변)
+
+
+class TestLintAlignment:
+    """세션 #45 재발방지 가드 — 드리프트·교차 중복·공개 카테고리 씨앗 누락."""
+
+    def test_repo_files_clean(self) -> None:
+        """저장소에 커밋된 실제 yml 2종은 드리프트 0·교차 중복 0이어야 한다(회귀 고정).
+
+        위반 실증(#45에서 정리): monitor-stand secondary의 '모니터암'이 monitor-arm primary를
+        first-match로 가려 오매핑됐다. 이 테스트가 있는 한 같은 실수는 커밋 단계에서 잡힌다.
+        """
+        assert sk.lint_alignment() == []
+
+    def test_drift_detected(self, tmp_path: Path) -> None:
+        seo = tmp_path / "seo.yml"
+        seo.write_text(
+            "categories:\n  no-such-slug:\n    primary: 가상\n    secondary: [가상추천]\n",
+            encoding="utf-8",
+        )
+        issues = sk.lint_alignment(path=seo)
+        assert [c for c, _ in issues] == ["drift"]
+
+    def test_cross_duplicate_detected(self, tmp_path: Path) -> None:
+        seo = tmp_path / "seo.yml"
+        seo.write_text(
+            "categories:\n"
+            "  cat-a:\n    primary: 도마\n    secondary: [겹침키워드]\n"
+            "  cat-b:\n    primary: 밥솥\n    secondary: ['겹침 키워드']\n",  # 공백 달라도 norm 동일
+            encoding="utf-8",
+        )
+        sources = tmp_path / "sources.yml"
+        sources.write_text(
+            "categories:\n" "  cat-a: {require_any: [도마]}\n" "  cat-b: {require_any: [밥솥]}\n",
+            encoding="utf-8",
+        )
+        issues = sk.lint_alignment(path=seo, sources_path=sources)
+        assert [c for c, _ in issues] == ["dup"]
+        assert "cat-a" in issues[0][1] and "cat-b" in issues[0][1]
+
+    def test_published_category_without_seed_flagged(self, tmp_path: Path) -> None:
+        import sqlite3 as sql
+
+        conn = sql.connect(":memory:")
+        conn.execute(
+            "CREATE TABLE categories (id INTEGER PRIMARY KEY, slug TEXT, name_ko TEXT, "
+            "status TEXT DEFAULT 'draft')"
+        )
+        conn.execute(
+            "INSERT INTO categories (slug, name_ko, status) VALUES "
+            "('office-chair','의자','published'), ('drying-rack','빨래건조대','draft'), "
+            "('mystery-cat','미지','published')"
+        )
+        issues = sk.lint_alignment(conn)
+        codes = [c for c, _ in issues]
+        # 공개+씨앗 없음(mystery-cat)만 경고 — draft(drying-rack)는 공개 전이라 미대상
+        assert codes == ["published_no_seed"]
+        assert "mystery-cat" in issues[0][1]
+        conn.close()
+
+    def test_no_categories_table_skips_db_check(self) -> None:
+        import sqlite3 as sql
+
+        conn = sql.connect(":memory:")  # categories 없음(구 스키마) — 예외 없이 파일 점검만
+        assert sk.lint_alignment(conn) == []
+        conn.close()
+
+
 if __name__ == "__main__":
     import pytest
 

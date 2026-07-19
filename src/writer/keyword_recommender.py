@@ -74,6 +74,7 @@ def default_seeds(path: Path | None = None) -> list[dict[str, Any]]:
                 "seed": primary,
                 "core": entry.get("core"),
                 "exclude_terms": tuple(entry.get("exclude_terms") or ()),
+                "require_terms": tuple(entry.get("require_terms") or ()),
                 "category": key,
                 "cached_secondary": list(entry.get("secondary") or []),
             }
@@ -121,6 +122,7 @@ def recommend(
                 "seed": custom_seed.strip(),
                 "core": None,
                 "exclude_terms": (),
+                "require_terms": (),
                 "category": None,
                 "cached_secondary": [],
             }
@@ -147,6 +149,7 @@ def recommend(
                     seed,
                     core=spec.get("core"),
                     exclude_terms=tuple(spec.get("exclude_terms") or ()),
+                    require_terms=tuple(spec.get("require_terms") or ()),
                     volume_floor=floor,
                     fetch=fetch,
                     dry_run=False,
@@ -211,6 +214,8 @@ def auto_pick_keyword(
        (score=월검색량) → 그 키워드.
     반환: {keyword_id, keyword, source: "queue"|"recommend"} 또는 None(추천도 없음).
     """
+    from collector import keyword_relevance  # 지연 임포트(순환 회피)
+
     # pending 중 '발행가능(카테고리 매핑)'을 우선 집는다 — 미매핑은 후순위 강등(세션 #39).
     #   ★skip·삭제가 아니다: 미매핑 키워드는 큐에 그대로 남아 auto-cycle digest/ALERT로 운영자에게
     #   보고된다(추천 롱테일·완전무인 자동보충을 죽이지 않기 위함). 전부 미매핑이면 기존처럼 맨 위
@@ -222,8 +227,6 @@ def auto_pick_keyword(
         "score DESC, priority DESC, id"
     ).fetchall()
     if rows:
-        from collector import keyword_relevance  # 지연 임포트(순환 회피)
-
         for kid, kw in rows:
             ok, _code = keyword_relevance.publishability(str(kw))
             if ok:
@@ -231,9 +234,22 @@ def auto_pick_keyword(
         # 전부 미매핑 — 멈추지 않고 맨 위 1건(behavior 보존). digest가 '큐 발행가능 0'을 ALERT.
         return {"keyword_id": int(rows[0][0]), "keyword": str(rows[0][1]), "source": "queue"}
 
-    top = top_recommendation(
+    # 큐가 빔 — 추천에서 자동 보충. ★세션 #45: '발행 가능' 추천만 큐에 넣는다.
+    #   ①미매핑 → ali 수집 skip·상품 0·failed = 그날 무인 발행 0(여름이불류 침묵 데드엔드)
+    #   ②draft(비공개) 카테고리 → 공개 허브 없는 고아 글
+    # 첫 '매핑 + 카테고리 공개' 후보를 선택하고, 전부 부적격이면 None — auto-cycle이 '생성 0'
+    # 으로 digest abnormal→[ALERT]·텔레그램(fail-loud). 사람 경로(대시보드 추천 다이얼로그·
+    # 수동 추가)는 제한하지 않는다(운영자 판단 존중 — 부적격 사유는 발행 단계가 보류로 가시화).
+    recs = recommend(
         conn, seeds=seeds, custom_seed=custom_seed, channel=channel, fetch=fetch, live=live
     )
+    top = None
+    for rec in recs:
+        slug = keyword_relevance.resolve_category(str(rec.get("keyword") or ""))
+        if slug is None or keyword_relevance.category_blocked(conn, slug):
+            continue
+        top = rec
+        break
     if top is None:
         return None
 
