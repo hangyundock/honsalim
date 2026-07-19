@@ -153,7 +153,8 @@ def auto_forecast(conn: sqlite3.Connection, cfg: dict[str, Any], now: datetime) 
     ).fetchall()
     picks: list[dict[str, Any]] = []
     for r in rows:
-        ok, _code = keyword_relevance.publishability(str(r[1]))
+        # conn 전달(#45): draft 카테고리 매핑 키워드가 '발행가능·예정일'로 잘못 표시되지 않게
+        ok, _code = keyword_relevance.publishability(str(r[1]), conn)
         picks.append(
             {
                 "id": int(r[0]),

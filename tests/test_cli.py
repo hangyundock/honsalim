@@ -20,7 +20,7 @@ except ImportError:
     pytest = None  # type: ignore[assignment]
 
     @contextmanager
-    def raises(exc_type: type[BaseException]) -> Any:  # type: ignore[no-redef]
+    def raises(exc_type: type[BaseException]) -> Any:  # type: ignore[no-redef, misc]
         try:
             yield
         except exc_type:
@@ -391,6 +391,47 @@ class TestBuildParser:
         rc = cli.cmd_build(args)
         assert rc == 0
         assert manifest_path.exists()
+
+    def test_build_full_loads_secrets_before_render(
+        self, tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """★#45 적대검증: build --full도 secrets 로드 후 렌더 — 비대칭 빌드 방지 배선.
+
+        이게 없으면 secrets 미로드 렌더가 IndexNow 키 파일(<key>.txt)을 산출물에서 지우고,
+        그 삭제가 커밋되면 라이브 keyLocation 404로 이후 통지가 조용히 무효화된다.
+        """
+        order: list[str] = []
+
+        def fake_load_secrets() -> dict[str, Any]:
+            order.append("secrets")
+            return {}
+
+        fake_summary: dict[str, Any] = {
+            "out_dir": str(tmp_path),
+            "pages": 1,
+            "scenarios": 0,
+            "categories": 0,
+            "articles_published": 1,
+        }
+
+        def fake_render(**kw: Any) -> dict[str, Any]:
+            order.append("render")
+            return fake_summary
+
+        monkeypatch.setattr(cli.config, "load_secrets", fake_load_secrets)
+        monkeypatch.setattr("builder.renderer.render_site", fake_render)
+        monkeypatch.setattr(
+            "builder.go_function.generate_go_function", lambda conn, root: {"count": 0}
+        )
+        p = tmp_path / "t.db"
+        from common import db as dbmod
+
+        dbmod.migrate(db_path=p)
+        monkeypatch.setattr(cli.db, "DB_PATH", p)
+        parser = cli.build_parser()
+        args = parser.parse_args(["build", "--full"])
+        assert cli.cmd_build(args) == 0
+        assert order[:2] == ["secrets", "render"]  # 로드가 렌더보다 먼저
 
 
 class TestEnrichCommandExecution:

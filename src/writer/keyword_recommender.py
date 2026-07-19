@@ -46,6 +46,9 @@ _COMP_FACTOR: dict[str, float] = {
 }
 # 검색량 상한(이 이상은 동일 취급) — head 키워드 검색량 과가중 억제. [추정·운영 트래픽으로 보정].
 WINNABLE_VOL_CAP = 30000
+# 무인 리필의 추천 스캔 폭(#45) — 표시용 limit(20)와 분리. 상위가 미매핑 후보로 채워져도
+# 매핑·공개 후보를 놓치지 않도록 충분히 넓게(전 씨앗 후보 합계보다 큼).
+_REFILL_SCAN_LIMIT = 200
 
 
 def _comp_factor(competition: Any) -> float:
@@ -228,7 +231,9 @@ def auto_pick_keyword(
     ).fetchall()
     if rows:
         for kid, kw in rows:
-            ok, _code = keyword_relevance.publishability(str(kw))
+            # conn 전달(#45): draft 카테고리 매핑도 후순위 강등 — 생성 비용을 쓴 뒤 보류되는
+            # 어긋남 방지(auto_approve category_draft와 정합)
+            ok, _code = keyword_relevance.publishability(str(kw), conn)
             if ok:
                 return {"keyword_id": int(kid), "keyword": str(kw), "source": "queue"}
         # 전부 미매핑 — 멈추지 않고 맨 위 1건(behavior 보존). digest가 '큐 발행가능 0'을 ALERT.
@@ -240,8 +245,19 @@ def auto_pick_keyword(
     # 첫 '매핑 + 카테고리 공개' 후보를 선택하고, 전부 부적격이면 None — auto-cycle이 '생성 0'
     # 으로 digest abnormal→[ALERT]·텔레그램(fail-loud). 사람 경로(대시보드 추천 다이얼로그·
     # 수동 추가)는 제한하지 않는다(운영자 판단 존중 — 부적격 사유는 발행 단계가 보류로 가시화).
+    # ★스캔 폭(#45 적대검증): 표시용 기본 limit(20)로 자른 '뒤' 가드를 걸면 상위가 미매핑
+    # 헤드로 채워질 때 21위+의 매핑 후보를 놓쳐 그날 생성 0이 된다 — 미매핑 후보는 큐에 안
+    # 들어가 dedup에도 안 걸려 매일 상위에 잔류하는 반면 매핑 후보는 하루 1개씩 소비되므로
+    # 시간이 갈수록 악화. 넉넉한 폭으로 스캔한다(비용 동일 — 네이버 호출 수는 씨앗 수로 결정,
+    # limit은 출력 절단일 뿐).
     recs = recommend(
-        conn, seeds=seeds, custom_seed=custom_seed, channel=channel, fetch=fetch, live=live
+        conn,
+        seeds=seeds,
+        custom_seed=custom_seed,
+        channel=channel,
+        fetch=fetch,
+        live=live,
+        limit=_REFILL_SCAN_LIMIT,
     )
     top = None
     for rec in recs:

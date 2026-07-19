@@ -78,7 +78,7 @@ def category_blocked(conn: sqlite3.Connection, slug: str) -> bool:
     return bool(row) and str(row[0]) != "published"
 
 
-def publishability(keyword: str) -> tuple[bool, str]:
+def publishability(keyword: str, conn: sqlite3.Connection | None = None) -> tuple[bool, str]:
     """키워드만으로 '생성 전' 판정 가능한 발행가능성(필요조건) — (ok, code). 세션 #39.
 
     생성 전에 확실히 아는 건 '카테고리에 매핑되나'(resolve_category) 하나뿐이다. 매핑이 없으면
@@ -86,12 +86,20 @@ def publishability(keyword: str) -> tuple[bool, str]:
     쿠팡 첨부 여부와 무관하게 자동 발행이 안 된다 — 그래서 여기서도 쿠팡으로 면제하지 않는다(eligible과
     정확히 일치). off-target·featured>0·seo 통과는 글·상품을 만든 뒤에만 알 수 있어 여기선 못 본다.
 
+    ★conn 제공 시(#45): 카테고리가 draft(비공개)면 'category_draft'도 판정 — auto_approve의
+    새 보류와 정합(화면 발행 예측·digest 집계·auto_pick 강등이 실제 보류를 미리 반영해, 생성
+    LLM 비용을 쓴 뒤에야 보류를 알게 되는 어긋남을 막는다). conn 없으면 기존(매핑만) 동작.
+
     ★따라서 ok=True는 '발행 보장'이 아니라 '생성 전엔 명백히 막히지 않음'(필요조건)이다 — 이 신호로
     키워드를 **거부/skip 하지 말 것**(추천 롱테일·완전무인 자동보충을 죽임). 후순위 강등 + 가시화
-    (어떤 키워드가 왜 막히는지 보고)에만 쓴다. code: 'mapped' | 'unmapped'(드리프트 방지 단일 소스).
+    (어떤 키워드가 왜 막히는지 보고)에만 쓴다.
+    code: 'mapped' | 'unmapped' | 'category_draft'(드리프트 방지 단일 소스).
     """
-    if resolve_category(keyword) is None:
+    slug = resolve_category(keyword)
+    if slug is None:
         return False, "unmapped"
+    if conn is not None and category_blocked(conn, slug):
+        return False, "category_draft"
     return True, "mapped"
 
 

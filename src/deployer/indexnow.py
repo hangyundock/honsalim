@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -51,11 +52,7 @@ def indexnow_ready() -> bool:
 
 
 def sitemap_urls(site_dir: Path) -> list[str]:
-    """빌드 산출물 sitemap.xml의 <loc> 전체 — 핑 대상 URL 목록.
-
-    사이트가 소규모(수십 URL)라 '이번에 바뀐 것'을 따로 계산하지 않고 사이트맵 전체를
-    통지한다(새 글·갱신된 카테고리·허브가 전부 포함 — 단순·race-free). 실패는 빈 목록(§0).
-    """
+    """빌드 산출물 sitemap.xml의 <loc> 전체. 실패는 빈 목록(§0)."""
     try:
         # 파싱 대상 = 우리 빌더(render_site)가 방금 만든 자체 산출물 — 외부 입력 아님(S314 예외 사유)
         tree = ElementTree.parse(site_dir / "sitemap.xml")  # noqa: S314
@@ -66,6 +63,92 @@ def sitemap_urls(site_dir: Path) -> list[str]:
         ]
     except Exception:
         return []
+
+
+def _parse_sitemap(xml_text: str) -> dict[str, str | None]:
+    """sitemap XML 문자열 → {loc: lastmod|None}. 자체 산출물 파싱(S314 예외 사유 동일)."""
+    root = ElementTree.fromstring(xml_text)  # noqa: S314
+    out: dict[str, str | None] = {}
+    for url in root.findall("sm:url", _SITEMAP_NS):
+        loc_el = url.find("sm:loc", _SITEMAP_NS)
+        if loc_el is None or not (loc_el.text or "").strip():
+            continue
+        lm_el = url.find("sm:lastmod", _SITEMAP_NS)
+        out[(loc_el.text or "").strip()] = (lm_el.text or "").strip() if lm_el is not None else None
+    return out
+
+
+def changed_urls(prev_xml: str | None, curr_xml: str) -> list[str]:
+    """직전 배포 사이트맵 대비 **변경분만** — 추가·lastmod 변경·삭제된 URL (세션 #45 적대검증).
+
+    IndexNow 지침은 '추가·변경·삭제된 URL만 제출'을 요구한다 — 변경 없는 전체를 매일
+    재제출하면 엔진이 호스트 제출 신뢰를 낮춰 정작 새 글 통지까지 무시될 수 있다.
+    prev가 None(첫 배포·직전본 조회 실패)이거나 prev 파싱 실패면 전체 폴백(§0 — 과통지가
+    무통지보다 낫다). curr 파싱 실패는 빈 목록.
+    """
+    try:
+        curr = _parse_sitemap(curr_xml)
+    except Exception:
+        return []
+    if prev_xml is None:
+        return list(curr)
+    try:
+        prev = _parse_sitemap(prev_xml)
+    except Exception:
+        return list(curr)
+    added_or_modified = [loc for loc, lm in curr.items() if loc not in prev or prev[loc] != lm]
+    deleted = [loc for loc in prev if loc not in curr]  # 비공개·301 이전도 통지 대상(프로토콜)
+    return added_or_modified + deleted
+
+
+def deploy_urls(
+    site_dir: Path, prev_sitemap_xml: str | None, refreshed_category_slugs: list[str]
+) -> list[str]:
+    """이번 배포의 IndexNow 통지 대상 = 사이트맵 변경분 + 이번 사이클에 갱신된 카테고리 페이지.
+
+    카테고리는 사이트맵에 lastmod가 없어(SITEMAP-02) diff로는 내용 갱신이 안 보인다 —
+    새로고침(수집·가격 갱신)된 카테고리 slug를 직접 받아 합친다. 실패는 빈 목록(§0).
+    """
+    try:
+        curr_xml = (site_dir / "sitemap.xml").read_text(encoding="utf-8")
+    except OSError:
+        return []
+    urls = changed_urls(prev_sitemap_xml, curr_xml)
+    full = sitemap_urls(site_dir)
+    host = urlparse(full[0]).hostname if full else None
+    if host:
+        for slug in refreshed_category_slugs:
+            urls.append(f"https://{host}/categories/{slug}/")
+    out: list[str] = []
+    for u in urls:  # 순서 보존 dedupe
+        if u not in out:
+            out.append(u)
+    return out
+
+
+def key_file_live(host: str, *, attempts: int = 4, interval_s: float = 30.0) -> bool:
+    """라이브 keyLocation(https://<host>/<key>.txt)이 실제 서빙 중인지 폴링 (세션 #45 적대검증).
+
+    push 직후엔 CI 반영(1~2분) 전이라 키 파일이 404일 수 있고, 키 파일이 404인 채 핑하면
+    엔진의 비동기 키 검증 실패로 그 배치가 통째로 폐기된다(202는 수신 확인일 뿐). 첫 배포·
+    키 파일 유실 드리프트까지 상시 가드 — 미확인이면 핑을 생략한다(다음 배포에서 재시도).
+    전 예외 무시·§0(폴링 실패가 배포 결과에 영향 없음).
+    """
+    key = _key()
+    if not key or not host:
+        return False
+    url = f"https://{host}/{key}.txt"
+    for i in range(max(1, attempts)):
+        try:
+            with urllib.request.urlopen(url, timeout=_TIMEOUT_S) as resp:  # noqa: S310 — https 고정
+                body = resp.read(4096).decode("utf-8", "replace").strip()
+                if 200 <= int(getattr(resp, "status", 0) or 0) < 300 and body == key:
+                    return True
+        except (urllib.error.URLError, OSError, ValueError):
+            pass
+        if i < max(1, attempts) - 1:
+            time.sleep(interval_s)
+    return False
 
 
 def ping(urls: list[str]) -> bool:

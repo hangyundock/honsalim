@@ -103,3 +103,46 @@ class TestFilterProducts:
         kept, dropped = kr.filter_products("컴퓨터의자", products)
         assert {p["source_product_id"] for p in kept} == {"chair"}
         assert {p["source_product_id"] for p in dropped} == {"cover"}
+
+
+class TestPublishabilityWithConn:
+    """★세션 #45 — publishability의 conn 판정: draft 카테고리는 'category_draft'.
+
+    화면 발행 예측·digest 집계·auto_pick 강등이 auto_approve의 실제 보류(category_draft)와
+    같은 코드를 쓰게 하는 단일 소스 — 생성 LLM 비용을 쓴 뒤에야 보류를 아는 어긋남 방지.
+    """
+
+    @staticmethod
+    def _conn(status: str) -> object:
+        import sqlite3 as sql
+
+        c = sql.connect(":memory:")
+        c.execute(
+            "CREATE TABLE categories (id INTEGER PRIMARY KEY, slug TEXT, name_ko TEXT, "
+            "status TEXT DEFAULT 'draft')"
+        )
+        c.execute(
+            "INSERT INTO categories (slug, name_ko, status) VALUES ('office-chair','의자',?)",
+            (status,),
+        )
+        return c
+
+    def test_without_conn_keeps_legacy_mapping_only(self) -> None:
+        assert kr.publishability("컴퓨터의자") == (True, "mapped")
+        assert kr.publishability("강아지 사료") == (False, "unmapped")
+
+    def test_draft_category_blocked_with_conn(self) -> None:
+        conn = self._conn("draft")
+        assert kr.publishability("컴퓨터의자", conn) == (False, "category_draft")  # type: ignore[arg-type]
+
+    def test_published_category_ok_with_conn(self) -> None:
+        conn = self._conn("published")
+        assert kr.publishability("컴퓨터의자", conn) == (True, "mapped")  # type: ignore[arg-type]
+
+    def test_missing_row_fail_open_with_conn(self) -> None:
+        # 행 없음(미프로비저닝 DB) — 막지 않음(category_blocked fail-open과 동일)
+        import sqlite3 as sql
+
+        c = sql.connect(":memory:")
+        c.execute("CREATE TABLE categories (id INTEGER PRIMARY KEY, slug TEXT, status TEXT)")
+        assert kr.publishability("컴퓨터의자", c) == (True, "mapped")

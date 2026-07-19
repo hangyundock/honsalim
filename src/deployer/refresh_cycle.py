@@ -230,21 +230,37 @@ def run_refresh_cycle(
 def _notify_indexnow(result: CycleResult, project_root: Path) -> None:
     """배포 성공 후속 IndexNow 통지 — 어떤 실패도 사이클 결과를 바꾸지 않는다(§0, 세션 #45).
 
-    통지는 배포(push) 성공이 확정된 뒤에만 호출된다. CI 반영(1~2분)보다 핑이 먼저 나가도
-    IndexNow는 즉시 크롤이 아닌 통지 프로토콜이라 무해 [추정]. 실패는 notes에만 기록.
+    #45 적대검증 반영: ①전체 재제출 금지 — 직전 배포 커밋(HEAD^)의 sitemap과 diff한 변경분 +
+    이번 사이클에 실제 갱신된 카테고리만 통지(IndexNow 지침 — 변경 URL만. 반복 전체 제출은
+    호스트 신뢰 하락으로 새 글 통지까지 무시될 수 있음) ②발송 전 라이브 keyLocation 폴링 —
+    CI 반영 시차·키 파일 유실 상태에서 핑하면 키 검증 실패로 배치가 조용히 폐기되므로,
+    확인 실패 시 이번 회차는 생략(다음 배포에서 재시도). 실패는 notes에만 기록.
     """
     try:
+        from urllib.parse import urlparse
+
         from deployer import indexnow
 
         if not indexnow.indexnow_ready():
             result.notes.append("IndexNow 미설정 — 통지 생략")
             return
-        urls = indexnow.sitemap_urls(project_root / "build" / "site")
+        site_dir = project_root / "build" / "site"
+        # 직전 배포본 sitemap = HEAD^(방금 만든 배포 커밋의 부모) — build/site는 배포 커밋만 수정
+        prev = _git(["show", "HEAD^:build/site/sitemap.xml"], cwd=project_root)
+        prev_xml = prev.stdout if prev.returncode == 0 and prev.stdout.strip() else None
+        refreshed = [r.slug for r in result.refreshed if r.ok]
+        urls = indexnow.deploy_urls(site_dir, prev_xml, refreshed_category_slugs=refreshed)
         if not urls:
-            result.notes.append("IndexNow 통지 생략 — sitemap URL 없음")
+            result.notes.append("IndexNow 통지 생략 — 변경 URL 없음")
+            return
+        host = urlparse(urls[0]).hostname or ""
+        if not indexnow.key_file_live(host):
+            result.notes.append("IndexNow 통지 생략 — 키 파일 미라이브(다음 배포에서 재시도)")
             return
         ok = indexnow.ping(urls)
-        result.notes.append(f"IndexNow 통지 {'성공' if ok else '실패(무시)'} — {len(urls)} URL")
+        result.notes.append(
+            f"IndexNow 통지 {'성공' if ok else '실패(무시)'} — 변경 {len(urls)} URL"
+        )
     except Exception as e:  # 어떤 예외도 배포 결과를 오염시키지 않음(§0)
         result.notes.append(f"IndexNow 오류(무시): {type(e).__name__}")
 

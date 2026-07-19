@@ -257,7 +257,7 @@ class TestIndexnowWiring:
         monkeypatch.setattr(rc, "_git", lambda args, **kw: _Ok())
         monkeypatch.setattr(rc, "git_push", lambda **kw: _Ok())
 
-    def test_deploy_success_pings_sitemap_urls(
+    def test_deploy_success_pings_changed_urls(
         self, conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from deployer import indexnow as ixn
@@ -265,9 +265,13 @@ class TestIndexnowWiring:
         self._fake_git(monkeypatch)
         calls: dict[str, object] = {}
         monkeypatch.setattr(ixn, "indexnow_ready", lambda: True)
+        # 변경분 산출(#45) — 전체 사이트맵이 아니라 deploy_urls 결과만 통지
         monkeypatch.setattr(
-            ixn, "sitemap_urls", lambda p: ["https://honsallim.com/", "https://honsallim.com/a/"]
+            ixn,
+            "deploy_urls",
+            lambda site, prev, refreshed_category_slugs: ["https://honsallim.com/articles/new/"],
         )
+        monkeypatch.setattr(ixn, "key_file_live", lambda host, **kw: True)
 
         def fake_ping(urls: list[str]) -> bool:
             calls["urls"] = list(urls)
@@ -283,8 +287,55 @@ class TestIndexnowWiring:
             dry_run=False,
         )
         assert res.deployed is True
-        assert calls["urls"] == ["https://honsallim.com/", "https://honsallim.com/a/"]
+        assert calls["urls"] == ["https://honsallim.com/articles/new/"]
         assert any("IndexNow 통지 성공" in n for n in res.notes)
+
+    def test_key_file_not_live_skips_ping(
+        self, conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """키 파일 미라이브(CI 시차·유실)면 핑 생략 — 검증 실패로 배치가 폐기되는 헛발송 방지."""
+        from deployer import indexnow as ixn
+
+        self._fake_git(monkeypatch)
+        monkeypatch.setattr(ixn, "indexnow_ready", lambda: True)
+        monkeypatch.setattr(
+            ixn,
+            "deploy_urls",
+            lambda site, prev, refreshed_category_slugs: ["https://honsallim.com/x/"],
+        )
+        monkeypatch.setattr(ixn, "key_file_live", lambda host, **kw: False)
+        monkeypatch.setattr(ixn, "ping", lambda urls: pytest.fail("키 미라이브면 핑 금지"))
+        res = rc.run_refresh_cycle(
+            conn,
+            project_root=Path("."),
+            refresh=False,
+            do_build=False,
+            do_deploy=True,
+            dry_run=False,
+        )
+        assert res.deployed is True  # 통지 생략은 배포 결과와 무관(§0)
+        assert any("키 파일 미라이브" in n for n in res.notes)
+
+    def test_no_changed_urls_skips_ping(
+        self, conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """변경 URL 0 — 전체 재제출 금지(IndexNow 지침·호스트 신뢰 보호), 통지 생략."""
+        from deployer import indexnow as ixn
+
+        self._fake_git(monkeypatch)
+        monkeypatch.setattr(ixn, "indexnow_ready", lambda: True)
+        monkeypatch.setattr(ixn, "deploy_urls", lambda site, prev, refreshed_category_slugs: [])
+        monkeypatch.setattr(ixn, "ping", lambda urls: pytest.fail("변경 없음이면 핑 금지"))
+        res = rc.run_refresh_cycle(
+            conn,
+            project_root=Path("."),
+            refresh=False,
+            do_build=False,
+            do_deploy=True,
+            dry_run=False,
+        )
+        assert res.deployed is True
+        assert any("변경 URL 없음" in n for n in res.notes)
 
     def test_push_failure_never_pings(
         self, conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch

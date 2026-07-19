@@ -297,6 +297,51 @@ class TestRefillPublishableOnly:
         assert picked is not None
         assert picked["keyword"] == "책상의자"  # 기존 winnable 1위 그대로(공개면 제한 없음)
 
+    def test_refill_scans_beyond_display_limit(self) -> None:
+        """★#45 적대검증: 상위 20이 전부 미매핑이어도 21위+의 매핑 후보를 찾아낸다.
+
+        미매핑 후보는 큐에 안 들어가 dedup에 안 걸려 매일 상위에 잔류 — 표시용 limit(20)로
+        자른 뒤 가드를 걸면 매핑 후보를 영영 못 집는 래칫이 된다(스캔 폭 분리로 해소).
+        """
+        conn = _db()
+        seeds: list[dict[str, Any]] = [
+            {
+                "seed": "잡동사니",
+                "core": None,
+                "exclude_terms": (),
+                "require_terms": (),
+                "category": None,
+                "cached_secondary": [],
+            }
+        ]
+        rows = [
+            # 미매핑 25건 — 전부 winnable 상위(검색량 9만~)
+            {"keyword": f"미매핑키워드{i}", "volume": 90000 - i, "competition": "낮음"}
+            for i in range(25)
+        ] + [
+            # 매핑 후보 1건 — winnable 최하위(26위)
+            {"keyword": "컴퓨터의자", "volume": 2100, "competition": "높음"}
+        ]
+        picked = kr.auto_pick_keyword(
+            conn, seeds=seeds, fetch=lambda s, dry_run=False: [dict(r) for r in rows]
+        )
+        assert picked is not None
+        assert picked["keyword"] == "컴퓨터의자"  # 26위여도 스캔 폭 안에서 발견
+
+    def test_pending_draft_category_deprioritized(self) -> None:
+        """#45: pending 큐에서도 draft 카테고리 매핑은 후순위 — 생성 비용 후 보류되는 어긋남 방지."""
+        conn = _db()
+        conn.execute(
+            "INSERT INTO categories (slug, name_ko, status) VALUES "
+            "('office-chair','의자','draft'), ('desk','책상','published')"
+        )
+        conn.commit()
+        kq.add_keyword(conn, "컴퓨터의자", channel="ali", score=9999.0)  # draft 카테고리 — 강등
+        kq.add_keyword(conn, "컴퓨터 책상", channel="ali", score=10.0)  # published — 우선
+        picked = kr.auto_pick_keyword(conn, seeds=SEED, fetch=_fetch)
+        assert picked is not None
+        assert picked["keyword"] == "컴퓨터 책상"
+
 
 class TestWinnableScore:
     def test_lower_competition_ranks_higher(self) -> None:

@@ -101,6 +101,124 @@ class TestPing:
         assert indexnow.ping(["https://honsallim.com/"]) is False  # 예외 없이 False
 
 
+_SM_HEAD = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+)
+
+
+def _sm(*entries: tuple[str, str | None]) -> str:
+    body = "".join(
+        f"  <url><loc>{loc}</loc>" + (f"<lastmod>{lm}</lastmod>" if lm else "") + "</url>\n"
+        for loc, lm in entries
+    )
+    return _SM_HEAD + body + "</urlset>\n"
+
+
+class TestChangedUrls:
+    """#45 적대검증 — IndexNow 지침(변경 URL만 제출) 준수: diff 산출."""
+
+    def test_added_modified_deleted(self) -> None:
+        prev = _sm(
+            ("https://h.com/", None),
+            ("https://h.com/a/", "2026-07-01"),
+            ("https://h.com/gone/", None),
+        )
+        curr = _sm(
+            ("https://h.com/", None),  # 불변 — 제출 안 함
+            ("https://h.com/a/", "2026-07-19"),  # lastmod 변경
+            ("https://h.com/new/", "2026-07-19"),  # 신규
+        )
+        out = indexnow.changed_urls(prev, curr)
+        assert "https://h.com/" not in out  # 변경 없는 URL 재제출 금지
+        assert set(out) == {"https://h.com/a/", "https://h.com/new/", "https://h.com/gone/"}
+
+    def test_no_prev_falls_back_to_full(self) -> None:
+        curr = _sm(("https://h.com/", None), ("https://h.com/a/", None))
+        assert set(indexnow.changed_urls(None, curr)) == {"https://h.com/", "https://h.com/a/"}
+
+    def test_broken_prev_falls_back_to_full(self) -> None:
+        curr = _sm(("https://h.com/", None))
+        assert indexnow.changed_urls("<broken", curr) == ["https://h.com/"]
+
+    def test_broken_curr_returns_empty(self) -> None:
+        assert indexnow.changed_urls(None, "<broken") == []
+
+
+class TestDeployUrls:
+    def test_merges_changed_and_refreshed_categories(self, tmp_path: Path) -> None:
+        (tmp_path / "sitemap.xml").write_text(
+            _sm(
+                ("https://honsallim.com/", None),
+                ("https://honsallim.com/articles/new/", "2026-07-19"),
+            ),
+            encoding="utf-8",
+        )
+        prev = _sm(("https://honsallim.com/", None))
+        out = indexnow.deploy_urls(tmp_path, prev, refreshed_category_slugs=["office-chair"])
+        assert out == [
+            "https://honsallim.com/articles/new/",
+            "https://honsallim.com/categories/office-chair/",
+        ]
+
+    def test_missing_sitemap_returns_empty(self, tmp_path: Path) -> None:
+        assert indexnow.deploy_urls(tmp_path, None, refreshed_category_slugs=["x"]) == []
+
+
+class TestKeyFileLive:
+    KEY = "abcd1234efgh5678"
+
+    def _resp(self, body: bytes, status: int = 200) -> _FakeResp:
+        r = _FakeResp(body)
+        r.status = status
+        return r
+
+    def test_live_when_body_matches(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("INDEXNOW_KEY", self.KEY)
+        seen: list[str] = []
+
+        def fake_urlopen(url: str, timeout: int = 0) -> _FakeResp:
+            seen.append(url)
+            return self._resp(self.KEY.encode())
+
+        monkeypatch.setattr(indexnow.urllib.request, "urlopen", fake_urlopen)
+        assert indexnow.key_file_live("honsallim.com", attempts=1) is True
+        assert seen == [f"https://honsallim.com/{self.KEY}.txt"]
+
+    def test_retries_then_succeeds(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("INDEXNOW_KEY", self.KEY)
+        calls = {"n": 0}
+
+        def fake_urlopen(url: str, timeout: int = 0) -> _FakeResp:
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise urllib.error.URLError("404")  # CI 반영 전
+            return self._resp(self.KEY.encode())
+
+        monkeypatch.setattr(indexnow.urllib.request, "urlopen", fake_urlopen)
+        assert indexnow.key_file_live("honsallim.com", attempts=4, interval_s=0) is True
+        assert calls["n"] == 3
+
+    def test_false_when_body_mismatch(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # 200이어도 내용이 키와 다르면(예: SPA 폴백 페이지) 미라이브 판정
+        monkeypatch.setenv("INDEXNOW_KEY", self.KEY)
+        monkeypatch.setattr(
+            indexnow.urllib.request,
+            "urlopen",
+            lambda url, timeout=0: self._resp(b"<html>not-key</html>"),
+        )
+        assert indexnow.key_file_live("honsallim.com", attempts=1) is False
+
+    def test_false_after_attempts_exhausted(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("INDEXNOW_KEY", self.KEY)
+
+        def boom(url: str, timeout: int = 0) -> _FakeResp:
+            raise urllib.error.URLError("down")
+
+        monkeypatch.setattr(indexnow.urllib.request, "urlopen", boom)
+        assert indexnow.key_file_live("honsallim.com", attempts=2, interval_s=0) is False
+
+
 class TestSitemapUrls:
     def test_parses_locs(self, tmp_path: Path) -> None:
         (tmp_path / "sitemap.xml").write_text(

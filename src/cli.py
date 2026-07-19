@@ -1866,6 +1866,14 @@ def cmd_build(args: argparse.Namespace) -> int:
     if args.full or args.preview:
         from builder import renderer
 
+        try:
+            # IndexNow 키 파일(<key>.txt) 생성용 env 보장(#45 적대검증) — refresh_cycle 빌드와
+            # 동일 패턴. 이게 없으면 build --full이 secrets 미로드 렌더로 키 파일을 산출물에서
+            # 지우고, 그 삭제가 커밋되면 라이브 keyLocation 404 → 이후 IndexNow 통지가 조용히
+            # 무효화된다(비대칭 빌드). 실패해도 빌드 계속(§0).
+            config.load_secrets()
+        except Exception:  # noqa: S110 — secrets 없음=키 파일 생략일 뿐
+            pass
         out_dir = (PROJECT_ROOT / "build" / "preview") if args.preview else renderer.DEFAULT_OUT
         summary = renderer.render_site(out_dir=out_dir, include_drafts=args.preview)
         mode = "미리보기(draft 포함·검토용)" if args.preview else "공개(published만)"
@@ -2705,7 +2713,8 @@ def _auto_cycle_digest_and_alert(
     publishable = 0
     blocked: Counter[str] = Counter()
     for (kw,) in pend:
-        ok, code = keyword_relevance.publishability(str(kw))
+        # conn 전달(#45): draft 카테고리 매핑도 '막힘(category_draft)'으로 집계 — 실제 보류와 정합
+        ok, code = keyword_relevance.publishability(str(kw), conn)
         if ok:
             publishable += 1
         else:

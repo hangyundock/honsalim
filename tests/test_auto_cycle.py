@@ -14,6 +14,21 @@ import pytest
 import cli
 
 
+@pytest.fixture(autouse=True)
+def _no_real_notify(monkeypatch: pytest.MonkeyPatch) -> None:
+    """★실발송·실 secrets 격리 (세션 #45 적대검증 적발 — §0 테스트 위생).
+
+    오케스트레이션 테스트가 cmd_auto_cycle 라이브 경로를 돌 때 _auto_cycle_notify가 실
+    config.load_secrets()→notify.send_telegram()까지 도달해, telegram.env가 설정된 운영
+    머신에서는 **pytest 실행마다 주인 폰으로 가짜 '무인 사이클' 리포트가 실발송**되고
+    실 시크릿 4종이 os.environ에 유입돼 이후 테스트가 머신·순서 의존이 되던 결함의 차단.
+    알림 내용 자체는 digest 단위 테스트가 검증한다.
+    """
+    monkeypatch.setattr(cli, "_auto_cycle_notify", lambda *a, **k: None)
+    monkeypatch.setattr("common.notify.send_telegram", lambda *a, **k: False)
+    monkeypatch.setattr("common.config.load_secrets", lambda *a, **k: {})
+
+
 class TestAutoCycleGate:
     def test_off_by_default_does_nothing(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # auto_mode OFF → DB·LLM·배포 일절 없이 즉시 0 반환(안전 기본값)
@@ -185,7 +200,12 @@ class TestAutoCycleDigest:
         db.migrate(db_path=p)
         db.seed(db_path=p)
         monkeypatch.setattr(cli.db, "DB_PATH", p)  # 다이제스트 파일이 tmp에 쓰이도록
-        return db.connect(p)
+        conn = db.connect(p)
+        # #45: seed는 §2-마에 따라 전부 draft — 운영 현실(매핑 카테고리=published)을 반영해
+        # 공개로 올린다(publishability(conn)의 category_draft 판정과 기존 테스트 의도 정합).
+        conn.execute("UPDATE categories SET status='published'")
+        conn.commit()
+        return conn
 
     def test_healthy_not_abnormal(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from writer import keyword_queue as kq

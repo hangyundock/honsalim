@@ -18,6 +18,13 @@ from writer import article_writer, category_state
 from writer.state_machine import transition
 
 
+@pytest.fixture(autouse=True)
+def _isolate_indexnow_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """INDEXNOW_KEY env 격리(#45) — 다른 테스트의 실 secrets 로드가 렌더 산출물(키 파일 유무)을
+    바꿔 순서·머신 의존이 되는 것 차단. 키 파일 테스트는 각자 setenv로 명시 제어."""
+    monkeypatch.delenv("INDEXNOW_KEY", raising=False)
+
+
 @pytest.fixture()
 def built(tmp_path: Path) -> dict:
     """임시 DB에 migrate+seed 후 임시 디렉토리로 렌더. summary + out 반환."""
@@ -365,11 +372,18 @@ class TestPrivacyPage:
         assert "직접 수집하지 않는" in html  # 실수집 현실 기준(과대 기술 금지)
         assert "Cloudflare" in html  # 호스팅 위탁 고지
         assert "30일" in html  # 이메일 문의 응답 원칙(POLICY §7-5)
+        # PIPA §30 필수 항목(#45 적대검증 보완): 정보주체 권리·안전성 확보·보호책임자
+        assert "열람·정정·삭제" in html
+        assert "안전성 확보" in html
+        assert "보호책임자" in html
         assert "{{" not in html and "{%" not in html
 
     def test_privacy_in_sitemap_without_lastmod(self, built: dict) -> None:
         xml = (built["out"] / "sitemap.xml").read_text(encoding="utf-8")
-        assert "https://honsallim.com/privacy/" in xml  # 정적 페이지 — lastmod 없음(SITEMAP-02)
+        # 정적 페이지는 lastmod 미부여(SITEMAP-02·#40) — 블록 단위로 실제 단언(#45 무늬만 테스트 보강)
+        m = re.search(r"<url>\s*<loc>https://honsallim\.com/privacy/</loc>(.*?)</url>", xml, re.S)
+        assert m, "sitemap에 /privacy/ 없음"
+        assert "<lastmod>" not in m.group(1)
 
     def test_footer_links_to_privacy_page(self, built: dict) -> None:
         home = (built["out"] / "index.html").read_text(encoding="utf-8")
