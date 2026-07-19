@@ -21,6 +21,7 @@ import argparse
 import importlib
 import importlib.util
 import json
+import os
 import shutil
 import sqlite3
 import subprocess
@@ -473,6 +474,30 @@ def _check_seed_alignment() -> bool:
     return not hard
 
 
+def _check_indexnow() -> bool:
+    """§16 IndexNow 배포 정합 (세션 #45) — env 키 + build/site/<key>.txt 일치. 값 비노출.
+
+    환경 의존(secrets·빌드 산출물)이라 WARN 전용 — fresh checkout에서 doctor를 FAIL시키지
+    않는다(§0 graceful). 키 문자열은 출력하지 않음(_check_secrets 관례·logging 마스킹 정합).
+    """
+    from deployer import indexnow
+
+    if not indexnow.indexnow_ready():
+        print(f"{WARN} INDEXNOW_KEY 미설정 — 키 파일·통지 생략됨 (secrets indexnow.env 확인)")
+        return True
+    key = (os.environ.get("INDEXNOW_KEY") or "").strip()
+    key_file = PROJECT_ROOT / "build" / "site" / f"{key}.txt"
+    try:
+        deployed = key_file.exists() and key_file.read_text(encoding="utf-8").strip() == key
+    except OSError:
+        deployed = False
+    if deployed:
+        print(f"{OK} IndexNow 준비됨 — env 키 + 키 파일(build/site 루트) 일치")
+    else:
+        print(f"{WARN} IndexNow 키 파일 미배포 — 다음 빌드에서 자동 생성됨(#45)")
+    return True
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     """secrets·DB·외부 API 헬스 체크 (BACKEND §9 [확정])."""
     print("혼살림 doctor — Phase 1 인프라 헬스 체크")
@@ -522,6 +547,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     _print_section("15. 씨앗 정합 (seo_keywords ↔ category_sources, #45)")
     seeds_ok = _check_seed_alignment()
+
+    _print_section("16. IndexNow 배포 정합 (#45)")
+    _check_indexnow()  # WARN 전용 — 환경 의존이라 종합 게이트 미포함(§0 graceful)
 
     _print_section("종합")
     phase2_ok = tmpl_ok and mod_ok and sm_ok and tests_ok and workers_ok and caps_ok and seeds_ok

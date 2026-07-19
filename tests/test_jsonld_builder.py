@@ -141,7 +141,10 @@ class TestAuthorPublisher:
     def test_default_author_person_type(self) -> None:
         doc = json.loads(_build_default())
         assert doc["author"]["@type"] == "Person"
-        assert doc["author"]["name"] == "혼살림 운영자"
+        # #45: 저자=필명 '혼살다'(M2-2·O1) — byline·About Person 엔티티와 통일
+        assert doc["author"]["name"] == "혼살다"
+        # author.url=/about/ — 운영자 Person 엔티티 연결(E-E-A-T·FRONTEND §6-2)
+        assert doc["author"]["url"] == "https://honsallim.com/about/"
 
     def test_default_publisher_organization_type(self) -> None:
         doc = json.loads(_build_default())
@@ -437,6 +440,26 @@ class TestStructuredSchemas:
         out = as_script_tags([build_website_jsonld("https://honsallim.com"), ""])
         assert out.count('<script type="application/ld+json">') == 1
         assert "WebSite" in out
+
+    def test_person_operator_entity(self) -> None:
+        """★세션 #45 — 운영자 Person(E-E-A-T·M2): 필명·철학·전문영역·/about/ 연결·사진 없음."""
+        from builder.jsonld import build_person_jsonld
+
+        doc = json.loads(build_person_jsonld("https://honsallim.com", email="dugi2020@naver.com"))
+        assert doc["@type"] == "Person"
+        assert doc["name"] == "혼살다"  # 필명(M2-2) — Article author와 동일 엔티티
+        assert doc["url"] == "https://honsallim.com/about/"
+        assert doc["description"] == "혼자 살아도 충분히 따뜻한 일상을, 가성비 좋게."  # M2-3
+        assert "1인 가구 살림" in doc["knowsAbout"]  # M2-4
+        assert doc["worksFor"]["@type"] == "Organization"
+        assert doc["email"] == "dugi2020@naver.com"  # Q7(#20) 사이트 표기 이메일
+        assert "image" not in doc  # M2-5 [확정] — 운영자 사진(실물·AI) 게재 금지
+
+    def test_person_email_optional(self) -> None:
+        from builder.jsonld import build_person_jsonld
+
+        doc = json.loads(build_person_jsonld("https://honsallim.com"))
+        assert "email" not in doc
 
 
 if __name__ == "__main__":

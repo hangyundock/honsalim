@@ -156,6 +156,7 @@ class TestRenderSite:
             "index.html",
             "scenarios/index.html",
             "about/index.html",
+            "privacy/index.html",  # 개인정보처리방침(PIPA E2·세션 #45)
             "categories/index.html",
             "guides/index.html",  # 구매가이드 — 네비 링크 깨짐(/guides/ 404) 방지(세션 #20)
             "404.html",
@@ -346,6 +347,90 @@ class TestMethodPage:
     def test_footer_links_to_method(self, built: dict) -> None:
         home = (built["out"] / "index.html").read_text(encoding="utf-8")
         assert 'href="/method/"' in home  # 사이트 전역 푸터 신뢰 동선
+
+
+class TestPrivacyPage:
+    """개인정보처리방침 단독 페이지(/privacy/) — PIPA 게재 의무(E2 [확정])·세션 #45.
+
+    내용은 실제 수집 현실(직접 수집 없음·D1 로깅 보류 R4) 기준 — 과대 기술 금지(§0 정직성).
+    이전엔 footer가 /about/#privacy 앵커(방침 전문 없는 '빈 약속')로 연결됐다.
+    """
+
+    def test_privacy_page_written_and_honest(self, built: dict) -> None:
+        out: Path = built["out"]
+        path = out / "privacy" / "index.html"
+        assert path.exists(), "privacy 페이지 미생성"
+        html = path.read_text(encoding="utf-8")
+        assert "개인정보처리방침" in html
+        assert "직접 수집하지 않는" in html  # 실수집 현실 기준(과대 기술 금지)
+        assert "Cloudflare" in html  # 호스팅 위탁 고지
+        assert "30일" in html  # 이메일 문의 응답 원칙(POLICY §7-5)
+        assert "{{" not in html and "{%" not in html
+
+    def test_privacy_in_sitemap_without_lastmod(self, built: dict) -> None:
+        xml = (built["out"] / "sitemap.xml").read_text(encoding="utf-8")
+        assert "https://honsallim.com/privacy/" in xml  # 정적 페이지 — lastmod 없음(SITEMAP-02)
+
+    def test_footer_links_to_privacy_page(self, built: dict) -> None:
+        home = (built["out"] / "index.html").read_text(encoding="utf-8")
+        assert 'href="/privacy/"' in home  # 전 페이지 푸터 — 단독 페이지로 연결
+        assert 'href="/about/#privacy"' not in home  # 옛 앵커('빈 약속') 잔재 없음
+
+
+class TestAboutEEAT:
+    """세션 #45 — About 운영자 Person Schema(M2) + 부정직 문구 정리(L3·정직성 §0)."""
+
+    def test_about_has_person_jsonld(self, built: dict) -> None:
+        html = (built["out"] / "about" / "index.html").read_text(encoding="utf-8")
+        assert '"@type": "Person"' in html  # 운영자 Person 엔티티(E-E-A-T)
+        assert "혼살다" in html  # 필명(M2-2)
+        assert '"knowsAbout"' in html  # 전문성 영역(M2-4)
+
+    def test_no_false_experience_claims(self, built: dict) -> None:
+        """1인칭·거짓 경험 주장 제거(L3·QRG §4.5.3 — 가짜 경험 바이오는 최저 품질 신호)."""
+        about = (built["out"] / "about" / "index.html").read_text(encoding="utf-8")
+        method = (built["out"] / "method" / "index.html").read_text(encoding="utf-8")
+        for banned in ("실제 경험에서 출발", "검색에 며칠을 썼습니다", "실사용 경험"):
+            assert banned not in about, f"about에 거짓 경험 문구 잔존: {banned}"
+            assert banned not in method, f"method에 거짓 경험 문구 잔존: {banned}"
+        # 완전무인(자동 승인) 현실과 모순되는 '사람이 검토한 뒤 공개' 단정 제거
+        assert "그냥 올라가지 않습니다" not in method
+        assert "직접 사용 경험을 주장하지 않습니다" in about  # 정직 명문화
+
+
+class TestIndexnowKeyFile:
+    """세션 #45 — IndexNow <key>.txt 루트 생성(env 기반·미설정이면 생략·§0)."""
+
+    KEY = "abcd1234efgh5678"
+
+    def _render(self, tmp_path: Path, key: str | None, monkeypatch: pytest.MonkeyPatch) -> Path:
+        if key is None:
+            monkeypatch.delenv("INDEXNOW_KEY", raising=False)
+        else:
+            monkeypatch.setenv("INDEXNOW_KEY", key)
+        db_path = tmp_path / "test.db"
+        db.migrate(db_path=db_path)
+        db.seed(db_path=db_path)
+        out = tmp_path / "site"
+        renderer.render_site(out_dir=out, db_path=db_path)
+        return out
+
+    def test_key_file_written_with_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        out = self._render(tmp_path, self.KEY, monkeypatch)
+        f = out / f"{self.KEY}.txt"
+        assert f.exists()
+        assert f.read_text(encoding="utf-8").strip() == self.KEY
+
+    def test_no_key_file_without_env(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        out = self._render(tmp_path, None, monkeypatch)
+        assert not (out / f"{self.KEY}.txt").exists()  # 미설정 — 조용히 생략(빌드는 정상)
+
+    def test_invalid_key_not_written(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        out = self._render(tmp_path, "bad key/../x", monkeypatch)
+        txts = [p.name for p in out.glob("*.txt") if p.name != "robots.txt"]
+        assert txts == []  # 형식 밖 env 값은 경로로 새지 않음(방어)
 
 
 class TestPillarPage:

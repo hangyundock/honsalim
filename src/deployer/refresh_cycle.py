@@ -171,6 +171,14 @@ def run_refresh_cycle(
         from builder import go_function, renderer
         from common import db as _db
 
+        try:
+            # IndexNow 키 파일(<key>.txt) 생성용 env 보장 — 무인 경로는 secrets 미로드일 수
+            # 있다(#45). 실패해도 빌드는 계속(키 파일만 생략·§0).
+            from common import config as _config
+
+            _config.load_secrets()
+        except Exception:  # noqa: S110 — secrets 없음=키 파일 생략일 뿐, 빌드는 계속(§0)
+            pass
         renderer.render_site(
             out_dir=project_root / "build" / "site",
             db_path=db_path or _db.DB_PATH,
@@ -209,11 +217,36 @@ def run_refresh_cycle(
                 result.notes.append(
                     f"git push 실패 rc={push.returncode}: {push.stderr.strip()[:200]}"
                 )
-            elif verify_url:
-                v = verify_deploy(verify_url, dry_run=False)
-                result.verify_status = v.status_code
+            else:
+                if verify_url:
+                    v = verify_deploy(verify_url, dry_run=False)
+                    result.verify_status = v.status_code
+                # 배포 성공 후 IndexNow 통지(#45) — deployed 확정 '이후'에만, 절대 전파 금지(§0)
+                _notify_indexnow(result, project_root)
 
     return result
+
+
+def _notify_indexnow(result: CycleResult, project_root: Path) -> None:
+    """배포 성공 후속 IndexNow 통지 — 어떤 실패도 사이클 결과를 바꾸지 않는다(§0, 세션 #45).
+
+    통지는 배포(push) 성공이 확정된 뒤에만 호출된다. CI 반영(1~2분)보다 핑이 먼저 나가도
+    IndexNow는 즉시 크롤이 아닌 통지 프로토콜이라 무해 [추정]. 실패는 notes에만 기록.
+    """
+    try:
+        from deployer import indexnow
+
+        if not indexnow.indexnow_ready():
+            result.notes.append("IndexNow 미설정 — 통지 생략")
+            return
+        urls = indexnow.sitemap_urls(project_root / "build" / "site")
+        if not urls:
+            result.notes.append("IndexNow 통지 생략 — sitemap URL 없음")
+            return
+        ok = indexnow.ping(urls)
+        result.notes.append(f"IndexNow 통지 {'성공' if ok else '실패(무시)'} — {len(urls)} URL")
+    except Exception as e:  # 어떤 예외도 배포 결과를 오염시키지 않음(§0)
+        result.notes.append(f"IndexNow 오류(무시): {type(e).__name__}")
 
 
 def cycle_report(result: CycleResult, ran_at: str) -> dict[str, Any]:

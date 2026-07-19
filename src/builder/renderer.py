@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import os
 import re
 import shutil
 import sqlite3
@@ -1626,6 +1627,8 @@ def render_site(
         "eager_images": include_drafts,
     }
     org_ld = jsonld.build_organization_jsonld(SITE_ORIGIN, "혼살림", BUSINESS_INFO["email"])
+    # 운영자 Person 엔티티(E-E-A-T·M2·#45) — About 페이지에 주입, 글 author.url(/about/)과 연결.
+    person_ld = jsonld.build_person_jsonld(SITE_ORIGIN, email=BUSINESS_INFO["email"])
 
     # 산출물 청소 후 재생성 — 미게시·삭제된 콘텐츠가 배포물(라이브)에 잔존하지 않도록(세션 #20).
     # 정적 사이트는 DB 현재 상태와 정확히 일치해야 한다(예: 글 unpublish/삭제 → 라이브에서도 제거).
@@ -1745,6 +1748,28 @@ def render_site(
                 [
                     jsonld.build_breadcrumb_jsonld(
                         [{"name": "홈", "url": "/"}, {"name": "About"}], SITE_ORIGIN
+                    ),
+                    org_ld,
+                    person_ld,  # 운영자 Person(혼살다) — M2 [확정]·#45
+                ]
+            ),
+            **common,
+        ),
+    )
+
+    # 개인정보처리방침(/privacy/) — PIPA 게재 의무(DECISIONS E2 [확정])·세션 #45 신설.
+    # 내용은 실제 수집 현실(직접 수집 사실상 없음·D1 로깅 보류 R4) 기준 — 과대 기술 금지(§0 정직성).
+    w(
+        "privacy/index.html",
+        env.get_template("privacy.html").render(
+            active_nav="",
+            canonical_url=f"{SITE_ORIGIN}/privacy/",
+            meta_title="개인정보처리방침 | 혼살림",
+            meta_description="혼살림의 개인정보처리방침입니다. 회원가입·댓글 없이 운영되며 개인정보를 직접 수집하지 않습니다.",
+            schema_jsonld=jsonld.as_script_tags(
+                [
+                    jsonld.build_breadcrumb_jsonld(
+                        [{"name": "홈", "url": "/"}, {"name": "개인정보처리방침"}], SITE_ORIGIN
                     ),
                     org_ld,
                 ]
@@ -2025,7 +2050,15 @@ def render_site(
         for pg in article_pages
         if not pg.get("is_draft") and pg.get("published_at")
     }
-    static_urls = ["/", "/scenarios/", "/about/", "/method/", "/categories/", "/guides/"]
+    static_urls = [
+        "/",
+        "/scenarios/",
+        "/about/",
+        "/method/",
+        "/privacy/",
+        "/categories/",
+        "/guides/",
+    ]
     urls: list[tuple[str, str | None]] = (
         [(u, None) for u in static_urls]
         + ([(f"/{PILLAR_HOME_OFFICE['slug']}/", None)] if pillar_rendered else [])
@@ -2053,6 +2086,14 @@ def render_site(
         if fav_src.exists():
             shutil.copy2(fav_src, out_dir / fav)
             written.append(fav)
+
+    # IndexNow 키 파일(<key>.txt) — 루트 공개 서빙돼야 핑이 검증된다(F4·FRONTEND §7-3, 세션 #45).
+    # 키는 프로토콜상 '공개 키'(STATE [확정] — 회전 불요)라 산출물 포함이 안전. env 미설정
+    # (fresh checkout·테스트)이면 조용히 생략 — 빌드를 막지 않는다(§0). 형식 검증은 방어적
+    # (이상한 env 값이 경로로 새는 것 차단).
+    indexnow_key = (os.environ.get("INDEXNOW_KEY") or "").strip()
+    if indexnow_key and re.fullmatch(r"[A-Za-z0-9-]{8,128}", indexnow_key):
+        w(f"{indexnow_key}.txt", indexnow_key)
 
     return {
         "out_dir": str(out_dir),

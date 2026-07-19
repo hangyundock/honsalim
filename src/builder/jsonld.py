@@ -20,9 +20,14 @@ from typing import Any
 # POLICY §4 + VALIDATOR §8 ARTICLE_REQUIRED와 동일
 REQUIRED_META_FIELDS: tuple[str, ...] = ("title", "meta_description")
 
-DEFAULT_AUTHOR_NAME = "혼살림 운영자"
+# 저자 = 필명 '혼살다' (DECISIONS M2-2·O1 [확정] — Person Schema name + 글 byline과 통일).
+# #45 이전엔 '혼살림 운영자'로 byline(혼살다)과 불일치 — E-E-A-T 엔티티 일관성 위해 통일.
+DEFAULT_AUTHOR_NAME = "혼살다"
 DEFAULT_PUBLISHER_NAME = "혼살림"
 SCHEMA_CONTEXT = "https://schema.org"
+# 운영자 Person Schema 상수 (DECISIONS M2-3·M2-4 [확정], FRONTEND §4-5-bis)
+PERSON_DESCRIPTION = "혼자 살아도 충분히 따뜻한 일상을, 가성비 좋게."
+PERSON_KNOWS_ABOUT: tuple[str, ...] = ("1인 가구 살림", "자취", "홈오피스", "일상 살림")
 
 
 def _normalize_keywords(value: Any) -> str | None:
@@ -69,7 +74,7 @@ def build_article_jsonld(
         image_url: 대표 이미지 절대 URL
         published_at: ISO 8601 (예: "2026-05-28" 또는 "2026-05-28T11:00:00+09:00")
         modified_at: ISO 8601. None이면 published_at과 동일
-        author_name: 기본 "혼살림 운영자" (Person)
+        author_name: 기본 "혼살다" (Person — 필명·M2-2, byline과 통일)
         publisher_name: 기본 "혼살림" (Organization)
 
     반환: JSON 문자열 (한국어 보존, ensure_ascii=False).
@@ -92,7 +97,9 @@ def build_article_jsonld(
         "image": image_url,
         "datePublished": published_at,
         "dateModified": modified_at or published_at,
-        "author": {"@type": "Person", "name": author_name},
+        # author.url=/about/ — 글 저자를 운영자 Person 엔티티(About 페이지)와 연결(E-E-A-T·#45,
+        # FRONTEND §6-2). 렌더 시 재생성이라 기존 발행 글에도 다음 빌드에서 일괄 반영된다.
+        "author": {"@type": "Person", "name": author_name, "url": f"{base}/about/"},
         "publisher": {"@type": "Organization", "name": publisher_name},
         "mainEntityOfPage": main_entity_url,
     }
@@ -260,6 +267,30 @@ def build_organization_jsonld(
         "@type": "Organization",
         "name": name,
         "url": f"{base}/",
+    }
+    if email:
+        doc["email"] = email
+    return json.dumps(doc, ensure_ascii=False, separators=(", ", ": "))
+
+
+def build_person_jsonld(
+    site_base_url: str, name: str = DEFAULT_AUTHOR_NAME, email: str | None = None
+) -> str:
+    """운영자 Person JSON-LD — E-E-A-T author 엔티티 (M2 [확정]·FRONTEND §4-5-bis, 세션 #45).
+
+    name=필명 '혼살다'(M2-2·실명 비공개), description=운영 철학(M2-3), knowsAbout=전문성
+    영역(M2-4), url=/about/(글 author.url과 동일 — 엔티티 연결). ★사진(image) 미설정 —
+    M2-5 [확정]: 운영자 사진(실물·AI 생성 모두) 게재 금지(AI 사진=거짓 광고).
+    """
+    base = site_base_url.rstrip("/")
+    doc: dict[str, Any] = {
+        "@context": SCHEMA_CONTEXT,
+        "@type": "Person",
+        "name": name,
+        "url": f"{base}/about/",
+        "description": PERSON_DESCRIPTION,
+        "knowsAbout": list(PERSON_KNOWS_ABOUT),
+        "worksFor": {"@type": "Organization", "name": DEFAULT_PUBLISHER_NAME, "url": f"{base}/"},
     }
     if email:
         doc["email"] = email

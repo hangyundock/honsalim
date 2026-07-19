@@ -206,6 +206,8 @@ class TestDeploy:
         )
         monkeypatch.setattr(rc, "_git", lambda args, **kw: _Git())
         monkeypatch.setattr(rc, "git_push", lambda **kw: _Push())
+        # #45: 배포 성공 후속 IndexNow 통지는 별도 테스트에서 검증 — 여기선 차단(외부 호출 0)
+        monkeypatch.setattr(rc, "_notify_indexnow", lambda result, root: None)
         res = rc.run_refresh_cycle(
             conn,
             project_root=Path("."),
@@ -234,6 +236,132 @@ class TestDeploy:
             dry_run=True,
         )
         assert res.deployed is False
+
+
+class TestIndexnowWiring:
+    """★세션 #45 — 배포 성공 후 IndexNow 통지 배선 + §0 격리(핑 실패가 배포 결과 불변)."""
+
+    @staticmethod
+    def _fake_git(monkeypatch: pytest.MonkeyPatch) -> None:
+        from dataclasses import dataclass
+
+        @dataclass
+        class _Ok:
+            returncode: int = 0
+            stdout: str = ""
+            stderr: str = ""
+
+        monkeypatch.setattr(
+            rc, "detect_changes", lambda root, paths=rc.DEPLOY_PATHS: (True, " M x")
+        )
+        monkeypatch.setattr(rc, "_git", lambda args, **kw: _Ok())
+        monkeypatch.setattr(rc, "git_push", lambda **kw: _Ok())
+
+    def test_deploy_success_pings_sitemap_urls(
+        self, conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from deployer import indexnow as ixn
+
+        self._fake_git(monkeypatch)
+        calls: dict[str, object] = {}
+        monkeypatch.setattr(ixn, "indexnow_ready", lambda: True)
+        monkeypatch.setattr(
+            ixn, "sitemap_urls", lambda p: ["https://honsallim.com/", "https://honsallim.com/a/"]
+        )
+
+        def fake_ping(urls: list[str]) -> bool:
+            calls["urls"] = list(urls)
+            return True
+
+        monkeypatch.setattr(ixn, "ping", fake_ping)
+        res = rc.run_refresh_cycle(
+            conn,
+            project_root=Path("."),
+            refresh=False,
+            do_build=False,
+            do_deploy=True,
+            dry_run=False,
+        )
+        assert res.deployed is True
+        assert calls["urls"] == ["https://honsallim.com/", "https://honsallim.com/a/"]
+        assert any("IndexNow 통지 성공" in n for n in res.notes)
+
+    def test_push_failure_never_pings(
+        self, conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from dataclasses import dataclass
+
+        from deployer import indexnow as ixn
+
+        @dataclass
+        class _Ok:
+            returncode: int = 0
+            stdout: str = ""
+            stderr: str = ""
+
+        @dataclass
+        class _Fail:
+            returncode: int = 1
+            stdout: str = ""
+            stderr: str = "denied"
+
+        monkeypatch.setattr(
+            rc, "detect_changes", lambda root, paths=rc.DEPLOY_PATHS: (True, " M x")
+        )
+        monkeypatch.setattr(rc, "_git", lambda args, **kw: _Ok())
+        monkeypatch.setattr(rc, "git_push", lambda **kw: _Fail())
+        monkeypatch.setattr(
+            ixn, "indexnow_ready", lambda: pytest.fail("push 실패 시 IndexNow 호출 금지")
+        )
+        res = rc.run_refresh_cycle(
+            conn,
+            project_root=Path("."),
+            refresh=False,
+            do_build=False,
+            do_deploy=True,
+            dry_run=False,
+        )
+        assert res.deployed is False
+
+    def test_ping_exception_does_not_affect_deploy(
+        self, conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """§0: 통지 코드가 예외를 던져도 deployed=True 유지·notes에만 기록."""
+        from deployer import indexnow as ixn
+
+        self._fake_git(monkeypatch)
+        monkeypatch.setattr(
+            ixn, "indexnow_ready", lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+        )
+        res = rc.run_refresh_cycle(
+            conn,
+            project_root=Path("."),
+            refresh=False,
+            do_build=False,
+            do_deploy=True,
+            dry_run=False,
+        )
+        assert res.deployed is True  # 핑 실패는 배포 결과를 절대 오염시키지 않음
+        assert any("IndexNow 오류(무시)" in n for n in res.notes)
+
+    def test_not_ready_notes_and_skips(
+        self, conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from deployer import indexnow as ixn
+
+        self._fake_git(monkeypatch)
+        monkeypatch.setattr(ixn, "indexnow_ready", lambda: False)
+        monkeypatch.setattr(ixn, "ping", lambda urls: pytest.fail("미설정이면 핑 금지"))
+        res = rc.run_refresh_cycle(
+            conn,
+            project_root=Path("."),
+            refresh=False,
+            do_build=False,
+            do_deploy=True,
+            dry_run=False,
+        )
+        assert res.deployed is True
+        assert any("IndexNow 미설정" in n for n in res.notes)
 
 
 class TestReport:
