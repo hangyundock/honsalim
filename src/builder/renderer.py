@@ -1519,9 +1519,10 @@ def _load_pillar_spokes(
 def _sitemap(urls: list[tuple[str, str | None]]) -> str:
     """sitemap.xml 생성. 각 항목 = (경로, lastmod|None). lastmod 있으면 <lastmod> 출력.
 
-    lastmod는 발행 글(published_at)처럼 '실제 변경일'이 있는 페이지에만 넣는다 — 무인 일일
-    발행 사이트에서 검색엔진 재크롤 우선순위 신호(세션 #40 SITEMAP-02). 날짜가 모호한
-    정적·카테고리 페이지는 lastmod를 생략한다(부정확한 lastmod는 오히려 신뢰를 떨군다).
+    lastmod는 '실제 변경일'이 있는 페이지에만 넣는다 — 무인 일일 발행 사이트에서 검색엔진
+    재크롤 우선순위 신호(세션 #40 SITEMAP-02). 발행 글=published_at, 카테고리=연결 상품
+    MAX(last_seen_at)=상품 새로고침일(#46). 정확한 변경일이 없는 정적·페르소나 페이지는
+    lastmod를 생략한다(부정확한 lastmod는 오히려 신뢰를 떨군다 — Google 가이드).
     """
 
     def _line(u: str, lastmod: str | None) -> str:
@@ -2043,12 +2044,17 @@ def render_site(
             ),
         )
 
-    # sitemap.xml — (경로, lastmod). 발행 글만 lastmod(published_at 날짜)를 넣어 재크롤 신호를
-    # 준다(SITEMAP-02·#40). 정적·카테고리·페르소나는 변경일이 모호해 lastmod 생략(부정확 신호 회피).
+    # sitemap.xml — (경로, lastmod). lastmod는 '실제 변경일'이 있는 페이지에만 넣는다(부정확 lastmod는
+    # 오히려 신뢰를 떨군다 — Google 가이드). 발행 글=published_at(#40), 카테고리=연결 상품
+    # MAX(last_seen_at)=data_summary.collected(상품 새로고침일·날조 아님·#46. refresh-cycle이 재수집하면
+    # 갱신 → 재크롤·IndexNow diff 신호). 정적·페르소나는 정확한 변경일이 없어 여전히 생략(원설계 유지).
     art_lastmod = {
         pg["slug"]: (pg.get("published_at") or "")[:10]
         for pg in article_pages
         if not pg.get("is_draft") and pg.get("published_at")
+    }
+    cat_lastmod = {
+        pg["slug"]: (pg.get("data_summary", {}).get("collected") or None) for pg in category_pages
     }
     static_urls = [
         "/",
@@ -2062,7 +2068,7 @@ def render_site(
     urls: list[tuple[str, str | None]] = (
         [(u, None) for u in static_urls]
         + ([(f"/{PILLAR_HOME_OFFICE['slug']}/", None)] if pillar_rendered else [])
-        + [(f"/categories/{slug}/", None) for slug in category_slugs]
+        + [(f"/categories/{slug}/", cat_lastmod.get(slug)) for slug in category_slugs]
         + [(f"/personas/{p['id']}/", None) for p in personas]
         + [(f"/articles/{slug}/", art_lastmod.get(slug) or None) for slug in article_slugs]
     )

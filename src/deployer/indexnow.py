@@ -106,8 +106,10 @@ def deploy_urls(
 ) -> list[str]:
     """이번 배포의 IndexNow 통지 대상 = 사이트맵 변경분 + 이번 사이클에 갱신된 카테고리 페이지.
 
-    카테고리는 사이트맵에 lastmod가 없어(SITEMAP-02) diff로는 내용 갱신이 안 보인다 —
-    새로고침(수집·가격 갱신)된 카테고리 slug를 직접 받아 합친다. 실패는 빈 목록(§0).
+    카테고리 sitemap lastmod = MAX(last_seen_at)(#46)라 재수집일이 바뀌면 diff로 잡힌다. 다만
+    lastmod는 날짜(YYYY-MM-DD) 단위라 같은 날 재수집은 diff에 안 보일 수 있어, 안전망으로 이번
+    사이클에 새로고침(수집·가격 갱신)된 카테고리 slug도 직접 받아 합친다(중복은 아래 dedupe).
+    실패는 빈 목록(§0).
     """
     try:
         curr_xml = (site_dir / "sitemap.xml").read_text(encoding="utf-8")

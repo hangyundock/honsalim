@@ -391,6 +391,69 @@ class TestPrivacyPage:
         assert 'href="/about/#privacy"' not in home  # 옛 앵커('빈 약속') 잔재 없음
 
 
+class TestCategoryLastmod:
+    """세션 #46 — 카테고리 sitemap lastmod = 연결 상품 MAX(last_seen_at)(정확한 변경일·날조 아님).
+
+    정적·페르소나는 정확한 변경일이 없어 여전히 lastmod 생략(부정확 lastmod는 신뢰를 떨군다·
+    원설계 유지). refresh-cycle이 상품 재수집하면 last_seen_at 갱신 → 재크롤·IndexNow diff 신호.
+    """
+
+    def _sitemap_with_dated_category(self, tmp_path: Path, last_seen: str) -> str:
+        db_path = tmp_path / "test.db"
+        db.migrate(db_path=db_path)
+        db.seed(db_path=db_path)
+        conn = db.connect(db_path)
+        try:
+            cid = conn.execute("SELECT id FROM categories WHERE slug='office-chair'").fetchone()[0]
+            # 결정성: office-chair 기존 연결 제거 후 알려진 날짜의 상품만 연결 → MAX(last_seen_at) 고정
+            conn.execute("DELETE FROM category_products WHERE category_id=?", (cid,))
+            conn.execute(
+                "INSERT INTO products (source, source_product_id, name, currency, price_krw, "
+                "deeplink_url, deeplink_slug, affiliate_tag, created_at, updated_at, last_seen_at) "
+                "VALUES ('aliexpress', 'plm1', '상품 plm1', 'KRW', 99000, "
+                "'https://s.click.aliexpress.com/plm1', 'ali-plm1', 'honsalim', "
+                "datetime('now'), datetime('now'), ?)",
+                (last_seen,),
+            )
+            pid = conn.execute("SELECT id FROM products WHERE source_product_id='plm1'").fetchone()[
+                0
+            ]
+            conn.execute(
+                "INSERT INTO category_products (category_id, product_id, tier) VALUES (?,?,'budget')",
+                (cid, pid),
+            )
+            category_state.approve(conn, "office-chair")
+            conn.commit()
+        finally:
+            conn.close()
+        out = tmp_path / "site"
+        renderer.render_site(out_dir=out, db_path=db_path)
+        return (out / "sitemap.xml").read_text(encoding="utf-8")
+
+    def test_category_lastmod_equals_last_seen_date(self, tmp_path: Path) -> None:
+        xml = self._sitemap_with_dated_category(tmp_path, "2026-03-15 08:30:00")
+        m = re.search(
+            r"<url>\s*<loc>https://honsallim\.com/categories/office-chair/</loc>(.*?)</url>",
+            xml,
+            re.S,
+        )
+        assert m, "sitemap에 /categories/office-chair/ 없음"
+        # 정확한 변경일 = 상품 last_seen_at 날짜(날조된 '오늘'이 아님·Google 가이드 준수)
+        assert "<lastmod>2026-03-15</lastmod>" in m.group(1), m.group(1)
+
+    def test_static_pages_still_without_lastmod(self, tmp_path: Path) -> None:
+        xml = self._sitemap_with_dated_category(tmp_path, "2026-03-15 08:30:00")
+        # 정적 페이지는 정확한 변경일이 없어 여전히 lastmod 생략(원설계 유지·부정확 신호 회피)
+        for path in ("/about/", "/privacy/", "/categories/"):
+            m = re.search(
+                rf"<url>\s*<loc>https://honsallim\.com{re.escape(path)}</loc>(.*?)</url>",
+                xml,
+                re.S,
+            )
+            assert m, f"sitemap에 {path} 없음"
+            assert "<lastmod>" not in m.group(1), f"{path}에 부정확 lastmod 부여됨"
+
+
 class TestAboutEEAT:
     """세션 #45 — About 운영자 Person Schema(M2) + 부정직 문구 정리(L3·정직성 §0)."""
 

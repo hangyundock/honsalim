@@ -3,13 +3,14 @@
 > 활성 작업만. 완료 항목은 STATE.md "Phase X" 행 / EVENTS.md 참조.
 > Cap 5KB.
 
-## ★ 다음 세션 #46 — (상세 EVENTS #45)
+## ★ 다음 세션 #47 — (상세 EVENTS #46)
 
-- [ ] **[관찰] #45 무인·다양화·IndexNow 실전 확인** — ①내일 11:11 auto-cycle이 새 씨앗(7카테고리)에서 **주방 등 다양화 글** 발행하는지(카테고리 분포·auto_cycle.log·텔레그램) ②IndexNow 통지 실제 발송(변경분·키파일 라이브) ③미니밥솥형 카탈로그 재사용·refill 가드 라이브 정상.
-- [ ] **★성장 — 색인 커버리지 관찰·가속**([[growth-first-priority]]) — GSC/네이버 **4→증가** 추이. **주인 콘솔 몫**: /about/·/privacy/·/method/·최근 글 색인 요청. #45 IndexNow·내부링크·E-E-A-T·씨앗 다양화 효과 관찰. 편중 지속 시 씨앗 추가·B② 정책 최소형(2~3주 관찰 후).
-- [ ] **[결정 대기] draft 카테고리 3개 공개 여부** — 노트북거치대·빨래건조대·미니제습기. 공개하는 것만 씨앗 투입(미니제습기 씨앗은 **2027-04**=여름 2개월전). 새 클러스터 첫 글 사전검수 여부(기본=사후검토).
+- [ ] **[배포] #46 코드 라이브 반영** — renderer·indexnow·test(카테고리 lastmod) 변경을 운영 폴더 코드 동기화→빌드해야 라이브 sitemap에 카테고리 lastmod가 나감. 무인 wrapper `git pull` 불안정 footgun 확인·필요시 수동 ff([[autonomous-deploy-advances-origin]]).
+- [ ] **★[모니터링] 색인 전환**([[growth-first-priority]]) — 며칠 뒤 GSC에서 색인요청 **11개**(카테고리 5·정적·페르소나)가 "색인 생성됨"으로 전환됐는지 확인. 안 되면 원인=권위/시간(코드 아님·#46서 크롤예산 확정)·발행 지속. 남는 할당량으로 나머지 URL 추가 요청.
+- [ ] **[결정] 여름이불 무인 자동비공개** — #45 발행분을 #46 오늘 사후모니터가 '미달' 자동비공개(미매핑·얇음 추정). 방치 / 개선(카테고리 매핑·상품 보강 재발행) / 침구 쿠팡 카테고리 중 택.
+- [ ] **[결정 대기] draft 카테고리 3개 공개 여부** — 노트북거치대·빨래건조대·미니제습기. 공개하는 것만 씨앗 투입(미니제습기 씨앗은 **2027-04**). 새 클러스터 첫 글 사전검수 여부(기본=사후검토).
 - [ ] **(선택) 게이밍의자 글 구조 이관** — article.html 폴백→카테고리 구조(주인 원하면).
-- [ ] (이월) Phase 2 자가복원(배포 drift) · `review-helpfulknow` 월상한 · 쿠팡 부트스트랩(15만원→API).
+- [ ] (이월) IndexNow 관찰성 갭(성공 경로 res.notes 미로그) · Phase 2 자가복원(배포 drift) · `review-helpfulknow` 월상한 · 쿠팡 부트스트랩(15만원→API).
 - 참고: ★**매 세션 시작 시 운영 폴더 브랜치 확인**(`git -C D:\affiliate_hub branch --show-current`==main·[[autonomous-detached-head-silent-stop]]). 워크트리=`PYTHONPATH=src python -m cli`(자동 migrate). ★**무인 발행이 origin 전진→push 전 `git merge --ff-only origin/main`**([[autonomous-deploy-advances-origin]]). 운영 DB 직접수정 불가→주인 런처. ★한글→.py·ASCII([[powershell-korean-encoding]]). ★Edit 절대경로=운영 폴더 주의([[worktree-edit-path-footgun]]).
 
 ## 시점 의존 잔존 (세션 #6~7)

@@ -9,11 +9,11 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#45: 추천 키워드 편중 근본수정 + 색인 성장(E-E-A-T·IndexNow) + 적대검증 7건 + 여름이불 발행** — 씨앗 5→7(도마·미니밥솥)·require_terms·씨앗 정합 가드 / 무인 fail-loud(refill·생성0 경보·category_draft) / 운영자 Person·정직성 정비·/privacy/·IndexNow 전체 구현. 회귀 1051→**1114**. 상세 EVENTS #45·DECISIONS CC | 2026-07-19 #45 |
+| 진행 단계 | **#46: 무인 다양화 발행 검증 + 색인 원인 진단(크롤 예산 확정·기술 클린) + 카테고리 lastmod 근본수정 + 여름이불 무인 자동비공개 적발** — 오늘 나무도마(주방) 글 무인 발행·라이브 200 / 색인 격차=크롤예산·권위 확정(주인 11개 색인요청) / 카테고리 lastmod=MAX(last_seen_at)+가드2. 회귀 1114→**1116**. 상세 EVENTS #46·DECISIONS DD | 2026-07-20 #46 |
 | 운영 모델 | **★완전무인 가동 ON**: auto_mode ON·예약·`min_published`=**0**. 키워드+쿠팡 적재→auto-cycle 자동 생성·승인·발행→무관여. 자기보고 3겹(`auto_cycle_last.json`·[ALERT] 로그·텔레그램). 자가복원 **3겹**(#41 게이트 반려+#42 생성 예외+#44 안전정지 경보). **#45 무인 fail-loud 보강**: refill이 미매핑·비공개(draft) 카테고리 추천을 큐에 안 넣음(스캔폭 200)+생성 목표 대비 0편이면 abnormal 경보+auto_approve `category_draft` 보류. ★래퍼는 `main`일 때만 가동([[autonomous-detached-head-silent-stop]]). E7 완화=min_published | #45 |
 | Phase 1 완료 (#2~#3) | GitHub(2FA·Secrets·main-protect)·Cloudflare(도메인·Pages·R2·D1)·Anthropic·INDEXNOW 키·secrets·Git push·pre-commit 9종·Dependabot (세부 archive) | #3 |
 | Phase 2 핵심 모듈 (#3~#5) | cli·common·validator·writer·collector·enricher·builder·deployer·tracker·workers (세부 BACKEND §2) + **#17: category_collect·category_page_builder·concept_image·category_writer** | #17 |
-| Phase 2 회귀 테스트 | **1114 PASS + 1 skip** [확정 pytest, #45] — #45 +63(씨앗/require_terms·lint·카탈로그재사용·refill가드·Person LD·privacy·IndexNow·적대검증 반영), 위젯 Qt 크래시 테스트 1 opt-in skip. black·ruff·mypy 클린 | 2026-07-19 |
+| Phase 2 회귀 테스트 | **1116 PASS + 1 skip** [확정 pytest, #46] — #46 +2(카테고리 lastmod=last_seen_at 정확성·정적 무lastmod 가드), 위젯 Qt 크래시 테스트 1 opt-in skip. black·ruff·mypy 클린 | 2026-07-20 |
 | CLI 명령 (BACKEND §9) | **42개** — 코어(doctor·db·collect·enrich·validate·approve·promote·build·deploy·dashboard) + 카테고리(collect/build/approve·provision-category 등) + 운영(keyword-*·keyword-requeue·coupang-add·publish-queue·schedule·auto-cycle·refresh-cycle·build-deploy·monitor-articles·un/republish-article·notify-alert). ※IndexNow는 CLI 아님=`deployer.indexnow`(배포 후속) | #44 |
 | Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD(author=혼살다·/about/ 연결·#45). 세부 DECISIONS J·O·CC + EVENTS | #4~#45 |
 | doctor (BACKEND §9) | §1~§16(+#45 §15 씨앗 정합·§16 IndexNow 배포 정합) + §10 모듈 진입점 **71개** + #19 LLM 키 점검 | #45 |
@@ -21,7 +21,7 @@
 | 설계 문서 진척 | **12/12 완료** + SUMMARY (docs/ 참조). 일관성 모순 0건 | #2 |
 | 메모리 시스템 | feedback 7건([[incremental-critical-review]]·[[autonomous-safe-system]] 등) + reference market_research + MEMORY.md | #12 |
 | 5파일 시스템 + 슬래시 명령 | ✅ 구축 (start/save/end) | #1 |
-| 사이트 게시글 / 트래픽 / 수익 | **라이브 카테고리 6개** + **정식 글 12편**(무인 누적 + #45 **여름이불** kw-d1e641be·주인 수동승인·쿠팡 3개). 미발행 1(노트북받침대). ★**E-E-A-T·IndexNow 라이브(#45)**: Person Schema·/about/·/privacy/·저자 혼살다·키파일 200 전부 curl 검증. ★**색인 GSC 4/네이버 4 → 다음 레버=색인 커버리지↑**([[growth-first-priority]]) | #45 |
+| 사이트 게시글 / 트래픽 / 수익 | **라이브 카테고리 6개** + **정식 글 12편**(#46 나무도마 무인 발행 +1 · 여름이불 무인 '미달' 자동비공개 −1 상쇄). ★**색인 원인 확정(#46·DD1)**: 라이브 29 URL·색인 4 → 격차=**크롤 예산/권위**(기술·얇음·중복·링크 정량 클린). 주인 **미색인 11개 색인요청 완료**. 다음 레버=색인 전환+발행량+권위([[growth-first-priority]]) | #46 |
 
 ## 인프라
 
@@ -60,11 +60,11 @@
 
 ## 알려진 잔존 미해결
 
-### ★ 다음 세션 #46 — 상세 EVENTS #45
-1. **[관찰] #45 무인·색인 실전 확인**: ①내일 11:11 auto-cycle이 새 씨앗(도마·미니밥솥 포함 7카테고리)에서 키워드를 뽑아 **주방 등 다양화 글**이 실제 발행되는지(auto_cycle.log·텔레그램·카테고리 분포) ②IndexNow 통지가 배포 후 실제 나가는지(변경분·키파일 라이브 확인) ③미니밥솥형 카탈로그 재사용·refill 가드가 라이브서 정상인지.
-2. **★성장 — 색인 커버리지 관찰·가속**([[growth-first-priority]]): GSC/네이버 색인 **4→증가** 추이. **주인 콘솔 몫**: /about/·/privacy/·/method/·최근 글(여름이불·서재책상 등) 색인 요청(GSC URL검사·네이버 수집요청). #45 IndexNow·내부링크·E-E-A-T 효과 관찰. 여전히 편중이면 씨앗 추가·B② 정책(스포크 부족 클러스터 우선) 최소형 검토(2~3주 관찰 후).
-3. **(선택) 게이밍의자 글 구조 이관**(article.html 폴백→카테고리 구조) · 미니제습기 씨앗은 **2027-04**(여름 2개월전·색인리드타임).
-4. (이월) draft 카테고리 3개(노트북거치대·빨래건조대·미니제습기) 공개 여부·씨앗 투입 결정 · Phase 2 자가복원(배포 drift) · 쿠팡 부트스트랩(15만원→API).
+### ★ 다음 세션 #47 — 상세 EVENTS #46
+1. **[배포] #46 코드 라이브 반영**: renderer·indexnow·test 변경을 운영 폴더 코드 동기화→빌드해야 카테고리 lastmod가 라이브 sitemap에 나감. 무인 wrapper `git pull` 불안정 footgun 확인·필요시 수동 ff([[autonomous-deploy-advances-origin]]).
+2. **★[모니터링] 색인 전환**([[growth-first-priority]]): 며칠 뒤 GSC에서 색인요청 11개(카테고리 5·정적·페르소나)가 "색인 생성됨"으로 옮겨졌는지 확인. 안 되면 원인=권위/시간(코드 아님)·발행 지속. ※색인 원인은 #46서 확정(크롤 예산)—추가 진단 불요.
+3. **[결정] 여름이불 무인 자동비공개**: #45 발행분을 오늘 사후모니터가 '미달' 자동비공개 → 방치 / 개선(카테고리 매핑·상품 보강 후 재발행) / 침구 쿠팡 카테고리 중 택.
+4. (이월) IndexNow 관찰성 갭(성공 경로 res.notes 미로그·Bing/Yandex 이차) · draft 카테고리 3개(노트북거치대·빨래건조대·미니제습기) 공개 여부(미니제습기 씨앗 2027-04) · 게이밍의자 이관 · Phase 2 자가복원(배포 drift) · 쿠팡 부트스트랩(15만원→API).
 - ★**매 세션 시작 시 운영 폴더 브랜치 확인** `git -C D:\affiliate_hub branch --show-current`==main([[autonomous-detached-head-silent-stop]]). 워크트리=`PYTHONPATH=src python -m cli`(자동 migrate). ★무인 발행이 origin 전진→push 전 `git merge --ff-only origin/main`([[autonomous-deploy-advances-origin]]). ★한글→.py·ASCII([[powershell-korean-encoding]]). 운영 DB 직접수정 불가→주인 런처. ★Edit 절대경로=운영 폴더 주의([[worktree-edit-path-footgun]]).
 
 ### Phase 2 진척 가능 (검토 의존 큼)
