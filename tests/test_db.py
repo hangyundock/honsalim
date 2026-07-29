@@ -60,6 +60,10 @@ class TestConnect:
             # foreign_keys ON
             fk = conn.execute("PRAGMA foreign_keys").fetchone()[0]
             assert int(fk) == 1
+            # ★#47 busy_timeout — 대시보드·스케줄러 동시 쓰기 시 즉시 'database is locked'로
+            # 무인 사이클이 죽지 않도록 대기가 걸려 있어야 한다(0이면 회귀).
+            bt = conn.execute("PRAGMA busy_timeout").fetchone()[0]
+            assert int(bt) >= 5000
             conn.close()
         finally:
             _cleanup(path)

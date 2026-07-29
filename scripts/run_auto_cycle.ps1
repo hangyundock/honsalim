@@ -8,6 +8,11 @@
 
 $ErrorActionPreference = "Stop"
 
+# ★#47: python은 UTF-8로 출력(cli가 stdout 재구성)하는데 PS가 콘솔 코드페이지(cp949)로
+# 디코드해 로그의 한글이 영구히 깨졌다(무인 진단성 훼손 — #47 3일 공백 진단 때 판독 곤란).
+# 콘솔 없는 환경(드묾)에서 실패해도 래퍼는 계속(§0).
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
+
 $Root = Split-Path $PSScriptRoot -Parent
 $LogDir = Join-Path $Root "logs"
 if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir | Out-Null }
@@ -56,10 +61,19 @@ if (-not (Test-Path $Db)) {
 }
 
 # 3) 최신 코드 자기 갱신(best-effort)
-try {
-    & git pull --ff-only origin main 2>&1 | ForEach-Object { Write-Log "pull: $_" }
-} catch {
-    Write-Log "git pull 실패(무시·계속): $_"
+# ★#47 근본수정: 옛 try/catch는 EAP=Stop + 2>&1 조합에서 git의 정상 진행 메시지("From ...",
+# stderr 출력)가 예외로 승격돼 **매일 "git pull 실패"로 기록**됐다(성공/실패 판별 불능 —
+# origin 전진 시 자기갱신이 침묵 실패하면 다음날 발행 push가 비FF 거부로 정지하는 경로).
+# stderr를 예외로 만들지 않게 EAP를 잠시 낮추고, 성패는 $LASTEXITCODE로만 판정한다.
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+$pullOut = & git pull --ff-only origin main 2>&1
+$ErrorActionPreference = $prevEap
+foreach ($line in $pullOut) { Write-Log "pull: $line" }
+if ($LASTEXITCODE -ne 0) {
+    Write-Log "git pull 실패(exit=$LASTEXITCODE) - 무시하고 계속(원격 전진 상태면 발행 push가 거부될 수 있음)"
+} else {
+    Write-Log "git pull 성공(exit=0)"
 }
 
 # 4) 자동 사이클 (auto_mode ON일 때만 생성·승인·발행 — OFF면 cli가 즉시 중단)
@@ -67,5 +81,11 @@ Write-Log "auto-cycle --no-dry-run 실행"
 $out = & python -m cli auto-cycle --no-dry-run 2>&1
 $code = $LASTEXITCODE
 foreach ($line in $out) { Write-Log "cli: $line" }
+# ★#47 fail-loud: cli가 예외로 죽으면(exit≠0) digest·텔레그램 자기보고가 아예 안 나가
+# 조용한 실패가 된다(가드 3종만 경보하던 구멍). 발행 실패 rc는 cli도 경보를 보내므로
+# 중복될 수 있으나, 침묵보다 중복이 낫다(§0). 발송 실패는 무시(best-effort).
+if ($code -ne 0) {
+    Send-Alert "무인 자동 발행 사이클이 비정상 종료했습니다(exit=$code). 오늘 발행이 안 됐을 수 있습니다 - logs\auto_cycle.log 확인이 필요합니다."
+}
 Write-Log "=== 종료 (exit=$code) ==="
 exit $code

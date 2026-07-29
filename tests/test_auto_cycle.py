@@ -202,6 +202,109 @@ class TestAutoCycleOrchestration:
         assert digest["made"] == 1
 
 
+class TestUnpublishOnlyDeploy:
+    """★세션 #47 근본수정 — 비공개-only 날도 라이브에 반영돼야 한다(가드레일 무력화 방지).
+
+    옛 코드는 발행 0 + 자동비공개만 있는 날 cmd_build + cmd_deploy(git_push stub·commit 없음)를
+    타서 재빌드가 커밋되지 않아 CI가 안 돌고, 가드레일이 '미달'로 내린 글이 다음 발행일까지
+    라이브에 계속 노출됐다(#30과 동일 결함의 잔존 분기). 발행 경로(#32)와 동일하게
+    refresh_cycle(build + commit + push)을 거쳐야 한다.
+    """
+
+    def _run_unpublish_only_cycle(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        built: bool = True,
+        deployed: bool = True,
+        changed: bool = True,
+    ) -> tuple[int, dict[str, Any], list[Any]]:
+        """발행 0·자동비공개 1편인 라이브 사이클 실행 → (rc, refresh_cycle kwargs, notify 호출)."""
+        from types import SimpleNamespace
+
+        from common import db
+        from writer import keyword_recommender as kr_mod
+
+        p = tmp_path / "t.db"
+        db.migrate(db_path=p)
+        db.seed(db_path=p)  # 대기 키워드·approved draft 없음
+
+        monkeypatch.setattr(cli.db, "DB_PATH", p)
+        monkeypatch.setattr(
+            cli.settings,
+            "get",
+            lambda k, d=None, **kw: (
+                True if k == "auto_mode" else (1 if k == "publish_per_day" else d)
+            ),
+        )
+        # 생성 없음(추천 고갈) — 이 테스트의 관심은 비공개-only 배포 분기뿐.
+        monkeypatch.setattr(kr_mod, "auto_pick_keyword", lambda conn, **kw: None)
+        # 사후 모니터가 1편 자동 비공개했다고 보고.
+        monkeypatch.setattr(
+            "writer.article_guardrail.monitor",
+            lambda conn, auto_unpublish=False: {
+                "checked": 1,
+                "failed": [{"slug": "bad", "reasons": ["미달"], "flagged": []}],
+                "unpublished": ["bad"],
+            },
+        )
+        calls: dict[str, Any] = {}
+
+        def fake_refresh(conn: Any, **kw: Any) -> Any:
+            calls["kw"] = kw
+            return SimpleNamespace(
+                built=built, deployed=deployed, changed=changed, go_count=0, notes=[]
+            )
+
+        monkeypatch.setattr("deployer.refresh_cycle.run_refresh_cycle", fake_refresh)
+        notify_calls: list[Any] = []
+        monkeypatch.setattr(
+            cli, "_auto_cycle_notify", lambda digest, rc, published=None: notify_calls.append(rc)
+        )
+
+        rc = cli.cmd_auto_cycle(argparse.Namespace(count=1, dry_run=False, no_deploy=False))
+        return rc, calls.get("kw") or {}, notify_calls
+
+    def test_unpublish_only_goes_through_refresh_cycle_commit(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # 죽은 경로(cmd_build/cmd_deploy)를 타면 즉시 실패하도록 지뢰 설치 — 재발 방지의 핵심.
+        def boom(*a: Any, **k: Any) -> int:
+            raise AssertionError("비공개-only 배포가 옛 stub 경로(cmd_build/cmd_deploy)를 탔음")
+
+        monkeypatch.setattr(cli, "cmd_build", boom)
+        monkeypatch.setattr(cli, "cmd_deploy", boom)
+
+        rc, kw, notify_calls = self._run_unpublish_only_cycle(tmp_path, monkeypatch)
+        assert rc == 0
+        assert kw["do_build"] is True
+        assert kw["do_deploy"] is True
+        assert kw["refresh"] is False  # 수집 없음 — 비공개 반영 재빌드뿐
+        assert kw["dry_run"] is False
+        assert notify_calls == [None]  # 성공은 '발행 없음' 그대로(오경보 없음)
+
+    def test_unpublish_only_deploy_failure_alerts(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """배포 실패 rc가 notify로 전달돼 경보가 나간다(옛 코드는 None으로 삼켰다 — fail-loud)."""
+        rc, _kw, notify_calls = self._run_unpublish_only_cycle(
+            tmp_path, monkeypatch, built=True, deployed=False, changed=True
+        )
+        assert rc == 2
+        assert notify_calls == [2]  # 실패 rc 전달 → '발행 단계 실패' 경보
+
+    def test_unpublish_only_no_change_is_success(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """산출물 변경 없음(이미 반영됨)은 정상 종료 — 오경보를 만들지 않는다."""
+        rc, _kw, notify_calls = self._run_unpublish_only_cycle(
+            tmp_path, monkeypatch, built=True, deployed=False, changed=False
+        )
+        assert rc == 0
+        assert notify_calls == [None]
+
+
 class TestAutoApproveSafetyGate:
     """④ 세션 #33 — 초기 검수→자동 전환 안전장치: 발행 이력 N편 미만이면 자동 승인 보류."""
 

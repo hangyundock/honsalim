@@ -2744,18 +2744,8 @@ def cmd_publish_queue(args: argparse.Namespace) -> int:
     return 2
 
 
-def _deploy_ns() -> argparse.Namespace:
-    """publish/auto-cycle 공용 배포 인자 (git push main → CI가 Cloudflare Pages 반영)."""
-    return argparse.Namespace(
-        dry_run=False,
-        skip_push=False,
-        skip_wrangler=True,
-        verify_url=settings.get("verify_url"),
-        remote="origin",
-        branch="main",
-        build_dir="build/site",
-        project="honsalim",
-    )
+# ※_deploy_ns 헬퍼는 #47에서 제거 — cmd_deploy(git_push stub·commit 없음) 경로를 무인에서
+#   재사용하도록 유혹하던 죽은 코드. 무인 배포는 전부 refresh_cycle(commit+push) 경유.
 
 
 def _auto_cycle_digest_and_alert(
@@ -3135,12 +3125,48 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
         _auto_cycle_notify(digest, rc, published)
         return rc
     if mr["unpublished"] and not args.no_deploy:
-        print("     발행 대상 없음 — 비공개 반영 위해 재빌드·배포")
-        rc = cmd_build(
-            argparse.Namespace(manifest=None, full=True, preview=False, save_empty=False)
+        # ★세션 #47 근본수정: 옛 경로(cmd_build + cmd_deploy)는 git_push가 commit 없이 push만
+        # 하는 stub이라(#30과 동일 결함) 재빌드된 build/site가 커밋되지 않아 CI가 안 돌고,
+        # 가드레일이 '미달'로 내린 글이 **라이브에 계속 노출**됐다(다음 발행일 커밋이 우연히
+        # 쓸어갈 때까지 — 발행 공백기와 겹치면 며칠). 발행 경로(#32)와 동일하게 refresh_cycle
+        # (build + DEPLOY_PATHS commit + push)을 재사용한다. 실패 rc는 notify로 경보(fail-loud).
+        print("     발행 대상 없음 — 비공개 반영 위해 재빌드·배포(commit+push)")
+        import datetime
+
+        from deployer import refresh_cycle
+
+        msg = (
+            f"[auto-cycle {datetime.date.today().isoformat()}] "
+            f"가드레일 자동 비공개 {len(mr['unpublished'])}편 라이브 반영"
         )
-        rc = rc if rc != 0 else cmd_deploy(_deploy_ns())
-        _auto_cycle_notify(digest, None)
+        conn = db.connect(db.DB_PATH)
+        try:
+            res = refresh_cycle.run_refresh_cycle(
+                conn,
+                project_root=PROJECT_ROOT,
+                refresh=False,
+                auto_killswitch=False,
+                do_build=True,
+                do_deploy=True,
+                dry_run=False,
+                verify_url=settings.get("verify_url"),
+                commit_message=msg,
+                db_path=db.DB_PATH,
+            )
+        finally:
+            conn.close()
+        if not res.built:
+            print(f"{FAIL} 비공개 반영 빌드 실패: {'; '.join(res.notes) or '알 수 없음'}")
+            rc = 1
+        elif res.deployed or not res.changed:
+            # deployed=커밋·푸시 완료 / not changed=산출물 동일(이미 반영) — 둘 다 정상 종료
+            print(f"{OK} 비공개 {len(mr['unpublished'])}편 라이브 반영 완료")
+            rc = 0
+        else:
+            print(f"{FAIL} 비공개 반영 배포 실패: {'; '.join(res.notes) or '알 수 없음'}")
+            rc = 2
+        # rc≠0이면 notify가 '발행 단계 실패(rc=...)' 경보 발송 — 성공은 None(발행 없음 그대로).
+        _auto_cycle_notify(digest, rc if rc != 0 else None)
         return rc
     print("     발행/비공개 변경 없음 — 빌드 생략")
     _auto_cycle_notify(digest, None)

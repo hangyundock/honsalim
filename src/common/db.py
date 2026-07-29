@@ -23,11 +23,15 @@ MIGRATIONS_DIR = PROJECT_ROOT / "sql" / "migrations"
 SEEDS_DIR = PROJECT_ROOT / "sql" / "seeds"
 
 # DB §15-1 PRAGMA — 연결 시 자동 적용
+# ★#47 busy_timeout: 기본 0ms라 대시보드(운영자 조작)와 무인 스케줄러가 동시에 쓰면
+# 대기 없이 즉시 'database is locked'로 사이클이 죽을 수 있었다(WAL은 읽기-쓰기 충돌만
+# 해소, 쓰기-쓰기는 아님). 10초 대기 — 대시보드 쓰기는 짧아 사실상 전부 흡수(§0).
 PRAGMAS = (
     "PRAGMA journal_mode = WAL",
     "PRAGMA synchronous = NORMAL",
     "PRAGMA foreign_keys = ON",
     "PRAGMA temp_store = MEMORY",
+    "PRAGMA busy_timeout = 10000",
 )
 
 # 파일명 패턴: 001_xxx.sql · 002_yyy.sql ...
