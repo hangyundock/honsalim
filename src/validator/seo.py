@@ -178,8 +178,13 @@ def check_seo(payload: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     metrics: dict[str, Any] = {
         "chars": chars,
         "primary": primary,
+        "primary_len": len(primary_ns),
         "primary_freq": freq,
         "density_pct": round(density, 2),
+        # ★세션 #47: 재생성 지시를 '몇 회 필요'라는 절대 횟수로 계산하려면 하한·상한(카테고리
+        # 오버라이드 포함)이 필요하다 — cli._density_directive가 목표 밀도를 이 범위로 클램프한다.
+        "density_floor": floor,
+        "density_ceil": ceil,
         "headings": len(headings),
         "headings_with_keyword": kw_in_h,
         "secondary_present": present_secondary,

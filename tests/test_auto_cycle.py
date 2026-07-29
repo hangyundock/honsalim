@@ -148,6 +148,59 @@ class TestAutoCycleOrchestration:
         assert rc == 0
         assert gen == [99]  # 빈 큐인데도 추천 키워드로 생성 호출됨(완전 무인 핵심)
 
+    def _run_cycle_with_gen_rc(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, gen_rc: int
+    ) -> dict[str, Any]:
+        """대기 키워드 1개짜리 사이클을 gen_rc로 돌리고 digest(auto_cycle_last.json)를 돌려준다."""
+        import json
+
+        from common import db
+        from writer import keyword_queue as kq
+
+        p = tmp_path / "t.db"
+        db.migrate(db_path=p)
+        db.seed(db_path=p)
+        conn = db.connect(p)
+        kq.get_or_create(conn, "컴퓨터의자", channel="ali")
+        conn.commit()
+        conn.close()
+
+        monkeypatch.setattr(cli.db, "DB_PATH", p)
+        monkeypatch.setattr(
+            cli.settings,
+            "get",
+            lambda k, d=None, **kw: (
+                True if k == "auto_mode" else (1 if k == "publish_per_day" else d)
+            ),
+        )
+        monkeypatch.setattr(cli, "cmd_keyword_generate", lambda ns: gen_rc)
+        monkeypatch.setattr(cli, "cmd_publish_queue", lambda ns: 0)
+
+        assert cli.cmd_auto_cycle(argparse.Namespace(count=1, dry_run=False, no_deploy=True)) == 0
+        digest: dict[str, Any] = json.loads((p.parent / "auto_cycle_last.json").read_text("utf-8"))
+        return digest
+
+    def test_gate_reject_is_not_counted_as_made(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """★세션 #47 재발 방지 — 게이트 반려를 '생성 성공'으로 세면 fail-loud가 뚫린다.
+
+        라이브 적발: 07-21~23 '스텐도마'가 3일 연속 반려됐는데 cmd_keyword_generate가 0을
+        돌려줘 made=1로 집계 → #45 가드 `target>0 and made==0`이 False → abnormal=False →
+        발행 0편인 이틀(07-21·22)이 텔레그램 무경보로 조용히 지나갔다. 반려는 산출 0이다.
+        """
+        digest = self._run_cycle_with_gen_rc(tmp_path, monkeypatch, gen_rc=cli.RC_GATE_REJECTED)
+        assert digest["made"] == 0  # 반려는 세지 않는다
+        assert digest["target"] == 1
+        assert digest["abnormal"] is True  # 발행 0편 위험이 경보로 노출된다(fail-loud)
+
+    def test_successful_generate_is_counted_as_made(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """대조군 — 통과(rc=0)는 그대로 made로 집계된다(#47 수정이 성공 경로를 깨지 않음)."""
+        digest = self._run_cycle_with_gen_rc(tmp_path, monkeypatch, gen_rc=0)
+        assert digest["made"] == 1
+
 
 class TestAutoApproveSafetyGate:
     """④ 세션 #33 — 초기 검수→자동 전환 안전장치: 발행 이력 N편 미만이면 자동 승인 보류."""

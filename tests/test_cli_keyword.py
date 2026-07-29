@@ -564,7 +564,9 @@ class TestGateRejectSelfHeal:
         conn.close()
 
         rc = cli.cmd_keyword_generate(_ns(id=kid, page_size=20, dry_run=False))
-        assert rc == 0
+        # ★세션 #47: 반려는 성공(0)이 아니라 RC_GATE_REJECTED. 옛 0 반환이 auto-cycle의 made를
+        # 올려 fail-loud 가드를 뚫었다(07-21·22 무경보). 상태 전이는 그대로 pending 복귀.
+        assert rc == cli.RC_GATE_REJECTED
         conn = db.connect(migrated_db)
         kw = kq.get_keyword(conn, kid)
         conn.close()
@@ -892,3 +894,76 @@ class TestActionableFeedback:
             self._report("seo", ["density_high: 밀도 5%", "density_high: 밀도 5%"]), "kw"
         )
         assert len(fb) == 1
+
+
+class TestDensityDirectiveQuantified:
+    """★세션 #47 — 밀도 지시를 '지금 N회 → 약 M회'라는 절대 횟수로 역산한다.
+
+    라이브 적발: 07-21~23 '스텐도마'가 3일 연속 반려(0.44%→0.41% 무효, 0.28%→3.94% 오버슈트)
+    → 상한 도달 격리 → 발행 0편 3일. 원인은 "목표(~1.7%)로 높이세요"라는 정성 지시로는 LLM이
+    필요 반복 횟수를 역산하지 못한 것. 게이트 기준은 그대로 두고 지시 정밀도만 올린다.
+    """
+
+    _M: ClassVar[dict[str, object]] = {  # 07-23 라이브 실측 근사 — 산문 3,800자·'스텐도마'(4자)
+        "chars": 3800,
+        "primary_len": 4,
+        "density_floor": 1.0,
+        "density_ceil": 3.5,
+    }
+
+    def test_low_gives_absolute_goal_not_delta(self) -> None:
+        """★재생성은 직전 본문 없이 처음부터 다시 쓴다 → 지시는 '총 N회'(절대)여야 한다.
+
+        '13회를 더 넣어라'(차이)는 기준 본문이 없어 성립하지 않는다 — 새 글에서 LLM이 무엇에
+        더할지 알 수 없어 다시 언더슛/오버슈트한다. 직전 횟수는 참고로만 준다.
+        """
+        d = cli._density_directive("스텐도마", {**self._M, "primary_freq": 3}, too_low=True)
+        assert d is not None
+        assert "총 약 16회" in d  # 절대 목표 = round(1.7% * 3800 / 4)
+        assert "회를 더" not in d  # 차이(delta) 지시는 쓰지 않는다
+        assert "직전 생성은 3회" in d  # 직전 값은 참고로만
+        assert "238자마다" in d  # 분량이 달라져도 감을 유지할 밀도 감각
+        assert "도배" in d  # 상한 위반 방지 경고를 같이 준다
+
+    def test_high_gives_absolute_goal(self) -> None:
+        # 07-23 2차 재생성이 3회→37회로 튀어 상한(3.5%)을 넘긴 그 상황.
+        d = cli._density_directive("스텐도마", {**self._M, "primary_freq": 37}, too_low=False)
+        assert d is not None
+        assert "37회 써서 과밀" in d
+        assert "총 약 16회" in d  # 줄일 목표도 절대 횟수로
+        assert "덜어내" not in d
+
+    def test_category_override_clamps_target(self) -> None:
+        # 카테고리가 하한 2.0%로 올렸으면 기본 목표 1.7%는 그대로 쓰면 안 된다(넣자마자 또 미달).
+        m = {**self._M, "density_floor": 2.0, "density_ceil": 3.0, "primary_freq": 2}
+        d = cli._density_directive("스텐도마", m, too_low=True)
+        assert d is not None
+        assert "약 24회" in d  # 목표 = (2.0+3.0)/2 = 2.5% → round(2.5% * 3800 / 4)
+
+    def test_missing_metrics_falls_back_without_crash(self) -> None:
+        assert cli._density_directive("스텐도마", {}, too_low=True) is None
+        fb = cli._actionable_feedback(
+            {"overall_pass": False, "gates": {"seo": {"issues": ["density_low: 밀도 0.4%"]}}},
+            "스텐도마",
+        )
+        assert len(fb) == 1 and "스텐도마" in fb[0]  # 옛 정성 지시로 폴백(무너지지 않음)
+
+    def test_real_gate_pipeline_feeds_the_directive(self) -> None:
+        """★드리프트 가드 — 재생성 루프가 실제로 쓰는 경로로 end-to-end 검증.
+
+        cmd_enrich는 serialize_report(validate_all(payload))의 결과를 _actionable_feedback에
+        넘긴다. metrics 키 이름이 바뀌거나 serialize_report가 metrics를 떨구면 정량 지시가
+        조용히 옛 정성 지시로 되돌아가 #47 수정이 무력화된다(무증상 회귀). 계약을 고정한다.
+        """
+        from validator import serialize_report, validate_all
+
+        body = "# 스텐도마 고르는 법\n" + ("가나다라마바사아자차" * 70)  # 산문 700자·키워드 0회
+        report = serialize_report(validate_all({"body_md": body, "seo": {"primary": "스텐도마"}}))
+        assert "metrics" in report["gates"]["seo"], "serialize_report가 metrics를 보존해야 함"
+
+        fb = cli._actionable_feedback(report, "스텐도마")
+        quantified = [f for f in fb if "총 약" in f]
+        assert quantified, f"실제 게이트 산출로 정량 지시가 안 나옴: {fb}"
+        assert "총 약 3회" in quantified[0]  # round(1.7% * 700 / 4)
+        assert "직전 생성은 0회" in quantified[0]
+        assert "원인:" in quantified[0]  # 원본 issue(정확한 %)도 함께 보존

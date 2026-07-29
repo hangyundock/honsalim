@@ -59,6 +59,13 @@ FAIL = "[FAIL]"
 # 사이트 origin (builder.renderer.SITE_ORIGIN과 일치 — JSON-LD URL 생성용)
 SITE_ORIGIN = "https://honsallim.com"
 
+# ★세션 #47 — keyword-generate 종료코드: 게이트 반려(자가복원 대기·격리)를 '성공'과 구분한다.
+# 옛 코드는 반려도 0을 돌려줘 auto-cycle이 made(생성 성공 편수)를 올렸고, 그 결과 #45가 넣은
+# fail-loud 가드 `target>0 and made==0`이 무력화돼 발행 0편인 날이 abnormal=False로 조용히
+# 지나갔다(라이브 적발: 07-21·07-22 이틀 무경보 — 07-23 상한 도달 경보로 뒤늦게 노출).
+# 0=발행 가능한 draft 산출 / 2=대상 없음 / 3=상품 0(빈 글 차단) / 4=게이트 반려.
+RC_GATE_REJECTED = 4
+
 
 def _print_section(title: str) -> None:
     print(f"\n=== {title} ===")
@@ -609,6 +616,56 @@ def cmd_db_seed(args: argparse.Namespace) -> int:
     return 0
 
 
+def _density_directive(kw: str, metrics: dict[str, Any], *, too_low: bool) -> str | None:
+    """밀도 미달·과다를 '지금 N회 → 약 M회'라는 **절대 횟수** 지시로 바꾼다(★세션 #47).
+
+    옛 지시는 "목표(~1.7%)로 높이세요"/"줄이세요"라는 정성 표현이라(현재 밀도 %는 원인 문구로
+    함께 갔지만) LLM이 '몇 번 더 넣어야 하는지'를 역산하지 못해 재생성이 수렴하지 않았다.
+    라이브 적발(07-21~23 '스텐도마' 3일 연속 반려): 0.44%→0.41%(피드백 무효)·0.28%→3.94%
+    (3회→37회 오버슈트로 반대편 상한 위반) → 상한 도달 격리·3일 발행 0편.
+
+    밀도 = 키워드길이 * 반복수 / 산문길이 이므로 목표 반복수는 역산할 수 있다(validator.seo와
+    동일 식). 목표 밀도는 네이버 실측 1.7%를 쓰되, 카테고리가 하한·상한을 오버라이드했으면
+    그 범위 밖으로 나가지 않게 클램프한다. metrics가 없으면 None(호출부가 옛 정성 지시로 폴백).
+    ★게이트 기준은 낮추지 않는다 — 생성 지시의 정밀도만 올리는 자가복원(§0).
+    """
+    from validator.seo import DENSITY_TARGET
+
+    try:
+        chars = int(metrics.get("chars") or 0)
+        freq = int(metrics.get("primary_freq") or 0)
+        kw_len = int(metrics.get("primary_len") or 0)
+        floor = float(metrics.get("density_floor") or 0.0)
+        ceil = float(metrics.get("density_ceil") or 0.0)
+    except (TypeError, ValueError):
+        return None
+    if chars <= 0 or kw_len <= 0 or floor <= 0 or ceil <= floor:
+        return None
+
+    # 목표 밀도: 기본 1.7%. 카테고리 오버라이드로 범위를 벗어나면 범위 중앙으로 대체.
+    target_pct = DENSITY_TARGET if floor <= DENSITY_TARGET <= ceil else (floor + ceil) / 2
+    need = max(1, round(target_pct / 100 * chars / kw_len))
+    if need == freq:  # 반올림 경계 — 횟수로는 차이가 없어 정량 지시가 무의미
+        return None
+    # ★재생성은 직전 본문을 주지 않고 **처음부터 다시 쓴다**(claude_client.build_user_prompt는
+    # 원본 템플릿 + 보완 지시만 붙인다). 그래서 "N회를 더 넣어라"는 기준 본문이 없어 성립하지
+    # 않는다 — 반드시 '새 본문에 총 몇 회'라는 절대 목표로 준다. 직전 횟수는 참고로만.
+    per = max(1, round(chars / need))  # 몇 자마다 1회꼴 — 분량이 달라져도 감을 유지시킨다
+    goal = (
+        f"새로 쓰는 본문에 대표키워드 '{kw}'를 **총 약 {need}회** 포함하세요"
+        f"(산문 {chars:,}자 기준 목표 밀도 {target_pct:.1f}% — 대략 {per:,}자마다 1회꼴)."
+    )
+    if too_low:
+        return (
+            f"{goal} 직전 생성은 {freq}회뿐이라 미달이었습니다. 한 문단에 몰아넣지 말고 여러 "
+            "문단·소제목에 고르게 나누세요(소제목에 쓴 것도 횟수에 포함됩니다). 도배는 금지."
+        )
+    return (
+        f"직전 생성은 '{kw}'를 {freq}회 써서 과밀(도배 = 스팸/어뷰징)이었습니다. {goal} "
+        "나머지 자리는 대명사나 일반어('이 제품' 등)로 바꿔 문장을 자연스럽게 유지하세요."
+    )
+
+
 def _actionable_feedback(report: dict[str, Any], primary: str | None) -> list[str]:
     """게이트 미달 issues를 '무엇을 어떻게 고쳐라'는 실행지시로 변환(★세션 #41 근본수정).
 
@@ -622,6 +679,9 @@ def _actionable_feedback(report: dict[str, Any], primary: str | None) -> list[st
     out: list[str] = []
     seen: set[str] = set()
     for gate in report.get("gates", {}).values():
+        # 밀도 지시를 절대 횟수로 역산하려면 해당 게이트의 metrics가 필요하다(#47).
+        gm = gate.get("metrics")
+        metrics: dict[str, Any] = gm if isinstance(gm, dict) else {}
         for issue in gate.get("issues", []):
             issue = str(issue)
             code = issue.split(":", 1)[0].strip()
@@ -639,12 +699,13 @@ def _actionable_feedback(report: dict[str, Any], primary: str | None) -> list[st
                     "없으므로 사용후기·체험 톤을 쓰지 마세요."
                 )
             elif code == "density_low" and kw:
-                directive = (
+                # #47: 정량(몇 회 더) 우선, metrics 없으면 옛 정성 지시로 폴백.
+                directive = _density_directive(kw, metrics, too_low=True) or (
                     f"대표키워드 '{kw}'를 본문에 조금 더 자연스럽게 반복해 밀도를 목표(~1.7%)로 "
                     "높이세요(도배는 금지)."
                 )
             elif code == "density_high" and kw:
-                directive = (
+                directive = _density_directive(kw, metrics, too_low=False) or (
                     f"대표키워드 '{kw}' 반복이 과합니다 — 자연스럽게 줄이세요(도배=스팸/어뷰징)."
                 )
             elif code == "intro_no_keyword" and kw:
@@ -2305,7 +2366,10 @@ def cmd_keyword_generate(args: argparse.Namespace) -> int:
             print(
                 f"{FAIL} 검증 반려 {n_fail}회 상한 도달 — 자동 재시도 중단(failed)·수동 검토 필요"
             )
-        return 0
+        # ★세션 #47: 반려는 '발행 가능한 draft 산출 0'이므로 성공(0)이 아니다. 옛 코드가 0을
+        # 돌려줘 auto-cycle의 made가 올라가고 abnormal 가드가 뚫렸다(위 RC_GATE_REJECTED 주석).
+        # 키워드 상태(pending 복귀/failed 격리)는 위에서 이미 처리 — 여기서는 집계만 정정한다.
+        return RC_GATE_REJECTED
     _set_keyword_status(args.id, "failed", f"validate rc={rc}")
     return rc
 
@@ -3009,9 +3073,11 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
                     )
                     print(f"{WARN} 키워드 #{_kid} 생성 예외 상한({n_fail}회) — 격리·계속: {e}")
                 rc = 3
-            if (
-                rc == 0
-            ):  # 상품 0개(빈 글 차단·rc=3) 등 실패는 세지 않음 — 다음 회차가 다른 키워드를 집는다
+            # made = '발행 가능한 draft를 실제로 산출한 편수'. 상품 0개(빈 글 차단·rc=3)·게이트
+            # 반려(rc=4·#47)·생성 예외(rc=3)는 산출 0이므로 세지 않는다 — 다음 회차가 다른
+            # 키워드를 집는다. ★이 구분이 곧 fail-loud: made==0이면 아래 digest가 abnormal로
+            # 잡아 텔레그램 경보를 띄운다(#45 가드가 #47 전까지 반려에 뚫려 있었다).
+            if rc == 0:
                 made += 1
         print(f"     글 생성 {made}편 완료")
     else:
