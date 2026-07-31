@@ -137,6 +137,7 @@ class TestTruth:
             "3년 사용했습니다. 아직 튼튼합니다.",
             "2년 썼는데 흔들림이 없었습니다.",
             "1년 사용해보니 상판이 휘었습니다.",
+            "이 책상은 3년 사용 중입니다.",  # 진행형도 경험 주장
         ],
     )
     def test_experiential_usage_claims_still_fail(self, body: str) -> None:
@@ -148,15 +149,22 @@ class TestTruth:
     @pytest.mark.parametrize(
         "body",
         [
-            # ★라이브 07-31 실측 오탐 — 후기를 인용한 객관 서술인데 1인칭으로 반려돼
-            #   재생성 기회를 계속 소모했다(3회 중 2회).
+            # ★라이브 07-31 실측 오탐 2건 — 객관 서술인데 1인칭으로 반려돼 재생성 기회를
+            #   계속 소모했다(draft 41 "2~3년 사용에도" · draft 43 "1~2년 사용 후").
             "스테인리스 프레임은 2~3년 사용에도 견고하다는 후기가 많습니다.",
+            "기숙사처럼 1~2년 사용 후 이동할 가능성이 높은 환경에 적합합니다.",
             "3년 사용 시 경첩이 헐거워질 수 있습니다.",
             "2년 사용 기간을 기준으로 보면 원목이 유리합니다.",
+            "5년 사용할 수 있는 내구성을 갖췄습니다.",
+            "장기간 사용하면 마모될 수 있어 2년 사용 시점 점검이 좋습니다.",
         ],
     )
     def test_objective_durability_statements_are_not_first_person(self, body: str) -> None:
-        """'N년 사용' 뒤에 부사격 조사·명사가 붙으면 경험 주장이 될 수 없다 — 통과해야 한다."""
+        """★2차 근본수정 — 경험 주장 동사 활용형(했/해보/썼/중이)이 없으면 통과해야 한다.
+
+        1차(비경험 꼬리 블랙리스트)는 '사용 후'라는 새 형태로 곧장 재발했다 — 비경험 꼬리는
+        열린 집합이라 나열로 끝나지 않는다. 경험 동사 화이트리스트가 근본 방향이다.
+        """
         ok, rpt = check_truth({"body_md": body, "products": []})
         assert not any("first_person_forbidden" in i for i in rpt["issues"]), (body, rpt["issues"])
         assert ok is True, (body, rpt["issues"])
