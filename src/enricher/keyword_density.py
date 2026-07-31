@@ -91,6 +91,15 @@ def target_count(chars: int, kw_len: int, target_pct: float) -> int:
     return _count_for(target_pct, chars, kw_len)
 
 
+def min_count_for(pct: float, chars: int, kw_len: int) -> int:
+    """밀도 하한을 넘기는 **최소** 반복 횟수.
+
+    ★#48 라이브 적발: 지시가 상한에만 "탈락"을 붙이고 하한은 "약 N회"로만 말하자 모델이
+    한쪽 경고만 추적해 0.78%까지 떨어뜨렸다(미달 탈락). 미달 경계도 숫자로 못박기 위한 값.
+    """
+    return max(1, math.ceil(pct * chars / 100 / kw_len))
+
+
 def cap_count(need: int) -> int:
     """절대 상한 횟수 — 목표를 넘겨도 여기까지. 산문 길이가 줄어도 상한을 넘지 않는 폭."""
     return max(need + 2, _round_half_up(need * CAP_MARGIN))

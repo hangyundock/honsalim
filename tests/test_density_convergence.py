@@ -183,7 +183,7 @@ class TestSeoDirectiveAntiSpam:
 
     def test_states_a_hard_cap(self) -> None:
         d = build_seo_directive("책상추천")
-        assert "넘기지 마라" in d
+        assert "'도배'로 탈락" in d
 
     def test_forbids_the_observed_spam_pattern(self) -> None:
         """라이브에서 실제로 나온 도배 형태를 이름으로 금지해야 한다(추상적 '도배 금지'는 실패)."""
@@ -205,6 +205,52 @@ class TestSeoDirectiveAntiSpam:
     def test_empty_primary_emits_nothing(self) -> None:
         assert build_seo_directive("") == ""
         assert build_seo_directive(None) == ""
+
+
+class TestDirectiveBoundSymmetry:
+    """★#48 라이브 2차 적발 — 게이트 경계 중 **한쪽에만** '탈락'을 붙이면 반대편으로 넘어간다.
+
+    07-30·31: 옛 지시가 하한에만 '탈락'을 달아(#19 "하한 1.0% 미달도 탈락이니 충분히 쓸 것")
+    31회 도배. 07-31 18:11(내 1차 수정): 상한에만 '탈락'을 달자 7회·소제목 0개로 미달 탈락.
+    모델은 '탈락'이라고 쓴 조건만 추적한다 — 그러니 **하드 게이트 요건 전부**가 같은 무게의
+    실패 경고를 달고 있어야 한다. 문구 하나를 찍어 검사하는 대신 그 성질 자체를 고정한다.
+    """
+
+    def test_every_hard_bound_states_a_failure_consequence(self) -> None:
+        d = build_seo_directive("책상추천", ["원룸 책상"])
+        # 밀도 하한·상한이 **둘 다** 탈락 사유로 명시돼야 한다(한쪽만 있으면 반대편으로 쏠린다).
+        assert "'미달'로 탈락" in d, "하한 미달이 탈락 사유로 명시되지 않았다"
+        assert "'도배'로 탈락" in d, "상한 초과가 탈락 사유로 명시되지 않았다"
+        # 소제목 최소 1개도 하드 게이트(headings_keyword_low)다 — 0개 탈락을 못박아야 한다.
+        assert "0개면 탈락" in d, "소제목 0개가 탈락 사유로 명시되지 않았다"
+
+    def test_min_and_max_counts_are_both_numeric(self) -> None:
+        low, high = per_1000_band(4, DENSITY_FLOOR, DENSITY_CEIL, DENSITY_TARGET)
+        d = build_seo_directive("책상추천")
+        assert f"최소 {low}회 이상" in d and f"최대 {high}회 이하" in d
+
+    def test_substitution_advice_cannot_drive_below_the_floor(self) -> None:
+        """★'두 번째 언급부터는 대체어로'가 모델을 전부 치환하게 만들어 0.78%까지 떨어뜨렸다."""
+        d = build_seo_directive("책상추천")
+        assert "두 번째 언급부터는" not in d
+        assert "전부 바꾸면 하한 미달로 탈락" in d
+
+    def test_regen_directive_also_states_both_bounds(self) -> None:
+        """재생성 지시도 같은 성질을 지켜야 한다 — 여기만 한쪽이면 재시도에서 다시 뒤집힌다."""
+        metrics = {
+            "chars": 3123,
+            "primary_len": 4,
+            "density_floor": 1.0,
+            "density_ceil": 3.5,
+            "primary_freq": 6,
+        }
+        for too_low in (True, False):
+            d = cli._density_directive(
+                "책상추천", {**metrics, "primary_freq": 6 if too_low else 31}, too_low=too_low
+            )
+            assert d is not None
+            assert "'미달'로 탈락" in d and "'도배'로 탈락" in d, (too_low, d)
+            assert "0개면 그것만으로 탈락" in d, (too_low, d)
 
 
 class TestDensityDirectiveRegen:

@@ -644,6 +644,7 @@ def _density_directive(kw: str, metrics: dict[str, Any], *, too_low: bool) -> st
         cap_count,
         join_josa,
         keyword_substitute,
+        min_count_for,
         regen_target_pct,
         target_count,
     )
@@ -665,29 +666,36 @@ def _density_directive(kw: str, metrics: dict[str, Any], *, too_low: bool) -> st
     if need == freq:  # 반올림 경계 — 횟수로는 차이가 없어 정량 지시가 무의미
         return None
     cap = cap_count(need)
+    floor_min = min_count_for(floor, chars, kw_len)
     # ★재생성은 직전 본문을 주지 않고 **처음부터 다시 쓴다**(claude_client.build_user_prompt는
     # 원본 템플릿 + 보완 지시만 붙인다). 그래서 "N회를 더 넣어라"는 기준 본문이 없어 성립하지
     # 않는다 — 반드시 '새 본문에 총 몇 회'라는 절대 목표로 준다. 직전 횟수는 참고로만.
     per = max(1, chars // need)  # 몇 자마다 1회꼴 — 분량이 달라져도 감을 유지시킨다
+    # ★#48 라이브 적발: 상한에만 '탈락'을 붙였더니 모델이 그 경고만 추적해 반대편(미달)로
+    #   떨어졌다(0.78%). 재생성 지시도 **양쪽 경계를 같은 무게로** 숫자와 함께 준다.
     goal = (
         f"새로 쓰는 본문에 대표키워드 '{kw}'를 **총 약 {need}회** 포함하세요"
         f"(산문 {chars:,}자 기준 목표 밀도 {target_pct:.1f}% — 대략 {per:,}자마다 1회꼴). "
-        f"**{cap}회를 넘기면 도배로 탈락합니다.**"
+        f"**{floor_min}회 미만이면 '미달'로 탈락하고 {cap}회를 넘기면 '도배'로 탈락합니다** "
+        "— 두 경계 사이에 반드시 들어와야 합니다."
     )
     substitute = keyword_substitute(kw)
     anti = (
-        f"★상품 소개 문단마다·FAQ 답변마다 '{kw}'를 넣지 마세요 — 실제 탈락 원인이 이 패턴입니다. "
-        f"소제목은 1~2개에만 쓰고, '{kw}'를 상품을 가리키는 명사로 쓰지 마세요"
+        f"채우는 방식도 중요합니다 — ❌상품 소개 문단마다·FAQ 답변마다 '{kw}' 넣기, "
+        f"❌소제목 3개 이상에 넣기, ❌'{kw}'를 상품을 가리키는 명사로 쓰기"
     )
     if substitute:
         anti += (
             f'(✗ "가성비 높은 {join_josa(kw, "이다")}" '
-            f'→ ✅ "가성비 높은 {join_josa(substitute, "이다")}").'
+            f'→ ✅ "가성비 높은 {join_josa(substitute, "이다")}"). '
         )
         alt = f"'{substitute}'·'이 제품'·대명사"
     else:
-        anti += '(✗ "가성비 높은 …" 식 지칭).'
+        anti += '(✗ "가성비 높은 …" 식 지칭). '
         alt = "'이 제품'·'해당 상품'·대명사"
+    # 소제목 최소 1개는 별도 게이트(headings_keyword_low)라 밀도만 맞추면 또 탈락한다 —
+    # 실제로 07-31 라이브에서 밀도 미달과 소제목 0개가 함께 났다. 같이 못박는다.
+    anti += f"단 **소제목(##) 1~2개에는 '{kw}'를 반드시 넣으세요 — 0개면 그것만으로 탈락합니다.**"
     if too_low:
         return (
             f"{goal} 직전 생성은 {freq}회뿐이라 미달이었습니다. 배분은 도입부 1~2회 · 소제목 "
@@ -695,7 +703,8 @@ def _density_directive(kw: str, metrics: dict[str, Any], *, too_low: bool) -> st
         )
     return (
         f"직전 생성은 '{kw}'를 {freq}회 써서 과밀(도배 = 스팸/어뷰징)이었습니다. {goal} "
-        f"나머지 자리는 {alt}로 바꿔 문장을 자연스럽게 유지하세요. {anti}"
+        f"줄일 때는 최소 횟수를 채운 뒤 남는 자리만 {alt}로 바꾸세요(전부 바꾸면 미달로 탈락). "
+        f"{anti}"
     )
 
 

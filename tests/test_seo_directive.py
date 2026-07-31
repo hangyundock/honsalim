@@ -45,7 +45,8 @@ class TestBuildDirective:
         #   '1,000자당 N~M회'라는 길이 비례 밴드로 바꿨다(라이브 07-30·07-31 이틀 발행 0편).
         out = build_seo_directive("노트북 거치대", [])
         assert "1,000자당" in out  # 하한·상한을 함께 담은 길이 비례 밴드
-        assert "넘기지 마라" in out  # 도배 상한을 절대 표현으로 금지
+        # ★#48 라이브 2차: 상한에만 '탈락'을 달자 반대편(미달)로 넘어갔다 — 양쪽 다 명시해야 한다.
+        assert "'도배'로 탈락" in out and "'미달'로 탈락" in out
         assert "거치대" in out  # 대체 표현 안내
         assert "무조건" in out and "절대" in out  # 단정·과장 금지 어휘
 
