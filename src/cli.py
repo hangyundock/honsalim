@@ -22,6 +22,7 @@ import importlib
 import importlib.util
 import json
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -752,7 +753,8 @@ def _actionable_feedback(report: dict[str, Any], primary: str | None) -> list[st
                 # ★#48 B2 — 키워드 글 절대 하한 미달. %역산이 아니라 절대 횟수를 그대로 요구한다.
                 mc = int(metrics.get("min_count") or 0)
                 now = int(metrics.get("primary_freq") or 0)
-                target = max(mc, now + 2) if mc else 0
+                # 권장은 하한보다 1 위 — 정확히 경계를 노리면 낮은 롤에서 절반이 미달로 떨어진다.
+                target = max(mc + 1, now + 2) if mc else 0
                 directive = (
                     (
                         f"대표키워드 '{kw}'를 본문 전체에서 **최소 {mc}회 이상**(권장 {target}회) "
@@ -1012,7 +1014,11 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                     feedback = [
                         f"응답 형식 오류({e}). META-JSON + BODY-MARKDOWN 두 블록으로 분리 출력하세요."
                     ]
-                    print(f"     [시도 {attempt}] 형식 오류 — 재생성")
+                    # ★#48 관찰성: 08-01 00:45 사이클에서 형식 오류가 2연속으로 재시도를 전부
+                    # 소진했는데 원문이 안 남아 원인을 진단할 수 없었다(우연한 API 흔들림인지
+                    # 재생성 피드백과의 상호작용인지 판별 불가). 실패 응답의 머리를 로그에 남긴다.
+                    head = re.sub(r"\s+", " ", (result.response_text or ""))[:200]
+                    print(f"     [시도 {attempt}] 형식 오류({e}) — 재생성 · 응답 머리: {head}")
                     continue
                 enriched_payload = _build_enriched_payload(meta, body_md, result.usage)
                 report = serialize_report(validate_all(enriched_payload))
