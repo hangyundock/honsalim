@@ -12,6 +12,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import pytest
+
 from validator import (
     check_disclosure,
     check_links,
@@ -127,6 +129,47 @@ class TestTruth:
         )
         assert ok is False
         assert any("first_person_forbidden" in i for i in rpt["issues"])
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            "이 제품을 6개월 사용해보았습니다.",  # 경험 주장 — 원래 목적
+            "3년 사용했습니다. 아직 튼튼합니다.",
+            "2년 썼는데 흔들림이 없었습니다.",
+            "1년 사용해보니 상판이 휘었습니다.",
+        ],
+    )
+    def test_experiential_usage_claims_still_fail(self, body: str) -> None:
+        """★세션 #48 오탐 제거 후에도 **진짜 경험 주장은 그대로 막혀야 한다**(기준 완화 아님)."""
+        ok, rpt = check_truth({"body_md": body, "products": []})
+        assert ok is False, body
+        assert any("first_person_forbidden" in i for i in rpt["issues"]), body
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            # ★라이브 07-31 실측 오탐 — 후기를 인용한 객관 서술인데 1인칭으로 반려돼
+            #   재생성 기회를 계속 소모했다(3회 중 2회).
+            "스테인리스 프레임은 2~3년 사용에도 견고하다는 후기가 많습니다.",
+            "3년 사용 시 경첩이 헐거워질 수 있습니다.",
+            "2년 사용 기간을 기준으로 보면 원목이 유리합니다.",
+        ],
+    )
+    def test_objective_durability_statements_are_not_first_person(self, body: str) -> None:
+        """'N년 사용' 뒤에 부사격 조사·명사가 붙으면 경험 주장이 될 수 없다 — 통과해야 한다."""
+        ok, rpt = check_truth({"body_md": body, "products": []})
+        assert not any("first_person_forbidden" in i for i in rpt["issues"]), (body, rpt["issues"])
+        assert ok is True, (body, rpt["issues"])
+
+    def test_explicit_first_person_markers_are_untouched(self) -> None:
+        """오탐 예외가 명시적 1인칭 표지를 뚫는 구멍이 되면 안 된다."""
+        for body in (
+            "내 원룸에서 3년 사용에도 만족했습니다.",  # '내 원룸' 패턴이 잡는다
+            "우리집 책상은 2년 사용 시 문제없었습니다.",  # '우리집' 패턴이 잡는다
+        ):
+            ok, rpt = check_truth({"body_md": body, "products": []})
+            assert ok is False, body
+            assert any("first_person_forbidden" in i for i in rpt["issues"]), body
 
     def test_pass_third_person_information(self) -> None:
         """3인칭 정보형은 pass (위키바이형 톤)."""
