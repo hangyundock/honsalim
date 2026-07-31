@@ -748,6 +748,20 @@ def _actionable_feedback(report: dict[str, Any], primary: str | None) -> list[st
                     "바꾸세요. 예: 'N년 사용'→'N년 내구성', '써보니'→'실측 기준'. 직접 촬영 사진이 "
                     "없으므로 사용후기·체험 톤을 쓰지 마세요."
                 )
+            elif code == "count_low" and kw:
+                # ★#48 B2 — 키워드 글 절대 하한 미달. %역산이 아니라 절대 횟수를 그대로 요구한다.
+                mc = int(metrics.get("min_count") or 0)
+                now = int(metrics.get("primary_freq") or 0)
+                target = max(mc, now + 2) if mc else 0
+                directive = (
+                    (
+                        f"대표키워드 '{kw}'를 본문 전체에서 **최소 {mc}회 이상**(권장 {target}회) "
+                        f"쓰세요 — 지금은 {now}회뿐이라 미달 탈락입니다. 도입부·소제목·본문 문단·FAQ "
+                        "등 서로 다른 자리에 1회씩 자연스럽게 추가하면 됩니다. 같은 문단 도배는 금지."
+                    )
+                    if mc
+                    else None
+                )
             elif code == "density_low" and kw:
                 # #47: 정량(몇 회 더) 우선, metrics 없으면 옛 정성 지시로 폴백.
                 directive = _density_directive(kw, metrics, too_low=True) or (

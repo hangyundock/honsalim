@@ -207,49 +207,94 @@ class TestSeoDirectiveAntiSpam:
         assert build_seo_directive(None) == ""
 
 
-class TestKeywordArticleFloor:
-    """★#48(주인 결정 A) — 키워드 글만 하한을 낮춘다. 카테고리 페이지는 1.0% 유지.
+class TestKeywordArticleMinCount:
+    """★#48(주인 결정 B2) — 키워드 글 하한 = 절대 횟수(≥4) + 위치 게이트. 카테고리는 % 유지.
 
-    라이브 5개 본문 실측: 도배를 금지하면 '책상추천' 같은 검색어 복합어의 자연 문체가
-    0.78~0.97%로 수렴해 하한 1.0%에 닿지 못했다(지시 문구 3회 변경에도 동일). 도배로만 도달하는
-    31회는 상한(3.5%)에 걸린다 — 착지 가능한 밴드가 없었다. 상한·도배 금지는 그대로 두고
-    하한만 자연 문체 실측선까지 내린 것이 이 결정이다.
+    라이브 6개 본문 실측: 검색어 복합어('책상추천')는 도배를 금지하면 자연 문체가 **본문 길이와
+    무관하게 4~7회**로 수렴한다(지시 숫자 8~14를 4회 연속 무시). 절대 횟수라 %하한은 어떤 값이어도
+    긴 글에서 뚫린다 — 같은 세션의 결정 A(0.8%)도 5,199자 글 0.41%로 곧장 뚫려 대체됐다.
+    상한(3.5%)·도배 금지·위치 게이트는 그대로다.
     """
 
-    def test_keyword_article_uses_the_lower_floor(self) -> None:
+    def test_keyword_article_gets_min_count(self) -> None:
         from collector import seo_keywords
-        from validator.seo import KEYWORD_ARTICLE_DENSITY_FLOOR
+        from validator.seo import KEYWORD_ARTICLE_MIN_COUNT
 
         cfg = seo_keywords.keyword_gate_config("책상추천", "desk")
         assert cfg is not None
-        assert cfg["density_floor"] == KEYWORD_ARTICLE_DENSITY_FLOOR
+        assert cfg["min_count"] == KEYWORD_ARTICLE_MIN_COUNT
         assert cfg["primary"] == "책상추천"
+        assert "density_floor" not in cfg or cfg["density_floor"] != 0.8  # A 방식 잔재 없음
 
-    def test_category_page_floor_is_untouched(self) -> None:
-        """카테고리 대표어는 일반 명사라 자연 반복이 쉽다 — 기준을 낮출 이유가 없다."""
+    def test_category_page_keeps_percent_floor(self) -> None:
+        """카테고리 페이지엔 min_count가 없다 — %하한 그대로."""
         from collector import seo_keywords
-        from validator.seo import DENSITY_FLOOR
 
         cfg = seo_keywords.gate_config("desk")
-        assert cfg is not None
-        assert float(cfg.get("density_floor") or DENSITY_FLOOR) == DENSITY_FLOOR
+        assert cfg is not None and "min_count" not in cfg
 
-    def test_live_measured_bodies_now_clear_the_floor(self) -> None:
-        """실측값으로 검산 — 라이브에서 나온 자연 문체 밀도가 새 하한을 넘어야 결정이 유효하다."""
-        from validator.seo import KEYWORD_ARTICLE_DENSITY_FLOOR
+    def test_draft43_shape_now_passes(self) -> None:
+        """★라이브 실패 재현 검산 — draft 43(4회/3,893자·0.41%)이 위치 요건과 함께 통과해야 한다."""
+        from validator.seo import check_seo
 
-        for measured in (0.97, 0.90):  # draft 41 · 42
-            assert measured >= KEYWORD_ARTICLE_DENSITY_FLOOR, measured
+        filler = "원룸 공간과 예산을 기준으로 고르는 방법을 정리한 설명 문장이다. "
+        body = (
+            "# 원룸 자취생을 위한 책상추천 가이드\n\n"
+            f"첫 자취를 앞두고 책상추천을 검색하는 사람을 위한 안내다. {filler * 3}\n\n"
+            "## 1. 누구를 위한 책상추천 가이드인가\n\n"
+            f"이 책상추천 가이드는 처음 자취를 시작하는 사람 기준이다. {filler * 60}\n\n"
+            "## 6. 자주 묻는 질문\n\n"
+            f"**Q: 책상추천 리스트에서 고른 제품, 배송은 얼마나 걸리나요?**\n\nA: {filler * 60}"
+        )
+        ok, rpt = check_seo({"body_md": body, "seo": {"primary": "책상추천", "min_count": 4}})
+        m = rpt["metrics"]
+        assert m["primary_freq"] >= 4 and m["density_pct"] < 1.0, m  # 전제: %하한이면 탈락인 형상
+        assert ok is True, rpt["issues"]
+
+    def test_below_min_count_fails_with_count_low(self) -> None:
+        from validator.seo import check_seo
+
+        filler = "원룸 공간과 예산을 기준으로 고르는 방법을 정리한 설명 문장이다. "
+        body = (
+            "# 책상추천 가이드\n\n책상추천 기준을 정리한다.\n\n"
+            f"## 책상추천 고르는 법\n\n{filler * 30}"
+        )
+        ok, rpt = check_seo({"body_md": body, "seo": {"primary": "책상추천", "min_count": 4}})
+        assert ok is False
+        assert any(str(i).startswith("count_low") for i in rpt["issues"])
+        assert not any(str(i).startswith("density_low") for i in rpt["issues"])
 
     def test_ceiling_and_spam_ban_are_unchanged(self) -> None:
-        """★하한만 조정한다 — 상한을 함께 풀면 옛 도배(4.33%)가 되살아난다."""
+        """★하한 형태만 바꾼다 — 상한을 함께 풀면 옛 도배(4.33%)가 되살아난다."""
         from validator.seo import DENSITY_CEIL, check_seo
 
         assert DENSITY_CEIL == 3.5
         body = "# 책상추천\n\n## 책상추천 정리\n\n" + ("책상추천 " * 40 + "설명 문장입니다. " * 5)
-        ok, rpt = check_seo({"body_md": body, "seo": {"primary": "책상추천", "density_floor": 0.8}})
+        ok, rpt = check_seo({"body_md": body, "seo": {"primary": "책상추천", "min_count": 4}})
         assert ok is False
         assert any(str(i).startswith("density_high") for i in rpt["issues"])
+
+    def test_min_count_regen_feedback_is_absolute(self) -> None:
+        """count_low 재생성 지시 — %역산이 아니라 절대 횟수를 그대로 요구해야 한다."""
+        report = {
+            "overall_pass": False,
+            "gates": {
+                "seo": {
+                    "issues": ["count_low: 대표키워드 '책상추천' 3회 < 최소 4회"],
+                    "metrics": {"min_count": 4, "primary_freq": 3},
+                }
+            },
+        }
+        fb = cli._actionable_feedback(report, "책상추천")
+        assert len(fb) == 1
+        assert "최소 4회 이상" in fb[0] and "지금은 3회" in fb[0]
+
+    def test_first_generation_directive_states_min_count(self) -> None:
+        """첫 생성 지시도 절대 횟수 형태 + 양쪽 경계('미달'·'도배') 명시를 유지해야 한다."""
+        d = build_seo_directive("책상추천", min_count=4)
+        assert "총 4회 이상" in d
+        assert "'미달'로 탈락" in d and "'도배'로 탈락" in d
+        assert "1,000자당" in d  # 상한은 여전히 길이 비례
 
 
 class TestDirectiveHeadingExample:

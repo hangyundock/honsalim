@@ -150,11 +150,13 @@ def build_user_prompt(request: GenerateRequest) -> str:
 
     seo = request.seo or {}
     # 카테고리가 밴드를 오버라이드했으면 지시의 '1,000자당 N회'도 그 밴드로 계산해야 한다(#48).
+    # min_count(키워드 글 절대 하한·B2)가 있으면 지시도 절대 횟수 형태로 나간다.
     seo_directive = build_seo_directive(
         seo.get("primary"),
         seo.get("secondary"),
         density_floor=seo.get("density_floor"),
         density_ceil=seo.get("density_ceil"),
+        min_count=seo.get("min_count"),
     )
     prompt = prompt_loader.render(
         "article_main",

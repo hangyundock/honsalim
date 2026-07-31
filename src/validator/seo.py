@@ -28,14 +28,15 @@ from typing import Any
 #   - 하드 fail은 대표키워드(=#1) 필수 항목만. 보조키워드·소제목 수는 warning(재생성 트리거 X).
 #   - 상한은 넉넉히(3.5%) — 정상 글이 과밀로 오탐돼 재생성되는 비용 방지.
 DENSITY_FLOOR = 1.0  # % — 미만이면 대표키워드를 사실상 안 쓴 글
-# ★세션 #48 (주인 결정) — **키워드 파생 글 전용** 하한. 카테고리 페이지는 1.0% 그대로.
-#   근거: 라이브 5개 본문 전수 실측. 대표키워드가 '책상추천' 같은 **검색어 복합어**일 때,
-#   도배(상품 지칭 명사 반복)를 금지하면 지시 문구를 세 번 바꿔도 자연 문체가 6~7회
-#   (0.78%·0.97%·0.90%)로 수렴했다. 반면 도배를 허용해야 나오는 31회는 상한(3.5%)에 걸린다.
-#   즉 '도배 금지'와 '하한 1.0%'가 이 키워드 부류에서 서로 모순이라 착지 가능한 밴드가 없었다.
-#   → 상한·도배 금지는 그대로 두고 하한만 자연 문체 실측선까지 내린다(품질 기준 완화가 아니라
-#     생성 가능 범위와의 정합). 카테고리 대표어(일반 명사)는 자연 반복이 쉬워 1.0%를 유지한다.
-KEYWORD_ARTICLE_DENSITY_FLOOR = 0.8
+# ★세션 #48 (주인 결정 B2) — **키워드 파생 글 전용** 절대 횟수 하한. 카테고리 페이지는 % 유지.
+#   라이브 6개 본문 실측: '책상추천' 같은 검색어 복합어는 도배(상품 지칭 명사)를 금지하면 자연
+#   문체가 **본문 길이와 무관하게 4~7회**로 수렴했다(지시 숫자 8~14를 4회 연속 무시). 절대
+#   횟수라 %하한은 어떤 값이어도 긴 글에서 뚫린다 — 같은 세션의 결정 A(0.8%)도 5,199자 글에서
+#   0.41%로 곧장 뚫려 이 값으로 대체됐다.
+#   하한의 목적은 "키워드를 사실상 안 쓴 글" 차단인데, 위치 게이트(제목·도입부·소제목)가 이미
+#   타겟팅을 강제하므로 절대 4회면 목적이 충족된다(구글은 정확형 밀도를 순위 요인으로 쓰지 않음).
+#   ★상한(3.5%)·도배 금지는 그대로다 — 완화가 아니라 모델의 길이 무관 행동과 하한의 정합.
+KEYWORD_ARTICLE_MIN_COUNT = 4
 DENSITY_CEIL = 3.5  # % — 초과면 과밀(도배)=스팸. 넉넉히 둬 오탐 재생성 비용 방지
 DENSITY_TARGET = 1.7  # % — 네이버 상위 실측(directive·운영자 안내용 목표치)
 INTRO_CHARS = 200  # 도입부 정의 — 산문 공백 제거 후 앞 N자
@@ -86,6 +87,7 @@ def check_seo(payload: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
           "secondary": ["가성비 사무용 의자", ...],  # 보조키워드(선택, 네이버 연관검색어)
           "density_floor": 1.0,  # (선택) 카테고리별 하한 오버라이드
           "density_ceil":  3.5,  # (선택) 상한 오버라이드
+          "min_count": 4,        # (선택·키워드 글) 절대 횟수 하한 — 있으면 %하한 대신 이걸 검사
       }
 
     seo 또는 seo.primary가 없으면 skip(pass) — 기존 파이프라인 무영향.
@@ -128,10 +130,19 @@ def check_seo(payload: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     issues: list[str] = []
     warnings: list[str] = []
 
-    # 밀도 (하한·상한 둘 다 강제)
+    # 밀도 (하한·상한 둘 다 강제).
+    # ★세션 #48 B2 — min_count가 있으면(키워드 글) 하한을 **절대 횟수**로 검사한다. 검색어
+    #   복합어의 자연 사용량은 본문 길이와 무관한 절대 횟수(실측 4~7회)라 %하한은 긴 글에서
+    #   반드시 뚫린다. 상한(도배)은 그대로 % 기준 — 완화 아님(모듈 상수 주석 참조).
+    min_count = int(seo.get("min_count") or 0)
     if chars == 0:
         issues.append("density_empty: 산문 본문이 비어 있음")
-    elif density < floor:
+    elif min_count > 0 and freq < min_count:
+        issues.append(
+            f"count_low: 대표키워드 '{primary}' {freq}회 < 최소 {min_count}회 "
+            f"(키워드 글 절대 하한 — 서로 다른 문단·소제목·FAQ에 자연스럽게 더 쓸 것)"
+        )
+    elif min_count <= 0 and density < floor:
         issues.append(
             f"density_low: 대표키워드 '{primary}' 밀도 {density:.2f}% < {floor}% "
             f"(네이버 목표 ~{DENSITY_TARGET}%, 정확형 노출을 늘릴 것)"
@@ -193,6 +204,8 @@ def check_seo(payload: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
         # 오버라이드 포함)이 필요하다 — cli._density_directive가 목표 밀도를 이 범위로 클램프한다.
         "density_floor": floor,
         "density_ceil": ceil,
+        # 키워드 글 절대 하한(#48 B2) — count_low 재생성 지시가 이 값으로 목표를 만든다.
+        "min_count": min_count,
         "headings": len(headings),
         "headings_with_keyword": kw_in_h,
         "secondary_present": present_secondary,

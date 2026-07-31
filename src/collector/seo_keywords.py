@@ -16,7 +16,7 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
-from validator.seo import DENSITY_FLOOR, KEYWORD_ARTICLE_DENSITY_FLOOR
+from validator.seo import KEYWORD_ARTICLE_MIN_COUNT
 
 try:
     import yaml
@@ -78,10 +78,11 @@ def keyword_gate_config(
 
     category_key 미매핑이면 None(상위에서 fail-open). density 오버라이드는 gate_config에서 승계.
 
-    ★세션 #48(주인 결정) — 키워드 글은 **하한만** `KEYWORD_ARTICLE_DENSITY_FLOOR`로 낮춘다.
-    대표키워드가 '책상추천' 같은 검색어 복합어면 도배를 금지한 자연 문체가 0.78~0.97%로 수렴해
-    하한 1.0%에 닿지 못한다(라이브 5개 본문 실측). 상한·도배 금지는 그대로다. 카테고리가 이미
-    더 낮은 하한을 지정했으면 그 값을 존중한다(올리지 않는다).
+    ★세션 #48(주인 결정 B2) — 키워드 글은 %하한 대신 **절대 횟수 하한**(`min_count`)을 쓴다.
+    검색어 복합어('책상추천')의 자연 사용량은 본문 길이와 무관한 절대 횟수(라이브 실측 4~7회)라
+    %하한은 긴 글에서 반드시 뚫린다(같은 세션 결정 A(0.8%)가 5,199자 글 0.41%로 곧장 뚫려 대체).
+    min_count가 있으면 validator/seo가 %하한 대신 이것을 검사한다. 상한(도배)·위치 게이트·
+    카테고리 페이지(%하한 유지)는 그대로다.
     """
     cfg = gate_config(category_key, path)
     if cfg is None:
@@ -93,9 +94,7 @@ def keyword_gate_config(
     cfg = dict(cfg)
     cfg["primary"] = kw
     cfg["secondary"] = [cat_primary] if cat_primary and cat_primary != kw else []
-    current_floor = cfg.get("density_floor")
-    base_floor = float(current_floor) if current_floor is not None else DENSITY_FLOOR
-    cfg["density_floor"] = min(base_floor, KEYWORD_ARTICLE_DENSITY_FLOOR)
+    cfg["min_count"] = KEYWORD_ARTICLE_MIN_COUNT
     return cfg
 
 
