@@ -20,7 +20,9 @@ class TestBuildDirective:
     def test_includes_primary_rules(self) -> None:
         out = build_seo_directive(PRIMARY, SECONDARY)
         assert PRIMARY in out
-        assert "1.7%" in out  # 네이버 기준 밀도 목표
+        # ★세션 #48: 밀도 목표를 '1.7%'라는 백분율이 아니라 **'1,000자당 N회'**로 준다.
+        #   첫 생성 시점엔 산문 길이를 몰라 백분율을 횟수로 못 옮기고, 그 간극이 도배를 불렀다.
+        assert "1,000자당" in out
         assert "제목" in out and "도입부" in out and "소제목" in out
 
     def test_lists_each_secondary(self) -> None:
@@ -38,20 +40,26 @@ class TestBuildDirective:
         assert "컴퓨터의자" in out
 
     def test_density_range_and_bans_absolutes(self) -> None:
-        # 세션 #33: 게이트 정합 — 정확형 밀도 하한(1.0%) 확보 + 상한(3%) 도배 금지 + 단정/과장 금지.
-        # (세션 #19 '정확형 억제' 과교정으로 하한 미달하던 것을 게이트 범위와 정합하게 수정)
+        # 세션 #33: 게이트 정합 — 정확형 밀도 하한 확보 + 도배 상한 금지 + 단정/과장 금지.
+        # ★세션 #48: 하한 확보 표현("충분히 쓸 것")이 오히려 도배를 유발해, 하한·상한을 모두
+        #   '1,000자당 N~M회'라는 길이 비례 밴드로 바꿨다(라이브 07-30·07-31 이틀 발행 0편).
         out = build_seo_directive("노트북 거치대", [])
-        assert "1.0~1.7%" in out  # 밀도 하한 확보 범위 명시(게이트 정합)
-        assert "3% 초과" in out  # 도배 상한 금지
-        assert "거치대" in out  # 대체 표현(short form) 안내
+        assert "1,000자당" in out  # 하한·상한을 함께 담은 길이 비례 밴드
+        assert "넘기지 마라" in out  # 도배 상한을 절대 표현으로 금지
+        assert "거치대" in out  # 대체 표현 안내
         assert "무조건" in out and "절대" in out  # 단정·과장 금지 어휘
 
-    def test_short_form_substitution(self) -> None:
-        from enricher.seo_directive import _short_form
+    def test_keyword_substitute_is_not_a_noop(self) -> None:
+        """★세션 #48 — 옛 `_short_form`은 단일어에서 **자기 자신**을 반환해 대체 지시가 무의미했다.
 
-        assert _short_form("노트북 거치대") == "거치대"
-        assert _short_form("컴퓨터 책상") == "책상"
-        assert _short_form("모니터암") == "모니터암"  # 단일어는 그대로
+        '과하면 <줄임말>로 대체하라'가 실패한 키워드('책상추천'·'스텐도마'·'모니터암')에서
+        전부 `X를 X로 대체하라`가 되어, 상한 초과를 막을 탈출구가 애초에 없었다.
+        """
+        from enricher.keyword_density import keyword_substitute
+
+        assert keyword_substitute("노트북 거치대") == "거치대"
+        assert keyword_substitute("컴퓨터 책상") == "책상"
+        assert keyword_substitute("모니터암") is None  # 자기 자신을 돌려주지 않는다
 
 
 class TestPromptInjection:

@@ -902,6 +902,11 @@ class TestDensityDirectiveQuantified:
     라이브 적발: 07-21~23 '스텐도마'가 3일 연속 반려(0.44%→0.41% 무효, 0.28%→3.94% 오버슈트)
     → 상한 도달 격리 → 발행 0편 3일. 원인은 "목표(~1.7%)로 높이세요"라는 정성 지시로는 LLM이
     필요 반복 횟수를 역산하지 못한 것. 게이트 기준은 그대로 두고 지시 정밀도만 올린다.
+
+    ★세션 #48 — 이 정량화만으로는 수렴하지 않았다(07-30·07-31 '책상추천' 이틀 연속 발행 0편).
+    목표를 SEO 최적 1.7%로 주면 모델이 자연 문체를 버리고 '구조 단위마다 배치'하는 도배 모드로
+    건너뛴다. 목표를 **하한+20%**로 낮추고 절대 상한을 함께 주도록 바꿨으므로, 아래 기대 횟수도
+    그 정책(enricher/keyword_density.regen_target_pct)을 따른다. 상세는 test_density_convergence.py.
     """
 
     _M: ClassVar[dict[str, object]] = {  # 07-23 라이브 실측 근사 — 산문 3,800자·'스텐도마'(4자)
@@ -919,10 +924,10 @@ class TestDensityDirectiveQuantified:
         """
         d = cli._density_directive("스텐도마", {**self._M, "primary_freq": 3}, too_low=True)
         assert d is not None
-        assert "총 약 16회" in d  # 절대 목표 = round(1.7% * 3800 / 4)
+        assert "총 약 13회" in d  # 절대 목표 = 1.4%(하한 1.0의 1.4배) 기준 3800 / 4
         assert "회를 더" not in d  # 차이(delta) 지시는 쓰지 않는다
         assert "직전 생성은 3회" in d  # 직전 값은 참고로만
-        assert "238자마다" in d  # 분량이 달라져도 감을 유지할 밀도 감각
+        assert "292자마다" in d  # 분량이 달라져도 감을 유지할 밀도 감각
         assert "도배" in d  # 상한 위반 방지 경고를 같이 준다
 
     def test_high_gives_absolute_goal(self) -> None:
@@ -930,15 +935,15 @@ class TestDensityDirectiveQuantified:
         d = cli._density_directive("스텐도마", {**self._M, "primary_freq": 37}, too_low=False)
         assert d is not None
         assert "37회 써서 과밀" in d
-        assert "총 약 16회" in d  # 줄일 목표도 절대 횟수로
+        assert "총 약 13회" in d  # 줄일 목표도 절대 횟수로
         assert "덜어내" not in d
 
     def test_category_override_clamps_target(self) -> None:
-        # 카테고리가 하한 2.0%로 올렸으면 기본 목표 1.7%는 그대로 쓰면 안 된다(넣자마자 또 미달).
+        # 카테고리가 하한 2.0%로 올렸으면 기본 목표(1.7%)는 하한 미달이라 쓸 수 없다.
         m = {**self._M, "density_floor": 2.0, "density_ceil": 3.0, "primary_freq": 2}
         d = cli._density_directive("스텐도마", m, too_low=True)
         assert d is not None
-        assert "약 24회" in d  # 목표 = (2.0+3.0)/2 = 2.5% → round(2.5% * 3800 / 4)
+        assert "약 27회" in d  # 목표 = 2.0% * 1.4 = 2.8% → 2.8% * 3800 / 4
 
     def test_missing_metrics_falls_back_without_crash(self) -> None:
         assert cli._density_directive("스텐도마", {}, too_low=True) is None
@@ -964,6 +969,6 @@ class TestDensityDirectiveQuantified:
         fb = cli._actionable_feedback(report, "스텐도마")
         quantified = [f for f in fb if "총 약" in f]
         assert quantified, f"실제 게이트 산출로 정량 지시가 안 나옴: {fb}"
-        assert "총 약 3회" in quantified[0]  # round(1.7% * 700 / 4)
+        assert "총 약 2회" in quantified[0]  # 1.4% 기준 700 / 4 — #48 목표 = 하한의 1.4배
         assert "직전 생성은 0회" in quantified[0]
         assert "원인:" in quantified[0]  # 원본 issue(정확한 %)도 함께 보존

@@ -261,6 +261,8 @@ def _check_phase2_modules() -> bool:
         ("enricher.retry", "RetryConfig"),
         ("enricher.seo_directive", "build_seo_directive"),
         ("enricher.seo_regenerate", "regenerate_until_seo_pass"),
+        ("enricher.keyword_density", "keyword_substitute"),
+        ("enricher.density_fix", "try_reduce_density"),
         ("enricher.category_writer", "generate_category_guide"),
         ("enricher.category_page_builder", "build_and_save"),
         ("enricher.concept_image", "generate_concept_image"),
@@ -625,10 +627,26 @@ def _density_directive(kw: str, metrics: dict[str, Any], *, too_low: bool) -> st
     (3회→37회 오버슈트로 반대편 상한 위반) → 상한 도달 격리·3일 발행 0편.
 
     밀도 = 키워드길이 * 반복수 / 산문길이 이므로 목표 반복수는 역산할 수 있다(validator.seo와
-    동일 식). 목표 밀도는 네이버 실측 1.7%를 쓰되, 카테고리가 하한·상한을 오버라이드했으면
-    그 범위 밖으로 나가지 않게 클램프한다. metrics가 없으면 None(호출부가 옛 정성 지시로 폴백).
+    동일 식). metrics가 없으면 None(호출부가 옛 정성 지시로 폴백).
     ★게이트 기준은 낮추지 않는다 — 생성 지시의 정밀도만 올리는 자가복원(§0).
+
+    ★세션 #48 — #47의 정량 지시가 라이브에서 수렴하지 않은 것을 근본수정한다. 07-30·07-31
+    '책상추천'이 이틀 연속 `시도1 미달(2·6회) → "총 약 14~15회" → 시도2 도배(31회·약 4%)`로
+    반려됐다. 저장 본문 전수 확인 결과 모델은 횟수를 센 게 아니라 **문체를 바꿔** 소제목·상품
+    문단·FAQ 답변마다 기계적으로 배치했다(keyword_density 모듈 docstring에 상세). 세 가지를 고친다.
+    - 목표를 SEO 최적(1.7%)에서 **하한+20%**로 낮춘다 — 자연 문체에서 한 걸음 거리라 도배 모드로
+      건너뛰지 않는다. 게이트 밴드 안이므로 기준 완화가 아니다.
+    - **절대 상한(cap)을 함께 준다** — 옛 지시엔 "넘기지 말라"는 숫자가 없었다.
+    - 관찰된 도배 패턴을 **금지 예시로 명시**한다. 특히 미달(too_low) 쪽 지시의 "여러 문단·
+      소제목에 고르게 나누세요"가 '단위마다 배치'로 읽혀 오버슈트를 부추긴 정황이라 걷어낸다.
     """
+    from enricher.keyword_density import (
+        cap_count,
+        join_josa,
+        keyword_substitute,
+        regen_target_pct,
+        target_count,
+    )
     from validator.seo import DENSITY_TARGET
 
     try:
@@ -642,27 +660,42 @@ def _density_directive(kw: str, metrics: dict[str, Any], *, too_low: bool) -> st
     if chars <= 0 or kw_len <= 0 or floor <= 0 or ceil <= floor:
         return None
 
-    # 목표 밀도: 기본 1.7%. 카테고리 오버라이드로 범위를 벗어나면 범위 중앙으로 대체.
-    target_pct = DENSITY_TARGET if floor <= DENSITY_TARGET <= ceil else (floor + ceil) / 2
-    need = max(1, round(target_pct / 100 * chars / kw_len))
+    target_pct = regen_target_pct(floor, ceil, DENSITY_TARGET)
+    need = target_count(chars, kw_len, target_pct)
     if need == freq:  # 반올림 경계 — 횟수로는 차이가 없어 정량 지시가 무의미
         return None
+    cap = cap_count(need)
     # ★재생성은 직전 본문을 주지 않고 **처음부터 다시 쓴다**(claude_client.build_user_prompt는
     # 원본 템플릿 + 보완 지시만 붙인다). 그래서 "N회를 더 넣어라"는 기준 본문이 없어 성립하지
     # 않는다 — 반드시 '새 본문에 총 몇 회'라는 절대 목표로 준다. 직전 횟수는 참고로만.
-    per = max(1, round(chars / need))  # 몇 자마다 1회꼴 — 분량이 달라져도 감을 유지시킨다
+    per = max(1, chars // need)  # 몇 자마다 1회꼴 — 분량이 달라져도 감을 유지시킨다
     goal = (
         f"새로 쓰는 본문에 대표키워드 '{kw}'를 **총 약 {need}회** 포함하세요"
-        f"(산문 {chars:,}자 기준 목표 밀도 {target_pct:.1f}% — 대략 {per:,}자마다 1회꼴)."
+        f"(산문 {chars:,}자 기준 목표 밀도 {target_pct:.1f}% — 대략 {per:,}자마다 1회꼴). "
+        f"**{cap}회를 넘기면 도배로 탈락합니다.**"
     )
+    substitute = keyword_substitute(kw)
+    anti = (
+        f"★상품 소개 문단마다·FAQ 답변마다 '{kw}'를 넣지 마세요 — 실제 탈락 원인이 이 패턴입니다. "
+        f"소제목은 1~2개에만 쓰고, '{kw}'를 상품을 가리키는 명사로 쓰지 마세요"
+    )
+    if substitute:
+        anti += (
+            f'(✗ "가성비 높은 {join_josa(kw, "이다")}" '
+            f'→ ✅ "가성비 높은 {join_josa(substitute, "이다")}").'
+        )
+        alt = f"'{substitute}'·'이 제품'·대명사"
+    else:
+        anti += '(✗ "가성비 높은 …" 식 지칭).'
+        alt = "'이 제품'·'해당 상품'·대명사"
     if too_low:
         return (
-            f"{goal} 직전 생성은 {freq}회뿐이라 미달이었습니다. 한 문단에 몰아넣지 말고 여러 "
-            "문단·소제목에 고르게 나누세요(소제목에 쓴 것도 횟수에 포함됩니다). 도배는 금지."
+            f"{goal} 직전 생성은 {freq}회뿐이라 미달이었습니다. 배분은 도입부 1~2회 · 소제목 "
+            f"1~2회 · 나머지는 본문 문단에 자연스럽게(소제목에 쓴 것도 횟수에 포함). {anti}"
         )
     return (
         f"직전 생성은 '{kw}'를 {freq}회 써서 과밀(도배 = 스팸/어뷰징)이었습니다. {goal} "
-        "나머지 자리는 대명사나 일반어('이 제품' 등)로 바꿔 문장을 자연스럽게 유지하세요."
+        f"나머지 자리는 {alt}로 바꿔 문장을 자연스럽게 유지하세요. {anti}"
     )
 
 
@@ -965,6 +998,28 @@ def cmd_enrich(args: argparse.Namespace) -> int:
             if not enriched_payload:
                 print(f"{FAIL} {max_attempts}회 생성 모두 응답/형식 실패 — 저장 안 함")
                 return 3
+            if not passed:
+                # ★세션 #48 백스톱 — 재시도를 다 써도 '과밀'만 남았으면 LLM 재호출 없이(비용 0)
+                # 초과분을 대체어로 바꿔 밴드 안으로 되돌린다. 지시(①)만으로는 LLM 출력이
+                # 확률적이라 수렴이 보장되지 않는다(#47이 지시만 고쳐 실패한 지점의 근본 보강).
+                # 적용 조건·보호 구역·되돌리기는 enricher/density_fix.py 참조.
+                from enricher.density_fix import skip_reason, try_reduce_density
+
+                last_report = serialize_report(validate_all(enriched_payload))
+                reduced = try_reduce_density(enriched_payload, last_report)
+                if reduced is not None:
+                    enriched_payload, fix_info = reduced
+                    enriched_payload["density_fix"] = fix_info
+                    passed = True
+                    print(
+                        f"{OK} 과밀 결정적 감산 — '{fix_info['keyword']}' "
+                        f"{fix_info['freq_before']}→{fix_info['freq_after']}회"
+                        f"({fix_info['density_before']}%→{fix_info['density_after']}%)"
+                        f" · 대체어 {fix_info['substitute']!r} {fix_info['replaced']}곳"
+                        f"/후보 {fix_info['candidates']}곳 · LLM 재호출 없음"
+                    )
+                else:
+                    print(f"     감산 백스톱 미적용 — {skip_reason(enriched_payload, last_report)}")
             if not passed:
                 print(
                     f"{WARN} 게이트 미통과 — 마지막 시도 저장(검토 대기), cmd_validate가 최종 판정"

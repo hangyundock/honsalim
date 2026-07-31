@@ -149,7 +149,13 @@ def build_user_prompt(request: GenerateRequest) -> str:
     from .seo_directive import build_seo_directive
 
     seo = request.seo or {}
-    seo_directive = build_seo_directive(seo.get("primary"), seo.get("secondary"))
+    # 카테고리가 밴드를 오버라이드했으면 지시의 '1,000자당 N회'도 그 밴드로 계산해야 한다(#48).
+    seo_directive = build_seo_directive(
+        seo.get("primary"),
+        seo.get("secondary"),
+        density_floor=seo.get("density_floor"),
+        density_ceil=seo.get("density_ceil"),
+    )
     prompt = prompt_loader.render(
         "article_main",
         scenario=request.scenario,

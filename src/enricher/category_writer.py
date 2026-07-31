@@ -29,7 +29,14 @@ def build_category_prompt(
     category_name: str, seo: dict[str, Any], feedback: list[str] | None = None
 ) -> str:
     """카테고리 가이드 user 프롬프트 조립 (seo 2층 배치 지시 주입 + 재생성 피드백)."""
-    directive = build_seo_directive(seo.get("primary"), seo.get("secondary"))
+    # ★#48: 카테고리가 밴드를 오버라이드했으면 '1,000자당 N회'도 그 밴드로 계산해야 한다.
+    # (기본값으로 계산하면 하한 2.0% 카테고리에 1.0% 기준 횟수를 주어 넣자마자 미달)
+    directive = build_seo_directive(
+        seo.get("primary"),
+        seo.get("secondary"),
+        density_floor=seo.get("density_floor"),
+        density_ceil=seo.get("density_ceil"),
+    )
     prompt = prompt_loader.render(
         "category_guide",
         category_name=category_name,
@@ -78,7 +85,14 @@ def build_category_page_prompt(
     """
     seo = seo or {}
     directive = (
-        build_seo_directive(seo.get("primary"), seo.get("secondary")) if seo.get("primary") else ""
+        build_seo_directive(
+            seo.get("primary"),
+            seo.get("secondary"),
+            density_floor=seo.get("density_floor"),
+            density_ceil=seo.get("density_ceil"),
+        )
+        if seo.get("primary")
+        else ""
     )
     prompt = prompt_loader.render(
         "category_page",
