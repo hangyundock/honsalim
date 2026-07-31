@@ -207,6 +207,59 @@ class TestSeoDirectiveAntiSpam:
         assert build_seo_directive(None) == ""
 
 
+class TestKeywordArticleFloor:
+    """★#48(주인 결정 A) — 키워드 글만 하한을 낮춘다. 카테고리 페이지는 1.0% 유지.
+
+    라이브 5개 본문 실측: 도배를 금지하면 '책상추천' 같은 검색어 복합어의 자연 문체가
+    0.78~0.97%로 수렴해 하한 1.0%에 닿지 못했다(지시 문구 3회 변경에도 동일). 도배로만 도달하는
+    31회는 상한(3.5%)에 걸린다 — 착지 가능한 밴드가 없었다. 상한·도배 금지는 그대로 두고
+    하한만 자연 문체 실측선까지 내린 것이 이 결정이다.
+    """
+
+    def test_keyword_article_uses_the_lower_floor(self) -> None:
+        from collector import seo_keywords
+        from validator.seo import KEYWORD_ARTICLE_DENSITY_FLOOR
+
+        cfg = seo_keywords.keyword_gate_config("책상추천", "desk")
+        assert cfg is not None
+        assert cfg["density_floor"] == KEYWORD_ARTICLE_DENSITY_FLOOR
+        assert cfg["primary"] == "책상추천"
+
+    def test_category_page_floor_is_untouched(self) -> None:
+        """카테고리 대표어는 일반 명사라 자연 반복이 쉽다 — 기준을 낮출 이유가 없다."""
+        from collector import seo_keywords
+        from validator.seo import DENSITY_FLOOR
+
+        cfg = seo_keywords.gate_config("desk")
+        assert cfg is not None
+        assert float(cfg.get("density_floor") or DENSITY_FLOOR) == DENSITY_FLOOR
+
+    def test_live_measured_bodies_now_clear_the_floor(self) -> None:
+        """실측값으로 검산 — 라이브에서 나온 자연 문체 밀도가 새 하한을 넘어야 결정이 유효하다."""
+        from validator.seo import KEYWORD_ARTICLE_DENSITY_FLOOR
+
+        for measured in (0.97, 0.90):  # draft 41 · 42
+            assert measured >= KEYWORD_ARTICLE_DENSITY_FLOOR, measured
+
+    def test_ceiling_and_spam_ban_are_unchanged(self) -> None:
+        """★하한만 조정한다 — 상한을 함께 풀면 옛 도배(4.33%)가 되살아난다."""
+        from validator.seo import DENSITY_CEIL, check_seo
+
+        assert DENSITY_CEIL == 3.5
+        body = "# 책상추천\n\n## 책상추천 정리\n\n" + ("책상추천 " * 40 + "설명 문장입니다. " * 5)
+        ok, rpt = check_seo({"body_md": body, "seo": {"primary": "책상추천", "density_floor": 0.8}})
+        assert ok is False
+        assert any(str(i).startswith("density_high") for i in rpt["issues"])
+
+
+class TestDirectiveHeadingExample:
+    """★#48 라이브 — 8섹션 표준 제목을 그대로 복사하느라 소제목 키워드가 0개가 되던 문제."""
+
+    def test_directive_shows_the_concrete_heading_to_edit(self) -> None:
+        d = build_seo_directive("책상추천")
+        assert "## 1. 누구를 위한 책상추천 가이드인가" in d
+
+
 class TestDirectiveBoundSymmetry:
     """★#48 라이브 2차 적발 — 게이트 경계 중 **한쪽에만** '탈락'을 붙이면 반대편으로 넘어간다.
 

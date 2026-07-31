@@ -113,6 +113,15 @@ class TestKeywordGateConfig:
         assert sk.keyword_gate_config("등받이의자", "no-such-category") is None
 
     def test_density_overrides_preserved(self, tmp_path: Path) -> None:
+        """★세션 #48 계약 변경 — 상한(ceil) 오버라이드는 그대로 승계하되, **하한(floor)은 승계하지
+        않고 키워드 글 상한선(0.8%)으로 낮춘다**(주인 결정 A).
+
+        카테고리가 하한을 1.5%로 올려뒀다면 키워드 글에는 더 도달 불가능해진다 — 검색어 복합어는
+        도배를 금지한 자연 문체가 0.78~0.97%에서 수렴하기 때문(라이브 5개 본문 실측). 하한을
+        '올리는' 방향의 오버라이드만 무시하고, 더 낮게 지정한 카테고리는 그 값을 존중한다.
+        """
+        from validator.seo import KEYWORD_ARTICLE_DENSITY_FLOOR
+
         p = tmp_path / "seo_keywords.yml"
         p.write_text(
             "categories:\n"
@@ -127,8 +136,24 @@ class TestKeywordGateConfig:
         assert cfg is not None
         assert cfg["primary"] == "롱테일 키워드"
         assert cfg["secondary"] == ["테스트 대표어"]
-        assert cfg["density_floor"] == 1.5  # gate_config 오버라이드 승계
-        assert cfg["density_ceil"] == 3.0
+        assert cfg["density_floor"] == KEYWORD_ARTICLE_DENSITY_FLOOR  # 하한은 올려 받지 않는다
+        assert cfg["density_ceil"] == 3.0  # 상한 오버라이드는 그대로 승계
+        # 카테고리 페이지 자체는 원래 하한(1.5%)을 그대로 쓴다 — 변경 범위는 키워드 글뿐.
+        cat_cfg = sk.gate_config("test-cat", path=p)
+        assert cat_cfg is not None and cat_cfg["density_floor"] == 1.5
+
+    def test_keyword_floor_respects_a_lower_category_override(self, tmp_path: Path) -> None:
+        """카테고리가 더 낮은 하한을 지정했으면 그 값을 존중한다(0.8로 올리지 않는다)."""
+        p = tmp_path / "seo_keywords.yml"
+        p.write_text(
+            "categories:\n"
+            "  test-cat:\n"
+            "    primary: 테스트 대표어\n"
+            "    density_floor: 0.5\n",
+            encoding="utf-8",
+        )
+        cfg = sk.keyword_gate_config("롱테일 키워드", "test-cat", path=p)
+        assert cfg is not None and cfg["density_floor"] == 0.5
 
     def test_keyword_primary_satisfies_headings_but_category_does_not(self) -> None:
         # 핵심 증명: '등받이의자' 글(소제목이 등받이의자 중심)을
