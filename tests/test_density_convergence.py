@@ -1,4 +1,4 @@
-"""세션 #48 — 대표키워드 밀도 수렴(지시 ① + 결정적 감산 백스톱 ②) 회귀.
+﻿"""세션 #48 — 대표키워드 밀도 수렴(지시 ① + 결정적 감산 백스톱 ②) 회귀.
 
 라이브 근거(07-30 draft 38 · 07-31 draft 39, 저장 본문 전수 확인):
     시도1 미달(2회·6회) → "총 약 14~15회" 지시 → 시도2 **31회**(4.33%·3.97%) → 반려 → 발행 0편
@@ -235,6 +235,46 @@ class TestDirectiveBoundSymmetry:
         assert "두 번째 언급부터는" not in d
         assert "전부 바꾸면 하한 미달로 탈락" in d
 
+    def test_regen_min_is_the_target_not_the_bare_floor(self) -> None:
+        """★#48 라이브 3차 적발 — 모델은 제시된 **최소치를 그대로 쓴다**.
+
+        07-31 18:23 실측: "총 약 9회, **7회 미만이면 미달**"을 주자 모델이 목표 9가 아니라
+        경계값 7회를 정확히 썼다. 그 사이 본문이 2,546→2,900자로 늘어 7회가 0.97%가 되며
+        하한(1.0%)에 딱 1회 모자라 탈락. 미달 경계로 하한 최소치를 말하면 안 되고, 목표치를
+        말해야 길이가 변해도 살아남는다.
+        """
+        chars, kw_len, floor = 2546, 4, 1.0
+        metrics = {
+            "chars": chars,
+            "primary_len": kw_len,
+            "density_floor": floor,
+            "density_ceil": 3.5,
+            "primary_freq": 4,
+        }
+        d = cli._density_directive("책상추천", metrics, too_low=True)
+        assert d is not None
+        bare_floor = math.ceil(floor * chars / 100 / kw_len)  # 07-31에 실제로 제시했던 7
+        need = target_count(chars, kw_len, regen_target_pct(floor, 3.5, DENSITY_TARGET))
+        assert need > bare_floor, "전제: 목표는 하한 최소치보다 커야 한다"
+        assert f"{bare_floor}회 미만이면" not in d, "하한 최소치를 미달 경계로 제시하면 앵커링된다"
+        assert f"{need}회 미만이면 '미달'로 탈락" in d
+        # 모델이 제시된 최소치를 그대로 써도, 본문이 25% 길어질 때까지는 하한을 지켜야 한다
+        # (07-31 실측 드리프트가 +14%였다). need회가 하한을 유지하는 최대 산문 길이로 검산.
+        survivable_chars = need * kw_len * 100 / floor
+        assert survivable_chars >= chars * 1.25, (survivable_chars, chars)
+
+    def test_regen_directive_keeps_a_length_independent_ratio(self) -> None:
+        """절대 횟수는 본문 길이가 바뀌면 무너진다(#47과 같은 계열) — 비율을 함께 준다."""
+        metrics = {
+            "chars": 2546,
+            "primary_len": 4,
+            "density_floor": 1.0,
+            "density_ceil": 3.5,
+            "primary_freq": 4,
+        }
+        d = cli._density_directive("책상추천", metrics, too_low=True)
+        assert d is not None and "1,000자당" in d
+
     def test_regen_directive_also_states_both_bounds(self) -> None:
         """재생성 지시도 같은 성질을 지켜야 한다 — 여기만 한쪽이면 재시도에서 다시 뒤집힌다."""
         metrics = {
@@ -267,8 +307,8 @@ class TestDensityDirectiveRegen:
         """#47은 1.7%(약 14회)를 목표로 줘 모델이 도배 모드로 점프했다 → 1.4%로 낮춘다."""
         d = cli._density_directive("책상추천", {**self._M, "primary_freq": 6}, too_low=True)
         assert d is not None
-        assert "총 약 11회" in d  # 1.4% * 3215 / 4
-        assert "총 약 14회" not in d  # #47이 주던 값(1.7%) — 도배 모드를 유발했다
+        assert "11회 이상" in d  # 1.4% * 3215 / 4
+        assert "14회 이상" not in d  # #47이 주던 값(1.7%) — 도배 모드를 유발했다
 
     def test_low_directive_carries_cap_and_anti_pattern(self) -> None:
         d = cli._density_directive("책상추천", {**self._M, "primary_freq": 6}, too_low=True)
@@ -289,7 +329,7 @@ class TestDensityDirectiveRegen:
         d = cli._density_directive("책상추천", {**self._M, "primary_freq": 31}, too_low=False)
         assert d is not None
         assert "31회 써서 과밀" in d
-        assert "총 약 11회" in d and "17회를 넘기면" in d
+        assert "11회 이상" in d and "17회를 넘기면" in d
         assert "'책상'·'이 제품'·대명사" in d  # no-op이던 대체어 지시가 실제 대체어를 준다
 
     def test_missing_metrics_still_falls_back_without_crash(self) -> None:
@@ -305,7 +345,7 @@ class TestDensityDirectiveRegen:
         body = "# 책상추천 고르는 법\n" + ("가나다라마바사아자차" * 70)
         report = serialize_report(validate_all({"body_md": body, "seo": {"primary": "책상추천"}}))
         assert "metrics" in report["gates"]["seo"]
-        quantified = [f for f in cli._actionable_feedback(report, "책상추천") if "총 약" in f]
+        quantified = [f for f in cli._actionable_feedback(report, "책상추천") if "회 이상" in f]
         assert quantified, "실제 게이트 산출로 정량 지시가 안 나옴"
         assert "원인:" in quantified[0]
 

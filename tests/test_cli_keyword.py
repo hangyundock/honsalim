@@ -1,4 +1,4 @@
-"""cli 키워드 큐 명령 회귀 테스트 (세션 #25) — add·generate(dry)·list·reject.
+﻿"""cli 키워드 큐 명령 회귀 테스트 (세션 #25) — add·generate(dry)·list·reject.
 
 LLM·외부 API는 호출하지 않는 경로만 (dry_run·검증·반려·목록).
 """
@@ -924,7 +924,7 @@ class TestDensityDirectiveQuantified:
         """
         d = cli._density_directive("스텐도마", {**self._M, "primary_freq": 3}, too_low=True)
         assert d is not None
-        assert "총 약 13회" in d  # 절대 목표 = 1.4%(하한 1.0의 1.4배) 기준 3800 / 4
+        assert "13회 이상" in d  # 절대 목표 = 1.4%(하한 1.0의 1.4배) 기준 3800 / 4
         assert "회를 더" not in d  # 차이(delta) 지시는 쓰지 않는다
         assert "직전 생성은 3회" in d  # 직전 값은 참고로만
         assert "292자마다" in d  # 분량이 달라져도 감을 유지할 밀도 감각
@@ -935,7 +935,7 @@ class TestDensityDirectiveQuantified:
         d = cli._density_directive("스텐도마", {**self._M, "primary_freq": 37}, too_low=False)
         assert d is not None
         assert "37회 써서 과밀" in d
-        assert "총 약 13회" in d  # 줄일 목표도 절대 횟수로
+        assert "13회 이상" in d  # 줄일 목표도 절대 횟수로
         assert "덜어내" not in d
 
     def test_category_override_clamps_target(self) -> None:
@@ -943,7 +943,7 @@ class TestDensityDirectiveQuantified:
         m = {**self._M, "density_floor": 2.0, "density_ceil": 3.0, "primary_freq": 2}
         d = cli._density_directive("스텐도마", m, too_low=True)
         assert d is not None
-        assert "약 27회" in d  # 목표 = 2.0% * 1.4 = 2.8% → 2.8% * 3800 / 4
+        assert "27회 이상" in d  # 목표 = 2.0% * 1.4 = 2.8% → 2.8% * 3800 / 4
 
     def test_missing_metrics_falls_back_without_crash(self) -> None:
         assert cli._density_directive("스텐도마", {}, too_low=True) is None
@@ -967,8 +967,8 @@ class TestDensityDirectiveQuantified:
         assert "metrics" in report["gates"]["seo"], "serialize_report가 metrics를 보존해야 함"
 
         fb = cli._actionable_feedback(report, "스텐도마")
-        quantified = [f for f in fb if "총 약" in f]
+        quantified = [f for f in fb if "회 이상" in f]
         assert quantified, f"실제 게이트 산출로 정량 지시가 안 나옴: {fb}"
-        assert "총 약 2회" in quantified[0]  # 1.4% 기준 700 / 4 — #48 목표 = 하한의 1.4배
+        assert "2회 이상" in quantified[0]  # 1.4% 기준 700 / 4 — #48 목표 = 하한의 1.4배
         assert "직전 생성은 0회" in quantified[0]
         assert "원인:" in quantified[0]  # 원본 issue(정확한 %)도 함께 보존

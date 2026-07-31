@@ -666,7 +666,14 @@ def _density_directive(kw: str, metrics: dict[str, Any], *, too_low: bool) -> st
     if need == freq:  # 반올림 경계 — 횟수로는 차이가 없어 정량 지시가 무의미
         return None
     cap = cap_count(need)
-    floor_min = min_count_for(floor, chars, kw_len)
+    # ★#48 라이브 3차 적발 — '미달 경계'로 **하한 최소치(floor_min)를 그대로 말하면 안 된다**.
+    #   07-31 18:23 실측: 지시 "총 약 9회, 7회 미만이면 미달"에 모델이 목표(9)가 아니라 **경계값
+    #   7회를 정확히 썼고**, 그 사이 본문이 2,546자 → 2,900자로 길어져 7회가 0.97%가 되며 하한
+    #   1.0%에 딱 1회 모자라 탈락했다. 원인 둘: (a)모델은 제시된 최소치에 앵커링한다 (b)절대
+    #   횟수는 본문 길이가 바뀌면 그대로 무너진다(#47이 겪은 것과 같은 계열).
+    #   → 미달 경계를 **목표치 자체**로 올린다(목표를 쓰면 1.4%라 길이가 29% 늘어도 하한 유지).
+    stated_min = max(need, min_count_for(floor, chars, kw_len))
+    per_1000 = max(1, min_count_for(target_pct, 1000, kw_len))
     # ★재생성은 직전 본문을 주지 않고 **처음부터 다시 쓴다**(claude_client.build_user_prompt는
     # 원본 템플릿 + 보완 지시만 붙인다). 그래서 "N회를 더 넣어라"는 기준 본문이 없어 성립하지
     # 않는다 — 반드시 '새 본문에 총 몇 회'라는 절대 목표로 준다. 직전 횟수는 참고로만.
@@ -674,10 +681,11 @@ def _density_directive(kw: str, metrics: dict[str, Any], *, too_low: bool) -> st
     # ★#48 라이브 적발: 상한에만 '탈락'을 붙였더니 모델이 그 경고만 추적해 반대편(미달)로
     #   떨어졌다(0.78%). 재생성 지시도 **양쪽 경계를 같은 무게로** 숫자와 함께 준다.
     goal = (
-        f"새로 쓰는 본문에 대표키워드 '{kw}'를 **총 약 {need}회** 포함하세요"
-        f"(산문 {chars:,}자 기준 목표 밀도 {target_pct:.1f}% — 대략 {per:,}자마다 1회꼴). "
-        f"**{floor_min}회 미만이면 '미달'로 탈락하고 {cap}회를 넘기면 '도배'로 탈락합니다** "
-        "— 두 경계 사이에 반드시 들어와야 합니다."
+        f"새로 쓰는 본문에 대표키워드 '{kw}'를 **{stated_min}회 이상 {cap}회 이하**로 포함하세요"
+        f"(권장 {need}회 · 산문 {chars:,}자 기준 목표 밀도 {target_pct:.1f}% — 대략 {per:,}자마다 1회꼴). "
+        f"**{stated_min}회 미만이면 '미달'로 탈락하고 {cap}회를 넘기면 '도배'로 탈락합니다** "
+        f"— 두 경계 사이에 반드시 들어와야 합니다. 본문 길이가 위 기준과 달라지면 "
+        f"**1,000자당 {per_1000}회** 비율을 유지하세요(횟수보다 이 비율이 우선)."
     )
     substitute = keyword_substitute(kw)
     anti = (
