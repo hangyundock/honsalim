@@ -786,6 +786,10 @@ def _actionable_feedback(report: dict[str, Any], primary: str | None) -> list[st
     return out
 
 
+# 실험에서 의미 있는 게이트 = **모델이 쓴 본문으로 판정되는 것들**. schema(JSON-LD)·disclosure
+# (공정위 고지)는 생성 후 시스템이 삽입하므로 원문만 재면 항상 fail이 떠 결과를 오독하게 만든다.
+_MODEL_OWNED_GATES = ("truth", "links", "seo")
+
 # ★세션 #48 — cmd_enrich(운영)와 cmd_experiment(실험)가 **완전히 같은 프롬프트 입력**을 쓰도록
 # SQL과 조립을 한 곳에 둔다. 처음엔 실험 쪽에서 따로 SELECT를 짜다 `season_peak`를 빠뜨려 실험이
 # 운영과 다른 프롬프트를 측정하고 있었다(자체 재검수 적발 — 측정 도구가 틀리면 결론도 틀린다).
@@ -921,6 +925,7 @@ def cmd_experiment(args: argparse.Namespace) -> int:
 
     print("\n  n | 키워드 | 밀도    | 산문자수 | 소제목KW | seo | 미달 게이트")
     _print_experiment_table(rows)
+    print("  ※ schema·disclosure는 생성 후 시스템이 삽입 — 실험 측정 대상 아님")
     return 0
 
 
@@ -960,7 +965,10 @@ def _run_experiment_samples(
         payload = {"body_md": body_md, "title": meta.get("title"), "seo": seo_cfg}
         rep = serialize_report(validate_all(payload))
         m = rep["gates"]["seo"].get("metrics") or {}
-        failed = [g for g, v in rep["gates"].items() if v["issues"]]
+        # ★schema·disclosure는 **생성 후 시스템이 삽입**한다(_build_enriched_payload의 JSON-LD·
+        #   공정위 고지). 원문만 재는 실험에서 이 둘은 항상 fail이라 '가짜 미달'이 된다 —
+        #   첫 실행 표에 그대로 찍혀 나왔다(자체 재검수 적발). 모델이 실제로 책임지는 게이트만 센다.
+        failed = [g for g, v in rep["gates"].items() if v["issues"] and g in _MODEL_OWNED_GATES]
         rows.append(
             {
                 "n": i,
@@ -997,7 +1005,7 @@ def _print_experiment_table(rows: list[dict[str, Any]]) -> None:
         mid = len(freqs) // 2
         print(
             f"\n  분포 — 키워드 횟수 {freqs[0]}~{freqs[-1]}(중앙 {freqs[mid]}) · "
-            f"밀도 {dens[0]:.2f}~{dens[-1]:.2f}% · 5게이트 통과 {passes}/{len(ok_rows)}"
+            f"밀도 {dens[0]:.2f}~{dens[-1]:.2f}% · 모델 책임 게이트 통과 {passes}/{len(ok_rows)}"
         )
         tin = sum(int((r["usage"] or {}).get("input_tokens") or 0) for r in ok_rows)
         tout = sum(int((r["usage"] or {}).get("output_tokens") or 0) for r in ok_rows)

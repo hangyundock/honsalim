@@ -146,6 +146,16 @@ class TestExperimentHarness:
         usage_db.commit()
         assert cli.cmd_experiment(argparse.Namespace(draft=1, samples=1, dry_run=True)) == 2
 
+    def test_system_inserted_gates_are_excluded_from_measurement(self) -> None:
+        """★첫 실행이 낸 가짜 신호 — schema·disclosure는 **생성 후 시스템이 삽입**한다.
+
+        원문만 재는 실험에서 이 둘은 항상 fail이라 "5게이트 통과 0/3"이라는 오독을 만들었다
+        (실제 seo 통과는 2/3였다). 모델이 책임지는 게이트만 세야 결론이 맞는다.
+        """
+        assert set(cli._MODEL_OWNED_GATES) == {"truth", "links", "seo"}
+        assert "schema" not in cli._MODEL_OWNED_GATES
+        assert "disclosure" not in cli._MODEL_OWNED_GATES
+
     def test_prompt_matches_production_exactly(self, usage_db: sqlite3.Connection) -> None:
         """★드리프트 가드 — 실험이 운영과 **다른 프롬프트**를 재면 결론도 틀린다.
 
