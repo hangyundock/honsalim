@@ -9,16 +9,18 @@
 
 | 영역 | 값 | 최종 확인 세션 |
 |------|----|---------------|
-| 진행 단계 | **#47: 무인 발행 3일 공백 근본수정(반려 집계·밀도 지시) + 전체 정밀진단 안정화 5건** — 07-21~23 발행 0편 원인=`스텐도마` 게이트 반려 3연속(침묵 정지 아님) / fail-loud 구멍 3개 봉인(반려 집계·비공개 배포·cli 크래시) / 래퍼 3건(pull 판정·로그 인코딩·경보)+busy_timeout. 회귀 1116→**1126**. 상세 EVENTS #47·DECISIONS EE | 2026-07-29 #47 |
-| 운영 모델 | **★완전무인 가동 ON**: auto_mode ON·예약·`min_published`=**0**. 키워드+쿠팡 적재→auto-cycle 자동 생성·승인·발행→무관여. 자기보고 3겹(`auto_cycle_last.json`·[ALERT] 로그·텔레그램). 자가복원 **3겹**(#41 게이트 반려+#42 생성 예외+#44 안전정지 경보). #45 fail-loud 보강(refill 매핑·공개 한정·생성0 경보·`category_draft` 보류). **#47 fail-loud 구멍 3개 봉인**: 게이트 반려를 성공으로 세던 집계 정정(`RC_GATE_REJECTED`)·비공개-only 날 배포 실패 경보·cli 비정상 종료(exit≠0) 래퍼 경보. ★래퍼는 `main`일 때만 가동([[autonomous-detached-head-silent-stop]]). E7 완화=min_published | #47 |
+| 진행 단계 | **#48: 무인 발행 밀도 벽 돌파 + 라이브 2편 + 비용 낭비 방지 5종 + slug 근본수정** — 07-30·31 발행 0편 원인=`책상추천` density 진동(도배↔미달). 키워드 글 하한을 **절대 횟수(min_count≥4)**로 전환(B2·주인 결정)·1인칭 오탐 화이트리스트 반전·재시도 2→3·과밀 감산 백스톱. 08-01 정규 사이클 **시도 1회 통과 자동 발행**. 회귀 1126→**1230**. 상세 EVENTS #48·DECISIONS FF | 2026-08-01 #48 |
+| 운영 모델 | **★완전무인 가동 ON**: auto_mode ON·예약·`min_published`=**0**. 키워드+쿠팡 적재→auto-cycle 자동 생성·승인·발행→무관여. 자기보고 3겹(`auto_cycle_last.json`·[ALERT] 로그·텔레그램). 자가복원 **4겹**(#41 게이트 반려+#42 생성 예외+#44 안전정지+**#48 과밀 감산 백스톱**). fail-loud: #45 refill·생성0 / #47 반려 집계·비공개 배포·cli 크래시 / **#48 형식오류 응답 원문 로깅**. ★래퍼는 `main`일 때만 가동([[autonomous-detached-head-silent-stop]]). E7 완화=min_published | #48 |
+| ★발행 실패 대응 순서 | **CLAUDE.md §7-3 [확정 #48]** — ①격리된 키워드는 **그대로 두면** 다음 사이클이 다른 키워드로 재개(`keyword-requeue`로 되살리지 말 것) ②문제 키워드는 `cli experiment`로 **오프라인 분포 측정** ③라이브 재생성은 마지막 1회. ★n=1 라이브 판단 금지(#48에 6회 연속 실패) | #48 |
 | Phase 1·2 기반 (#2~#17) | Phase 1 인프라(GitHub·Cloudflare·secrets·pre-commit 9종) + 핵심 모듈 10종(cli·common·validator·writer·collector·enricher·builder·deployer·tracker·workers) + #17 카테고리 4종. 세부=BACKEND §2·archive | #17 |
-| Phase 2 회귀 테스트 | **1126 PASS + 1 skip** [확정 pytest, #47] — #47 +10(반려 집계 fail-loud 2·밀도 정량지시 5(실경로 드리프트 가드 포함)·비공개-only 배포 3·busy_timeout 1), 위젯 Qt 크래시 테스트 1 opt-in skip. black·ruff·mypy 클린 | 2026-07-29 |
-| CLI 명령 (BACKEND §9) | **42개** — 코어(doctor·db·collect·enrich·validate·approve·promote·build·deploy·dashboard) + 카테고리(collect/build/approve·provision-category 등) + 운영(keyword-*·keyword-requeue·coupang-add·publish-queue·schedule·auto-cycle·refresh-cycle·build-deploy·monitor-articles·un/republish-article·notify-alert). ※IndexNow는 CLI 아님=`deployer.indexnow`(배포 후속) | #44 |
-| Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD(author=혼살다·/about/ 연결·#45). 세부 DECISIONS J·O·CC + EVENTS | #4~#45 |
-| doctor (BACKEND §9) | §1~§16(+#45 §15 씨앗 정합·§16 IndexNow 배포 정합) + §10 모듈 진입점 **71개** + #19 LLM 키 점검 | #45 |
-| DB 초기화 | `data/honsalim.db` **v9**(migration 002~009) + categories 9·category_products + products(정가/할인·판매량) + keyword_queue(#25) + articles.structured_json(#34) + api_usage(#36) + personas 3·scenarios 10. ★대시보드 시작 시 자동 migrate. ※DB는 gitignore — 새 워크트리는 `db migrate`+`db seed`(+`collect-category`) 재생성 | #36 |
+| Phase 2 회귀 테스트 | **1230 PASS + 1 skip** [확정 pytest, #48] — #48 +104(밀도 수렴·조사 안전 치환·감산 백스톱·배선 가드·경계 대칭·1인칭 화이트리스트·비용 통제 3종·slug 조각 판정/자가교정), 위젯 Qt 크래시 1 opt-in skip. black·ruff·mypy 클린 | 2026-08-01 |
+| CLI 명령 (BACKEND §9) | **43개** — 코어 10 + 카테고리(provision-category 등) + 운영(keyword-*·publish-queue·auto-cycle·refresh-cycle·monitor-articles·notify-alert 등) + **experiment(#48 오프라인 분포 측정·기본 dry-run)**. ※IndexNow는 CLI 아님=`deployer.indexnow` | #48 |
+| Phase 2 흐름 골격 | collected→enriched→validated/rejected→approved→published 6 상태 + **5 게이트**(truth·schema·disclosure·links·**seo**, validate_and_save) + META-JSON + Article JSON-LD(author=혼살다·/about/ 연결·#45). ★키워드 글 seo 하한=**절대 횟수 min_count≥4**(#48 FF3), 카테고리는 %하한 유지. 세부 DECISIONS J·O·CC·FF | #4~#48 |
+| doctor (BACKEND §9) | §1~§16(+#45 §15 씨앗 정합·§16 IndexNow 배포 정합) + §10 모듈 진입점 **73개** + #19 LLM 키 점검 | #48 |
+| DB 초기화 | `data/honsalim.db` **v10**(migration 002~010) + categories 9 + products + keyword_queue(#25) + articles.structured_json(#34) + api_usage(#36·**#48 tokens_in/out**) + personas 3·scenarios 10. ★대시보드 시작 시 자동 migrate. ※DB는 gitignore — 새 워크트리는 `db migrate`+`db seed` 재생성 | #48 |
+| LLM 비용 추적 (#48) | `api_usage(provider='llm')` — **재시도·형식오류·빈응답까지 매 호출 1행**. enrich 로그에 24h 요약. ★단가 `llm_price_in_per_1m`/`_out_per_1m` **미입력(0)** → 토큰만 기록·비용 $0. 캐시 적중 관측(실측 59% 자동·FF7). 미연결: 카테고리 가이드·비전 게이트 | #48 |
 | 설계 문서 / 메모리 / 5파일 | 설계 12/12 완료+SUMMARY(모순 0) · 메모리 feedback 7+reference · 5파일+슬래시(start/save/end) ✅ | #1~#12 |
-| 사이트 게시글 / 트래픽 / 수익 | **라이브 카테고리 6개** + **정식 글 18편**(#46 12편 + 07-24~29 무인 6편 연속 발행). ★**색인 원인 확정(#46·DD1)**: 라이브 29 URL·색인 4 → 격차=**크롤 예산/권위**(기술·얇음·중복·링크 정량 클린). 주인 **미색인 11개 색인요청 완료**(07-20·전환 확인 필요). 다음 레버=색인 전환+발행량+권위([[growth-first-priority]]) | #47 |
+| 사이트 게시글 / 트래픽 / 수익 | **라이브 카테고리 6개** + **정식 글 20편**(#48 +2: `kw-269a4bdb` 책상추천·`1-2` 1인용밥솥). ★**색인 원인 확정(#46·DD1)**: 라이브 29 URL·색인 4 → 격차=**크롤 예산/권위**(기술·얇음·중복·링크 정량 클린). 주인 **미색인 11개 색인요청 완료**(07-20·전환 확인 필요). 다음 레버=색인 전환+발행량+권위([[growth-first-priority]]) | #48 |
 
 ## 인프라
 
@@ -26,7 +28,7 @@
 |------|----|
 | 프로젝트 폴더 | `D:\affiliate_hub\` (docs·archive·.claude/commands 하위) |
 | 사이트 / 도메인 / 호스팅 | 혼살림 / **honsallim.com 라이브**(겹ㄹ=알리 'ali' 차단 회피·SSL Active·2027-06-01 Auto Renew) + honsalim.com(구·**301 Page Rule**·경로보존) / **Cloudflare Pages `honsalim`** |
-| GitHub | **`hangyundock/honsalim` Public** — origin/main = **#47 `289a7aa`**(정밀진단 안정화 5건), 운영 폴더 동기화됨. **build-and-deploy: main push → 커밋된 build/site를 Cloudflare Pages 배포**(CI 재빌드 없음·글 DB 로컬). ★**무인 배포는 전부 `refresh_cycle`**(build/site·functions/go를 commit+push) — `deployer.git_push`는 commit 없는 stub이라 단독 사용 금지(#32·#47 EE4). ※★**반드시 main 브랜치 유지**(detached면 무인 정지·#44) |
+| GitHub | **`hangyundock/honsalim` Public** — origin/main = **#48**(밀도 벽 돌파·비용 통제·slug), 운영 폴더 동기화됨. **build-and-deploy: main push → 커밋된 build/site를 Cloudflare Pages 배포**(CI 재빌드 없음·글 DB 로컬). ★**무인 배포는 전부 `refresh_cycle`** — `deployer.git_push`는 commit 없는 stub이라 단독 사용 금지(#32·#47 EE4). ※★**반드시 main 유지**(detached면 무인 정지·#44) |
 | GitHub Secrets / Branch Protection | CF_API_TOKEN · CF_ACCOUNT_ID · INDEXNOW_KEY 등록 / ruleset `main-protect` Active |
 | R2 / D1 | `honsalim-images` (APAC) / `honsalim-clicks` ID `9bae858e-456f-40e7-8084-c3b90e4ec3ca` |
 | Python / 로그 | 3.10 32-bit (TIMA·AutoBlog 공유) / `logs/auto_cycle.log`(무인 1차 증거·#47 UTF-8 복구)·`honsalim.log` |
@@ -39,34 +41,26 @@
 | 도메인 honsalim.com | 만료 2027-05-28 | Auto Renew (D-60 알림) |
 | Cloudflare API Token | 활성 (만료 GUI 미지원) | 6개월 회전 권장 — **2026-11-28** [추정] |
 | Anthropic API Key | 영구 [관찰] | 6개월 회전 권장 — **2026-11-28** [추정] |
-| INDEXNOW_KEY | 영구 [확정 — 공개 키] | 회전 불요 |
-| GitHub PAT | 미발급 (Actions는 GITHUB_TOKEN 자동) [확정] | — |
-| AliExpress Portals | **완전 연결** [확정 #22]: `ALI_TRACKING_ID=honsallim` → 제품별 promotion_link 생성·`/go/`→302 라이브 작동 | 2026-06-03 |
+| INDEXNOW_KEY / GitHub PAT | 영구(공개 키·회전 불요) / 미발급(Actions는 GITHUB_TOKEN 자동) [확정] | — |
+| AliExpress Portals | **완전 연결** [확정 #22]: `ALI_TRACKING_ID=honsallim` → promotion_link·`/go/`→302 라이브 | 2026-06-03 |
 | 쿠팡 파트너스 | 보류 | Phase 4 (콘텐츠 누적 후) 재가입 |
 
 ## 보안 / 권한
 
-| 항목 | 상태 |
-|------|------|
-| secrets 격리 / pre-commit 9종 / GitHub Secrets·Branch Protection | ✅ 전부 운영 중(detect-secrets v1.5.0+black·ruff·mypy 매 커밋 Passed) |
-| `.claude/settings.json` deny 24·allow 14 | 사전 작성 완료 — 사용자 검토 대기 |
+secrets 격리 · pre-commit 9종(detect-secrets v1.5.0+black·ruff·mypy 매 커밋 Passed) · GitHub Secrets · Branch Protection **전부 운영 중**. `.claude/settings.json` deny 24·allow 14 = 사용자 검토 대기.
 
 ## 알려진 잔존 미해결
 
-### ★ 다음 세션 #48 — 상세 EVENTS #47
-1. **[관찰] 07-30 11:11 사이클 3종 검증** — ①`스텐도마` 재생성이 새 정량 지시("총 약 N회")로 게이트 통과하는지(실패해도 #47 수정으로 **1일차 텔레그램 경보**) ②`auto_cycle.log` 한글이 정상 기록되는지(EE5③) ③pull이 "성공(exit=0)"으로 기록되는지(EE5②). 셋 다 로그 확인만으로 판정 가능.
-2. **★[모니터링] 색인 전환**([[growth-first-priority]]): GSC 색인요청 11개(07-20)가 "색인 생성됨"으로 옮겨졌는지 확인. 안 되면 원인=권위/시간(코드 아님)·발행 지속. ※색인 원인은 #46서 확정(크롤 예산)—추가 진단 불요.
-3. **★[관찰·신규 #47] 도마 클러스터 편중 위험**: 07-24~29 발행 6편 중 **4편이 도마**(도마추천·엔드그레인도마·실리콘도마·TPU도마) + cutting-board 카테고리. DD1이 경고한 **글↔카테고리 8-shingle 겹침 44~50%**가 한 클러스터에 집중 → 크롤 후 '얇은 중복'으로 일부만 색인될 리스크. 씨앗 다양화(#45)가 작동하나 소진 순서상 같은 카테고리를 연속 소비. 대책 검토(씨앗 라운드로빈·카테고리 간 분산) 필요.
-4. **[관찰·신규 #47] 비표준 slug 2건**: article #6 slug=`1`, #18 slug=`tpu`(정상은 `kw-<hash>`). URL 품질·색인 영향 [확인 불가] — slug 생성 경로 점검 필요.
-5. **[결정] 여름이불 무인 자동비공개**: #45 발행분을 #46 사후모니터가 '미달' 자동비공개 → 방치 / 개선(카테고리 매핑·상품 보강 후 재발행) / 침구 쿠팡 카테고리 중 택. (현재 unpublished 2편)
-6. (이월) IndexNow 관찰성 갭(성공 경로 res.notes 미로그·Bing/Yandex 이차) · draft 카테고리 3개(노트북거치대·빨래건조대·미니제습기) 공개 여부(미니제습기 씨앗 2027-04) · 게이밍의자 이관 · 쿠팡 부트스트랩(15만원→API).
+### ★ 다음 세션 #49 — **작업 목록은 TODO.md**, 상세 근거는 EVENTS #48·DECISIONS FF
+1. **★[관찰·최우선] 본문 예산 축소 부작용** — 산문 25~30%↓(출력 토큰 절감)과 함께 키워드 자연 출현이 4~7 → **3~5회(중앙 4)**로 하락, `min_count=4` 여유가 얇다(3샘플 중 1건 `count_low`). 08-01 정규 사이클은 시도 1회 통과. 며칠 안정성 관찰 → 흔들리면 예산 2,900~3,400자 상향(검증은 `cli experiment`, 라이브 사이클 금지).
+2. **[입력 대기·주인] LLM 단가** `llm_price_*_per_1m` — 0이라 비용 $0 표시(토큰은 기록 중).
+3. **★[모니터링] 색인 전환**([[growth-first-priority]]) · 4.[이월] 도마 클러스터 편중 · 5.[결정] 여름이불 자동비공개 · 6.(이월) IndexNow 관찰성·draft 카테고리 3개·게이밍의자 이관·쿠팡 부트스트랩.
+- ※**비표준 slug는 #48 해결**(FF8). 라이브 3건(`/articles/1/`·`/tpu/`·`/1-2/`)은 **주인 결정으로 URL 유지**(301 없이 바꾸면 색인 단절, 301도 크롤 예산 소모).
 - ★**매 세션 시작 시 운영 폴더 브랜치 확인** `git -C D:\affiliate_hub branch --show-current`==main([[autonomous-detached-head-silent-stop]]). 워크트리=`PYTHONPATH=src python -m cli`(자동 migrate). ★무인 발행이 origin 전진→push 전 `git merge --ff-only origin/main`([[autonomous-deploy-advances-origin]]). ★한글→.py·ASCII([[powershell-korean-encoding]]). 운영 DB 직접수정 불가→주인 런처. ★Edit 절대경로=운영 폴더 주의([[worktree-edit-path-footgun]]).
 
-### 진척 가능 / 잔존 (작음)
-- `builder/manifest.py` 증분 빌드 · `collector/coupang.py`(Phase 4) · Actions status check Branch Protection · BitLocker(사용자 결정)
-
-### 보류
-- AdSense 신청(Phase 6·2026-12) · 영어 사이트 확장 · 보조 호스팅 GitHub Pages
+### 진척 가능(작음) / 보류
+- 작음: `builder/manifest.py` 증분 빌드 · `collector/coupang.py`(Phase 4) · Actions status check · BitLocker(사용자 결정)
+- 보류: AdSense 신청(Phase 6·2026-12) · 영어 사이트 확장 · 보조 호스팅 GitHub Pages
 
 ## 캘린더 알림
 
