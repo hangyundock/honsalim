@@ -238,10 +238,16 @@ class _LLMResponse:
         input_tokens: int = 0,
         output_tokens: int = 0,
         stop_reason: str = "end_turn",
+        cached_tokens: int = 0,
     ) -> None:
         self.content = [_TextBlock(text)]
         self.usage = _Usage(input_tokens, output_tokens)
         self.stop_reason = stop_reason
+        # ★세션 #48 관찰성 — 프롬프트 캐시가 실제로 걸렸는지. build_system_blocks가 붙인
+        # cache_control은 _system_to_text가 평문으로 납작하게 만들며 사라지는데(OpenRouter는
+        # system을 문자열로 받는다), 그럼에도 제공자가 자동 프리픽스 캐시를 걸어 줄 수 있다.
+        # 응답의 cached_tokens를 안 읽어 **효과를 관측조차 못 하던** 갭을 메운다.
+        self.cached_tokens = cached_tokens
 
 
 class _AnthropicBackend:
@@ -357,11 +363,18 @@ class _OpenRouterBackend:
             message = choices[0].get("message") or {}
             usage = data.get("usage") or {}
             finish = choices[0].get("finish_reason")
+            # 제공자마다 캐시 필드 이름이 다르다(OpenAI 계열 prompt_tokens_details.cached_tokens /
+            # 일부는 최상위 cached_tokens). 있는 쪽을 집어 관측만 한다 — 없으면 0.
+            details = usage.get("prompt_tokens_details") or {}
+            cached = details.get("cached_tokens") if isinstance(details, dict) else None
+            if cached is None:
+                cached = usage.get("cached_tokens")
             return _LLMResponse(
                 message.get("content") or "",
                 usage.get("prompt_tokens", 0),
                 usage.get("completion_tokens", 0),
                 "max_tokens" if finish == "length" else "end_turn",
+                int(cached or 0),
             )
 
 
@@ -462,6 +475,8 @@ class ClaudeClient:
             usage={
                 "input_tokens": getattr(response.usage, "input_tokens", 0),
                 "output_tokens": getattr(response.usage, "output_tokens", 0),
+                # 캐시 적중 토큰(#48 관찰성). Anthropic 경로엔 이 속성이 없어 0.
+                "cached_tokens": getattr(response, "cached_tokens", 0),
             },
             dry_run=False,
             stop_reason=getattr(response, "stop_reason", None),
@@ -505,6 +520,8 @@ class ClaudeClient:
             usage={
                 "input_tokens": getattr(response.usage, "input_tokens", 0),
                 "output_tokens": getattr(response.usage, "output_tokens", 0),
+                # 캐시 적중 토큰(#48 관찰성). Anthropic 경로엔 이 속성이 없어 0.
+                "cached_tokens": getattr(response, "cached_tokens", 0),
             },
             dry_run=False,
             stop_reason=getattr(response, "stop_reason", None),

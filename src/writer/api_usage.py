@@ -23,18 +23,99 @@ def record(
     status: str,
     est_cost_usd: float = 0.0,
     detail: str | None = None,
+    tokens_in: int | None = None,
+    tokens_out: int | None = None,
 ) -> bool:
     """API 사용 1건 기록. 테이블 없거나 오류면 조용히 False(추적이 본기능을 막지 않음·§0)."""
     try:
         conn.execute(
-            "INSERT INTO api_usage (provider, kind, status, est_cost_usd, detail) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (provider, kind, status, float(est_cost_usd), (detail or "")[:200]),
+            "INSERT INTO api_usage (provider, kind, status, est_cost_usd, detail, "
+            "tokens_in, tokens_out) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                provider,
+                kind,
+                status,
+                float(est_cost_usd),
+                (detail or "")[:200],
+                tokens_in,
+                tokens_out,
+            ),
         )
         conn.commit()
         return True
     except sqlite3.Error:
         return False
+
+
+def llm_cost_usd(tokens_in: int, tokens_out: int) -> float:
+    """토큰 → 추정 비용(USD). **단가 설정이 없으면 0** — 모르는 값을 지어내지 않는다(§0).
+
+    설정 `llm_price_in_per_1m` / `llm_price_out_per_1m`(백만 토큰당 USD)를 주인이 넣으면
+    그때부터 원가가 집계된다. 넣지 않아도 토큰 수는 항상 기록되므로 사용량 추적은 유효하다.
+    """
+    from common import settings
+
+    p_in = settings.get_float("llm_price_in_per_1m")
+    p_out = settings.get_float("llm_price_out_per_1m")
+    if p_in <= 0 and p_out <= 0:
+        return 0.0
+    return (tokens_in / 1_000_000) * p_in + (tokens_out / 1_000_000) * p_out
+
+
+def record_llm(
+    conn: sqlite3.Connection,
+    *,
+    model: str,
+    tokens_in: int,
+    tokens_out: int,
+    purpose: str,
+    status: str = "ok",
+) -> bool:
+    """LLM 호출 1건 기록 — ★재시도分도 각각 1행(세션 #48).
+
+    #36의 Imagen 추적과 달리 LLM은 아무 기록이 없었다. 콘솔 로그의 usage는 재시도 중 마지막
+    1회분만 남아 "오늘 얼마 썼나"에 답할 수 없었다(#48 적발). 호출 지점마다 호출해 전량 기록한다.
+    """
+    return record(
+        conn,
+        "llm",
+        purpose,
+        status,
+        llm_cost_usd(tokens_in, tokens_out),
+        model,
+        tokens_in,
+        tokens_out,
+    )
+
+
+def llm_summary(conn: sqlite3.Connection, days: int = 1) -> dict[str, Any]:
+    """최근 N일 LLM 사용 요약 — calls·tokens_in·tokens_out·est_cost_usd."""
+    empty: dict[str, Any] = {
+        "calls": 0,
+        "tokens_in": 0,
+        "tokens_out": 0,
+        "est_cost_usd": 0.0,
+        "days": days,
+    }
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*), COALESCE(SUM(tokens_in),0), COALESCE(SUM(tokens_out),0), "
+            "       COALESCE(SUM(est_cost_usd),0) "
+            "FROM api_usage WHERE provider='llm' "
+            "  AND created_at >= datetime('now', ?)",
+            (f"-{max(1, int(days))} days",),
+        ).fetchone()
+    except sqlite3.Error:
+        return empty
+    if row is None:
+        return empty
+    return {
+        "calls": int(row[0] or 0),
+        "tokens_in": int(row[1] or 0),
+        "tokens_out": int(row[2] or 0),
+        "est_cost_usd": float(row[3] or 0.0),
+        "days": days,
+    }
 
 
 def record_imagen(conn: sqlite3.Connection, *, ok: bool, error: str | None = None) -> bool:

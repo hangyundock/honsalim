@@ -21,6 +21,7 @@ import argparse
 import importlib
 import importlib.util
 import json
+import logging
 import os
 import re
 import shutil
@@ -785,6 +786,227 @@ def _actionable_feedback(report: dict[str, Any], primary: str | None) -> list[st
     return out
 
 
+# ★세션 #48 — cmd_enrich(운영)와 cmd_experiment(실험)가 **완전히 같은 프롬프트 입력**을 쓰도록
+# SQL과 조립을 한 곳에 둔다. 처음엔 실험 쪽에서 따로 SELECT를 짜다 `season_peak`를 빠뜨려 실험이
+# 운영과 다른 프롬프트를 측정하고 있었다(자체 재검수 적발 — 측정 도구가 틀리면 결론도 틀린다).
+_ENRICH_SOURCE_SQL = """
+    SELECT s.slug, s.title_ko, s.season_peak, s.description,
+           p.slug, p.title_ko, p.description, p.age_range, d.raw_payload, d.keyword_id
+    FROM drafts d
+    JOIN scenarios s ON d.scenario_id = s.id
+    JOIN personas p ON s.persona_id = p.id
+    WHERE d.id = ?
+"""
+
+
+def _enrich_inputs(row: Any) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]]]:
+    """`_ENRICH_SOURCE_SQL` 결과 행 → (scenario, persona, products) 프롬프트 입력 3종."""
+    scenario_dict = {
+        "slug": row[0],
+        "title_ko": row[1],
+        "season_peak": row[2],
+        "description": row[3],
+        # scenarios 스키마에 keywords 컬럼 없음 (DB §7-1) — 검색 키워드 힌트는 비우고
+        # 본문 생성 후 meta_extractor가 meta_keywords를 추출한다 (BACKEND §3).
+        "keywords": "",
+    }
+    persona_dict = {
+        "slug": row[4],
+        "title_ko": row[5],
+        "description": row[6],
+        "age_range": row[7],
+    }
+    # 수집 후보(C-1, raw_payload.candidates)를 본문 프롬프트의 {{products}}로 주입
+    products: list[dict[str, Any]] = []
+    if row[8]:
+        try:
+            rp = json.loads(row[8])
+            if isinstance(rp, dict) and isinstance(rp.get("candidates"), list):
+                products = rp["candidates"]
+        except (json.JSONDecodeError, TypeError):
+            products = []
+    return scenario_dict, persona_dict, products
+
+
+def _keyword_seo_cfg(conn: sqlite3.Connection, keyword_id: Any) -> tuple[str, dict[str, Any]]:
+    """draft의 keyword_id → (키워드, seo 게이트 설정). 미매핑이면 ("", {}) — 상위에서 fail-open."""
+    if not keyword_id:
+        return "", {}
+    kwrow = conn.execute("SELECT keyword FROM keyword_queue WHERE id = ?", (keyword_id,)).fetchone()
+    if not (kwrow and kwrow[0]):
+        return "", {}
+    from collector import keyword_relevance, seo_keywords
+
+    keyword = str(kwrow[0])
+    cat = keyword_relevance.resolve_category(keyword)
+    if not cat:
+        return keyword, {}
+    return keyword, (seo_keywords.keyword_gate_config(keyword, cat) or {})
+
+
+def _record_llm_usage(
+    conn: sqlite3.Connection, client: Any, usage: dict[str, int] | None, purpose: str
+) -> None:
+    """LLM 호출 1건을 api_usage에 기록 (세션 #48). 실패해도 본기능을 막지 않는다(§0).
+
+    ★재시도·형식오류·빈응답까지 **전부** 기록해야 한다 — 실패한 호출도 과금되기 때문이다.
+    """
+    if not usage:
+        return
+    try:
+        from writer import api_usage
+
+        api_usage.record_llm(
+            conn,
+            model=str(getattr(client, "model", "") or "unknown"),
+            tokens_in=int(usage.get("input_tokens") or 0),
+            tokens_out=int(usage.get("output_tokens") or 0),
+            purpose=purpose,
+        )
+    except Exception as e:  # 추적 실패가 생성을 막으면 안 된다(§0)
+        logging.debug("LLM 사용량 기록 실패(무시): %s", e)
+
+
+def cmd_experiment(args: argparse.Namespace) -> int:
+    """★세션 #48 — 오프라인 생성 실험 하네스. **DB 쓰기·승인·빌드·배포 없음.**
+
+    저장된 draft의 상품 후보·SEO 설정을 그대로 재사용해 **LLM 출력만 변수로 격리**하고, N개
+    샘플을 뽑아 5게이트 지표 분포를 표로 보여준다. 알리 수집도 다시 하지 않는다(비용·변수 0).
+
+    왜 필요한가(#48 실측): 프롬프트를 고쳐 **라이브 사이클을 1회 돌려 판정**하는 루프를 6번
+    반복해 15콜·3시간을 썼다. 확률적 출력은 n=1로 판단할 수 없다 — 2번째 실행 시점에 이미
+    "자연 사용량이 길이 무관 4~7회로 고정"이라는 결론에 필요한 표본이 있었는데도 문구만 3번 더
+    바꿨다. 이 명령은 **분포를 먼저 보는 것**을 가장 쉬운 길로 만든다(CLAUDE.md §7-3).
+
+    기본 dry_run=True — 프롬프트와 예상 콜 수만 출력(비용 0). 실제 호출은 --no-dry-run.
+    """
+    from enricher.claude_client import ClaudeClient, GenerateRequest
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        row = conn.execute(_ENRICH_SOURCE_SQL, (args.draft,)).fetchone()
+        if not row:
+            print(f"{FAIL} draft {args.draft} 없음")
+            return 2
+        scenario, persona, products = _enrich_inputs(row)
+        if not products:
+            print(f"{FAIL} draft {args.draft}에 상품 후보가 없음 — 실험 대상 아님")
+            return 2
+        keyword, seo_cfg = _keyword_seo_cfg(conn, row[9])
+    finally:
+        conn.close()
+
+    samples = max(1, int(args.samples))
+    print(f"{OK} 실험 대상 draft {args.draft} · 키워드 {keyword!r} · 상품 후보 {len(products)}개")
+    print(f"     대표키워드={seo_cfg.get('primary')!r} min_count={seo_cfg.get('min_count')}")
+    client = None
+    if args.dry_run:
+        req = GenerateRequest(scenario=scenario, persona=persona, products=products, seo=seo_cfg)
+        result = ClaudeClient(api_key=None).generate_article(req, dry_run=True)
+        print(f"     user_prompt {len(result.user_prompt):,}자 · 샘플 {samples}개 예정")
+        print(f"{WARN} dry-run — 실제 호출 없음(비용 0). 실행하려면 --no-dry-run")
+        return 0
+
+    config.load_secrets()
+    client = ClaudeClient(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+    rows: list[dict[str, Any]] = []
+    # ★실험 호출도 돈이 나간다 — 사용량 추적에서 빠지면 "오늘 얼마 썼나"가 또 틀린다(#48 재검수).
+    rec_conn = db.connect(db.DB_PATH)
+    try:
+        _run_experiment_samples(
+            client, samples, scenario, persona, products, seo_cfg, rows, rec_conn
+        )
+    finally:
+        rec_conn.close()
+
+    print("\n  n | 키워드 | 밀도    | 산문자수 | 소제목KW | seo | 미달 게이트")
+    _print_experiment_table(rows)
+    return 0
+
+
+def _run_experiment_samples(
+    client: Any,
+    samples: int,
+    scenario: dict[str, Any],
+    persona: dict[str, Any],
+    products: list[dict[str, Any]],
+    seo_cfg: dict[str, Any],
+    rows: list[dict[str, Any]],
+    rec_conn: sqlite3.Connection,
+) -> None:
+    """샘플 N개 생성 + 5게이트 측정. DB에는 **사용량 기록만** 쓴다(글·상태 변경 없음)."""
+    from enricher.claude_client import (
+        ArticleResponseError,
+        GenerateRequest,
+        is_truncated,
+        split_article_response,
+    )
+    from validator import serialize_report, validate_all
+
+    for i in range(1, samples + 1):
+        req = GenerateRequest(scenario=scenario, persona=persona, products=products, seo=seo_cfg)
+        result = client.generate_article(req, dry_run=False)
+        _record_llm_usage(rec_conn, client, result.usage, "experiment")
+        if not result.response_text or is_truncated(result):
+            rows.append({"n": i, "err": "빈 응답/잘림"})
+            print(f"     [{i}/{samples}] 빈 응답·잘림")
+            continue
+        try:
+            meta, body_md = split_article_response(result.response_text)
+        except ArticleResponseError as e:
+            rows.append({"n": i, "err": f"형식 오류({e})"})
+            print(f"     [{i}/{samples}] 형식 오류: {e}")
+            continue
+        payload = {"body_md": body_md, "title": meta.get("title"), "seo": seo_cfg}
+        rep = serialize_report(validate_all(payload))
+        m = rep["gates"]["seo"].get("metrics") or {}
+        failed = [g for g, v in rep["gates"].items() if v["issues"]]
+        rows.append(
+            {
+                "n": i,
+                "freq": m.get("primary_freq"),
+                "density": m.get("density_pct"),
+                "chars": m.get("chars"),
+                "hkw": m.get("headings_with_keyword"),
+                "seo_ok": not rep["gates"]["seo"]["issues"],
+                "failed": failed,
+                "issues": rep["gates"]["seo"]["issues"],
+                "usage": result.usage,
+            }
+        )
+        print(f"     [{i}/{samples}] 완료")
+
+
+def _print_experiment_table(rows: list[dict[str, Any]]) -> None:
+    """샘플별 지표 + **분포 요약**. 분포가 목적이다 — 한 줄만 보고 판단하지 말 것(#48)."""
+    print("  " + "-" * 68)
+    for r in rows:
+        if r.get("err"):
+            print(f"  {r['n']} | {r['err']}")
+            continue
+        mark = "OK " if r["seo_ok"] else "FAIL"
+        print(
+            f"  {r['n']} |   {r['freq']!s:>3}  | {r['density']:>5.2f}% |  {r['chars']:>5}   "
+            f"|    {r['hkw']}     | {mark} | {','.join(r['failed']) or '-'}"
+        )
+    ok_rows = [r for r in rows if not r.get("err")]
+    if ok_rows:
+        freqs = sorted(int(r["freq"] or 0) for r in ok_rows)
+        dens = sorted(float(r["density"] or 0) for r in ok_rows)
+        passes = sum(1 for r in ok_rows if not r["failed"])
+        mid = len(freqs) // 2
+        print(
+            f"\n  분포 — 키워드 횟수 {freqs[0]}~{freqs[-1]}(중앙 {freqs[mid]}) · "
+            f"밀도 {dens[0]:.2f}~{dens[-1]:.2f}% · 5게이트 통과 {passes}/{len(ok_rows)}"
+        )
+        tin = sum(int((r["usage"] or {}).get("input_tokens") or 0) for r in ok_rows)
+        tout = sum(int((r["usage"] or {}).get("output_tokens") or 0) for r in ok_rows)
+        cch = sum(int((r["usage"] or {}).get("cached_tokens") or 0) for r in ok_rows)
+        cache_note = f" · 캐시적중 {cch:,}" if cch else " · 캐시적중 0(미적용/미보고)"
+        print(f"  토큰 — input {tin:,} · output {tout:,}{cache_note} (샘플 {len(ok_rows)}개 합계)")
+    print(f"{OK} 실험 종료 — 글·상태·발행 변경 없음(사용량 기록만 남김)")
+
+
 def cmd_enrich(args: argparse.Namespace) -> int:
     """Claude API로 본문 생성 (BACKEND §3).
 
@@ -810,30 +1032,8 @@ def cmd_enrich(args: argparse.Namespace) -> int:
             print(f"{FAIL} draft {args.draft} 또는 연결된 scenario·persona 없음")
             return 2
 
-        scenario_dict = {
-            "slug": row[0],
-            "title_ko": row[1],
-            "season_peak": row[2],
-            "description": row[3],
-            # scenarios 스키마에 keywords 컬럼 없음 (DB §7-1) — 검색 키워드 힌트는 비우고
-            # 본문 생성 후 meta_extractor가 meta_keywords를 추출한다 (BACKEND §3).
-            "keywords": "",
-        }
-        persona_dict = {
-            "slug": row[4],
-            "title_ko": row[5],
-            "description": row[6],
-            "age_range": row[7],
-        }
-        # 수집 후보(C-1, raw_payload.candidates)를 본문 프롬프트의 {{products}}로 주입
-        products: list[dict] = []
-        if row[8]:
-            try:
-                rp = json.loads(row[8])
-                if isinstance(rp, dict) and isinstance(rp.get("candidates"), list):
-                    products = rp["candidates"]
-            except (json.JSONDecodeError, TypeError):
-                products = []
+        # ★#48 — 실험 하네스(cmd_experiment)와 공용. 따로 조립하면 프롬프트가 갈라진다.
+        scenario_dict, persona_dict, products = _enrich_inputs(row)
         # ★세션 #33 — SEO 키워드 세트 주입: 키워드 경로 글도 카테고리 SEO 최적화·검증을 받게 한다.
         # 미주입 시 validator seo 게이트가 skip돼 무인 글이 SEO 미검증으로 양산되던 갭(실증 발견).
         # 키워드 → 카테고리(resolve_category) → seo_keywords.gate_config → 프롬프트 지시 + seo 게이트 활성.
@@ -996,6 +1196,9 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                     feedback=feedback,
                 )
                 result = client.generate_article(req, dry_run=False)
+                # ★#48 — 재시도分까지 **매 호출 1행** 기록. 옛 코드는 마지막 시도 usage만 로그로
+                # 흘려보내 "오늘 얼마 썼나"에 답할 수 없었다(비용 관리 불가). 실패한 호출도 돈이 나간다.
+                _record_llm_usage(conn, client, result.usage, "article")
                 if not result.response_text:
                     feedback = [
                         "직전 응답 본문이 비었습니다. META-JSON과 BODY-MARKDOWN을 정확히 출력하세요."
@@ -1080,6 +1283,20 @@ def cmd_enrich(args: argparse.Namespace) -> int:
                 f"     제목: {enriched_payload['title']!r} · 본문 {len(enriched_payload['body_md'])}자"
                 f" · featured {len(enriched_payload['products'])}/{len(products)}"
             )
+            try:
+                from writer import api_usage
+
+                s = api_usage.llm_summary(conn, days=1)
+                if s["calls"]:
+                    cost = f" · 추정 ${s['est_cost_usd']:.4f}" if s["est_cost_usd"] > 0 else ""
+                    print(
+                        f"     [24h LLM] {s['calls']}콜 · in {s['tokens_in']:,} · "
+                        f"out {s['tokens_out']:,}{cost}"
+                    )
+            except Exception as e:  # 요약 실패가 생성을 막으면 안 된다(§0)
+                logging.debug("LLM 사용량 요약 실패(무시): %s", e)
+            if result.usage and result.usage.get("cached_tokens"):
+                print(f"     캐시 적중: {result.usage['cached_tokens']:,} 토큰")
             if result.usage:
                 print(
                     f"     usage: input={result.usage.get('input_tokens')} "
@@ -3333,6 +3550,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="실제 Claude API 호출 (비용 발생 — 명시 승인 후)",
     )
     p_enrich.set_defaults(func=cmd_enrich, dry_run=True)
+
+    p_exp = sub.add_parser(
+        "experiment",
+        help="★오프라인 생성 실험 — 저장 draft 재사용·N샘플 분포 측정. DB 쓰기·발행 없음(#48)",
+    )
+    p_exp.add_argument("--draft", type=int, required=True, help="상품 후보·SEO를 빌려올 draft id")
+    p_exp.add_argument("--samples", type=int, default=3, help="생성 샘플 수 (기본 3)")
+    p_exp.add_argument(
+        "--no-dry-run",
+        dest="dry_run",
+        action="store_false",
+        help="실제 LLM 호출 (샘플 수만큼 비용 발생)",
+    )
+    p_exp.set_defaults(func=cmd_experiment, dry_run=True)
 
     p_validate = sub.add_parser("validate", help="validator 4 게이트 검사 (POLICY §3·§4·§2·§6)")
     p_validate.add_argument("--draft", type=int, required=True, help="draft id")

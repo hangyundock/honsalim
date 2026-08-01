@@ -231,5 +231,6 @@ class TestClaudeClientDeepSeekPath:
         result = client.generate_raw("시스템", "유저", dry_run=False)
         assert result.dry_run is False
         assert result.response_text == "생성됨"
-        assert result.usage == {"input_tokens": 3, "output_tokens": 9}
+        # ★#48: cached_tokens가 usage에 추가됐다(캐시 관찰성). 제공자가 안 주면 0.
+        assert result.usage == {"input_tokens": 3, "output_tokens": 9, "cached_tokens": 0}
         assert result.stop_reason == "end_turn"
