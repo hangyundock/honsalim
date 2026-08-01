@@ -55,6 +55,116 @@ class TestSlugify:
     def test_different_korean_different_slug(self) -> None:
         assert kq.slugify("원룸 가습기") != kq.slugify("미니 건조기")
 
+    @pytest.mark.parametrize(
+        ("keyword", "bad_slug"),
+        [
+            ("1인용밥솥", "1"),  # 라이브 article 22 — 충돌해 `1-2`가 됐다
+            ("TPU도마", "tpu"),  # 라이브 article 18
+            ("32인치모니터암", "32"),  # 큐 대기 중 — 다음 발행에서 터질 예정이었다
+            ("LED스탠드", "led"),
+            ("USB허브", "usb"),
+        ],
+    )
+    def test_partial_ascii_no_longer_produces_fragment_slug(
+        self, keyword: str, bad_slug: str
+    ) -> None:
+        """★세션 #48 근본수정 — 한글이 버려지고 **남은 조각**이 slug가 되던 라이브 결함.
+
+        옛 폴백은 '전부 유실'일 때만 걸려, 숫자·영문이 섞인 한글 키워드가 의미 없는 URL을 만들고
+        서로 충돌했다('1…'로 시작하는 키워드는 전부 `1`).
+        """
+        s = kq.slugify(keyword)
+        assert s != bad_slug, f"{keyword}가 아직 조각 slug({bad_slug})를 만든다"
+        assert s.startswith("kw-")
+        assert s == kq.slugify(keyword)  # 결정적
+
+    def test_fragment_collision_is_gone(self) -> None:
+        """조각 slug의 진짜 피해 — 서로 다른 키워드가 같은 slug로 충돌하던 것."""
+        assert kq.slugify("1인용밥솥") != kq.slugify("1인가구책상")
+
+    def test_lossless_ascii_is_preserved(self) -> None:
+        """유실이 없으면 읽기 좋은 slug를 그대로 쓴다 — 과잉 폴백 방지."""
+        assert kq.slugify("desk lamp") == "desk-lamp"
+        assert kq.slugify("Office Chair 2026") == "office-chair-2026"
+
+    def test_accent_decomposition_is_not_a_loss(self) -> None:
+        """NFKD가 분해하는 결합 악센트는 '유실'이 아니다 — 폴백을 트리거하면 안 된다."""
+        assert kq.slugify("café latte") == "cafe-latte"
+
+
+class TestLegacyFragmentDetection:
+    """★#48 — slugify 수정만으로는 부족했다. 큐에 **이미 굳은** 조각 slug를 식별해야 한다."""
+
+    def test_detects_the_live_cases(self) -> None:
+        assert kq.is_legacy_fragment_slug("32", "32인치모니터암")
+        assert kq.is_legacy_fragment_slug("1", "1인용컴퓨터책상")
+        assert kq.is_legacy_fragment_slug("tpu", "TPU도마")
+
+    def test_accepts_uniqueness_suffix(self) -> None:
+        """중복 회피로 `-2`가 붙은 형태도 같은 조각이다(라이브 article 22 = `1-2`)."""
+        assert kq.is_legacy_fragment_slug("1-2", "1인용밥솥")
+
+    def test_leaves_healthy_slugs_alone(self) -> None:
+        assert not kq.is_legacy_fragment_slug("desk-lamp", "desk lamp")
+        assert not kq.is_legacy_fragment_slug("kw-269a4bdb", "책상추천")
+
+    def test_never_touches_a_deliberate_slug(self) -> None:
+        """★운영자가 일부러 지정한 slug를 조각으로 오인해 덮어쓰면 안 된다."""
+        assert not kq.is_legacy_fragment_slug("mini-rice-cooker", "1인용밥솥")
+        assert not kq.is_legacy_fragment_slug("monitor-arm-32", "32인치모니터암")
+
+
+class TestLegacySlugSelfRepair:
+    """★#48 — 큐에 굳어 있던 조각 slug를 시나리오 생성 시점에 교정(자가복원·§0).
+
+    라이브 실측: `32인치모니터암`이 slug `32`를 문 채 **시나리오 없이 대기** 중이었다.
+    그대로 발행됐다면 `/articles/32/`가 됐다. 이 지점은 시나리오가 아직 없는 키워드만 도달하므로
+    (글·라이브 URL 부재) 교정이 안전하다.
+    """
+
+    def test_pending_fragment_is_repaired_before_it_becomes_a_url(self) -> None:
+        conn = _db()
+        kid = kq.add_keyword(conn, "32인치모니터암", channel="ali", slug="32")
+        assert (
+            conn.execute("SELECT slug FROM keyword_queue WHERE id=?", (kid,)).fetchone()[0] == "32"
+        )
+
+        sid = kq.ensure_scenario_for_keyword(conn, kid)
+        scen_slug = conn.execute("SELECT slug FROM scenarios WHERE id=?", (sid,)).fetchone()[0]
+        kw_slug = conn.execute("SELECT slug FROM keyword_queue WHERE id=?", (kid,)).fetchone()[0]
+        assert scen_slug != "32", "공개 URL 씨앗이 아직 조각이다"
+        assert scen_slug.startswith("kw-") and kw_slug.startswith("kw-")
+        conn.close()
+
+    def test_existing_scenario_is_never_renamed(self) -> None:
+        """★이미 시나리오(=글·라이브 URL)가 있으면 절대 건드리지 않는다."""
+        conn = _db()
+        kid = kq.add_keyword(conn, "TPU도마", channel="ali", slug="tpu")
+        first = kq.ensure_scenario_for_keyword(conn, kid)
+        before = conn.execute("SELECT slug FROM scenarios WHERE id=?", (first,)).fetchone()[0]
+        again = kq.ensure_scenario_for_keyword(conn, kid)  # 재호출 = 재사용 경로
+        after = conn.execute("SELECT slug FROM scenarios WHERE id=?", (again,)).fetchone()[0]
+        assert again == first and after == before
+        conn.close()
+
+    def test_deliberate_slug_survives_scenario_creation(self) -> None:
+        conn = _db()
+        kid = kq.add_keyword(conn, "1인용밥솥", channel="ali", slug="mini-rice-cooker")
+        sid = kq.ensure_scenario_for_keyword(conn, kid)
+        assert (
+            conn.execute("SELECT slug FROM scenarios WHERE id=?", (sid,)).fetchone()[0]
+            == "mini-rice-cooker"
+        )
+        conn.close()
+
+    def test_new_keywords_never_get_a_fragment_in_the_first_place(self) -> None:
+        """근본수정 확인 — 새로 등록되는 키워드는 조각 slug 자체가 안 생긴다."""
+        conn = _db()
+        kid = kq.add_keyword(conn, "32인치모니터암", channel="ali")
+        slug = conn.execute("SELECT slug FROM keyword_queue WHERE id=?", (kid,)).fetchone()[0]
+        assert slug.startswith("kw-")
+        conn.close()
+
 
 class TestAddKeyword:
     def test_insert_pending(self) -> None:

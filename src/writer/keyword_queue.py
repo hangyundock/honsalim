@@ -21,14 +21,50 @@ VALID_STATUSES = frozenset({"pending", "generating", "drafted", "published", "di
 
 
 def slugify(text: str, fallback_prefix: str = "kw") -> str:
-    """키워드 → URL-safe slug. ASCII 영숫자만; 한글 등으로 비면 키워드 해시 기반 안정 slug."""
+    """키워드 → URL-safe slug. **원문 글자·숫자가 하나라도 유실되면** 해시 기반 안정 slug.
+
+    ★세션 #48 근본수정 — 옛 코드는 ASCII로 못 옮기는 문자를 조용히 버리고 **남은 조각만으로**
+    slug를 만들었고, 폴백은 '전부 유실'일 때만 걸렸다(부분 유실은 그대로 통과). 그래서 라이브에
+    의미 없는 URL이 쌓였다:
+        `1인용밥솥` → `1`(충돌해 `1-2`) · `TPU도마` → `tpu` · `32인치모니터암` → `32`
+    한글이 통째로 버려진 잔여물이라 ①의미 전달 0 ②서로 다른 키워드가 같은 조각으로 충돌
+    ('1…'로 시작하는 키워드는 전부 `1`) ③URL 품질 저하. 순수 한글만 `kw-<hash>`가 나온 이유도
+    이것이다 — 부분 유실은 폴백을 못 탔다.
+
+    → **부분 유실도 폴백**. ASCII 표기가 원문을 온전히 담을 때만 그대로 쓴다.
+        `desk lamp` → `desk-lamp`(유실 없음·유지) · `café` → `cafe`(NFKD 분해는 유실 아님)
+    """
     norm = unicodedata.normalize("NFKD", text or "")
     ascii_only = norm.encode("ascii", "ignore").decode("ascii")
     s = re.sub(r"[^a-zA-Z0-9]+", "-", ascii_only).strip("-").lower()
-    if not s:
+    # 유실 판정은 NFKD **분해 후** 기준으로 센다 — 'café'의 결합 악센트(Mn)는 alnum이 아니라
+    # 유실로 잡히지 않고, 한글 음절이 분해된 자모(Lo)는 alnum이라 정확히 유실로 잡힌다.
+    kept = sum(1 for ch in ascii_only if ch.isalnum())
+    original = sum(1 for ch in norm if ch.isalnum())
+    if not s or kept < original:
         h = hashlib.sha1((text or "").encode("utf-8")).hexdigest()[:8]  # noqa: S324 (식별용·비보안)
         s = f"{fallback_prefix}-{h}"
     return s[:60]
+
+
+def _legacy_fragment_slug(keyword: str) -> str:
+    """옛(버그) slugify의 산출물 — 유실을 따지지 않고 ASCII 잔여물만 남기던 결과. 판정 전용."""
+    norm = unicodedata.normalize("NFKD", keyword or "")
+    ascii_only = norm.encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-zA-Z0-9]+", "-", ascii_only).strip("-").lower()[:60]
+
+
+def is_legacy_fragment_slug(stored: str, keyword: str) -> bool:
+    """저장된 slug가 **옛 버그가 만든 조각**인가 (세션 #48).
+
+    운영자가 일부러 지정한 slug는 건드리면 안 되므로, 옛 함수의 산출물과 **정확히 일치**할 때만
+    True로 본다(`-2` 같은 중복 회피 접미사는 허용). 유실이 없어 새 규칙에서도 같은 값이 나오는
+    정상 slug('desk-lamp')는 대상이 아니다.
+    """
+    legacy = _legacy_fragment_slug(keyword)
+    if not legacy or slugify(keyword) == legacy:
+        return False  # 유실 없음 = 정상 slug
+    return stored == legacy or re.fullmatch(rf"{re.escape(legacy)}-\d+", stored or "") is not None
 
 
 def _unique_slug(conn: sqlite3.Connection, table: str, base: str) -> str:
@@ -189,7 +225,20 @@ def ensure_scenario_for_keyword(
     if persona_id is None:
         raise ValueError("페르소나가 없습니다 — `db seed`로 페르소나를 먼저 만드세요")
 
-    sslug = _unique_slug(conn, "scenarios", str(kw["slug"]))
+    # ★세션 #48 자가복원 — 큐에 이미 저장된 **옛 조각 slug**를 여기서 교정한다.
+    # slugify 수정만으로는 부족했다: 시나리오 slug(=공개 URL의 씨앗)는 keyword_queue.slug를 물려받고,
+    # 그 값은 키워드 등록 시점의 옛 규칙으로 이미 굳어 있었다(라이브 적발: `32인치모니터암`이 slug
+    # `32`를 문 채 대기 중 → 다음 발행에서 `/articles/32/`가 될 예정이었다).
+    # ★이 지점은 **시나리오가 아직 없는 키워드만** 도달한다(위에서 early return) → 글·라이브 URL이
+    # 존재하지 않으므로 교정이 안전하다. 이미 발행된 것들의 URL은 절대 건드리지 않는다.
+    base_slug = str(kw["slug"])
+    if is_legacy_fragment_slug(base_slug, str(kw.get("keyword") or "")):
+        base_slug = slugify(str(kw["keyword"]))
+        conn.execute(
+            "UPDATE keyword_queue SET slug = ? WHERE id = ?",
+            (_unique_slug(conn, "keyword_queue", base_slug), keyword_id),
+        )
+    sslug = _unique_slug(conn, "scenarios", base_slug)
     # active=0 — 키워드 파생 시나리오는 '내맘대로 세팅'(라이프스타일 시나리오) 목록에 노출하지 않는다
     # (세션 #35: 제품 키워드 글이 가짜 시나리오로 세팅 페이지를 오염시키던 문제 근본 차단). draft FK용
     # 으로만 존재하고, 글은 카테고리로 흡수·리다이렉트되므로 세팅에 카드가 필요 없다.
