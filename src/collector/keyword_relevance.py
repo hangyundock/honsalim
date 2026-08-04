@@ -103,6 +103,31 @@ def publishability(keyword: str, conn: sqlite3.Connection | None = None) -> tupl
     return True, "mapped"
 
 
+def mapping_warning(keyword: str, conn: sqlite3.Connection | None = None) -> str | None:
+    """사람이 큐에 키워드를 넣을 때 보여줄 경고 문구. 문제 없으면 None. (세션 #49)
+
+    무인 리필(auto_pick_keyword)은 미매핑·비공개 후보를 **자동 배제**하지만, 사람 경로
+    (대시보드 🎯추천/🆕추가, `keyword-add`, `keyword-recommend --add-top`)는 운영자 판단을
+    존중해 제한하지 않는다. 그 비대칭 때문에 미매핑 키워드가 조용히 큐에 쌓였다가 며칠 뒤
+    **LLM 비용을 쓴 뒤에야** 'unmapped 보류'로 발행 0편이 된다(#49 라이브: '32인치모니터암'
+    07-27 추가 → 08-04 발행 0편). 막지 않고 **넣는 순간 알려준다** — 결정은 운영자 몫.
+    """
+    ok, code = publishability(keyword, conn)
+    if ok:
+        return None
+    if code == "category_draft":
+        slug = resolve_category(keyword)
+        return (
+            f"'{keyword}'는 비공개(draft) 카테고리 {slug!r}에 속합니다 — "
+            "카테고리를 공개 승인하기 전까지 자동 발행이 보류됩니다."
+        )
+    return (
+        f"'{keyword}'는 어느 카테고리에도 매핑돼 있지 않습니다(seo_keywords.yml 정확 매칭). "
+        "이대로 두면 ①SEO 밀도 지시 없이 생성되고 ②자동 승인이 'unmapped'로 보류해 "
+        "그날 발행이 0편이 됩니다. 해당 카테고리 secondary에 이 키워드를 추가하세요."
+    )
+
+
 def filter_products(
     keyword: str, products: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:

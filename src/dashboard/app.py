@@ -286,13 +286,16 @@ class RecommendDialog(QDialog):
         info = QLabel(
             "검색량순 추천입니다. 맨 앞 체크박스로 여러 개를 한꺼번에 고른 뒤 "
             "'체크한 키워드 추가'를 누르세요(행을 클릭해도 체크됩니다).\n"
-            "(월검색량=네이버 실데이터 · '캐시'=검색량 미상 보조키워드)"
+            "(월검색량=네이버 실데이터 · '캐시'=검색량 미상 보조키워드)\n"
+            "★'발행' 칸이 ✅가 아니면 글을 만들어도 자동 승인이 보류돼 그날 발행이 0편이 됩니다 "
+            "— 검색량이 높아도 먼저 seo_keywords.yml에 매핑하세요."
         )
         info.setStyleSheet("color:#555;")
         info.setWordWrap(True)
         lay.addWidget(info)
         # 맨 앞 체크박스 컬럼 — 여러 키워드를 한 번에 골라 일괄 등록(#38 주인 요청).
-        self.table = _read_only_table(["✓", "키워드", "월검색량", "경쟁도", "씨앗", "출처"])
+        # '발행' 칸(#49) — 미매핑·비공개 카테고리를 **고르기 전에** 보여준다.
+        self.table = _read_only_table(["✓", "키워드", "월검색량", "경쟁도", "발행", "씨앗", "출처"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.setRowCount(len(recs))
         for i, r in enumerate(recs):
@@ -305,8 +308,18 @@ class RecommendDialog(QDialog):
             self.table.setItem(i, 1, _cell(str(r.get("keyword") or "")))
             self.table.setItem(i, 2, _cell(vol))
             self.table.setItem(i, 3, _cell(str(r.get("competition") or "")))
-            self.table.setItem(i, 4, _cell(str(r.get("seed") or "")))
-            self.table.setItem(i, 5, _cell(src))
+            # publishable 키가 없으면(구 호출부·테스트) 판정 불가 → 빈칸. 없는 정보를 ✅로 꾸미지 않는다.
+            if "publishable" in r:
+                pub = (
+                    "✅"
+                    if r.get("publishable")
+                    else f"❌ {r.get('publishable_code') or ''}".strip()
+                )
+            else:
+                pub = "—"
+            self.table.setItem(i, 4, _cell(pub))
+            self.table.setItem(i, 5, _cell(str(r.get("seed") or "")))
+            self.table.setItem(i, 6, _cell(src))
         # 키워드 등 다른 칸을 클릭해도 그 행 체크가 토글되게(체크박스 칸을 정확히 안 눌러도 편하게).
         self.table.cellClicked.connect(self._toggle_row)
         lay.addWidget(self.table, 1)
@@ -1266,6 +1279,7 @@ class DashboardWindow(QMainWindow):
         custom = seed.strip() or None
 
         def task() -> list[dict[str, Any]]:
+            from collector import keyword_relevance
             from common import config
             from writer import keyword_recommender as kr
 
@@ -1274,9 +1288,18 @@ class DashboardWindow(QMainWindow):
             conn = db.connect(db.DB_PATH)
             try:
                 recs = kr.recommend(conn, custom_seed=custom, limit=30, live=True)
+                # ★세션 #49: 고르기 전에 '자동발행 가능'을 함께 보여준다(선택 창 '발행' 칸).
+                # 검색량만 보고 고르면 미매핑 키워드가 큐에 들어가 며칠 뒤 LLM 비용을 쓴 뒤
+                # 'unmapped 보류'로 그날 발행 0편이 된다(#49 '32인치모니터암' 실제 사례).
+                # DB 접근은 여기(백그라운드 작업)서 끝내고 다이얼로그엔 결과만 넘긴다.
+                for r in recs:
+                    _ok, code = keyword_relevance.publishability(str(r.get("keyword") or ""), conn)
+                    r["publishable"] = _ok
+                    r["publishable_code"] = code
             finally:
                 conn.close()
-            print(f"[추천] 후보 {len(recs)}건")
+            n_block = sum(1 for r in recs if not r.get("publishable"))
+            print(f"[추천] 후보 {len(recs)}건 (자동발행 불가 {n_block}건 — 선택 창 '발행' 칸 확인)")
             return recs
 
         self.run_task(task, on_done=self._after_recommend, label="추천 키워드 조회")

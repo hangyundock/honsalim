@@ -2379,6 +2379,7 @@ def _set_keyword_status(keyword_id: int, status: str, reason: str | None = None)
 
 def cmd_keyword_add(args: argparse.Namespace) -> int:
     """키워드를 발행 큐에 추가 (status=pending). 운영 대시보드 '대기 키워드'."""
+    from collector import keyword_relevance
     from writer import keyword_queue as kq
 
     conn = db.connect(db.DB_PATH)
@@ -2393,12 +2394,16 @@ def cmd_keyword_add(args: argparse.Namespace) -> int:
             notes=args.note,
             score=args.score,
         )
+        # ★세션 #49: 미매핑이면 넣는 순간 경고(차단 아님 — 운영자 판단 존중).
+        warning = keyword_relevance.mapping_warning(args.keyword, conn)
     except ValueError as e:
         print(f"{FAIL} {e}")
         return 2
     finally:
         conn.close()
     print(f"{OK} 키워드 #{kid} 추가: {args.keyword!r} (채널={args.channel}, status=pending)")
+    if warning:
+        print(f"{WARN} {warning}")
     return 0
 
 
@@ -2408,6 +2413,7 @@ def cmd_keyword_recommend(args: argparse.Namespace) -> int:
     네이버 실 월검색량(읽기 전용·무료). 씨앗별 실패 시 캐시 보조키워드로 자가복원.
     --add-top로 1순위를 큐에 추가(status=pending) — '선택 없으면 자동 세팅' 헤드리스 대응.
     """
+    from collector import keyword_relevance
     from writer import keyword_queue as kq
     from writer import keyword_recommender as kr
 
@@ -2428,8 +2434,13 @@ def cmd_keyword_recommend(args: argparse.Namespace) -> int:
         for i, r in enumerate(recs, 1):
             vol = f"{r['volume']:,}" if r["volume"] is not None else "—"
             src = "네이버" if r["source"] == "naver" else "캐시"
+            # ★세션 #49: 고르기 **전에** 미매핑을 보여준다. 검색량만 보고 고르면 며칠 뒤
+            # LLM 비용을 쓴 뒤 'unmapped 보류'로 발행 0편이 된다(#49 '32인치모니터암').
+            _ok, code = keyword_relevance.publishability(r["keyword"], conn)
+            mark = "" if _ok else f"  ← ★{code}(자동발행 불가)"
             print(
-                f"  {i:>2}. {r['keyword']}  (월검색 {vol} · {r['competition']} · {src} · 씨앗 {r['seed']})"
+                f"  {i:>2}. {r['keyword']}  (월검색 {vol} · {r['competition']} · {src} · "
+                f"씨앗 {r['seed']}){mark}"
             )
         if args.add_top:
             top = recs[0]
@@ -2440,6 +2451,9 @@ def cmd_keyword_recommend(args: argparse.Namespace) -> int:
                 f"{OK} 1순위 {top['keyword']!r} → 키워드 #{kid} 추가 "
                 f"(채널 {top['channel']}, status=pending)"
             )
+            warning = keyword_relevance.mapping_warning(top["keyword"], conn)
+            if warning:
+                print(f"{WARN} {warning}")
         return 0
     finally:
         conn.close()

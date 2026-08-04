@@ -15,6 +15,21 @@ from writer import article_writer, state_machine
 from writer import auto_approve as aa
 from writer import keyword_queue as kq
 
+# '보고서를 자동 생성' sentinel — None·""·깨진 JSON도 **테스트 입력값**이라 그것들과 겹치지 않는
+# 별도 객체가 필요하다(#49: ""를 sentinel로 쓰다가 빈 문자열 케이스가 자동 생성으로 새어 통과).
+_AUTO_REPORT = object()
+
+
+def _seo_report(*, skipped: bool) -> dict:
+    """운영에서 저장되는 validation_report의 최소 형태 (★세션 #49).
+
+    운영은 `article_writer.validate_and_save`만이 validated로 전이시키며 **항상** 보고서를
+    저장한다(실데이터 43/43). auto_approve가 'seo 게이트가 실제로 돌았는지'를 이 보고서로
+    판정하므로, 테스트 픽스처도 보고서를 남겨야 운영과 같은 조건이 된다.
+    """
+    metrics = {"skipped": True} if skipped else {"primary": "테스트", "primary_freq": 5}
+    return {"overall_pass": True, "gates": {"seo": {"issues": [], "metrics": metrics}}}
+
 
 def _make_validated_draft(
     conn: sqlite3.Connection,
@@ -23,10 +38,15 @@ def _make_validated_draft(
     *,
     set_validated: bool = True,
     sources: tuple[str, ...] | None = None,
+    seo_skipped: bool = False,
+    validation_report: str | None | object = _AUTO_REPORT,
 ) -> int:
     """validated(또는 enriched) draft + enriched_payload featured + 선택 키워드 생성.
 
     sources: featured별 제휴처(aliexpress/coupang). None이면 전부 aliexpress(기존 호환).
+    seo_skipped: seo 게이트가 skip된 채 validated된 상태 재현(#49 미매핑 생성 경로).
+    validation_report: 생략(기본)이면 seo_skipped에 맞춰 자동 생성. 값을 주면 그대로 저장 —
+        None·""(빈 문자열)·깨진 JSON 같은 손상 사례를 그대로 재현하기 위해 sentinel과 분리한다.
     """
     sid = conn.execute("SELECT id FROM scenarios ORDER BY id LIMIT 1").fetchone()[0]
     did = article_writer.create_draft(conn, scenario_id=sid)
@@ -42,6 +62,12 @@ def _make_validated_draft(
         ]
     }
     article_writer.save_enriched(conn, did, ep)
+    if validation_report is _AUTO_REPORT:
+        article_writer.save_validation_report(conn, did, _seo_report(skipped=seo_skipped))
+    else:
+        conn.execute(
+            "UPDATE drafts SET validation_report = ? WHERE id = ?", (validation_report, did)
+        )
     if set_validated:
         state_machine.transition(conn, did, "validated")
     conn.commit()
@@ -240,3 +266,62 @@ class TestReasonCode:
         assert good in res["approved"]
         codes = {h["draft"]: h["code"] for h in res["held"]}
         assert codes.get(unmapped) == "unmapped"
+
+
+class TestSeoUnverified:
+    """★세션 #49 — 'validated = 5게이트 통과'가 깨지는 구멍 봉인.
+
+    미매핑 키워드로 만든 글은 seo_cfg가 비어 validator seo 게이트가 **skip(=pass 취급)** 된 채
+    validated가 된다. auto_approve는 게이트를 재검증하지 않으므로, 나중에 그 키워드를 씨앗에
+    추가(매핑)하는 순간 미검증 글이 그대로 무인 자동 발행된다 — 08-04 draft #48이 실제 이 상태.
+    """
+
+    def test_seo_skipped_draft_is_held(self, conn: sqlite3.Connection) -> None:
+        did = _make_validated_draft(conn, "컴퓨터의자", ("인체공학 사무용 의자",), seo_skipped=True)
+        ok, reason, code = aa.eligible(conn, did)
+        assert ok is False
+        assert code == "seo_unverified"
+        assert "재생성" in reason
+
+    def test_seo_measured_draft_still_eligible(self, conn: sqlite3.Connection) -> None:
+        """정상(게이트 실측) 글은 그대로 승인 — 과차단 회귀 방지."""
+        did = _make_validated_draft(conn, "컴퓨터의자", ("인체공학 사무용 의자",))
+        ok, reason, code = aa.eligible(conn, did)
+        assert ok is True, reason
+        assert code == "ok"
+
+    def test_mapping_added_later_does_not_auto_publish_unverified(
+        self, conn: sqlite3.Connection
+    ) -> None:
+        """★재발 방지 핵심: 미매핑 상태로 생성 → 나중에 매핑돼도 자동 발행되면 안 된다.
+
+        매핑을 추가하면 'unmapped' 보류는 풀리지만 seo는 여전히 미검증이므로 보류가 유지돼야
+        한다. 이 단언이 없으면 씨앗 보강이 곧 미달 글 발행 트리거가 된다(#49 draft #48).
+        """
+        did = _make_validated_draft(conn, "메쉬의자", ("인체공학 사무용 의자",), seo_skipped=True)
+        # 매핑은 정상(메쉬의자 ∈ office-chair secondary) — 그래도 seo 미검증이라 보류
+        ok, _reason, code = aa.eligible(conn, did)
+        assert ok is False and code == "seo_unverified"
+        res = aa.auto_approve(conn, apply=True)
+        assert did not in res["approved"]
+        assert {h["draft"]: h["code"] for h in res["held"]}.get(did) == "seo_unverified"
+
+    @pytest.mark.parametrize(
+        "report",
+        [None, "", "{잘못된 json", '{"gates": {}}', '{"gates": {"seo": {}}}'],
+    )
+    def test_missing_or_broken_report_is_held(
+        self, conn: sqlite3.Connection, report: str | None
+    ) -> None:
+        """보고서가 없거나 깨졌으면 '검증을 확인할 수 없음' → 보류(fail-closed·미탐<오탐)."""
+        did = _make_validated_draft(
+            conn, "컴퓨터의자", ("인체공학 사무용 의자",), validation_report=report
+        )
+        ok, _reason, code = aa.eligible(conn, did)
+        assert ok is False and code == "seo_unverified"
+
+    def test_unmapped_reported_before_seo_unverified(self, conn: sqlite3.Connection) -> None:
+        """미매핑이면서 seo skip인 글(=생성 직후 상태)은 더 실행 가능한 'unmapped'로 보고한다."""
+        did = _make_validated_draft(conn, "강아지 사료", ("사료",), seo_skipped=True)
+        ok, _reason, code = aa.eligible(conn, did)
+        assert ok is False and code == "unmapped"

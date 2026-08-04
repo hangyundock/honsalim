@@ -4,9 +4,19 @@ E7(사람 1클릭 승인)을 'fail-closed 자동 승인'으로 대체 — **auto
 자동 승인 조건(전부 충족해야 approved 전이):
   1. status='validated' (5게이트 truth/schema/disclosure/links/seo 전부 통과)
   2. 키워드가 카테고리에 매핑됨 — 매핑 없으면 적합성 검증 불가 → 보류(사람)
-  3. 자동수집(ali) featured 상품이 전부 키워드-카테고리 적합(off-target 0).
+  3. **seo 게이트가 실제로 돌았을 것**(skip 아님) — 아래 ★세션 #49 참조
+  4. 자동수집(ali) featured 상품이 전부 키워드-카테고리 적합(off-target 0).
      수동 쿠팡 배너는 사람이 고른 것이라 적합성 검사 면제(수집 단계 정책과 일치, 세션 #39).
 하나라도 불충족이면 보류(validated 유지·사람 검토). 미탐<오탐 — 나쁜 글 자동발행보다 좋은 글 보류.
+
+★세션 #49 — 'validated = 5게이트 통과'가 성립하지 않는 구멍(라이브 적발):
+  미매핑 키워드로 글을 만들면 cli가 seo_cfg를 주입하지 못해(cli.py `_keyword_seo_cfg` → {})
+  validator seo 게이트가 **skip(=pass 취급)** 된 채 validated가 된다. 그 draft는 밀도·소제목·
+  도입부 배치를 **한 번도 검사받지 않은** 글이다. 그런데 auto_approve는 게이트를 재검증하지 않고
+  status만 보므로, 나중에 운영자가 그 키워드를 씨앗에 추가(매핑)하는 순간 위 2번이 통과하면서
+  **미검증 글이 재검증 없이 무인 자동 발행**된다. 실제로 draft 4·26·48 세 건이 이 상태였고
+  (48은 산문 대표키워드 0회·소제목 0개로 명백한 미달), 앞의 둘은 우연히 기준을 넘겨 통과했을 뿐이다.
+  → 저장된 validation_report에서 seo가 skip이면 보류(code='seo_unverified'). 재생성해야 해소된다.
 
 비용 0(DB·문자열만). 자동 승인된 글은 publish-queue가 promote→build→deploy 한다.
 """
@@ -34,20 +44,43 @@ def _draft_keyword(conn: sqlite3.Connection, keyword_id: int | None) -> str | No
     return str(row[0]) if row and row[0] else None
 
 
+def _seo_unverified(validation_report: str | None) -> bool:
+    """저장된 검증 보고서에서 seo 게이트가 **실측되지 않았으면** True (세션 #49).
+
+    validator.check_seo는 payload에 seo.primary가 없으면 `metrics.skipped=True`로 통과시킨다
+    (opt-in 설계). 그 skip을 '통과'로 읽으면 미검증 글이 자동 승인된다 — 모듈 docstring 참조.
+    보고서 자체가 없거나 파싱 불가면 '검증을 확인할 수 없음'이므로 동일하게 True(fail-closed).
+    """
+    if not validation_report:
+        return True
+    try:
+        report = json.loads(validation_report)
+    except (json.JSONDecodeError, TypeError):
+        return True
+    gates = report.get("gates")
+    if not isinstance(gates, dict) or "seo" not in gates:
+        return True
+    metrics = (gates.get("seo") or {}).get("metrics")
+    if not isinstance(metrics, dict):
+        return True
+    return bool(metrics.get("skipped"))
+
+
 def eligible(conn: sqlite3.Connection, draft_id: int) -> tuple[bool, str, str]:
     """draft가 자동 승인 가능한지. 반환: (ok, reason, code).
 
     code = machine-readable 보류 사유(영문 enum) — 무인 가시화·알림이 '문제 보류'를 분류·집계하는
     단일 소스(세션 #39). 사람용 reason과 분리해 로그 문자열 파싱 없이 코드로 판정한다.
-    값: ok / no_draft / not_validated / no_keyword / unmapped / category_draft / payload_error /
-    featured_zero / offtarget.
+    값: ok / no_draft / not_validated / no_keyword / unmapped / category_draft / seo_unverified /
+    payload_error / featured_zero / offtarget.
     """
     row = conn.execute(
-        "SELECT status, keyword_id, enriched_payload FROM drafts WHERE id = ?", (draft_id,)
+        "SELECT status, keyword_id, enriched_payload, validation_report FROM drafts WHERE id = ?",
+        (draft_id,),
     ).fetchone()
     if row is None:
         return False, "draft 없음", "no_draft"
-    status, keyword_id, ep_json = row[0], row[1], row[2]
+    status, keyword_id, ep_json, vr_json = row[0], row[1], row[2], row[3]
     if status != "validated":
         return False, f"상태 {status!r}(validated 아님)", "not_validated"
     keyword = _draft_keyword(conn, keyword_id)
@@ -65,6 +98,17 @@ def eligible(conn: sqlite3.Connection, draft_id: int) -> tuple[bool, str, str]:
             False,
             f"카테고리 {slug!r} 비공개(draft) — 카테고리 공개 승인 후 자동 발행",
             "category_draft",
+        )
+    # ★세션 #49: seo 게이트가 실제로 돌았는지 확인(모듈 docstring 참조). 여기 도달한 draft는
+    # 위에서 키워드가 확인된 '키워드 글'이므로 seo 게이트는 반드시 실측됐어야 한다 — skip은
+    # 'SEO 미검증'이지 'SEO 통과'가 아니다. 보고서가 없거나 깨진 경우도 검증을 확인할 수 없으니
+    # 같이 보류한다(fail-closed — 이 모듈의 미탐<오탐 정책. 실데이터 43건 전부 보고서가 있어
+    # 기존 흐름 회귀 없음).
+    if _seo_unverified(vr_json):
+        return (
+            False,
+            "seo 게이트 미검증(생성 시 미매핑이라 skip) — 매핑 후 재생성 필요",
+            "seo_unverified",
         )
     try:
         ep = json.loads(ep_json) if ep_json else {}

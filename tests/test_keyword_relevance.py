@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from collector import keyword_relevance as kr
 
 
@@ -25,6 +27,23 @@ class TestResolveCategory:
     def test_unknown_keyword_is_none(self) -> None:
         assert kr.resolve_category("강아지 사료") is None
         assert kr.resolve_category("") is None
+
+    @pytest.mark.parametrize(
+        "kw",
+        ["32인치모니터암", "27인치모니터암", "24인치모니터암", "34인치모니터암", "고중량모니터암"],
+    )
+    def test_monitor_arm_inch_variants_map(self, kw: str) -> None:
+        """★세션 #49 — 인치 변형 미등재가 08-04 발행 0편의 원인.
+
+        resolve_category는 오매핑 방지를 위해 정확 매칭만 하므로 변형은 하나씩 씨앗에 있어야
+        한다. 네이버 실측(검색량 300+)에서 확인된 것만 등재했다.
+        """
+        assert kr.resolve_category(kw) == "monitor-arm"
+
+    def test_monitor_arm_brand_variants_still_unmapped(self) -> None:
+        """브랜드 키워드는 의도적으로 미등재 — 알리 공급 불가·헛트래픽(기존 씨앗 정책)."""
+        for kw in ("노스바유모니터암", "어고트론모니터암", "한성모니터암"):
+            assert kr.resolve_category(kw) is None, kw
 
 
 class TestEffectiveExclude:
@@ -146,3 +165,33 @@ class TestPublishabilityWithConn:
         c = sql.connect(":memory:")
         c.execute("CREATE TABLE categories (id INTEGER PRIMARY KEY, slug TEXT, status TEXT)")
         assert kr.publishability("컴퓨터의자", c) == (True, "mapped")
+
+
+class TestMappingWarning:
+    """★세션 #49 — 사람 추가 경로(대시보드 🎯추천/🆕추가·CLI)의 미매핑 경고.
+
+    무인 리필은 미매핑을 자동 배제하지만 사람 경로는 운영자 판단 존중으로 막지 않는다. 그 비대칭
+    탓에 '32인치모니터암'이 07-27 큐에 들어가 08-04에야 LLM 비용을 쓴 뒤 unmapped 보류 →
+    발행 0편이 됐다. 차단이 아니라 **넣는 순간 알린다**.
+    """
+
+    def test_mapped_keyword_no_warning(self) -> None:
+        assert kr.mapping_warning("컴퓨터의자") is None
+
+    def test_unmapped_keyword_warns_with_actionable_fix(self) -> None:
+        msg = kr.mapping_warning("강아지 사료")
+        assert msg is not None
+        assert "강아지 사료" in msg
+        # 무엇을 하면 되는지가 문구에 있어야 경고가 쓸모 있다(secondary 추가).
+        assert "secondary" in msg
+
+    def test_draft_category_warns_differently(self) -> None:
+        conn = TestPublishabilityWithConn._conn("draft")
+        msg = kr.mapping_warning("컴퓨터의자", conn)  # type: ignore[arg-type]
+        assert msg is not None and "비공개" in msg
+
+    def test_warning_matches_publishability_single_source(self) -> None:
+        """경고 유무가 publishability와 어긋나면 화면과 실제 보류가 갈라진다(드리프트 가드)."""
+        for kw in ("컴퓨터의자", "강아지 사료", "32인치모니터암", "메쉬의자"):
+            ok, _code = kr.publishability(kw)
+            assert (kr.mapping_warning(kw) is None) is ok, kw
