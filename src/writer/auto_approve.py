@@ -44,7 +44,7 @@ def _draft_keyword(conn: sqlite3.Connection, keyword_id: int | None) -> str | No
     return str(row[0]) if row and row[0] else None
 
 
-def _seo_unverified(validation_report: str | None) -> bool:
+def seo_unverified(validation_report: str | None) -> bool:
     """저장된 검증 보고서에서 seo 게이트가 **실측되지 않았으면** True (세션 #49).
 
     validator.check_seo는 payload에 seo.primary가 없으면 `metrics.skipped=True`로 통과시킨다
@@ -104,7 +104,7 @@ def eligible(conn: sqlite3.Connection, draft_id: int) -> tuple[bool, str, str]:
     # 'SEO 미검증'이지 'SEO 통과'가 아니다. 보고서가 없거나 깨진 경우도 검증을 확인할 수 없으니
     # 같이 보류한다(fail-closed — 이 모듈의 미탐<오탐 정책. 실데이터 43건 전부 보고서가 있어
     # 기존 흐름 회귀 없음).
-    if _seo_unverified(vr_json):
+    if seo_unverified(vr_json):
         return (
             False,
             "seo 게이트 미검증(생성 시 미매핑이라 skip) — 매핑 후 재생성 필요",

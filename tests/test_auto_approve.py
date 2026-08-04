@@ -325,3 +325,82 @@ class TestSeoUnverified:
         did = _make_validated_draft(conn, "강아지 사료", ("사료",), seo_skipped=True)
         ok, _reason, code = aa.eligible(conn, did)
         assert ok is False and code == "unmapped"
+
+
+class TestSeoUnverifiedHelper:
+    """seo_unverified() 자체 — cli approve(사람 경로) 경고도 이 함수를 쓰므로 단일 소스."""
+
+    @pytest.mark.parametrize(
+        "report,expected",
+        [
+            (None, True),  # 보고서 없음 → 확인 불가
+            ("", True),
+            ("{깨진 json", True),
+            ('{"gates": {}}', True),  # seo 게이트 자체가 없음
+            ('{"gates": {"seo": {}}}', True),  # metrics 없음
+            ('{"gates": {"seo": {"metrics": {"skipped": true}}}}', True),  # 명시적 skip
+            ('{"gates": {"seo": {"metrics": {"primary_freq": 7}}}}', False),  # 실측됨
+        ],
+    )
+    def test_verdicts(self, report: str | None, expected: bool) -> None:
+        assert aa.seo_unverified(report) is expected
+
+
+def _db_file(conn: sqlite3.Connection) -> str:
+    """연결이 붙어 있는 파일 경로 — cmd_approve가 conn을 닫으므로 매번 새로 열기 위해."""
+    for _seq, name, file in conn.execute("PRAGMA database_list"):
+        if name == "main":
+            return str(file)
+    raise AssertionError("main DB 경로를 찾을 수 없음")
+
+
+class TestHumanApproveWarns:
+    """★세션 #49 — 사람 1클릭 승인은 §2-마에 따라 **막지 않되**, 미검증이면 알린다.
+
+    화면엔 '5게이트 통과'로 보이는데 실은 seo를 한 번도 안 잰 글일 수 있다(생성 시 미매핑).
+    """
+
+    @staticmethod
+    def _patch_connect(conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch) -> str:
+        path = _db_file(conn)
+        # cmd_approve는 finally에서 연결을 닫는다 — 픽스처 conn을 그대로 주면 이후 단언이
+        # 'closed database'로 죽는다. 호출마다 같은 파일에 **새 연결**을 준다.
+        # ★원본을 먼저 붙잡는다 — 람다 안에서 db.connect를 부르면 패치된 자기 자신을 불러
+        # RecursionError가 난다(실제로 밟음).
+        original_connect = db.connect
+        monkeypatch.setattr("common.db.connect", lambda *_a, **_k: original_connect(Path(path)))
+        return path
+
+    def test_approve_warns_when_seo_unverified(
+        self,
+        conn: sqlite3.Connection,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ) -> None:
+        import argparse
+
+        import cli
+
+        did = _make_validated_draft(conn, "컴퓨터의자", ("인체공학 사무용 의자",), seo_skipped=True)
+        self._patch_connect(conn, monkeypatch)
+        rc = cli.cmd_approve(argparse.Namespace(draft=did, note=None))
+        out = capsys.readouterr().out
+        assert rc == 0  # 막지 않는다(사람 판단이 최종 권한)
+        assert "실측되지 않았습니다" in out
+        assert state_machine.current_status(conn, did) == "approved"
+
+    def test_approve_silent_when_verified(
+        self,
+        conn: sqlite3.Connection,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,
+    ) -> None:
+        import argparse
+
+        import cli
+
+        did = _make_validated_draft(conn, "컴퓨터의자", ("인체공학 사무용 의자",))
+        self._patch_connect(conn, monkeypatch)
+        cli.cmd_approve(argparse.Namespace(draft=did, note=None))
+        assert "실측되지 않았습니다" not in capsys.readouterr().out
+        assert state_machine.current_status(conn, did) == "approved"

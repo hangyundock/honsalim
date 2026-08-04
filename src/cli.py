@@ -1356,17 +1356,33 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 
 def cmd_approve(args: argparse.Namespace) -> int:
-    """validated draft → approved (사용자 1클릭 승인). BACKEND §9 [확정]."""
+    """validated draft → approved (사용자 1클릭 승인). BACKEND §9 [확정].
+
+    ★세션 #49: 자동 승인(auto_approve)은 seo 미검증 글을 보류하지만 이 사람 경로는 §2-마에 따라
+    사람 판단이 최종 권한이라 **막지 않는다**. 다만 화면에 '5게이트 통과'로 보이는 글이 실은
+    seo를 한 번도 안 잰 글일 수 있으므로(생성 시 키워드 미매핑) 승인 직전에 알려는 준다.
+    """
+    from writer import auto_approve as aa
     from writer import state_machine
 
     conn = db.connect(db.DB_PATH)
     try:
+        row = conn.execute(
+            "SELECT validation_report FROM drafts WHERE id = ?", (args.draft,)
+        ).fetchone()
+        unverified = row is not None and aa.seo_unverified(row[0])
         reason = "cli approve" + (f" — {args.note}" if args.note else "")
         state_machine.transition(conn, args.draft, "approved", reason=reason)
         # drafts.user_approved_at·user_approved_note 갱신은 promote 시점에 자동
         print(f"{OK} draft {args.draft} → approved")
         if args.note:
             print(f"     note: {args.note}")
+        if unverified:
+            print(
+                f"{WARN} 이 글은 seo 게이트가 **실측되지 않았습니다**(생성 시 키워드 미매핑 → skip). "
+                "밀도·소제목·도입부 배치가 미검증이니 본문을 직접 확인하거나, "
+                "키워드를 seo_keywords.yml에 매핑한 뒤 재생성하는 편이 안전합니다."
+            )
         return 0
     finally:
         conn.close()
