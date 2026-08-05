@@ -481,7 +481,15 @@ def _check_seed_alignment() -> bool:
     if not issues:
         print(f"{OK} 씨앗 정합 — 드리프트 0 · 교차 중복 0 · 공개 카테고리 전부 씨앗 보유")
     elif not hard:
-        print(f"{OK} 씨앗 파일 정합(드리프트·중복 0) — 공개 카테고리 씨앗 누락 {len(soft)}건 경고")
+        # soft는 성격이 다른 둘이 섞인다(#50) — 뭉뚱그리면 사람이 원인을 오해한다.
+        n_unreach = sum(1 for c, _ in soft if c == "unreachable")
+        n_other = len(soft) - n_unreach
+        parts = []
+        if n_other:
+            parts.append(f"공개 카테고리 씨앗 누락 {n_other}건")
+        if n_unreach:
+            parts.append(f"무인 추천 도달 불가 씨앗 {n_unreach}건(매핑 사전 역할은 유효)")
+        print(f"{OK} 씨앗 파일 정합(드리프트·중복 0) — {' · '.join(parts)} 경고")
     return not hard
 
 

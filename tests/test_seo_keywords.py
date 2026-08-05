@@ -242,8 +242,13 @@ class TestLintAlignment:
 
         위반 실증(#45에서 정리): monitor-stand secondary의 '모니터암'이 monitor-arm primary를
         first-match로 가려 오매핑됐다. 이 테스트가 있는 한 같은 실수는 커밋 단계에서 잡힌다.
+
+        ★#50: 'unreachable'(무인 추천 도달 불가)만 제외한다 — 그 secondary들은 **매핑 사전
+        역할이 유효**해서(사람이 그 키워드를 추가하면 resolve_category가 카테고리를 찾아준다)
+        지우는 게 오히려 손해다. 즉 고쳐야 할 오류가 아니라 알고 있어야 할 정보다.
+        나머지(drift·dup·published_no_seed) 0 보장은 그대로 유지한다.
         """
-        assert sk.lint_alignment() == []
+        assert [i for i in sk.lint_alignment() if i[0] != "unreachable"] == []
 
     def test_drift_detected(self, tmp_path: Path) -> None:
         seo = tmp_path / "seo.yml"
@@ -284,7 +289,7 @@ class TestLintAlignment:
             "('office-chair','의자','published'), ('drying-rack','빨래건조대','draft'), "
             "('mystery-cat','미지','published')"
         )
-        issues = sk.lint_alignment(conn)
+        issues = [i for i in sk.lint_alignment(conn) if i[0] != "unreachable"]  # #50
         codes = [c for c, _ in issues]
         # 공개+씨앗 없음(mystery-cat)만 경고 — draft(drying-rack)는 공개 전이라 미대상
         assert codes == ["published_no_seed"]
@@ -295,8 +300,60 @@ class TestLintAlignment:
         import sqlite3 as sql
 
         conn = sql.connect(":memory:")  # categories 없음(구 스키마) — 예외 없이 파일 점검만
-        assert sk.lint_alignment(conn) == []
+        assert [i for i in sk.lint_alignment(conn) if i[0] != "unreachable"] == []  # #50
         conn.close()
+
+    def test_unreachable_secondary_detected(self, tmp_path: Path) -> None:
+        """★#50 — 어떤 core도 포함하지 않는 secondary는 무인 추천에서 영구 제외된다.
+
+        keyword_research가 연관검색어를 core 부분문자열로 거르므로(no_core), 씨앗에 적어두어도
+        네이버가 추천할 수 없다. 실측: monitor-stand는 5개 중 2개가 이 상태여서 실질 씨앗이
+        3개뿐이었고, 그 결과 리필 적격 후보 0개인 날이 나왔다.
+        """
+        seo = tmp_path / "seo.yml"
+        seo.write_text(
+            "categories:\n"
+            "  cat-a:\n    primary: 모니터 받침대\n    core: 받침대\n"
+            "    secondary: [높이조절 받침대, 모니터 라이저]\n",  # 라이저에 '받침대' 없음
+            encoding="utf-8",
+        )
+        sources = tmp_path / "sources.yml"
+        sources.write_text("categories:\n  cat-a: {require_any: [받침대]}\n", encoding="utf-8")
+        issues = sk.lint_alignment(path=seo, sources_path=sources)
+        assert [c for c, _ in issues] == ["unreachable"]
+        assert "모니터 라이저" in issues[0][1]
+
+    def test_reachable_secondary_not_flagged(self, tmp_path: Path) -> None:
+        """다른 카테고리의 core를 포함하면 도달 가능 — 씨앗과 매핑 카테고리는 교차해도 된다.
+
+        실제 사례: '모니터거치대'는 monitor-arm으로 매핑되지만 laptop-stand의 core('거치대')를
+        타고 추천 후보가 된다. 자기 카테고리 core만 보면 이런 정상 경로를 오탐한다.
+        """
+        seo = tmp_path / "seo.yml"
+        seo.write_text(
+            "categories:\n"
+            "  cat-a:\n    primary: 모니터암\n    core: 모니터암\n"
+            "    secondary: [모니터 거치대]\n"  # '모니터암' 없지만 cat-b의 '거치대' 포함
+            "  cat-b:\n    primary: 노트북 거치대\n    core: 거치대\n    secondary: [휴대용 거치대]\n",
+            encoding="utf-8",
+        )
+        sources = tmp_path / "sources.yml"
+        sources.write_text(
+            "categories:\n  cat-a: {require_any: [모니터암]}\n  cat-b: {require_any: [거치대]}\n",
+            encoding="utf-8",
+        )
+        assert [c for c, _ in sk.lint_alignment(path=seo, sources_path=sources)] == []
+
+    def test_no_core_config_skips_unreachable_check(self, tmp_path: Path) -> None:
+        """core를 하나도 안 쓰면 필터 자체가 없으므로 점검 생략 — 전건 오경보 방지."""
+        seo = tmp_path / "seo.yml"
+        seo.write_text(
+            "categories:\n  cat-a:\n    primary: 아무거나\n    secondary: [전혀다른말]\n",
+            encoding="utf-8",
+        )
+        sources = tmp_path / "sources.yml"
+        sources.write_text("categories:\n  cat-a: {require_any: [아무거나]}\n", encoding="utf-8")
+        assert sk.lint_alignment(path=seo, sources_path=sources) == []
 
 
 if __name__ == "__main__":

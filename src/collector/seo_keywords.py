@@ -157,6 +157,33 @@ def lint_alignment(
                     ("dup", f"{kw!r}가 {prev}·{key} 양쪽에 있음 — first-match로 {prev}에 오매핑")
                 )
 
+    # ★세션 #50 — 'unreachable': 무인 추천이 절대 집을 수 없는 secondary.
+    #   keyword_research는 연관검색어를 core 부분문자열로 거른다(core_ns not in keyword_ns →
+    #   'no_core'). 따라서 **어느 카테고리의 core도 포함하지 않는** secondary는 네이버가 아무리
+    #   추천해도 후보가 되지 못한다(사람 수동 추가는 여전히 가능 — resolve_category는 작동).
+    #   실측(#50): 75개 중 5개가 이 상태였고 monitor-stand는 5개 중 2개(40%)가 죽어 실질 씨앗이
+    #   3개뿐이라 리필 적격 후보 0개인 날이 나왔다. 씨앗을 늘려도 도달 불가면 발행 지속성에
+    #   기여하지 못하므로, 추가 시점에 바로 보이게 한다.
+    #   ※core를 하나도 안 쓰는 구성이면 필터 자체가 없으므로 점검을 생략한다(오경보 방지).
+    #   ★정규화는 **운영 필터와 같은 함수**(keyword_research._ns)를 쓴다 — _norm_kw는 소문자화까지
+    #   해서 더 관대하므로, 영문 core가 생기면 실제로는 도달 불가인데 lint만 통과하는 어긋남이 난다.
+    from collector.keyword_research import _ns  # 지연 임포트(순환 회피)
+
+    core_set = {_ns(str(e.get("core") or "")) for e in entries.values()}
+    core_set.discard("")
+    if core_set:
+        for key, entry in entries.items():
+            for kw in entry.get("secondary") or []:
+                norm = _ns(str(kw or ""))
+                if norm and not any(c in norm for c in core_set):
+                    issues.append(
+                        (
+                            "unreachable",
+                            f"{kw!r}({key})가 어떤 카테고리의 core도 포함하지 않음 — "
+                            "무인 추천에서 no_core로 영구 제외(사람 수동 추가만 가능)",
+                        )
+                    )
+
     if conn is not None:
         try:
             rows = conn.execute(
