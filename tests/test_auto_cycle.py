@@ -341,7 +341,12 @@ class TestUnpublishOnlyDeploy:
         def fake_refresh(conn: Any, **kw: Any) -> Any:
             calls["kw"] = kw
             return SimpleNamespace(
-                built=built, deployed=deployed, changed=changed, go_count=0, notes=[]
+                built=built,
+                deployed=deployed,
+                changed=changed,
+                go_count=0,
+                notes=[],
+                gate_blocked=None,
             )
 
         monkeypatch.setattr("deployer.refresh_cycle.run_refresh_cycle", fake_refresh)

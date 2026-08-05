@@ -462,7 +462,9 @@ def _audit_findings() -> list:
     """
     from validator import site_audit
 
-    return site_audit.audit_site(PROJECT_ROOT / "build" / "site")
+    # doctor는 사람이 직접 볼 때만 도는 진단 도구라 유사도(양산 감지)까지 포함한다.
+    # 매일 도는 배포 게이트는 성능 때문에 제외(#51 실측 — 유사도가 감사 시간의 대부분).
+    return site_audit.audit_site(PROJECT_ROOT / "build" / "site", include_duplication=True)
 
 
 def _check_internal_links() -> bool:
@@ -3519,7 +3521,8 @@ def _weekly_summary_lines() -> list[str]:
             conn.close()
         from validator import site_audit
 
-        findings = site_audit.audit_site(PROJECT_ROOT / "build" / "site")
+        # 주간은 사람이 읽는 보고라 유사도(양산 감지)까지 포함 — 매일 게이트에서는 제외(성능).
+        findings = site_audit.audit_site(PROJECT_ROOT / "build" / "site", include_duplication=True)
         n_fail = sum(1 for f in findings if f.severity == "fail")
         n_warn = len(findings) - n_fail
         health = "✅ 이상 없음" if n_fail == 0 else f"🚨 결함 {n_fail}건"
@@ -3533,8 +3536,12 @@ def _weekly_summary_lines() -> list[str]:
         if n_fail:
             out.append(f"  {site_audit.summarize(findings, limit=3)}")
         return out
-    except Exception:  # 요약 실패가 사이클 알림을 막지 않는다(§0)
-        return []
+    except Exception as e:
+        # 요약 실패가 사이클 알림을 막지는 않되(§0), **조용히 사라지지도 않게** 한다.
+        # ★#51 재검수: 처음엔 그냥 return []이라, 주간 요약이 영영 안 와도 아무도 몰랐다
+        # (실측에서 워크트리 DB 부재로 0줄 반환하는 걸 발견). fail-loud가 이 프로젝트 원칙이다.
+        logging.getLogger(__name__).warning("주간 요약 생성 실패: %s: %s", type(e).__name__, e)
+        return ["", f"⚠️ 주간 요약 생성 실패({type(e).__name__}) — 로그 확인 필요"]
 
 
 def cmd_notify_alert(args: argparse.Namespace) -> int:
@@ -3764,6 +3771,15 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
         if not res.built:
             print(f"{FAIL} 비공개 반영 빌드 실패: {'; '.join(res.notes) or '알 수 없음'}")
             rc = 1
+        elif res.gate_blocked:
+            # ★#51 재검수 적발 — 게이트가 막으면 built=True·changed=False·deployed=False가 되어
+            # 아래 `res.deployed or not res.changed`가 True로 평가된다. 그대로 두면 배포가
+            # 막혔는데 "라이브 반영 완료·rc=0"으로 오판하고 알림도 안 간다 = 가드레일이 내린
+            # 글이 라이브에 남은 채 조용히 지나간다(#47에서 고친 결함의 재발). 반드시 먼저 본다.
+            global _LAST_GATE_BLOCK
+            _LAST_GATE_BLOCK = res.gate_blocked
+            print(f"{FAIL} 비공개 반영 배포 차단 — 산출물 검사 결함\n{res.gate_blocked}")
+            rc = 4
         elif res.deployed or not res.changed:
             # deployed=커밋·푸시 완료 / not changed=산출물 동일(이미 반영) — 둘 다 정상 종료
             print(f"{OK} 비공개 {len(mr['unpublished'])}편 라이브 반영 완료")

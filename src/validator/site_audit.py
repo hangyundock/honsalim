@@ -16,7 +16,6 @@
 
 from __future__ import annotations
 
-import difflib
 import json
 import re
 from dataclasses import dataclass
@@ -28,11 +27,14 @@ SITE_ORIGIN = "https://honsallim.com"
 _DISCLOSURE_TERMS = ("수수료", "제휴", "어필리에이트")
 _DISCLOSURE_HEAD_CHARS = 1200
 
-# 본문 유사도 경고선 — 같은 카테고리 글은 구조·카탈로그를 공유해 어느 정도 겹치는 게 정상이라
-# 낮게 잡으면 전부 걸린다. #51 실측 분포: 최고 0.74(실리콘도마↔스텐도마), 0.65+ 6쌍.
-# 그래서 실측 최고치보다 위인 0.80을 '양산 의심' 경고선으로 둔다(차단 아님·판단은 주인).
-_SIMILARITY_WARN = 0.80
-_SIMILARITY_SAMPLE = 4000  # 비교 표본 길이(전문 비교는 O(n²)로 느려짐)
+# 본문 유사도 경고선 (문자 5-gram Jaccard). 같은 카테고리 글은 구조·카탈로그를 공유해 어느
+# 정도 겹치는 게 정상이라 낮게 잡으면 전부 걸린다.
+# ★#51 Jaccard 실측 분포(22편 231쌍): 최고 0.628(실리콘도마↔스텐도마) · 상위 10쌍 0.55~0.63.
+#   어느 선부터 구글 페널티인지는 확정 근거가 없다 — 목적은 '지금보다 뚜렷이 나빠지면 보이게'다.
+#   그래서 실측 최고보다 약 20% 위인 0.75로 둔다(현재 0쌍 = 오탐 없음, 사실상 같은 글이면 걸림).
+#   ※SequenceMatcher 기준 옛 값(0.80)과 숫자는 비슷해 보이지만 **다른 지표**다(그때 최고 0.74).
+_SIMILARITY_WARN = 0.75
+_SIMILARITY_SAMPLE = 4000  # 비교 표본 길이(전문 비교는 글 수의 제곱으로 커진다)
 
 
 @dataclass(frozen=True)
@@ -187,26 +189,45 @@ def audit_compliance(pages: dict[str, str]) -> list[Finding]:
     return out
 
 
+def _shingles(text: str, k: int = 5) -> set[str]:
+    """문자 k-gram 집합 — Jaccard 유사도용."""
+    return {text[i : i + k] for i in range(max(0, len(text) - k + 1))}
+
+
 def audit_duplication(pages: dict[str, str]) -> list[Finding]:
     """글 본문 유사도 — 키워드만 바꾼 양산 의심 (구글 Helpful Content).
 
     차단하지 않는다(warn). 같은 카테고리 글은 구조·상품 카탈로그를 공유해 어느 정도 겹치는
     게 정상이고, 어느 선부터 페널티인지 확정된 근거가 없다. 급증을 **보이게** 하는 게 목적.
+
+    ★#51 재검수: 원래 difflib.SequenceMatcher를 썼는데 22편에 12.3초, 200편 추정 17분이었다.
+    매일 도는 배포 게이트가 그만큼 느려지면 무인 운영이 망가진다. 문자 5-gram **Jaccard**로
+    교체 — 집합 연산이라 훨씬 빠르고, '거의 같은 글'을 찾는 이 용도엔 정밀도가 충분하다
+    (순서 민감도를 잃지만 양산 감지에는 무관). 임계값은 지표가 달라졌으므로 재측정해 정한다.
     """
     arts = sorted(
-        (u, _text(h)[:_SIMILARITY_SAMPLE]) for u, h in pages.items() if u.startswith("/articles/")
+        (u, _shingles(_text(h)[:_SIMILARITY_SAMPLE]))
+        for u, h in pages.items()
+        if u.startswith("/articles/")
     )
     out: list[Finding] = []
-    for i, (ua, ta) in enumerate(arts):
-        for ub, tb in arts[i + 1 :]:
-            r = difflib.SequenceMatcher(None, ta, tb).ratio()
+    for i, (ua, sa) in enumerate(arts):
+        for ub, sb in arts[i + 1 :]:
+            union = len(sa | sb)
+            if not union:
+                continue
+            r = len(sa & sb) / union
             if r >= _SIMILARITY_WARN:
                 out.append(Finding("warn", "content-similar", f"본문 유사도 {r:.2f}: {ua} ↔ {ub}"))
     return out
 
 
-def audit_site(site: Path) -> list[Finding]:
+def audit_site(site: Path, *, include_duplication: bool = False) -> list[Finding]:
     """배포 산출물 전수 감사. 산출물이 없으면 빈 목록(빌드 전 — 게이트를 막지 않는다·§0).
+
+    include_duplication: 본문 유사도까지 볼지. **기본 False** — 유사도는 warn이라 배포를
+    막지도 않는데 글 수의 제곱으로 비싸진다(#51 실측). 매일 도는 배포 게이트는 끄고,
+    사람이 보는 doctor·주간 리포트에서만 켠다.
 
     반환 순서 = fail 먼저. 호출부는 has_failures()로 차단 여부를 판단한다.
     """
@@ -218,8 +239,9 @@ def audit_site(site: Path) -> list[Finding]:
         + audit_onpage(pages)
         + audit_sitemap(site, pages)
         + audit_compliance(pages)
-        + audit_duplication(pages)
     )
+    if include_duplication:
+        found += audit_duplication(pages)
     return sorted(found, key=lambda f: (f.severity != "fail", f.code, f.message))
 
 

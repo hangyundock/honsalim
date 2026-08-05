@@ -159,7 +159,12 @@ class TestAuditDoesNotOverBlock:
     def test_similar_content_is_warn_not_fail(self, tmp_path: Path) -> None:
         """같은 카테고리 글은 구조를 공유해 겹친다 — 차단하면 정상 발행이 막힌다."""
         _healthy(tmp_path, n=2)
-        same = "<p>혼살림은 제휴 수수료를 받습니다.</p>" + "<p>완전히 동일한 본문</p>" * 40
+        # ★반복문 40회 같은 픽스처는 부적절 — 5-gram '집합'이라 반복이 뭉개져 Jaccard가
+        # 낮게 나온다. 실제 글처럼 문장이 다양하면서 두 페이지가 동일해야 양산을 재현한다.
+        same = "<p>혼살림은 제휴 수수료를 받습니다.</p>" + "".join(
+            f"<p>{i}번 문단: 원룸 책상 높이와 의자 좌판 깊이를 함께 맞추는 방법 {i*7}</p>"
+            for i in range(60)
+        )
         for s, o in (("a0", "a1"), ("a1", "a0")):
             _page(
                 tmp_path,
@@ -168,9 +173,44 @@ class TestAuditDoesNotOverBlock:
                 body=same
                 + f'<a href="/articles/{o}/">{o}</a><a href="/go/ali-1" rel="nofollow">상품</a>',
             )
-        findings = site_audit.audit_site(tmp_path)
+        findings = site_audit.audit_site(tmp_path, include_duplication=True)
         assert not site_audit.has_failures(findings)
         assert any(f.code == "content-similar" for f in findings)
+
+    def test_duplication_is_off_by_default(self, tmp_path: Path) -> None:
+        """★#51 재검수: 유사도는 warn이라 배포를 막지도 않는데 글 수의 제곱으로 비싸다.
+
+        실측 — SequenceMatcher 22편 12.3초(200편 추정 17분). 매일 도는 배포 게이트가 그만큼
+        느려지면 무인 운영이 망가진다. 기본은 꺼두고 doctor·주간 리포트에서만 켠다.
+        """
+        _healthy(tmp_path, n=2)
+        # ★반복문 40회 같은 픽스처는 부적절 — 5-gram '집합'이라 반복이 뭉개져 Jaccard가
+        # 낮게 나온다. 실제 글처럼 문장이 다양하면서 두 페이지가 동일해야 양산을 재현한다.
+        same = "<p>혼살림은 제휴 수수료를 받습니다.</p>" + "".join(
+            f"<p>{i}번 문단: 원룸 책상 높이와 의자 좌판 깊이를 함께 맞추는 방법 {i*7}</p>"
+            for i in range(60)
+        )
+        for s, o in (("a0", "a1"), ("a1", "a0")):
+            _page(
+                tmp_path,
+                f"articles/{s}",
+                title=f"제목 {s} 입니다",
+                body=same
+                + f'<a href="/articles/{o}/">{o}</a><a href="/go/ali-1" rel="nofollow">상품</a>',
+            )
+        assert not any(f.code == "content-similar" for f in site_audit.audit_site(tmp_path))
+
+    def test_similarity_threshold_clears_real_site_distribution(self, tmp_path: Path) -> None:
+        """임계값이 정상 사이트를 걸지 않는가 — 실측 최고 0.628 대비 여유가 있어야 한다.
+
+        _healthy()는 글마다 본문 길이가 다른 정상 상태다. 여기서 경고가 뜨면 임계값이 과민하다.
+        """
+        _healthy(tmp_path, n=3)
+        assert site_audit._SIMILARITY_WARN >= 0.7  # 실측 분포(최고 0.628) 위여야 오탐이 없다
+        assert not any(
+            f.code == "content-similar"
+            for f in site_audit.audit_site(tmp_path, include_duplication=True)
+        )
 
     def test_unbuilt_site_returns_empty(self, tmp_path: Path) -> None:
         """빌드 전이면 빈 목록 — 게이트가 fresh checkout을 막으면 안 된다(§0)."""
@@ -279,6 +319,38 @@ class TestDeployGate:
         assert res.gate_blocked is None
         assert pushed == [True]
         assert any("경고" in n for n in res.notes)
+
+
+class TestGateResultInterpretation:
+    """★#51 재검수 적발 — 게이트 차단을 '성공'으로 오판하던 분기 (실제 버그였다).
+
+    게이트가 막으면 built=True · changed=False · deployed=False가 된다. auto_cycle의
+    '비공개 반영' 경로는 `res.deployed or not res.changed`를 성공 조건으로 써서, 이 조합이
+    True로 평가돼 **"라이브 반영 완료 · rc=0"으로 보고하고 알림도 안 갔다**. 가드레일이 내린
+    글이 라이브에 남은 채 조용히 지나가는 상태 — #47에서 고친 결함의 재발이었다.
+    """
+
+    def _result(self, *, gate_blocked: str | None):
+        from deployer.refresh_cycle import CycleResult
+
+        r = CycleResult(dry_run=False)
+        r.built = True
+        r.changed = False  # 게이트가 detect_changes 전에 반환하므로 기본값 그대로
+        r.deployed = False
+        r.gate_blocked = gate_blocked
+        return r
+
+    def test_blocked_result_is_not_mistaken_for_success(self) -> None:
+        """옛 성공 조건이 차단 결과에 True를 주는지 고정 — 이 조합이 버그의 정체다."""
+        r = self._result(gate_blocked="결함 1건")
+        assert (r.deployed or not r.changed) is True, "전제 붕괴 — 오판 조건이 재현되지 않음"
+        assert r.gate_blocked, "gate_blocked를 먼저 보지 않으면 성공으로 오판된다"
+
+    def test_clean_result_still_reads_as_success(self) -> None:
+        """정상 회차(변경 없음)는 여전히 성공으로 읽혀야 한다 — 과잉 차단 방지."""
+        r = self._result(gate_blocked=None)
+        assert r.gate_blocked is None
+        assert (r.deployed or not r.changed) is True
 
 
 def test_summarize_includes_failures() -> None:
