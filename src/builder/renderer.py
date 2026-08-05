@@ -893,7 +893,30 @@ def _cat_slug_from_concept(concept_image: str) -> str:
     return Path(concept_image).stem if concept_image else ""
 
 
-def _article_guide_cards(article_pages: list[dict]) -> list[dict]:
+def _resolve_cat_slug(concept_image: str, keyword: str | None = None) -> str:
+    """글 → 매핑 카테고리 slug. concept_image 우선, 없으면 **키워드로 폴백** (세션 #51).
+
+    ★근본 문제: 매핑을 concept_image 하나에만 의존해, LLM 구조화 출력(structured_json)이
+    비어 있는 글은 카테고리를 영영 못 찾는다. 그러면 (a) category.html 재구성을 못 받고
+    (b) 어느 글의 '같은 카테고리' 형제도 아니게 되어 내부링크 고아가 된다 — 라이브 실측:
+    게이밍의자 글 1편이 structured_json={} 상태로 발행돼 정확히 이 경로를 밟았다.
+    구조화 출력은 LLM 응답이라 언제든 다시 빌 수 있으므로, 발행 시점 데이터에 기대지 않고
+    **렌더 때 키워드로 되살린다**(무인 자가복원 §0 — 사람이 DB를 고칠 필요 없음).
+    """
+    slug = _cat_slug_from_concept(concept_image)
+    if slug or not keyword:
+        return slug
+    try:
+        from collector import keyword_relevance, seo_keywords
+
+        return keyword_relevance.resolve_category(keyword, seo_keywords.load_all()) or ""
+    except Exception:  # 씨앗 파일 손상 등 — 매핑만 포기하고 렌더는 계속(§0)
+        return ""
+
+
+def _article_guide_cards(
+    article_pages: list[dict], kw_by_slug: dict[str, str] | None = None
+) -> list[dict]:
     """published(비-draft) 글 → 가이드 카드 (홈·구매가이드·매핑 카테고리 내부링크용).
 
     세션 #40 근본 수정: 발행 글이 '시나리오 카드(active=1 시나리오에 글 연결됨)'로만 닿도록
@@ -919,7 +942,10 @@ def _article_guide_cards(article_pages: list[dict]) -> list[dict]:
                 "url": f"/articles/{pg['slug']}/",
                 "concept_image": pg.get("concept_image") or "",
                 "concept_image_alt": pg.get("concept_image_alt") or pg["title"],
-                "cat_slug": _cat_slug_from_concept(pg.get("concept_image", "")),
+                # 매핑은 concept_image 우선, 비면 키워드 폴백(#51 — structured 빈 글 자가복원)
+                "cat_slug": _resolve_cat_slug(
+                    pg.get("concept_image", ""), (kw_by_slug or {}).get(pg["slug"])
+                ),
             }
         )
     return cards
@@ -1693,7 +1719,7 @@ def render_site(
 
     # 발행 글 내부링크(고아 방지·세션 #40) — 시나리오 활성과 무관하게 홈·구매가이드·매핑
     # 카테고리에서 항상 글로 닿도록. guides_by_cat = 카테고리 slug → 그 카테고리에 매핑된 글 카드.
-    article_guides = _article_guide_cards(article_pages)
+    article_guides = _article_guide_cards(article_pages, kw_labels)
     for _gc in article_guides:
         _kw = kw_labels.get(_gc["slug"])
         if _kw:
@@ -1725,6 +1751,11 @@ def render_site(
         "personas": personas,
         "business_info": BUSINESS_INFO,
         "eager_images": include_drafts,
+        # og:image 기본값 (세션 #51) — _macros/meta.html은 og_image를 지원하는데 렌더 호출부가
+        # 한 번도 넘기지 않아 **전 42페이지에서 og:image가 누락**돼 있었다(라이브 실측).
+        # 부작용: twitter:card가 이미지 없는 'summary'로 떨어져 공유 카드가 텍스트만 나온다.
+        # 글·카테고리는 아래에서 자기 대표 이미지로 덮어쓰고, 나머지는 이 폴백을 쓴다.
+        "og_image": ARTICLE_OG_FALLBACK,
     }
     org_ld = jsonld.build_organization_jsonld(SITE_ORIGIN, "혼살림", BUSINESS_INFO["email"])
     # 운영자 Person 엔티티(E-E-A-T·M2·#45) — About 페이지에 주입, 글 author.url(/about/)과 연결.
@@ -1934,6 +1965,11 @@ def render_site(
     cat_by_slug = {cpg["slug"]: cpg for cpg in category_pages}
     for pg in article_pages:
         slug = pg["slug"]
+        # og:image = 글 대표 이미지(없으면 사이트 폴백) — JSON-LD image와 동일 소스(#51 단일 진실원).
+        art_common = {
+            **common,
+            "og_image": _abs_url(pg.get("concept_image")) or ARTICLE_OG_FALLBACK,
+        }
         # 발행 글 Article JSON-LD는 렌더 시점에 재생성(단일 진실원) — 저장본의 mainEntityOfPage
         # 슬래시 누락(IDX-04)·headline이 페이지 제목과 다른 3중 분산(IDX-03)을 기존·미래 글 모두에서
         # 일관 교정한다. headline=글 제목·datePublished=발행일·image=글 히어로(없으면 폴백).
@@ -1948,7 +1984,7 @@ def render_site(
                 image_url=_abs_url(pg.get("concept_image")) or ARTICLE_OG_FALLBACK,
                 published_at=pg.get("published_at") or "",
             )
-        base = cat_by_slug.get(_cat_slug_from_concept(pg.get("concept_image", "")))
+        base = cat_by_slug.get(_resolve_cat_slug(pg.get("concept_image", ""), kw_labels.get(slug)))
         # 빵부스러기 = 실제 탐색 계층(세션 #42 SEO): 카테고리 매핑 글은 홈>카테고리>{카테고리}>글.
         # 옛 '내맘대로 세팅' 고정은 글이 시나리오 허브 소속으로 잘못 신호돼 카테고리 클러스터가 끊겼다.
         if base is not None:
@@ -2006,7 +2042,7 @@ def render_site(
                     # 옛 []는 '자기 자신을 가리키는 목록'을 피하려던 것인데, 자기 제외 형제
                     # 목록으로 바꾸면 그 문제 없이 토픽 클러스터를 연결한다.
                     article_guides=siblings_by_slug.get(slug, []),
-                    **common,
+                    **art_common,
                 ),
             )
             continue
@@ -2036,7 +2072,7 @@ def render_site(
                 concept_image_alt=pg["concept_image_alt"],
                 # 글↔글 내부링크(세션 #51) — 미매핑 폴백 글도 형제 글로 연결(고아 방지)
                 sibling_articles=siblings_by_slug.get(slug, []),
-                **common,
+                **art_common,
             ),
         )
     # sitemap·게시수는 published만 — draft 미리보기 글은 제외(공개 색인·카운트 누출 방지, 세션 #29)
@@ -2127,7 +2163,12 @@ def render_site(
                 related=pg["related"],
                 # 이 카테고리에 매핑된 발행 글 가이드(토픽 클러스터·고아 방지·#40)
                 article_guides=guides_by_cat.get(cslug, []),
-                **common,
+                # og:image = 카테고리 대표 이미지(없으면 사이트 폴백) — #51
+                **{
+                    **common,
+                    "og_image": _abs_url(pg["category"].get("concept_image"))
+                    or ARTICLE_OG_FALLBACK,
+                },
             ),
         )
     category_slugs = [pg["slug"] for pg in category_pages]

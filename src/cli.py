@@ -499,6 +499,104 @@ def _check_internal_links() -> bool:
     return not orphans and not dead_ends
 
 
+def _check_seo_onpage() -> bool:
+    """§19 온페이지 SEO 정밀점검 — 배포 산출물 전 페이지 (세션 #51).
+
+    ★왜 필요한가: #51 수동 감사에서 **전 42페이지에 og:image가 없다**는 걸 처음 알았다.
+    매크로(_macros/meta.html)는 og_image를 지원하는데 렌더 호출부가 한 번도 넘기지 않은
+    배선 누락이었고, 부작용으로 twitter:card가 이미지 없는 'summary'로 떨어져 있었다.
+    글↔글 링크 0(§17)과 똑같이 **사람이 HTML을 손으로 뜯어야만 보이는** 종류라, 검사를
+    코드로 고정해 매 doctor에서 자동으로 드러나게 한다.
+
+    FAIL(검색 노출에 직접 영향) / WARN(품질 권고). noindex 페이지는 sitemap 대조에서 제외.
+    """
+    site = PROJECT_ROOT / "build" / "site"
+    if not (site / "index.html").is_file():
+        print(f"{WARN} build/site 없음 — 빌드 전이라 건너뜀 (`honsalim build --full` 후 재실행)")
+        return True
+
+    pages: dict[str, str] = {}
+    for p in site.rglob("index.html"):
+        rel = "/" + str(p.parent.relative_to(site)).replace("\\", "/").strip(".")
+        pages[(rel + "/").replace("//", "/")] = p.read_text(encoding="utf-8", errors="replace")
+
+    fails: list[str] = []
+    warns: list[str] = []
+    titles: dict[str, list[str]] = {}
+    noindex: set[str] = set()
+
+    for url, h in sorted(pages.items()):
+        if re.search(r'name="robots"[^>]+content="[^"]*noindex', h, re.I):
+            noindex.add(url)
+            continue  # 색인 대상이 아니면 온페이지 품질을 따질 의미가 없다
+        t = re.search(r"<title>(.*?)</title>", h, re.I | re.S)
+        tv = t.group(1).strip() if t else ""
+        if not tv:
+            fails.append(f"{url} title 없음")
+        else:
+            titles.setdefault(tv, []).append(url)
+        if not re.search(r'rel="canonical"[^>]+href="https://', h, re.I):
+            fails.append(f"{url} canonical 없음")
+        n_h1 = len(re.findall(r"<h1[^>]*>", h, re.I))
+        if n_h1 != 1:
+            fails.append(f"{url} H1 {n_h1}개(정확히 1개여야 함)")
+        if not re.search(r'property="og:image"', h, re.I):
+            fails.append(f"{url} og:image 없음(공유 카드에 이미지 미표시)")
+        if not re.search(r'name="description"[^>]+content="[^"]+"', h, re.I):
+            warns.append(f"{url} meta description 없음")
+        for raw in re.findall(r'<script type="application/ld\+json">(.*?)</script>', h, re.S):
+            try:
+                json.loads(raw)
+            except json.JSONDecodeError:
+                fails.append(f"{url} JSON-LD 파싱 실패(구조화 데이터 무효)")
+        if url.startswith("/articles/"):
+            if '"Article"' not in h:
+                fails.append(f"{url} Article 스키마 없음")
+            if '"BreadcrumbList"' not in h:
+                fails.append(f"{url} BreadcrumbList 스키마 없음")
+        for a in re.findall(r'<a\b[^>]*href="/go/[^"]*"[^>]*>', h, re.I):
+            rel_attr = re.search(r'rel="([^"]*)"', a)
+            if not rel_attr or not {"nofollow", "sponsored"} & set(rel_attr.group(1).split()):
+                fails.append(f"{url} 제휴링크에 rel nofollow/sponsored 없음(구글 정책 위반)")
+                break
+
+    # canonical이 다른 URL을 가리키는 중복은 정상 처리이므로, 같은 title이면서 self-canonical인
+    # 페이지들만 진짜 중복으로 본다(#51 /personas/ 오탐 제거).
+    def _canonical(html: str) -> str:
+        m = re.search(r'rel="canonical"[^>]+href="([^"]+)"', html, re.I)
+        return m.group(1).strip() if m else ""
+
+    for tv, urls in titles.items():
+        # ★정확 비교 — 부분일치로 판정하면 '/'는 슬래시로 끝나는 아무 canonical에나 걸린다.
+        selfc = [u for u in urls if _canonical(pages[u]) == f"https://honsallim.com{u}"]
+        if len(selfc) > 1:
+            fails.append(f"title 중복(둘 다 self-canonical) {selfc}: {tv[:40]}")
+
+    sm = site / "sitemap.xml"
+    if not sm.exists():
+        fails.append("sitemap.xml 없음")
+    else:
+        locs = set(re.findall(r"<loc>([^<]+)</loc>", sm.read_text(encoding="utf-8")))
+        want = {f"https://honsallim.com{u}" for u in pages if u not in noindex}
+        for m in sorted(want - locs):
+            warns.append(f"sitemap 누락: {m}")
+        for e in sorted(locs - want):
+            fails.append(f"sitemap에 있으나 산출물 없음(404 유발): {e}")
+
+    for m in fails:
+        print(f"{FAIL} {m}")
+    for m in warns[:6]:
+        print(f"{WARN} {m}")
+    if len(warns) > 6:
+        print(f"{WARN} … 외 {len(warns)-6}건")
+    if not fails:
+        print(
+            f"{OK} 온페이지 SEO — 색인 대상 {len(pages)-len(noindex)}페이지 "
+            f"(title·canonical·H1·og:image·JSON-LD·제휴 rel·sitemap 정합)"
+        )
+    return not fails
+
+
 def _check_keyword_duplicates() -> bool:
     """§18 유사 키워드 중복 — 표기만 다른 같은 주제로 중복 글이 나가는지 (세션 #51).
 
@@ -523,9 +621,15 @@ def _check_keyword_duplicates() -> bool:
     pairs: list[tuple[str, str, float]] = []
     for i, a in enumerate(kws):
         for b in kws[i + 1 :]:
-            if norm[a] == norm[b]:
+            na, nb = norm[a], norm[b]
+            if na == nb:
                 continue  # 완전 동일은 기존 dedup 담당
-            r = difflib.SequenceMatcher(None, norm[a], norm[b]).ratio()
+            # 한쪽이 다른 쪽을 통째로 품으면 '표기 변형'이 아니라 **범위가 다른 별개 주제**다
+            # (모니터받침대 ⊂ 듀얼모니터받침대 — #51 라이브 오탐). 여기서 잡으려는 건
+            # '메쉬의자 ↔ 매쉬의자'처럼 길이가 비슷한데 글자만 어긋난 중복이다.
+            if na in nb or nb in na:
+                continue
+            r = difflib.SequenceMatcher(None, na, nb).ratio()
             if r >= 0.75:
                 pairs.append((a, b, r))
     if pairs:
@@ -662,6 +766,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _print_section("18. 유사 키워드 중복 (#51)")
     _check_keyword_duplicates()  # WARN 전용 — 자동 제외는 오탐 위험, 판단은 주인(§1)
 
+    _print_section("19. 온페이지 SEO 정밀점검 (#51)")
+    seo_ok = _check_seo_onpage()
+
     _print_section("종합")
     phase2_ok = (
         tmpl_ok
@@ -672,6 +779,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         and caps_ok
         and seeds_ok
         and links_ok
+        and seo_ok
     )
     if py_ok and sec_ok and sql_ok and tools_ok and dep_found == dep_total and phase2_ok:
         print(f"{OK} 모든 필수 체크 통과 — Phase 2 진입 가능")
