@@ -454,145 +454,66 @@ def _check_size_caps() -> bool:
     return code != 2  # 파일 누락만 게이트, cap 초과는 WARN
 
 
-def _check_internal_links() -> bool:
-    """§17 내부링크 정합 — 발행 글이 서로 링크되는가 (세션 #51 재발방지).
+def _audit_findings() -> list:
+    """배포 산출물 감사 결과 — doctor·배포 게이트 공용(validator.site_audit 단일 진실원, #51).
 
-    ★배경: 글↔글 링크가 **0개**인 상태로 40일·22편이 발행됐고, 아무도 몰랐다. 사람이 라이브
-    HTML을 손으로 뜯어봐야 발견되는 종류의 결함이라 재발해도 또 모른다. 그래서 자동 검사로
-    고정한다(§0 자가 감지). 검사 대상은 **실제 배포되는 산출물**(build/site) — 코드가 아니라
-    결과를 본다(렌더 경로가 둘이라 한쪽만 고쳐도 통과하던 함정 차단).
-
-    - inbound 0(어느 글도 안 가리킴) = FAIL: 크롤러가 도달할 경로가 sitemap뿐인 고아.
-    - 산출물 없음(fresh checkout·빌드 전) = SKIP: doctor는 멈추지 않는다.
+    ★같은 코드를 쓰는 이유: doctor와 무인 게이트가 각자 판정하면 "doctor는 통과인데 배포가
+    막힌다"(또는 그 반대) 같은 어긋남이 생긴다. 검사 로직은 site_audit 한 곳에만 둔다.
     """
-    site = PROJECT_ROOT / "build" / "site" / "articles"
-    if not site.is_dir():
-        print(f"{WARN} build/site/articles 없음 — 빌드 전이라 건너뜀 (`honsalim build` 후 재실행)")
-        return True
-    pages = sorted(p for p in site.iterdir() if (p / "index.html").is_file())
-    if len(pages) < 2:
-        print(f"{OK} 발행 글 {len(pages)}편 — 형제 링크 판정 대상 아님(2편 미만)")
-        return True
-    inbound: dict[str, int] = {p.name: 0 for p in pages}
-    outbound: dict[str, int] = {}
-    for p in pages:
-        html = (p / "index.html").read_text(encoding="utf-8", errors="replace")
-        linked = {s for s in re.findall(r'href="/articles/([^/"]+)/"', html) if s != p.name}
-        outbound[p.name] = len(linked)
-        for s in linked:
-            if s in inbound:
-                inbound[s] += 1
-    orphans = sorted(s for s, n in inbound.items() if n == 0)
-    dead_ends = sorted(s for s, n in outbound.items() if n == 0)
-    if orphans:
-        print(f"{FAIL} inbound 0(어느 글도 안 가리킴) {len(orphans)}건: {', '.join(orphans[:5])}")
-    if dead_ends:
-        print(
-            f"{FAIL} outbound 0(다른 글로 못 나감) {len(dead_ends)}건: {', '.join(dead_ends[:5])}"
-        )
-    if not orphans and not dead_ends:
-        total = sum(outbound.values())
-        print(
-            f"{OK} 내부링크 정합 — 글 {len(pages)}편 · 글↔글 링크 {total}개 · 고아 0 "
-            f"(inbound 최소 {min(inbound.values())}회)"
-        )
-    return not orphans and not dead_ends
+    from validator import site_audit
+
+    return site_audit.audit_site(PROJECT_ROOT / "build" / "site")
 
 
-def _check_seo_onpage() -> bool:
-    """§19 온페이지 SEO 정밀점검 — 배포 산출물 전 페이지 (세션 #51).
+def _check_internal_links() -> bool:
+    """§17 내부링크 정합 — 글이 서로 링크되는가 (세션 #51 재발방지).
 
-    ★왜 필요한가: #51 수동 감사에서 **전 42페이지에 og:image가 없다**는 걸 처음 알았다.
-    매크로(_macros/meta.html)는 og_image를 지원하는데 렌더 호출부가 한 번도 넘기지 않은
-    배선 누락이었고, 부작용으로 twitter:card가 이미지 없는 'summary'로 떨어져 있었다.
-    글↔글 링크 0(§17)과 똑같이 **사람이 HTML을 손으로 뜯어야만 보이는** 종류라, 검사를
-    코드로 고정해 매 doctor에서 자동으로 드러나게 한다.
-
-    FAIL(검색 노출에 직접 영향) / WARN(품질 권고). noindex 페이지는 sitemap 대조에서 제외.
+    ★배경: 글↔글 링크가 **0개**인 상태로 40일·22편이 발행됐고 아무도 몰랐다. 배포 후 검증이
+    홈 1페이지의 상태코드만 봤기 때문이다. 사람이 라이브 HTML을 뜯어야 보이는 결함이라
+    검사를 코드로 고정한다. 판정은 site_audit이 하고 여기서는 표시만 한다.
     """
     site = PROJECT_ROOT / "build" / "site"
     if not (site / "index.html").is_file():
         print(f"{WARN} build/site 없음 — 빌드 전이라 건너뜀 (`honsalim build --full` 후 재실행)")
         return True
+    arts = (
+        [p for p in (site / "articles").glob("*/index.html")]
+        if (site / "articles").is_dir()
+        else []
+    )
+    bad = [f for f in _audit_findings() if f.code in ("link-orphan", "link-dead-end")]
+    for f in bad:
+        print(f"{FAIL} {f.message}")
+    if not bad:
+        print(f"{OK} 내부링크 정합 — 글 {len(arts)}편 · 고아 0 · 막다른 글 0")
+    return not bad
 
-    pages: dict[str, str] = {}
-    for p in site.rglob("index.html"):
-        rel = "/" + str(p.parent.relative_to(site)).replace("\\", "/").strip(".")
-        pages[(rel + "/").replace("//", "/")] = p.read_text(encoding="utf-8", errors="replace")
 
-    fails: list[str] = []
-    warns: list[str] = []
-    titles: dict[str, list[str]] = {}
-    noindex: set[str] = set()
+def _check_seo_onpage() -> bool:
+    """§19 온페이지 SEO·컴플라이언스 정밀점검 — 배포 산출물 전 페이지 (세션 #51).
 
-    for url, h in sorted(pages.items()):
-        if re.search(r'name="robots"[^>]+content="[^"]*noindex', h, re.I):
-            noindex.add(url)
-            continue  # 색인 대상이 아니면 온페이지 품질을 따질 의미가 없다
-        t = re.search(r"<title>(.*?)</title>", h, re.I | re.S)
-        tv = t.group(1).strip() if t else ""
-        if not tv:
-            fails.append(f"{url} title 없음")
-        else:
-            titles.setdefault(tv, []).append(url)
-        if not re.search(r'rel="canonical"[^>]+href="https://', h, re.I):
-            fails.append(f"{url} canonical 없음")
-        n_h1 = len(re.findall(r"<h1[^>]*>", h, re.I))
-        if n_h1 != 1:
-            fails.append(f"{url} H1 {n_h1}개(정확히 1개여야 함)")
-        if not re.search(r'property="og:image"', h, re.I):
-            fails.append(f"{url} og:image 없음(공유 카드에 이미지 미표시)")
-        if not re.search(r'name="description"[^>]+content="[^"]+"', h, re.I):
-            warns.append(f"{url} meta description 없음")
-        for raw in re.findall(r'<script type="application/ld\+json">(.*?)</script>', h, re.S):
-            try:
-                json.loads(raw)
-            except json.JSONDecodeError:
-                fails.append(f"{url} JSON-LD 파싱 실패(구조화 데이터 무효)")
-        if url.startswith("/articles/"):
-            if '"Article"' not in h:
-                fails.append(f"{url} Article 스키마 없음")
-            if '"BreadcrumbList"' not in h:
-                fails.append(f"{url} BreadcrumbList 스키마 없음")
-        for a in re.findall(r'<a\b[^>]*href="/go/[^"]*"[^>]*>', h, re.I):
-            rel_attr = re.search(r'rel="([^"]*)"', a)
-            if not rel_attr or not {"nofollow", "sponsored"} & set(rel_attr.group(1).split()):
-                fails.append(f"{url} 제휴링크에 rel nofollow/sponsored 없음(구글 정책 위반)")
-                break
-
-    # canonical이 다른 URL을 가리키는 중복은 정상 처리이므로, 같은 title이면서 self-canonical인
-    # 페이지들만 진짜 중복으로 본다(#51 /personas/ 오탐 제거).
-    def _canonical(html: str) -> str:
-        m = re.search(r'rel="canonical"[^>]+href="([^"]+)"', html, re.I)
-        return m.group(1).strip() if m else ""
-
-    for tv, urls in titles.items():
-        # ★정확 비교 — 부분일치로 판정하면 '/'는 슬래시로 끝나는 아무 canonical에나 걸린다.
-        selfc = [u for u in urls if _canonical(pages[u]) == f"https://honsallim.com{u}"]
-        if len(selfc) > 1:
-            fails.append(f"title 중복(둘 다 self-canonical) {selfc}: {tv[:40]}")
-
-    sm = site / "sitemap.xml"
-    if not sm.exists():
-        fails.append("sitemap.xml 없음")
-    else:
-        locs = set(re.findall(r"<loc>([^<]+)</loc>", sm.read_text(encoding="utf-8")))
-        want = {f"https://honsallim.com{u}" for u in pages if u not in noindex}
-        for m in sorted(want - locs):
-            warns.append(f"sitemap 누락: {m}")
-        for e in sorted(locs - want):
-            fails.append(f"sitemap에 있으나 산출물 없음(404 유발): {e}")
-
-    for m in fails:
-        print(f"{FAIL} {m}")
-    for m in warns[:6]:
-        print(f"{WARN} {m}")
+    ★왜 필요한가: #51 수동 감사에서 **전 42페이지에 og:image가 없다**는 걸 처음 알았다.
+    매크로는 og_image를 지원하는데 렌더 호출부가 한 번도 넘기지 않은 배선 누락이었다.
+    §17과 함께 이 검사는 **무인 배포 게이트와 동일한 코드**를 쓴다 — doctor가 통과시키면
+    배포도 통과하고, 막으면 배포도 막힌다.
+    """
+    site = PROJECT_ROOT / "build" / "site"
+    if not (site / "index.html").is_file():
+        print(f"{WARN} build/site 없음 — 빌드 전이라 건너뜀 (`honsalim build --full` 후 재실행)")
+        return True
+    findings = [f for f in _audit_findings() if f.code not in ("link-orphan", "link-dead-end")]
+    fails = [f for f in findings if f.severity == "fail"]
+    warns = [f for f in findings if f.severity != "fail"]
+    for f in fails:
+        print(f"{FAIL} {f.message}")
+    for f in warns[:6]:
+        print(f"{WARN} {f.message}")
     if len(warns) > 6:
         print(f"{WARN} … 외 {len(warns)-6}건")
     if not fails:
         print(
-            f"{OK} 온페이지 SEO — 색인 대상 {len(pages)-len(noindex)}페이지 "
-            f"(title·canonical·H1·og:image·JSON-LD·제휴 rel·sitemap 정합)"
+            f"{OK} 온페이지 SEO·컴플라이언스 — title·canonical·H1·og:image·JSON-LD·"
+            "제휴 rel·sitemap·대가성 고지 전부 정합"
         )
     return not fails
 
@@ -2591,6 +2512,9 @@ def cmd_refresh_cycle(args: argparse.Namespace) -> int:
     )
     print(f"{OK} 모니터링 갱신 → 기록 {report_path.name} · 대시보드 {dash_out}")
 
+    if res.gate_blocked:  # #51 배포 전 산출물 게이트
+        print(f"{FAIL} 배포 차단 — 산출물 검사 결함\n{res.gate_blocked}")
+        return 4
     rc_fail = any(not r.ok for r in res.refreshed)
     deploy_fail = (not res.dry_run) and (not args.no_deploy) and res.changed and not res.deployed
     return 1 if (rc_fail or deploy_fail) else 0
@@ -3295,6 +3219,13 @@ def cmd_publish_queue(args: argparse.Namespace) -> int:
     if not res.built:
         print(f"{FAIL} 빌드 실패: {'; '.join(res.notes) or '알 수 없음'}")
         return 1
+    if res.gate_blocked:
+        # ★#51 배포 전 산출물 게이트 — 결함 있는 페이지가 라이브·색인에 나가는 것을 원천 차단.
+        # 글은 DB상 published지만 라이브 미반영 상태로 남는다(다음 사이클이 자동 재시도).
+        global _LAST_GATE_BLOCK
+        _LAST_GATE_BLOCK = res.gate_blocked  # 상위 notify가 사유를 텔레그램에 실어 보낸다
+        print(f"{FAIL} 배포 차단 — 산출물 검사 결함\n{res.gate_blocked}")
+        return 4
     if args.no_deploy:
         print(f"{OK} {promoted}편 게시·빌드 완료 (배포 생략 — --no-deploy)")
         return 0
@@ -3456,6 +3387,11 @@ def _newly_published_articles(pre_ids: set[int]) -> list[dict[str, str]]:
     ]
 
 
+# 배포 전 산출물 게이트(#51)가 막았을 때의 사유 — cmd_publish_queue가 채우고 notify가 읽는다.
+# 프로세스 내 전달용(무인 사이클은 한 프로세스에서 발행→알림까지 끝난다).
+_LAST_GATE_BLOCK: str | None = None
+
+
 def _auto_cycle_notify(
     digest: dict[str, Any],
     publish_rc: int | None,
@@ -3510,7 +3446,14 @@ def _auto_cycle_notify(
             f"⚠️ 쿠팡 첨부 대기 {cp}편뿐(약 {cp}일분) — 소진 전 [🛒 쿠팡 첨부(저장)]로"
             " 보충하면 수익 링크가 끊기지 않습니다"
         )
-    if publish_rc is not None and publish_rc != 0:
+    if publish_rc == 4 and _LAST_GATE_BLOCK:
+        # ★#51 — 사유를 그대로 실어 보낸다. 주인이 명령을 입력하지 않아도 무엇이 막혔는지 안다.
+        alerts.append(
+            "🚨 배포 차단 — 산출물 검사에서 결함이 나와 라이브에 내보내지 않았습니다.\n"
+            f"{_LAST_GATE_BLOCK}\n"
+            "글은 저장돼 있고, 원인이 해소되면 다음 사이클이 자동으로 다시 배포합니다."
+        )
+    elif publish_rc is not None and publish_rc != 0:
         alerts.append(f"🚨 발행 단계 실패(rc={publish_rc}) — 로그 확인 필요")
 
     daily = bool(settings.get("telegram_daily_report", True))
@@ -3535,7 +3478,63 @@ def _auto_cycle_notify(
     lines.extend(alerts)
     if not alerts and not published:
         lines.append("✅ 조치 필요 없음")
+    weekly = _weekly_summary_lines()
+    if weekly:
+        lines.extend(weekly)
     notify.send_telegram("\n".join(lines))
+
+
+def _weekly_summary_lines() -> list[str]:
+    """주 1회(월요일) 사이트 건강 요약 — 매일 도는 사이클에 얹는다 (세션 #51).
+
+    ★별도 스케줄러 작업을 만들지 않는 이유: 등록해야 할 무인 작업이 늘수록 '조용히 죽는' 지점도
+    늘어난다(#43 detached HEAD로 10일 침묵한 전례). 이미 매일 도는 경로에 얹으면 새 실패 지점이
+    생기지 않고, 주간 요약이 안 오면 곧 일일 리포트도 안 온다는 뜻이라 감지도 같이 된다.
+
+    내용은 **주인이 판단에 쓰는 숫자**만: 발행 누적·산출물 검사 상태·큐 잔량. 어떤 실패도
+    사이클·알림을 막지 않는다(§0 — 예외는 빈 목록으로 흡수).
+    """
+    from datetime import date
+
+    if date.today().weekday() != 0:  # 0 = 월요일
+        return []
+    try:
+        conn = db.connect(db.DB_PATH)
+        try:
+            n_pub = int(
+                conn.execute("SELECT COUNT(*) FROM articles WHERE status='published'").fetchone()[0]
+            )
+            n_week = int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM articles WHERE status='published' "
+                    "AND published_at >= date('now','-7 day')"
+                ).fetchone()[0]
+            )
+            n_pending = int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM keyword_queue WHERE status='pending'"
+                ).fetchone()[0]
+            )
+        finally:
+            conn.close()
+        from validator import site_audit
+
+        findings = site_audit.audit_site(PROJECT_ROOT / "build" / "site")
+        n_fail = sum(1 for f in findings if f.severity == "fail")
+        n_warn = len(findings) - n_fail
+        health = "✅ 이상 없음" if n_fail == 0 else f"🚨 결함 {n_fail}건"
+        out = [
+            "",
+            "📊 주간 요약",
+            f"  발행 누적 {n_pub}편 (최근 7일 {n_week}편)",
+            f"  산출물 검사 {health}" + (f" · 경고 {n_warn}건" if n_warn else ""),
+            f"  대기 키워드 {n_pending}개",
+        ]
+        if n_fail:
+            out.append(f"  {site_audit.summarize(findings, limit=3)}")
+        return out
+    except Exception:  # 요약 실패가 사이클 알림을 막지 않는다(§0)
+        return []
 
 
 def cmd_notify_alert(args: argparse.Namespace) -> int:

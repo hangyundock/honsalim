@@ -18,9 +18,16 @@ import cli
 
 
 def _site(root: Path, pages: dict[str, list[str]]) -> None:
-    """build/site/articles/<slug>/index.html 생성. pages = {slug: [링크 대상 slug, ...]}"""
+    """build/site/articles/<slug>/index.html 생성. pages = {slug: [링크 대상 slug, ...]}
+
+    ★#51 리팩터 후 검사는 사이트 **전체**를 보므로 홈(build/site/index.html)이 있어야 한다.
+    없으면 '빌드 전'으로 판단해 건너뛴다(그 동작 자체는 test_skips_when_not_built가 고정).
+    """
+    home = root / "build" / "site"
+    home.mkdir(parents=True, exist_ok=True)
+    (home / "index.html").write_text("<html><body>home</body></html>", encoding="utf-8")
     for slug, links in pages.items():
-        d = root / "build" / "site" / "articles" / slug
+        d = home / "articles" / slug
         d.mkdir(parents=True, exist_ok=True)
         body = "".join(f'<a href="/articles/{t}/">{t}</a>' for t in links)
         (d / "index.html").write_text(f"<html><body>{body}</body></html>", encoding="utf-8")

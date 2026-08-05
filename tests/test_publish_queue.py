@@ -106,7 +106,9 @@ def test_live_publish_uses_refresh_cycle_commit(
 
     def fake_refresh(conn: object, **kw: object) -> object:
         calls["refresh_kw"] = kw
-        return SimpleNamespace(built=True, deployed=True, changed=True, go_count=3, notes=[])
+        return SimpleNamespace(
+            built=True, deployed=True, changed=True, go_count=3, notes=[], gate_blocked=None
+        )
 
     monkeypatch.setattr(cli, "cmd_promote", lambda args: 0)
     monkeypatch.setattr("deployer.refresh_cycle.run_refresh_cycle", fake_refresh)
@@ -135,7 +137,9 @@ def test_live_publish_no_deploy_builds_only(
 
     def fake_refresh(conn: object, **kw: object) -> object:
         calls["refresh_kw"] = kw
-        return SimpleNamespace(built=True, deployed=False, changed=False, go_count=0, notes=[])
+        return SimpleNamespace(
+            built=True, deployed=False, changed=False, go_count=0, notes=[], gate_blocked=None
+        )
 
     monkeypatch.setattr("deployer.refresh_cycle.run_refresh_cycle", fake_refresh)
 

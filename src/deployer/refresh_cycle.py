@@ -64,6 +64,9 @@ class CycleResult:
     push_rc: int | None = None
     verify_status: int | None = None
     notes: list[str] = field(default_factory=list)
+    # 배포 전 산출물 게이트(세션 #51) — 결함이 있으면 배포하지 않고 여기에 요약을 담는다.
+    # 상위(auto_cycle)가 이 값을 보고 텔레그램 경보를 띄운다. None = 검사 통과 또는 미실행.
+    gate_blocked: str | None = None
 
     @property
     def refresh_errors(self) -> list[RefreshOutcome]:
@@ -188,6 +191,26 @@ def run_refresh_cycle(
         result.built = True
         result.go_count = int(gres.get("count", 0))
 
+    # 3-bis) ★배포 전 산출물 게이트 (세션 #51 — 주인 승인 '배포 중단 + 즉시 알림')
+    #   무인 시스템에 생산 자동화만 있고 감시가 없어서, 글↔글 링크 0·전 페이지 og:image 누락이
+    #   40일간 매일 '정상'으로 보고됐다(배포 후 검증이 홈 1페이지 상태코드만 봤다).
+    #   여기가 **모든 무인 배포가 지나는 단일 관문**이라(publish_queue·auto_cycle 둘 다 이 함수를
+    #   쓴다) 한 곳만 막으면 전 경로가 보호된다.
+    #   ★차단하는 이유: 구글이 결함 페이지를 색인하면 되돌리기 어렵다. 하루 늦게 나가는 건
+    #   회복 가능하지만 잘못 색인된 건 오래 남는다(CLAUDE.md §0-3 안전·완벽 우선).
+    #   과민 차단은 발행을 죽이므로 fail은 검색 노출·정책 위반 직결 항목만이다(site_audit 참조).
+    if do_deploy and not dry_run and result.built:
+        from validator import site_audit
+
+        findings = site_audit.audit_site(project_root / "build" / "site")
+        if site_audit.has_failures(findings):
+            result.gate_blocked = site_audit.summarize(findings)
+            result.notes.append("배포 차단 — 산출물 검사 결함(site_audit)")
+            return result  # ★배포하지 않고 종료. 상위가 경보를 띄운다.
+        warns = [f for f in findings if f.severity != "fail"]
+        if warns:
+            result.notes.append(f"산출물 검사 경고 {len(warns)}건(배포는 진행)")
+
     # 4) 변경분만 배포 (commit + push → CI). dry_run에선 변경 감지만(read-only).
     result.changed, _txt = detect_changes(project_root)
     if do_deploy and not dry_run:
@@ -292,10 +315,13 @@ def cycle_report(result: CycleResult, ran_at: str) -> dict[str, Any]:
         "deployed": result.deployed,
         "push_rc": result.push_rc,
         "verify_status": result.verify_status,
+        "gate_blocked": result.gate_blocked,  # #51 배포 전 산출물 게이트 차단 사유
         "notes": result.notes,
+        # 게이트 차단은 '문제 있음'의 대표 신호 — 대시보드·다이제스트가 이 플래그를 본다.
         "had_issue": bool(result.refresh_errors)
         or bool(result.killswitched)
-        or bool(result.flagged),
+        or bool(result.flagged)
+        or bool(result.gate_blocked),
     }
 
 
