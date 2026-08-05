@@ -217,10 +217,16 @@
   {# 글(키워드): 키워드 가이드 後(예산표·함께보기·FAQ) — 상품 아래 SEO 텍스트(세션 #34) #}
   {% if is_article and article_guide_post %}<div class="cat-guide art-guide">{{ article_guide_post | safe }}</div>{% endif %}
 
-  {% if article_guides and not is_article %}
-  {# 이 카테고리 추천 가이드 글 — 토픽 클러스터·발행 글 내부링크(고아 방지·세션 #40).
-     글 페이지(is_article)는 자기 자신이므로 미표시. #}
-  <div class="sechead"><div class="eb">자세한 추천</div><h2>이 품목 추천 가이드</h2></div>
+  {% if article_guides %}
+  {# 토픽 클러스터·발행 글 내부링크(고아 방지·세션 #40).
+     - 카테고리 페이지: 이 품목의 추천 가이드 글 목록
+     - 글 페이지(is_article): 같은 카테고리→같은 그룹→최신 순 '형제 글'(세션 #51).
+       옛 구조는 글→글 링크가 0이라 구글이 주제 클러스터를 못 읽고 방문자도 1편에서 이탈했다.
+       자기 자신은 renderer._sibling_article_cards에서 제외되므로 자기참조 없음. #}
+  <div class="sechead">
+    <div class="eb">{% if is_article %}같은 주제{% else %}자세한 추천{% endif %}</div>
+    <h2>{% if is_article %}이어서 보면 좋은 가이드{% else %}이 품목 추천 가이드{% endif %}</h2>
+  </div>
   <div class="related-grid">
     {% for g in article_guides %}
     <a class="rel-card" href="{{ g.url }}">

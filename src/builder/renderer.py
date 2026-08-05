@@ -925,6 +925,99 @@ def _article_guide_cards(article_pages: list[dict]) -> list[dict]:
     return cards
 
 
+def _rotate(items: list[dict], offset: int) -> list[dict]:
+    """리스트를 offset칸 회전 (결정론적 — 같은 입력이면 항상 같은 출력·빌드 재현성 유지)."""
+    if not items:
+        return items
+    k = offset % len(items)
+    return items[k:] + items[:k]
+
+
+def _rescue_orphan_inbound(by_slug: dict[str, list[dict]], article_guides: list[dict]) -> list[str]:
+    """어느 글도 안 가리키는 글(inbound 0)을 최소 1회 링크되게 구제. 반환: 구제한 slug 목록.
+
+    세션 #51 재검수 적발: outbound(내가 남을 가리킴)만 보장해선 고아가 안 풀린다. 크롤러가
+    따라오는 건 inbound(남이 나를 가리킴)다. 카테고리 매핑이 빠진 글(concept_image 미설정)은
+    어느 글의 '같은 카테고리·같은 그룹' 후보에도 안 들어가 cap이 먼저 차 버려 영원히 0이 된다
+    (라이브 실측: 게이밍의자 글). 매핑 누락은 앞으로도 생길 수 있으므로 데이터가 아니라
+    렌더 단계에서 자동 구제한다(무인 자가복원 §0). 가장 많이 링크된 글의 자리를 하나 내주므로
+    링크 편중도 함께 완화된다.
+    """
+    if len(article_guides) < 2:
+        return []
+    by_ref = {g["slug"]: g for g in article_guides}
+    inbound: dict[str, int] = {g["slug"]: 0 for g in article_guides}
+    for lst in by_slug.values():
+        for c in lst:
+            if c["slug"] in inbound:
+                inbound[c["slug"]] += 1
+    rescued: list[str] = []
+    for orphan in [s for s in inbound if inbound[s] == 0]:
+        # 가장 많이 링크된 글(victim)의 슬롯 1칸을 고아에게 양보. slug 2차키로 결정론 보장.
+        victim = max(inbound, key=lambda s: (inbound[s], s))
+        if inbound[victim] <= 1:
+            break  # 양보할 여유가 없음(모두가 이미 희소) — 억지 교체 금지
+        for host, lst in sorted(by_slug.items()):
+            if host == orphan or any(c["slug"] == orphan for c in lst):
+                continue
+            hit = next((i for i, c in enumerate(lst) if c["slug"] == victim), None)
+            if hit is None:
+                continue
+            lst[hit] = by_ref[orphan]
+            inbound[victim] -= 1
+            inbound[orphan] += 1
+            rescued.append(orphan)
+            break
+    return rescued
+
+
+def _sibling_article_cards(
+    article_guides: list[dict],
+    group_by_cat: dict[str, str],
+    *,
+    cap: int = 6,
+) -> dict[str, list[dict]]:
+    """글 slug → '같은 주제의 다른 발행 글' 카드 목록 (글↔글 내부링크·토픽 클러스터, 세션 #51).
+
+    근본 문제(라이브 실측): 글 페이지에서 다른 **글**로 가는 링크가 0이었다. 의자 글 7편·
+    도마 글 6편이 서로를 전혀 안 가리켜, 카테고리 페이지를 경유해야만 닿았다. 그 결과
+    (a) 구글이 "이 사이트는 의자 주제를 깊게 다룬다"는 클러스터 신호를 못 읽고
+    (b) 방문자가 한 편 읽고 이탈했다(페이지뷰·체류 손실).
+
+    채우는 순서 = **같은 카테고리 → 같은 그룹(홈오피스 등) → 나머지**. 3단 폴백이라
+    카테고리에 글이 1편뿐이어도 링크가 비지 않는다(고아 방지·무인 자가완결 §0). draft는
+    호출부(_article_guide_cards)에서 이미 제외된다.
+
+    각 티어는 글 순번만큼 **회전**시켜 고른다. 회전 없이 published_at DESC를 그대로 쓰면
+    후보가 cap보다 많은 티어에서 늘 같은 최신 글만 뽑혀 링크가 한 편에 쏠린다(재검수 실측:
+    최신 글 14회 inbound vs 가장 오래된 글 1회 — 오래된 글일수록 링크를 못 받는 역효과).
+    회전은 인덱스 기반이라 무작위가 아니며 같은 DB면 같은 결과다(빌드 재현성).
+    마지막으로 _rescue_orphan_inbound가 inbound 0인 글을 구제한다.
+    """
+    by_slug: dict[str, list[dict]] = {}
+    for idx, me in enumerate(article_guides):
+        my_cat = me.get("cat_slug") or ""
+        my_grp = group_by_cat.get(my_cat, "") if my_cat else ""
+        same_cat: list[dict] = []
+        same_grp: list[dict] = []
+        others: list[dict] = []
+        for other in article_guides:
+            if other["slug"] == me["slug"]:
+                continue  # 자기 자신 제외
+            o_cat = other.get("cat_slug") or ""
+            if my_cat and o_cat == my_cat:
+                same_cat.append(other)
+            elif my_grp and o_cat and group_by_cat.get(o_cat, "") == my_grp:
+                same_grp.append(other)
+            else:
+                others.append(other)
+        by_slug[me["slug"]] = (
+            _rotate(same_cat, idx) + _rotate(same_grp, idx) + _rotate(others, idx)
+        )[:cap]
+    _rescue_orphan_inbound(by_slug, article_guides)
+    return by_slug
+
+
 def _attach_guides_to_groups(
     groups: list[dict], guides_by_cat: dict[str, list[dict]], *, cap: int = 4
 ) -> None:
@@ -1099,6 +1192,8 @@ def _load_category_pages(conn: sqlite3.Connection, include_drafts: bool = False)
         pages.append(
             {
                 "slug": c["slug"],
+                # 그룹 slug — 글↔글 내부링크에서 '같은 그룹(홈오피스) 형제 글' 판정에 쓴다(세션 #51).
+                "group_slug": c["group_slug"] or "",
                 "data_summary": data_summary,
                 "pillar_link": pillar_link,
                 "category": {
@@ -1609,6 +1704,10 @@ def render_site(
             guides_by_cat.setdefault(_gc["cat_slug"], []).append(_gc)
     # 카테고리 인덱스 카드에 세부 가이드 칩 부착 — 대분류→카테고리→키워드 글 3층 완성(세션 #42)
     _attach_guides_to_groups(category_groups, guides_by_cat)
+    # 글↔글 내부링크(세션 #51) — 글 페이지에서 같은 주제의 다른 글로 직접 가는 통로.
+    # 카테고리 경유만 가능하던 구조라 토픽 클러스터 신호가 끊겨 있었다(_sibling_article_cards 참조).
+    group_by_cat = {cpg["slug"]: cpg.get("group_slug", "") for cpg in category_pages}
+    siblings_by_slug = _sibling_article_cards(article_guides, group_by_cat)
 
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
@@ -1903,7 +2002,10 @@ def render_site(
                     quick_verdict=actx["quick_verdict"],
                     article_checkpoints=actx["article_checkpoints"],
                     has_article_checkpoints=actx["has_article_checkpoints"],
-                    article_guides=[],  # 글 페이지(is_article)에는 글 가이드 블록 미표시
+                    # 글↔글 내부링크(세션 #51) — 같은 카테고리→같은 그룹→최신 순 형제 글.
+                    # 옛 []는 '자기 자신을 가리키는 목록'을 피하려던 것인데, 자기 제외 형제
+                    # 목록으로 바꾸면 그 문제 없이 토픽 클러스터를 연결한다.
+                    article_guides=siblings_by_slug.get(slug, []),
                     **common,
                 ),
             )
@@ -1932,6 +2034,8 @@ def render_site(
                 has_checkpoints=pg["has_checkpoints"],
                 concept_image=pg["concept_image"],
                 concept_image_alt=pg["concept_image_alt"],
+                # 글↔글 내부링크(세션 #51) — 미매핑 폴백 글도 형제 글로 연결(고아 방지)
+                sibling_articles=siblings_by_slug.get(slug, []),
                 **common,
             ),
         )

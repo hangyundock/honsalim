@@ -44,8 +44,41 @@ _COMP_FACTOR: dict[str, float] = {
     "높음": 0.3,
     "high": 0.3,
 }
-# 검색량 상한(이 이상은 동일 취급) — head 키워드 검색량 과가중 억제. [추정·운영 트래픽으로 보정].
+# 검색량 상한(이 이상은 동일 취급) — head 검색량 과가중 억제. 공략 구간(ceiling) 도입 후에는
+# 구간 내에서만 작동하므로 사실상 무영향. 세션 #51 재검수에서 '상한을 낮춰 경쟁도를 결정자로'
+# 안은 기각됐다(네이버 경쟁도 '낮음'이 305개 중 1개 — 변별력 없음). 상세는 settings.py 주석.
 WINNABLE_VOL_CAP = 30000
+
+
+def _setting_int(key: str, fallback: int) -> int:
+    """설정 정수 조회 — 미초기화(단위 테스트·부트스트랩)면 폴백(멈추지 않음·§0)."""
+    try:
+        from common import settings
+
+        return int(settings.get_int(key))
+    except Exception:
+        return fallback
+
+
+def _volume_floor() -> int:
+    """공략 구간 하한 — 설정(keyword_volume_floor).
+
+    ★세션 #51: 옛 하한 2000이 네이버 후보의 94.8%(1,878/1,980)를 잘라 시스템이 최고경쟁
+    구간만 골랐다. 0~300은 계속 배제(실측상 0~100만 1,095개 = 트래픽 기대 0).
+    """
+    return max(0, _setting_int("keyword_volume_floor", keyword_research.VOLUME_FLOOR))
+
+
+def _volume_ceiling() -> int:
+    """공략 구간 상한 — 설정(keyword_volume_ceiling). 0이면 상한 없음(옛 동작).
+
+    검색량이 클수록 기존 강자(다나와·쿠팡·네이버블로그)가 점유해 신규 도메인이 못 이긴다.
+    실제로 우리가 진 22편이 전부 고검색량 구간이었다(GSC 평균 18.2위). 경쟁도 데이터는
+    변별력이 없어(위 주석) 검색량 자체를 난이도 지표로 쓴다.
+    """
+    return max(0, _setting_int("keyword_volume_ceiling", 0))
+
+
 # 무인 리필의 추천 스캔 폭(#45) — 표시용 limit(20)와 분리. 상위가 미매핑 후보로 채워져도
 # 매핑·공개 후보를 놓치지 않도록 충분히 넓게(전 씨앗 후보 합계보다 큼).
 _REFILL_SCAN_LIMIT = 200
@@ -57,11 +90,13 @@ def _comp_factor(competition: Any) -> float:
     return _COMP_FACTOR.get(key) or _COMP_FACTOR.get(key.lower(), 0.5)
 
 
-def winnable_score(volume: int | None, competition: Any) -> float:
+def winnable_score(volume: int | None, competition: Any, *, cap: int | None = None) -> float:
     """'틈' 점수 = 검색량(상한 cap) * 경쟁 가중. 검색량 미상(캐시)은 최하(-1.0). 세션 #33."""
     if volume is None:
         return -1.0
-    return min(int(volume), WINNABLE_VOL_CAP) * _comp_factor(competition)
+    return min(int(volume), cap if cap is not None else WINNABLE_VOL_CAP) * _comp_factor(
+        competition
+    )
 
 
 # ── 카테고리 균형(라운드로빈) — 한 카테고리 연속 소진 방지 (세션 #50) ────────────
@@ -191,11 +226,13 @@ def recommend(
     fetch: Callable[..., list[dict[str, Any]]] | None = None,
     live: bool = True,
     volume_floor: int | None = None,
+    volume_ceiling: int | None = None,
 ) -> list[dict[str, Any]]:
     """추천 키워드(검색량순). 항목: {keyword, volume, competition, seed, core, category, channel, source}.
 
     - custom_seed 지정 시 그 씨앗만 확장(임의 주제·core 미적용). 아니면 seeds, 그것도 없으면 기본 씨앗.
     - live=True: 네이버 실조회(씨앗별 실패 시 캐시 강등). live=False: 캐시(secondary)만 — 네트워크 0.
+    - 공략 구간 [volume_floor, volume_ceiling] (세션 #51) — 미지정 시 설정값. ceiling=0이면 상한 없음.
     """
     if custom_seed and custom_seed.strip():
         seed_list: list[dict[str, Any]] = [
@@ -213,7 +250,8 @@ def recommend(
     else:
         seed_list = default_seeds()
 
-    floor = keyword_research.VOLUME_FLOOR if volume_floor is None else volume_floor
+    floor = _volume_floor() if volume_floor is None else volume_floor
+    ceiling = _volume_ceiling() if volume_ceiling is None else volume_ceiling
     existing = _existing_topics(conn)
     seen: set[str] = set()
     out: list[dict[str, Any]] = []
@@ -248,6 +286,11 @@ def recommend(
         for row in rows:
             keyword = str(row.get("keyword") or "").strip()
             norm = _norm(keyword)
+            # 공략 구간 상한(세션 #51) — 검색량이 이보다 크면 기존 강자가 점유해 신규 도메인이
+            # 못 이긴다. 캐시 강등분(volume=None)은 판정 불가라 통과시킨다(#50 강등 경로 보존).
+            _v = row.get("volume")
+            if ceiling and _v is not None and int(_v) > ceiling:
+                continue
             if not keyword or norm in seen or norm in existing:
                 continue
             seen.add(norm)

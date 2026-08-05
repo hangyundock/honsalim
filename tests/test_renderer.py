@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -1434,3 +1435,265 @@ class TestArticleTitleTag:
             encoding="utf-8"
         )
         assert "<title>사무용 의자 고르는 법 | 혼살림</title>" in cat
+
+
+def _build_multi_article_site(
+    tmp_path: Path, *, count: int = 3, publish_category: bool = True
+) -> dict:
+    """seed + 같은 카테고리(office-chair) 매핑 발행 글 count편 후 렌더 (세션 #51 형제 링크용).
+
+    _build_article_site는 1편만 만들어 '형제 글'이 존재할 수 없다. 글↔글 내부링크는 2편
+    이상일 때만 검증 가능하므로 시나리오 count개로 각각 발행한다. 전부 concept_image가
+    office-chair라 같은 카테고리 형제가 된다.
+    """
+    import markdown as md_lib
+
+    db_path = tmp_path / "test.db"
+    db.migrate(db_path=db_path)
+    db.seed(db_path=db_path)
+    slugs: list[str] = []
+    conn = db.connect(db_path)
+    try:
+        for spid, price in (("m111", 143200), ("m222", 95600)):
+            conn.execute(
+                "INSERT INTO products (source, source_product_id, name, currency, price_krw, "
+                "deeplink_url, deeplink_slug, affiliate_tag, created_at, updated_at, last_seen_at) "
+                "VALUES ('aliexpress', ?, ?, 'KRW', ?, ?, ?, 'honsalim', "
+                "datetime('now'), datetime('now'), datetime('now'))",
+                (
+                    spid,
+                    f"상품 {spid}",
+                    price,
+                    f"https://s.click.aliexpress.com/{spid}",
+                    f"ali-{spid}",
+                ),
+            )
+        conn.commit()
+        rows = conn.execute(
+            "SELECT id, slug FROM scenarios ORDER BY id LIMIT ?", (count,)
+        ).fetchall()
+        assert len(rows) >= count, "seed 시나리오 부족 — 테스트 전제 붕괴"
+        for idx, srow in enumerate(rows):
+            scenario_id, slug = srow[0], srow[1]
+            did = article_writer.create_draft(conn, scenario_id=scenario_id)
+            transition(conn, did, "enriched")
+            transition(conn, did, "validated")
+            transition(conn, did, "approved")
+            title = f"의자 가이드 {idx}"
+            fields = {
+                "slug": slug,
+                "scenario_id": scenario_id,
+                "title": title,
+                "summary": "요약",
+                "body_md": _ARTICLE_BODY,
+                "body_html": md_lib.markdown(_ARTICLE_BODY, extensions=["extra", "sane_lists"]),
+                "meta_description": f"설명 {idx}",
+                "schema_jsonld": build_article_jsonld(
+                    meta={"title": title, "meta_description": f"설명 {idx}"},
+                    scenario={"slug": slug},
+                    site_base_url="https://honsallim.com",
+                    image_url="https://honsallim.com/static/img/og-default.png",
+                    published_at="2026-05-30",
+                ),
+                "disclosure_first": article_writer.extract_disclosure_first(_ARTICLE_BODY),
+                "content_hash": article_writer.compute_content_hash(_ARTICLE_BODY + str(idx)),
+                "truth_check_passed_at": "2026-05-30T00:00:00Z",
+                "user_approved_at": "2026-05-30T00:00:00Z",
+                "structured_json": json.dumps(
+                    {"concept_image": "/static/images/concepts/office-chair.webp"},
+                    ensure_ascii=False,
+                ),
+            }
+            aid = article_writer.promote_to_article(conn, did, fields)
+            article_writer.link_article_products(
+                conn,
+                aid,
+                [
+                    {"source": "aliexpress", "source_product_id": "m111"},
+                    {"source": "aliexpress", "source_product_id": "m222"},
+                ],
+            )
+            slugs.append(slug)
+        if publish_category:
+            pid = conn.execute("SELECT id FROM products WHERE source_product_id='m111'").fetchone()[
+                0
+            ]
+            cid = conn.execute("SELECT id FROM categories WHERE slug='office-chair'").fetchone()[0]
+            conn.execute(
+                "INSERT INTO category_products (category_id, product_id, tier) "
+                "VALUES (?,?,'budget')",
+                (cid, pid),
+            )
+            category_state.approve(conn, "office-chair")
+        conn.commit()
+    finally:
+        conn.close()
+
+    out = tmp_path / "site"
+    renderer.render_site(out_dir=out, db_path=db_path)
+    return {"out": out, "slugs": slugs}
+
+
+def _sib_card(slug: str, cat: str) -> dict:
+    return {
+        "slug": slug,
+        "title": f"{slug} 제목",
+        "intro": "",
+        "url": f"/articles/{slug}/",
+        "cat_slug": cat,
+    }
+
+
+class TestSiblingArticleCards:
+    """세션 #51: 글↔글 내부링크 — _sibling_article_cards 선정 규칙.
+
+    라이브 실측에서 글 페이지의 다른 '글' 링크가 0이었다(의자 글 7편이 서로를 안 가리킴).
+    같은 카테고리 → 같은 그룹 → 나머지 3단 폴백으로 링크가 비지 않게 한다.
+    """
+
+    GROUPS: ClassVar[dict[str, str]] = {
+        "office-chair": "homeoffice",
+        "desk": "homeoffice",
+        "cutting-board": "kitchen",
+    }
+
+    def test_excludes_self(self) -> None:
+        cards = [_sib_card("a", "office-chair"), _sib_card("b", "office-chair")]
+        out = renderer._sibling_article_cards(cards, self.GROUPS)
+        assert [c["slug"] for c in out["a"]] == ["b"]
+
+    def test_same_category_comes_first(self) -> None:
+        cards = [
+            _sib_card("me", "office-chair"),
+            _sib_card("other-group", "cutting-board"),
+            _sib_card("same-group", "desk"),
+            _sib_card("same-cat", "office-chair"),
+        ]
+        out = renderer._sibling_article_cards(cards, self.GROUPS)
+        assert [c["slug"] for c in out["me"]] == ["same-cat", "same-group", "other-group"]
+
+    def test_lone_article_in_category_still_gets_links(self) -> None:
+        """카테고리에 혼자여도 링크가 비지 않는다 — 고아 방지 폴백."""
+        cards = [_sib_card("lonely", "cutting-board"), _sib_card("x", "office-chair")]
+        out = renderer._sibling_article_cards(cards, self.GROUPS)
+        assert [c["slug"] for c in out["lonely"]] == ["x"]
+
+    def test_cap_limits_output(self) -> None:
+        cards = [_sib_card(f"s{i}", "office-chair") for i in range(12)]
+        out = renderer._sibling_article_cards(cards, self.GROUPS, cap=4)
+        assert len(out["s0"]) == 4
+
+    def test_single_article_site_yields_empty(self) -> None:
+        """글이 1편뿐이면 빈 목록 — 템플릿이 섹션 자체를 건너뛴다(빈 블록 X)."""
+        out = renderer._sibling_article_cards([_sib_card("only", "office-chair")], self.GROUPS)
+        assert out["only"] == []
+
+    def test_missing_group_map_does_not_crash(self) -> None:
+        """카테고리 미매핑 글(cat_slug='')도 폴백으로 링크를 받는다."""
+        cards = [_sib_card("nomap", ""), _sib_card("mapped", "office-chair")]
+        out = renderer._sibling_article_cards(cards, self.GROUPS)
+        assert [c["slug"] for c in out["nomap"]] == ["mapped"]
+
+    def test_links_are_not_concentrated_on_one_article(self) -> None:
+        """세션 #51 재검수: 회전 없이 발행일 역순 고정이면 최신 글에 링크가 쏠린다.
+
+        라이브 실측 회귀 = 최신 글 inbound 14회 vs 가장 오래된 글 1회. 후보가 cap보다 많은
+        티어에서 늘 같은 글만 뽑히던 문제. 회전이 빠지면 최대 inbound가 글 수만큼 치솟는다.
+        """
+        # office-chair 3편 + desk 6편(같은 homeoffice 그룹) — desk 후보가 cap 여유보다 많음
+        cards = [_sib_card(f"c{i}", "office-chair") for i in range(3)]
+        cards += [_sib_card(f"d{i}", "desk") for i in range(6)]
+        out = renderer._sibling_article_cards(cards, self.GROUPS, cap=4)
+        inbound: dict[str, int] = {c["slug"]: 0 for c in cards}
+        for lst in out.values():
+            for c in lst:
+                inbound[c["slug"]] += 1
+        # 완전 편중이면 특정 글이 (글 수-1)회까지 받는다. 회전이 있으면 그보다 훨씬 고르다.
+        assert max(inbound.values()) <= 6, f"링크 쏠림: {inbound}"
+        assert min(inbound.values()) >= 1, f"inbound 0인 글 존재: {inbound}"
+
+    def test_orphan_with_no_category_still_gets_inbound(self) -> None:
+        """세션 #51 재검수: outbound만으론 고아가 안 풀린다 — 크롤러는 inbound를 따라온다.
+
+        라이브 실측 회귀 = 카테고리 매핑이 없는 글(게이밍의자)이 다른 글의 '같은 카테고리·
+        같은 그룹' 후보에 못 들어가 cap이 먼저 차 inbound 0. _rescue_orphan_inbound가 구제.
+        """
+        cards = [_sib_card(f"chair{i}", "office-chair") for i in range(6)]
+        cards += [_sib_card(f"desk{i}", "desk") for i in range(6)]
+        cards.append(_sib_card("nomap", ""))  # 매핑 누락 = 어느 티어에도 안 들어감
+        out = renderer._sibling_article_cards(cards, self.GROUPS, cap=6)
+        inbound = sum(1 for lst in out.values() for c in lst if c["slug"] == "nomap")
+        assert inbound >= 1, "매핑 없는 글이 inbound 0 — 고아 잔존"
+
+    def test_rescue_never_creates_self_link(self) -> None:
+        """고아 구제가 자기 자신을 가리키는 링크를 만들지 않는다."""
+        cards = [_sib_card(f"chair{i}", "office-chair") for i in range(8)]
+        cards.append(_sib_card("nomap", ""))
+        out = renderer._sibling_article_cards(cards, self.GROUPS, cap=6)
+        for slug, lst in out.items():
+            assert all(c["slug"] != slug for c in lst), f"{slug}: 자기참조 발생"
+
+    def test_output_is_deterministic(self) -> None:
+        """같은 입력 → 같은 출력 (빌드 재현성 — 회전·구제가 무작위가 아님)."""
+        cards = [_sib_card(f"c{i}", "office-chair") for i in range(4)]
+        cards += [_sib_card(f"d{i}", "desk") for i in range(4)]
+        cards.append(_sib_card("nomap", ""))
+        first = renderer._sibling_article_cards(cards, self.GROUPS)
+        second = renderer._sibling_article_cards(cards, self.GROUPS)
+        assert {k: [c["slug"] for c in v] for k, v in first.items()} == {
+            k: [c["slug"] for c in v] for k, v in second.items()
+        }
+
+
+class TestArticleInternalLinksRendered:
+    """세션 #51 드리프트 가드 — 렌더된 글 HTML에 다른 글로 가는 링크가 실제로 존재.
+
+    누가 renderer의 article_guides를 다시 []로 되돌리거나 템플릿 조건(`and not is_article`)을
+    되살리면 여기서 깨진다. 라이브 실측 회귀(글→글 링크 0)를 코드로 고정한다.
+    """
+
+    def test_article_links_to_sibling_articles(self, tmp_path: Path) -> None:
+        built = _build_multi_article_site(tmp_path, count=3)
+        slugs = built["slugs"]
+        for slug in slugs:
+            html = (built["out"] / "articles" / slug / "index.html").read_text(encoding="utf-8")
+            linked = set(re.findall(r'href="/articles/([^/"]+)/"', html))
+            others = set(slugs) - {slug}
+            assert linked & others, f"{slug}: 다른 글로 가는 내부링크가 0 — 토픽 클러스터 끊김"
+
+    def test_article_does_not_link_to_itself(self, tmp_path: Path) -> None:
+        built = _build_multi_article_site(tmp_path, count=3)
+        for slug in built["slugs"]:
+            html = (built["out"] / "articles" / slug / "index.html").read_text(encoding="utf-8")
+            linked = re.findall(r'href="/articles/([^/"]+)/"', html)
+            assert slug not in linked, f"{slug}: 자기 자신을 내부링크로 가리킴"
+
+    def test_sibling_section_heading_present(self, tmp_path: Path) -> None:
+        built = _build_multi_article_site(tmp_path, count=2)
+        html = (built["out"] / "articles" / built["slugs"][0] / "index.html").read_text(
+            encoding="utf-8"
+        )
+        assert "이어서 보면 좋은 가이드" in html
+
+    def test_unmapped_fallback_article_also_links(self, tmp_path: Path) -> None:
+        """article.html 폴백 경로(카테고리 미매핑 글)에서도 형제 링크가 나온다.
+
+        렌더 경로가 둘(category.html 재사용 / article.html 폴백)이라 한쪽만 고치면
+        옛 글·미매핑 글이 계속 고아로 남는다.
+        """
+        built = _build_multi_article_site(tmp_path, count=2, publish_category=False)
+        slugs = built["slugs"]
+        html = (built["out"] / "articles" / slugs[0] / "index.html").read_text(encoding="utf-8")
+        assert "/categories/office-chair/" not in html  # 폴백 경로로 렌더됐음을 먼저 보장
+        linked = set(re.findall(r'href="/articles/([^/"]+)/"', html))
+        assert slugs[1] in linked, "폴백 경로 글에 형제 글 링크가 0"
+        assert slugs[0] not in linked, "자기 자신을 가리킴"
+
+    def test_category_page_guide_block_unchanged(self, tmp_path: Path) -> None:
+        """카테고리 페이지의 기존 '이 품목 추천 가이드' 블록은 그대로 — 회귀 없음(#40·#42)."""
+        built = _build_multi_article_site(tmp_path, count=2)
+        cat = (built["out"] / "categories" / "office-chair" / "index.html").read_text(
+            encoding="utf-8"
+        )
+        assert "이 품목 추천 가이드" in cat
+        assert "이어서 보면 좋은 가이드" not in cat  # 글 전용 문구가 카테고리로 새지 않음

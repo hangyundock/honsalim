@@ -18,6 +18,7 @@ Phase 2에서 build·deploy·validate·dashboard 등 순차 추가 (BACKEND §9 
 from __future__ import annotations
 
 import argparse
+import difflib
 import importlib
 import importlib.util
 import json
@@ -28,6 +29,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -452,6 +454,90 @@ def _check_size_caps() -> bool:
     return code != 2  # 파일 누락만 게이트, cap 초과는 WARN
 
 
+def _check_internal_links() -> bool:
+    """§17 내부링크 정합 — 발행 글이 서로 링크되는가 (세션 #51 재발방지).
+
+    ★배경: 글↔글 링크가 **0개**인 상태로 40일·22편이 발행됐고, 아무도 몰랐다. 사람이 라이브
+    HTML을 손으로 뜯어봐야 발견되는 종류의 결함이라 재발해도 또 모른다. 그래서 자동 검사로
+    고정한다(§0 자가 감지). 검사 대상은 **실제 배포되는 산출물**(build/site) — 코드가 아니라
+    결과를 본다(렌더 경로가 둘이라 한쪽만 고쳐도 통과하던 함정 차단).
+
+    - inbound 0(어느 글도 안 가리킴) = FAIL: 크롤러가 도달할 경로가 sitemap뿐인 고아.
+    - 산출물 없음(fresh checkout·빌드 전) = SKIP: doctor는 멈추지 않는다.
+    """
+    site = PROJECT_ROOT / "build" / "site" / "articles"
+    if not site.is_dir():
+        print(f"{WARN} build/site/articles 없음 — 빌드 전이라 건너뜀 (`honsalim build` 후 재실행)")
+        return True
+    pages = sorted(p for p in site.iterdir() if (p / "index.html").is_file())
+    if len(pages) < 2:
+        print(f"{OK} 발행 글 {len(pages)}편 — 형제 링크 판정 대상 아님(2편 미만)")
+        return True
+    inbound: dict[str, int] = {p.name: 0 for p in pages}
+    outbound: dict[str, int] = {}
+    for p in pages:
+        html = (p / "index.html").read_text(encoding="utf-8", errors="replace")
+        linked = {s for s in re.findall(r'href="/articles/([^/"]+)/"', html) if s != p.name}
+        outbound[p.name] = len(linked)
+        for s in linked:
+            if s in inbound:
+                inbound[s] += 1
+    orphans = sorted(s for s, n in inbound.items() if n == 0)
+    dead_ends = sorted(s for s, n in outbound.items() if n == 0)
+    if orphans:
+        print(f"{FAIL} inbound 0(어느 글도 안 가리킴) {len(orphans)}건: {', '.join(orphans[:5])}")
+    if dead_ends:
+        print(
+            f"{FAIL} outbound 0(다른 글로 못 나감) {len(dead_ends)}건: {', '.join(dead_ends[:5])}"
+        )
+    if not orphans and not dead_ends:
+        total = sum(outbound.values())
+        print(
+            f"{OK} 내부링크 정합 — 글 {len(pages)}편 · 글↔글 링크 {total}개 · 고아 0 "
+            f"(inbound 최소 {min(inbound.values())}회)"
+        )
+    return not orphans and not dead_ends
+
+
+def _check_keyword_duplicates() -> bool:
+    """§18 유사 키워드 중복 — 표기만 다른 같은 주제로 중복 글이 나가는지 (세션 #51).
+
+    공략 구간을 낮추면(#51) 후보에 표기 변형이 더 많이 섞인다 — 라이브 추천에서 '메쉬의자'
+    글이 이미 있는데 '매쉬의자'가 후보로 올라왔다. 기존 중복 제거는 정확히 같은 문자열만
+    걸러서 이걸 못 잡는다. 자동 제외는 오탐 위험이 있어 **하지 않고**, WARN으로 가시화만 한다
+    (판단은 주인 — CLAUDE.md §1). 종합 게이트 미포함.
+    """
+    if not db.DB_PATH.exists():
+        print(f"{WARN} DB 없음 — 건너뜀")
+        return True
+    conn = db.connect(db.DB_PATH)
+    try:
+        try:
+            kws = [str(r[0]) for r in conn.execute("SELECT keyword FROM keyword_queue") if r[0]]
+        except sqlite3.OperationalError:
+            print(f"{WARN} keyword_queue 없음(구 스키마) — 건너뜀")
+            return True
+    finally:
+        conn.close()
+    norm = {k: re.sub(r"\s", "", unicodedata.normalize("NFKC", k)).lower() for k in kws}
+    pairs: list[tuple[str, str, float]] = []
+    for i, a in enumerate(kws):
+        for b in kws[i + 1 :]:
+            if norm[a] == norm[b]:
+                continue  # 완전 동일은 기존 dedup 담당
+            r = difflib.SequenceMatcher(None, norm[a], norm[b]).ratio()
+            if r >= 0.75:
+                pairs.append((a, b, r))
+    if pairs:
+        pairs.sort(key=lambda t: -t[2])
+        print(f"{WARN} 표기가 비슷한 키워드 {len(pairs)}쌍 — 중복 콘텐츠 위험(자동 제외 안 함)")
+        for a, b, r in pairs[:5]:
+            print(f"       · {a} ↔ {b} (유사도 {r:.2f})")
+    else:
+        print(f"{OK} 유사 키워드 중복 없음 (큐 {len(kws)}건 전수 비교)")
+    return True  # WARN 전용 — 판단은 주인(§1)
+
+
 def _check_seed_alignment() -> bool:
     """§15 씨앗 정합 — seo_keywords ↔ category_sources ↔ 공개 카테고리 (세션 #45 재발방지).
 
@@ -570,8 +656,23 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _print_section("16. IndexNow 배포 정합 (#45)")
     _check_indexnow()  # WARN 전용 — 환경 의존이라 종합 게이트 미포함(§0 graceful)
 
+    _print_section("17. 내부링크 정합 (글↔글 토픽 클러스터, #51)")
+    links_ok = _check_internal_links()
+
+    _print_section("18. 유사 키워드 중복 (#51)")
+    _check_keyword_duplicates()  # WARN 전용 — 자동 제외는 오탐 위험, 판단은 주인(§1)
+
     _print_section("종합")
-    phase2_ok = tmpl_ok and mod_ok and sm_ok and tests_ok and workers_ok and caps_ok and seeds_ok
+    phase2_ok = (
+        tmpl_ok
+        and mod_ok
+        and sm_ok
+        and tests_ok
+        and workers_ok
+        and caps_ok
+        and seeds_ok
+        and links_ok
+    )
     if py_ok and sec_ok and sql_ok and tools_ok and dep_found == dep_total and phase2_ok:
         print(f"{OK} 모든 필수 체크 통과 — Phase 2 진입 가능")
         return 0

@@ -38,13 +38,13 @@ SEED: list[dict[str, Any]] = [
 
 ROWS: dict[str, list[dict[str, Any]]] = {
     "사무용 의자": [
-        {"keyword": "공부의자", "volume": 9000, "competition": "중간"},
-        {"keyword": "게이밍의자", "volume": 30100, "competition": "높음"},
-        {"keyword": "책상의자", "volume": 20620, "competition": "중간"},
-        {"keyword": "듀오백의자", "volume": 8590, "competition": "중간"},  # 브랜드 → 제외
-        {"keyword": "중고의자", "volume": 5000, "competition": "중간"},  # 거래성 → 제외
-        {"keyword": "사무용 의자", "volume": 26100, "competition": "중간"},  # == seed → 제외
-        {"keyword": "접이식테이블", "volume": 41810, "competition": "중간"},  # no_core → 제외
+        {"keyword": "공부의자", "volume": 900, "competition": "중간"},
+        {"keyword": "게이밍의자", "volume": 1900, "competition": "높음"},
+        {"keyword": "책상의자", "volume": 1500, "competition": "중간"},
+        {"keyword": "듀오백의자", "volume": 850, "competition": "중간"},  # 브랜드 → 제외
+        {"keyword": "중고의자", "volume": 500, "competition": "중간"},  # 거래성 → 제외
+        {"keyword": "사무용 의자", "volume": 1600, "competition": "중간"},  # == seed → 제외
+        {"keyword": "접이식테이블", "volume": 1800, "competition": "중간"},  # no_core → 제외
     ],
 }
 
@@ -64,7 +64,7 @@ class TestRecommend:
         assert recs[0]["source"] == "naver"
         assert recs[0]["channel"] == "ali"
         assert recs[0]["keyword"] == "책상의자"
-        assert recs[0]["volume"] == 20620
+        assert recs[0]["volume"] == 1500
         assert recs[0]["category"] == "office-chair"
 
     def test_dedupe_against_queue(self) -> None:
@@ -107,7 +107,7 @@ class TestRecommend:
 
         def fetch(seed: str, dry_run: bool = False) -> list[dict[str, Any]]:
             assert seed == "원룸 수납"
-            return [{"keyword": "원룸 수납장", "volume": 3000, "competition": "중간"}]
+            return [{"keyword": "원룸 수납장", "volume": 1500, "competition": "중간"}]
 
         recs = kr.recommend(conn, custom_seed="원룸 수납", fetch=fetch)
         assert recs[0]["keyword"] == "원룸 수납장"
@@ -243,9 +243,9 @@ class TestRefillPublishableOnly:
         rows = {
             "잡동사니": [
                 # winnable 1위지만 미매핑 — 큐 투입 금지(여름이불류 데드엔드)
-                {"keyword": "여름이불", "volume": 50000, "competition": "낮음"},
+                {"keyword": "여름이불", "volume": 1900, "competition": "낮음"},
                 # 매핑(office-chair·행 없음=fail-open) — 이것이 선택돼야
-                {"keyword": "컴퓨터의자", "volume": 3000, "competition": "중간"},
+                {"keyword": "컴퓨터의자", "volume": 1000, "competition": "중간"},
             ]
         }
         picked = kr.auto_pick_keyword(
@@ -270,7 +270,7 @@ class TestRefillPublishableOnly:
                 "cached_secondary": [],
             }
         ]
-        rows = {"잡동사니": [{"keyword": "여름이불", "volume": 50000, "competition": "낮음"}]}
+        rows = {"잡동사니": [{"keyword": "여름이불", "volume": 1900, "competition": "낮음"}]}
         picked = kr.auto_pick_keyword(
             conn, seeds=seeds, fetch=lambda s, dry_run=False: list(rows.get(s, []))
         )
@@ -316,11 +316,11 @@ class TestRefillPublishableOnly:
         ]
         rows = [
             # 미매핑 25건 — 전부 winnable 상위(검색량 9만~)
-            {"keyword": f"미매핑키워드{i}", "volume": 90000 - i, "competition": "낮음"}
+            {"keyword": f"미매핑키워드{i}", "volume": 1900 - i, "competition": "낮음"}
             for i in range(25)
         ] + [
             # 매핑 후보 1건 — winnable 최하위(26위)
-            {"keyword": "컴퓨터의자", "volume": 2100, "competition": "높음"}
+            {"keyword": "컴퓨터의자", "volume": 1000, "competition": "높음"}
         ]
         picked = kr.auto_pick_keyword(
             conn, seeds=seeds, fetch=lambda s, dry_run=False: [dict(r) for r in rows]
@@ -362,6 +362,94 @@ class TestWinnableScore:
         # 미상 경쟁도는 중간(0.5) — 낮음(1.0)과 높음(0.3) 사이.
         s = kr.winnable_score(10000, "unknown")
         assert kr.winnable_score(10000, "높음") < s < kr.winnable_score(10000, "낮음")
+
+
+class TestVolumeBand:
+    """세션 #51 근본수정 — 공략 구간 [floor, ceiling]. 검색량을 난이도 지표로 사용.
+
+    ★회귀 배경(라이브 실측): 하한 2000이 네이버 후보의 94.8%(1,878/1,980)를 잘라, 시스템이
+    가장 경쟁이 심한 상위 5%에서만 키워드를 골랐다 → 발행 22편 전부 head, GSC 평균 18.2위.
+    ★1차안 기각도 함께 고정: '상한(cap)을 낮춰 경쟁도를 결정자로' 안은 네이버 경쟁도 분포
+    (300~2000 구간 305개 중 '낮음' 1개)가 변별력이 없어 폐기했다. cap은 원래대로 30000.
+    """
+
+    BAND_SEED: ClassVar[list[dict[str, Any]]] = [
+        {
+            "seed": "사무용 의자",
+            "core": "의자",
+            "exclude_terms": (),
+            "require_terms": (),
+            "category": "office-chair",
+            "cached_secondary": [],
+        }
+    ]
+    BAND_ROWS: ClassVar[list[dict[str, Any]]] = [
+        {"keyword": "고검색의자", "volume": 25000, "competition": "중간"},  # 상한 초과 → 제외
+        {"keyword": "구간내의자", "volume": 1500, "competition": "중간"},  # 구간 내 → 통과
+        {"keyword": "저검색의자", "volume": 50, "competition": "낮음"},  # 하한 미만 → 제외
+    ]
+
+    def _fetch_band(self, seed: str, dry_run: bool = False) -> list[dict[str, Any]]:
+        return [dict(r) for r in self.BAND_ROWS]
+
+    def test_ceiling_excludes_head_keywords(self) -> None:
+        """상한 초과 = 기존 강자 점유 구간 → 신규 도메인은 못 이기므로 후보에서 제외."""
+        recs = kr.recommend(
+            _db(),
+            seeds=self.BAND_SEED,
+            fetch=self._fetch_band,
+            volume_floor=300,
+            volume_ceiling=2000,
+        )
+        kws = [r["keyword"] for r in recs]
+        assert "고검색의자" not in kws, "상한 초과 head가 후보에 남음 — 구간 제한 무효"
+        assert "구간내의자" in kws
+
+    def test_floor_still_excludes_no_traffic(self) -> None:
+        """하한 미만은 계속 배제 — 검색량 0에 가까운 키워드는 글을 써도 트래픽이 없다."""
+        recs = kr.recommend(
+            _db(),
+            seeds=self.BAND_SEED,
+            fetch=self._fetch_band,
+            volume_floor=300,
+            volume_ceiling=2000,
+        )
+        assert "저검색의자" not in [r["keyword"] for r in recs]
+
+    def test_ceiling_zero_means_no_upper_limit(self) -> None:
+        """ceiling=0 = 상한 없음(옛 동작) — 사이트가 성숙하면 head로 확장하는 경로."""
+        recs = kr.recommend(
+            _db(),
+            seeds=self.BAND_SEED,
+            fetch=self._fetch_band,
+            volume_floor=300,
+            volume_ceiling=0,
+        )
+        assert "고검색의자" in [r["keyword"] for r in recs]
+
+    def test_cached_degraded_rows_survive_ceiling(self) -> None:
+        """캐시 강등분(volume=None)은 판정 불가라 상한에 걸려 사라지면 안 된다(#50 경로 보존).
+
+        네이버 실패 시 yml secondary로 강등되는데, 여기서 전멸하면 무인 리필이 0건이 되어
+        발행이 멈춘다. 검색량 미상은 통과시키고 winnable에서 최하위로 밀리게만 한다.
+        """
+        recs = kr.recommend(
+            _db(),
+            seeds=[{**self.BAND_SEED[0], "cached_secondary": ["메쉬의자", "중역의자"]}],
+            fetch=lambda s, dry_run=False: [],  # 라이브 0건 → 캐시 강등
+            volume_floor=300,
+            volume_ceiling=2000,
+        )
+        assert [r["keyword"] for r in recs] == ["메쉬의자", "중역의자"]
+        assert all(r["source"] == "cached" for r in recs)
+
+    def test_defaults_come_from_settings(self) -> None:
+        """인자 미지정이면 설정값 — 주인이 config로 조정 가능(상수 하드코딩 아님)."""
+        assert kr._volume_floor() >= 0
+        assert kr._volume_ceiling() >= 0
+        # 기본 정책상 상한이 하한보다 커야 후보가 존재한다(설정 오기입 조기 발견).
+        if kr._volume_ceiling():
+            assert kr._volume_ceiling() > kr._volume_floor()
 
 
 class TestCategoryBalance:
@@ -407,12 +495,12 @@ class TestCategoryBalance:
         rows = {
             "살림": [
                 # cutting-board가 winnable 1~3위 독식(07-20~27 실제 상황 재현)
-                {"keyword": "나무도마", "volume": 30000, "competition": "낮음"},
-                {"keyword": "스텐도마", "volume": 29000, "competition": "낮음"},
-                {"keyword": "원목도마", "volume": 28000, "competition": "낮음"},
+                {"keyword": "나무도마", "volume": 1900, "competition": "낮음"},
+                {"keyword": "스텐도마", "volume": 1850, "competition": "낮음"},
+                {"keyword": "원목도마", "volume": 1800, "competition": "낮음"},
                 # 다른 카테고리는 점수가 한참 낮다
-                {"keyword": "컴퓨터의자", "volume": 5000, "competition": "중간"},
-                {"keyword": "서재책상", "volume": 4000, "competition": "중간"},
+                {"keyword": "컴퓨터의자", "volume": 1000, "competition": "중간"},
+                {"keyword": "서재책상", "volume": 900, "competition": "중간"},
             ]
         }
         cats: list[str | None] = []
@@ -437,8 +525,8 @@ class TestCategoryBalance:
 
         rows = {
             "살림": [
-                {"keyword": "중역의자", "volume": 30000, "competition": "낮음"},  # 많이 쓴 카테고리
-                {"keyword": "나무도마", "volume": 5000, "competition": "중간"},  # 안 쓴 카테고리
+                {"keyword": "중역의자", "volume": 1900, "competition": "낮음"},  # 많이 쓴 카테고리
+                {"keyword": "나무도마", "volume": 1000, "competition": "중간"},  # 안 쓴 카테고리
             ]
         }
         picked = kr.auto_pick_keyword(conn, seeds=self.SEED_MIX, fetch=self._fetch_of(rows))
@@ -453,8 +541,8 @@ class TestCategoryBalance:
         conn.commit()
         rows = {
             "살림": [
-                {"keyword": "여름이불", "volume": 50000, "competition": "낮음"},  # 미매핑
-                {"keyword": "스텐도마", "volume": 3000, "competition": "중간"},  # 유일 적격
+                {"keyword": "여름이불", "volume": 1900, "competition": "낮음"},  # 미매핑
+                {"keyword": "스텐도마", "volume": 1000, "competition": "중간"},  # 유일 적격
             ]
         }
         picked = kr.auto_pick_keyword(conn, seeds=self.SEED_MIX, fetch=self._fetch_of(rows))

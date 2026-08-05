@@ -154,7 +154,22 @@
     </div>
   </div>
 
-  {# 관련 내부링크 (체류·SEO) #}
+  {# 글↔글 내부링크 (토픽 클러스터·체류·SEO, 세션 #51) — 같은 카테고리→같은 그룹→최신 순.
+     옛 구조는 아래 고정 링크 2개뿐이라 다른 '글'로 가는 통로가 0이었다. #}
+  {% if sibling_articles %}
+  <div class="sechead"><div class="eb">같은 주제</div><h2>이어서 보면 좋은 가이드</h2></div>
+  <div class="related-grid">
+    {% for g in sibling_articles %}
+    <a class="rel-card" href="{{ g.url }}">
+      <div class="rel-name">{{ g.title }}</div>
+      <div class="rel-intro">{{ g.intro }}</div>
+      <div class="rel-go">가이드 보기 →</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# 구조 페이지 링크 (체류·SEO) #}
   <div class="sechead"><div class="eb">함께 보면 좋은</div><h2>관련 보기</h2></div>
   <div class="related-grid">
     <a class="rel-card" href="/categories/"><div class="rel-name">카테고리 전체 비교</div><div class="rel-intro">품목별 전체 제품을 가격·할인으로 비교</div><div class="rel-go">보러가기 →</div></a>
