@@ -161,11 +161,17 @@ def audit_sitemap(site: Path, pages: dict[str, str]) -> list[Finding]:
 
 
 def audit_compliance(pages: dict[str, str]) -> list[Finding]:
-    """공정위 대가성 고지 — 첫머리 노출 (위반 시 쿠팡 30일 수익 몰수·CLAUDE.md §9).
+    """공정위 대가성 고지 (위반 시 쿠팡 30일 수익 몰수·CLAUDE.md §9).
 
-    제휴 링크가 있는 페이지는 본문 앞부분에 대가성 문구가 있어야 한다. 5게이트의 disclosure는
-    **생성 시점**의 본문을 보는데, 템플릿이 바뀌어 렌더에서 문구가 빠지면 못 잡는다. 그래서
-    최종 산출물에서 한 번 더 본다(fail-closed — 이건 수익이 걸린 문제라 차단).
+    제휴 링크가 있는 페이지는 대가성 문구가 있어야 한다. 5게이트의 disclosure는 **생성 시점**의
+    본문을 보는데, 템플릿이 바뀌어 렌더에서 문구가 빠지면 못 잡는다. 그래서 최종 산출물에서
+    한 번 더 본다(수익이 걸린 문제라 fail-closed).
+
+    ★'첫머리' 요건은 **추천 글(/articles/)에만** 적용한다 — 공정위 심사지침은 게시물의 첫
+    부분 **또는 끝 부분**을 허용하고, 프로젝트 규칙(§9-4)의 첫머리 고지도 추천 콘텐츠 대상이다.
+    홈·카테고리 인덱스는 추천 게시물이 아니라 목록이라 푸터 고지로 충분하다.
+    ※이 구분을 안 두면 홈이 매일 걸려 **무인 배포가 영구히 막힌다**(#51 게이트 도입 전 실측으로
+      적발 — 과민 게이트가 발행을 죽이는 #48 실패를 그대로 재현할 뻔했다).
     """
     out: list[Finding] = []
     for url, h in sorted(pages.items()):
@@ -174,7 +180,9 @@ def audit_compliance(pages: dict[str, str]) -> list[Finding]:
         text = _text(h)
         if not any(k in text for k in _DISCLOSURE_TERMS):
             out.append(Finding("fail", "disclosure-missing", f"{url} 대가성 고지 문구 없음"))
-        elif not any(k in text[:_DISCLOSURE_HEAD_CHARS] for k in _DISCLOSURE_TERMS):
+        elif url.startswith("/articles/") and not any(
+            k in text[:_DISCLOSURE_HEAD_CHARS] for k in _DISCLOSURE_TERMS
+        ):
             out.append(Finding("fail", "disclosure-late", f"{url} 대가성 고지가 첫머리에 없음"))
     return out
 

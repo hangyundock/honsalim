@@ -176,6 +176,43 @@ class TestAuditDoesNotOverBlock:
         """빌드 전이면 빈 목록 — 게이트가 fresh checkout을 막으면 안 된다(§0)."""
         assert site_audit.audit_site(tmp_path) == []
 
+    def test_footer_disclosure_on_index_page_is_ok(self, tmp_path: Path) -> None:
+        """★홈·카테고리는 푸터 고지로 충분 — '첫머리' 요건은 추천 글에만.
+
+        게이트 도입 전 실측에서 홈이 이 항목에 걸렸다(고지가 푸터 4419번째 글자). 그대로
+        켰으면 **매일 배포가 막혔다**. 공정위 심사지침은 첫 부분 또는 끝 부분을 허용하고,
+        홈은 추천 게시물이 아니라 목록 페이지다. 과민 게이트가 발행을 죽이는 #48 재현 방지.
+        """
+        _healthy(tmp_path)
+        long_intro = "<p>목록 페이지 소개 문구</p>" * 60  # 고지를 1200자 밖으로 밀어냄
+        _page(
+            tmp_path,
+            "",
+            body=long_intro
+            + '<a href="/go/ali-1" rel="nofollow sponsored">상품</a>'
+            + "<footer>혼살림은 제휴(어필리에이트) 링크로 수수료를 받을 수 있습니다.</footer>",
+        )
+        findings = site_audit.audit_site(tmp_path)
+        assert not site_audit.has_failures(findings), [
+            f.message for f in findings if f.severity == "fail"
+        ]
+
+    def test_article_still_requires_first_disclosure(self, tmp_path: Path) -> None:
+        """반대로 추천 글은 첫머리 고지가 여전히 필수 — 완화가 글까지 뚫으면 안 된다."""
+        _healthy(tmp_path)
+        long_intro = "<p>본문 앞부분 채우기</p>" * 200  # 고지를 1200자 밖으로 확실히 밀어냄
+        _page(
+            tmp_path,
+            "articles/a0",
+            title="고지가 뒤에 있는 글",
+            body=long_intro
+            + '<a href="/articles/a1/">a1</a><a href="/go/ali-1" rel="nofollow sponsored">상품</a>'
+            + "<footer>제휴 수수료를 받습니다.</footer>",
+        )
+        assert "disclosure-late" in {
+            f.code for f in site_audit.audit_site(tmp_path) if f.severity == "fail"
+        }
+
 
 class TestDeployGate:
     """refresh_cycle 배포 전 게이트 — 결함이면 실제로 배포를 멈추는가."""
