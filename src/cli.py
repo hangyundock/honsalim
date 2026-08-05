@@ -3096,7 +3096,13 @@ def cmd_publish_queue(args: argparse.Namespace) -> int:
 
 
 def _auto_cycle_digest_and_alert(
-    conn: sqlite3.Connection, *, made: int, ar: dict[str, Any], approved_n: int, target: int = 0
+    conn: sqlite3.Connection,
+    *,
+    made: int,
+    ar: dict[str, Any],
+    approved_n: int,
+    target: int = 0,
+    refill_degraded: int = 0,
 ) -> dict[str, Any]:
     """무인 사이클 결과를 구조화 JSON으로 영속화 + 비정상 시 [ALERT] 로그(세션 #39 자기보고).
 
@@ -3160,6 +3166,7 @@ def _auto_cycle_digest_and_alert(
         "queue_coupang_pending": int(coupang_pending),
         "queue_gate_failed": len(gate_failed_kws),
         "gate_failed_keywords": gate_failed_kws,
+        "refill_degraded": int(refill_degraded),
         "abnormal": abnormal,
     }
     try:
@@ -3174,6 +3181,17 @@ def _auto_cycle_digest_and_alert(
             f"{publishable}/{len(pend)} (막힘 {dict(blocked) or '없음'}). 막힌 키워드를 카테고리에 "
             "매핑(seo_keywords.yml secondary)하거나 쿠팡 배너 첨부, 카테고리 공개 승인, 또는 큐에서 "
             "제거하세요. 생성 0편이면 씨앗·네이버 키·auto_cycle.log를 확인하세요."
+        )
+    # ★세션 #50 — 리필이 네이버 실검색량 대신 캐시(yml secondary 순서)로 키워드를 골랐다.
+    # 발행 자체는 되므로 abnormal(발행 0편 위험)에는 넣지 않는다(#49 과민 경보 교훈) — 대신
+    # 반려 격리와 같은 '발행 여부 무관 독립 경보'로 낸다. 조용히 두면 검색량 근거 없이 씨앗
+    # 순서대로 한 카테고리를 통째로 소진하는 상태가 무한히 계속된다(실측 07-01~27, 한 달 은폐).
+    if refill_degraded:
+        print(
+            f"{FAIL} [ALERT] 리필 검색량 조회 실패 {refill_degraded}건 — 네이버 대신 "
+            "캐시(seo_keywords.yml 순서)로 키워드를 골랐습니다. 검색량 근거 없는 선정이라 "
+            "카테고리 편중·저수요 키워드 위험이 있습니다. secrets의 네이버 검색광고 키"
+            "(API/SECRET/CUSTOMER_ID)와 네트워크를 확인하세요."
         )
     # 게이트 반려 상한 도달 격리 키워드는 발행 여부와 무관하게 항상 경보(사람이 손봐야 재생성됨).
     if gate_failed_kws:
@@ -3260,6 +3278,11 @@ def _auto_cycle_notify(
             f"🚨 반려(검토 필요) {digest['queue_gate_failed']}건: {kws}"
             " → 대시보드 키워드 탭 [🔁 반려 재시도] 또는 검토"
         )
+    if digest.get("refill_degraded"):
+        alerts.append(
+            f"⚠️ 리필 검색량 조회 실패 {digest['refill_degraded']}건 — 네이버 대신 씨앗"
+            " 순서로 키워드를 골랐습니다(카테고리 편중 위험). 네이버 검색광고 키 확인 필요"
+        )
     if cp == 0:
         alerts.append(
             "⚠️ 쿠팡 첨부 대기 0편 — 지금부터 쿠팡 수익 없는 글로 발행됩니다."
@@ -3338,6 +3361,16 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
     if not settings.get("auto_mode", False):
         print(f"{WARN} auto_mode OFF — 자동 사이클 중단 (설정에서 켜야 동작·사람 게이트 E7 유지)")
         return 0
+
+    # ★세션 #50 근본수정 — 무인 사이클은 secrets를 **먼저** 로드해야 한다.
+    #   빠져 있으면 리필(auto_pick_keyword→recommend)이 네이버 자격증명 없이 호출돼 실패하는데,
+    #   recommend는 예외를 삼켜 캐시(yml secondary)로 자가강등한다 → **조용히** 검색량 없이
+    #   yml에 적힌 순서대로 한 카테고리를 통째로 소진(실측: 07-01~03 desk 3연속, 07-20~27
+    #   cutting-board 6연속. 리필 투입 키워드 10건이 전부 score=0 = volume None = 캐시).
+    #   글 생성 경로는 자기 안에서 load_secrets를 불러 LLM이 멀쩡히 돌았기 때문에 한 달간
+    #   아무도 몰랐다([[project_verify_script_load_secrets]]와 동일 함정의 운영 코드판).
+    config.load_secrets()
+
     count = args.count if args.count is not None else settings.get_int("publish_per_day")
     live = not args.dry_run
     print(f"{OK} 자동 사이클 ({'live' if live else 'dry_run'}, 상한 {count})")
@@ -3358,6 +3391,9 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
     #    큐에 추가해 반환. 각 생성이 키워드를 generating→drafted/failed로 옮기므로 다음 회차가 다음
     #    키워드를 집는다(중복·무한루프 없음). ★큐가 비어도 멈추지 않는 게 완전 무인의 핵심 —
     #    옛 코드는 pending만 소비해 대기 키워드 0이면 0편 생성(EVENTS #33 갭). DeepSeek 비용은 count 상한.
+    # #50: 검색량 조회 실패로 캐시(yml 순서)에서 고른 건수. digest 호출이 `if live` 블록 밖이라
+    # 여기서 초기화한다(dry_run 경로에서도 이름이 항상 존재하도록).
+    refill_degraded = 0
     if live:
         from writer import keyword_recommender as kr_mod
 
@@ -3372,6 +3408,8 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
             if pick is None:
                 print("     보충할 키워드 없음(대기·추천 모두 고갈) — 생성 중단")
                 break
+            if pick.get("degraded"):
+                refill_degraded += 1
             print(
                 f"     글 생성 — 키워드 #{pick['keyword_id']} {pick['keyword']!r} ({pick['source']})"
             )
@@ -3455,7 +3493,12 @@ def cmd_auto_cycle(args: argparse.Namespace) -> int:
         # 무인 자기보고(세션 #39): 사이클 결과·큐 건강을 영속화하고 조용한 정지 위험 시 [ALERT].
         # target=count(#45) — 생성 목표 대비 0편이면 보류·큐 상태와 무관하게 abnormal(fail-loud).
         digest = _auto_cycle_digest_and_alert(
-            conn, made=made, ar=ar, approved_n=approved_n, target=count
+            conn,
+            made=made,
+            ar=ar,
+            approved_n=approved_n,
+            target=count,
+            refill_degraded=refill_degraded,
         )
     finally:
         conn.close()

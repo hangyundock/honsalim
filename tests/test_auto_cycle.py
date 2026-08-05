@@ -148,6 +148,93 @@ class TestAutoCycleOrchestration:
         assert rc == 0
         assert gen == [99]  # 빈 큐인데도 추천 키워드로 생성 호출됨(완전 무인 핵심)
 
+    def test_loads_secrets_before_refill(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """★세션 #50 배선 가드 — 리필보다 **먼저** secrets를 로드해야 한다.
+
+        빠지면 recommend가 네이버 자격증명 없이 호출돼 실패하는데, 예외를 삼켜 캐시(yml
+        secondary)로 자가강등한다 → 검색량 없이 **yml에 적힌 순서대로** 한 카테고리를 통째로
+        소진(실측 07-01~03 desk 3연속·07-20~27 cutting-board 6연속, 리필 투입 10건 score=0).
+        글 생성 경로는 자체적으로 load_secrets를 불러 LLM이 멀쩡히 돌았기 때문에 한 달간
+        은폐됐다 — 그래서 '호출 여부'가 아니라 **리필보다 앞'이라는 순서**를 고정한다.
+        """
+        from common import db
+        from writer import keyword_recommender as kr_mod
+
+        p = tmp_path / "t.db"
+        db.migrate(db_path=p)
+        db.seed(db_path=p)
+        monkeypatch.setattr(cli.db, "DB_PATH", p)
+        monkeypatch.setattr(
+            cli.settings,
+            "get",
+            lambda k, d=None, **kw: (
+                True if k == "auto_mode" else (1 if k == "publish_per_day" else d)
+            ),
+        )
+
+        order: list[str] = []
+
+        def _mark_secrets(*a: Any, **k: Any) -> dict[str, str]:
+            order.append("secrets")
+            return {}
+
+        def _mark_refill(conn: Any, **kw: Any) -> None:
+            order.append("refill")
+            return None  # 보충 없음 → 생성 루프 즉시 중단(부작용 0)
+
+        monkeypatch.setattr("common.config.load_secrets", _mark_secrets)
+        monkeypatch.setattr(kr_mod, "auto_pick_keyword", _mark_refill)
+        monkeypatch.setattr(cli, "cmd_publish_queue", lambda ns: 0)
+
+        cli.cmd_auto_cycle(argparse.Namespace(count=1, dry_run=False, no_deploy=True))
+        assert order[:2] == ["secrets", "refill"]  # 순서가 뒤집히면 캐시 강등이 재발한다
+
+    def test_refill_degraded_is_reported(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """★세션 #50 fail-loud — 캐시 강등으로 뽑았으면 digest 기록 + 독립 경보.
+
+        발행 자체는 되므로 abnormal(발행 0편 위험)로 올리지 않는다(#49 과민 경보 교훈) —
+        조용히 두면 검색량 근거 없는 선정이 무한히 계속되므로 '중단'이 아니라 '가시화'가 옳다.
+        """
+        import json
+
+        from common import db
+        from writer import keyword_recommender as kr_mod
+
+        p = tmp_path / "t.db"
+        db.migrate(db_path=p)
+        db.seed(db_path=p)
+        monkeypatch.setattr(cli.db, "DB_PATH", p)
+        monkeypatch.setattr(
+            cli.settings,
+            "get",
+            lambda k, d=None, **kw: (
+                True if k == "auto_mode" else (1 if k == "publish_per_day" else d)
+            ),
+        )
+        monkeypatch.setattr(
+            kr_mod,
+            "auto_pick_keyword",
+            lambda conn, **kw: {
+                "keyword_id": 99,
+                "keyword": "원룸 수납",
+                "source": "recommend",
+                "degraded": True,  # 네이버 실패 → 캐시로 강등된 상태
+            },
+        )
+        monkeypatch.setattr(cli, "cmd_keyword_generate", lambda ns: 0)
+        monkeypatch.setattr(cli, "cmd_publish_queue", lambda ns: 0)
+
+        cli.cmd_auto_cycle(argparse.Namespace(count=1, dry_run=False, no_deploy=True))
+
+        out = capsys.readouterr().out
+        assert "리필 검색량 조회 실패" in out  # 조용히 지나가면 한 달 은폐가 재발한다
+        digest = json.loads((p.parent / "auto_cycle_last.json").read_text(encoding="utf-8"))
+        assert digest["refill_degraded"] == 1
+
     def _run_cycle_with_gen_rc(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, gen_rc: int
     ) -> dict[str, Any]:

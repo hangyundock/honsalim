@@ -64,6 +64,84 @@ def winnable_score(volume: int | None, competition: Any) -> float:
     return min(int(volume), WINNABLE_VOL_CAP) * _comp_factor(competition)
 
 
+# ── 카테고리 균형(라운드로빈) — 한 카테고리 연속 소진 방지 (세션 #50) ────────────
+# 무인 리필은 winnable 점수 **전역 1위**를 매일 집는다. 그래서 한 카테고리가 상위를 점유하면
+# 그 씨앗이 소진될 때까지 같은 주제만 나간다 — 큐 이력 실측: 07-20~27 cutting-board **6일 연속**
+# (나무도마·스텐도마·도마추천·엔드그레인도마·실리콘도마·TPU도마). 같은 주제 글이 쌓이면 서로
+# 검색 경쟁을 하고 색인·노출 효율이 떨어진다(GSC 실측: 도마 6편 상위 노출 0편, 씨앗 소진율 67%).
+#
+# ★설계 근거(실데이터로 1차안 기각): '마지막 사용 시점이 오래된 카테고리 우선'은 **누적 사용량을
+#   무시**해 틀린다 — cutting-board는 6편이나 썼는데도 마지막 시점만 보면 우선 대상이 됐다.
+#   그래서 **사용 횟수**를 1차 키로 쓴다. 다만 횟수만 쓰면 신규·소량 카테고리가 균형점에 닿을
+#   때까지 연속 독식하므로, **직전 카테고리 연속 회피**를 그 앞에 둔다(격일 이상 간격 보장).
+# ★점수는 버리지 않는다 — 동률(같은 사용 횟수) 판정에만 쓰므로 카테고리 안에서는 여전히
+#   winnable 상위가 먼저 나간다. 후보 **집합**도 그대로라 '적격이 있는데 못 고르는' 일은 없다.
+_BALANCE_HISTORY = 60  # 큐 이력 조회 폭 — 카테고리 7개 기준 한 바퀴를 넉넉히 덮음.
+_UNMAPPED_RANK = 10**6  # 미매핑은 균형 대상이 아님 — 맨 뒤(어차피 리필 적격 필터가 거름).
+
+
+def category_usage(
+    conn: sqlite3.Connection,
+    *,
+    history: int = _BALANCE_HISTORY,
+    seo: dict[str, dict[str, Any]] | None = None,
+) -> tuple[dict[str, int], str | None]:
+    """큐 이력 → (카테고리별 사용 횟수, 직전 사용 카테고리). 세션 #50.
+
+    사람이 추가한 키워드도 그 카테고리를 **소비한 것**이므로 함께 센다(균형은 유입 경로와 무관).
+    큐 테이블이 없거나(구 스키마) 비면 ({}, None) — 호출부가 기존 점수순으로 자연 폴백한다.
+    """
+    from collector import keyword_relevance  # 지연 임포트(순환 회피)
+
+    try:
+        rows = conn.execute(
+            "SELECT keyword FROM keyword_queue ORDER BY created_at DESC, id DESC LIMIT ?",
+            (int(history),),
+        ).fetchall()
+    except sqlite3.OperationalError:  # 큐 테이블 없음 — 균형 판정 생략(멈추지 않음)
+        return {}, None
+
+    data = seo if seo is not None else seo_keywords.load_all()
+    counts: dict[str, int] = {}
+    last: str | None = None
+    for (kw,) in rows:
+        slug = keyword_relevance.resolve_category(str(kw or ""), data)
+        if slug is None:  # 미매핑은 어느 카테고리도 소비하지 않았다
+            continue
+        if last is None:  # 첫 매핑 행 = 가장 최근에 쓴 카테고리
+            last = slug
+        counts[slug] = counts.get(slug, 0) + 1
+    return counts, last
+
+
+def balance_sorted(
+    recs: list[dict[str, Any]],
+    counts: dict[str, int],
+    last_slug: str | None,
+    *,
+    seo: dict[str, dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """추천 후보를 카테고리 균형순으로 **재배열**(집합 불변 — 정렬만). 세션 #50.
+
+    키: (직전 카테고리면 1, 사용 횟수, -winnable 점수) 오름차순.
+    """
+    from collector import keyword_relevance  # 지연 임포트(순환 회피)
+
+    data = seo if seo is not None else seo_keywords.load_all()
+
+    def _key(rec: dict[str, Any]) -> tuple[int, int, float]:
+        slug = keyword_relevance.resolve_category(str(rec.get("keyword") or ""), data)
+        if slug is None:
+            return (1, _UNMAPPED_RANK, 0.0)
+        return (
+            1 if slug == last_slug else 0,
+            counts.get(slug, 0),
+            -winnable_score(rec.get("volume"), rec.get("competition")),
+        )
+
+    return sorted(recs, key=_key)  # stable — 동률은 원(점수) 순서 보존
+
+
 def default_seeds(path: Path | None = None) -> list[dict[str, Any]]:
     """seo_keywords.yml 카테고리 → 씨앗 목록 [{seed, core, exclude_terms, category, cached_secondary}]."""
     entries = seo_keywords.load_all() if path is None else seo_keywords.load_all(path)
@@ -235,9 +313,19 @@ def auto_pick_keyword(
             # 어긋남 방지(auto_approve category_draft와 정합)
             ok, _code = keyword_relevance.publishability(str(kw), conn)
             if ok:
-                return {"keyword_id": int(kid), "keyword": str(kw), "source": "queue"}
+                return {
+                    "keyword_id": int(kid),
+                    "keyword": str(kw),
+                    "source": "queue",
+                    "degraded": False,  # 큐 재사용은 검색량 조회와 무관
+                }
         # 전부 미매핑 — 멈추지 않고 맨 위 1건(behavior 보존). digest가 '큐 발행가능 0'을 ALERT.
-        return {"keyword_id": int(rows[0][0]), "keyword": str(rows[0][1]), "source": "queue"}
+        return {
+            "keyword_id": int(rows[0][0]),
+            "keyword": str(rows[0][1]),
+            "source": "queue",
+            "degraded": False,
+        }
 
     # 큐가 빔 — 추천에서 자동 보충. ★세션 #45: '발행 가능' 추천만 큐에 넣는다.
     #   ①미매핑 → ali 수집 skip·상품 0·failed = 그날 무인 발행 0(여름이불류 침묵 데드엔드)
@@ -259,9 +347,16 @@ def auto_pick_keyword(
         live=live,
         limit=_REFILL_SCAN_LIMIT,
     )
+    # ★카테고리 균형(#50): 점수 1위만 집으면 한 카테고리가 소진될 때까지 연속 선택된다
+    #   (실측 07-20~27 도마 6일 연속). 적게 쓴 카테고리 우선 + 직전 연속 회피로 순환시킨다.
+    #   재배열일 뿐 후보 집합은 그대로 — 적격이 하나뿐이어도 그것을 고른다(§0 멈추지 않음).
+    seo_data = seo_keywords.load_all()
+    counts, last_slug = category_usage(conn, seo=seo_data)
+    recs = balance_sorted(recs, counts, last_slug, seo=seo_data)
+
     top = None
     for rec in recs:
-        slug = keyword_relevance.resolve_category(str(rec.get("keyword") or ""))
+        slug = keyword_relevance.resolve_category(str(rec.get("keyword") or ""), seo_data)
         if slug is None or keyword_relevance.category_blocked(conn, slug):
             continue
         top = rec
@@ -277,4 +372,14 @@ def auto_pick_keyword(
         channel=str(top.get("channel") or channel),
         score=float(top.get("volume") or 0),
     )
-    return {"keyword_id": kid, "keyword": top["keyword"], "source": "recommend"}
+    # ★degraded(#50 fail-loud): 네이버 실검색량이 아니라 캐시(yml secondary)로 고른 키워드인가.
+    #   recommend는 조회 실패를 예외로 올리지 않고 캐시로 자가강등하므로(§0 멈추지 않음), 그
+    #   사실이 여기서 새어나가지 않으면 **선정 품질이 무너진 채로 조용히 계속 돈다** — 실제로
+    #   07-01~27 리필 10건이 전부 캐시였고 한 달간 아무도 몰랐다. 호출부(auto-cycle)가 이 값으로
+    #   경보한다. 발행 자체는 되므로 '중단'이 아니라 '가시화'가 옳은 처리다.
+    return {
+        "keyword_id": kid,
+        "keyword": top["keyword"],
+        "source": "recommend",
+        "degraded": str(top.get("source") or "") == "cached",
+    }

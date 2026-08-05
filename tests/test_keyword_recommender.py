@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from writer import keyword_queue as kq
 from writer import keyword_recommender as kr
@@ -362,6 +362,208 @@ class TestWinnableScore:
         # 미상 경쟁도는 중간(0.5) — 낮음(1.0)과 높음(0.3) 사이.
         s = kr.winnable_score(10000, "unknown")
         assert kr.winnable_score(10000, "높음") < s < kr.winnable_score(10000, "낮음")
+
+
+class TestCategoryBalance:
+    """★세션 #50: 무인 리필의 카테고리 균형(라운드로빈) — 한 카테고리 연속 소진 방지.
+
+    실사고: 07-20~27 큐 이력이 cutting-board **6일 연속**(나무도마·스텐도마·도마추천·
+    엔드그레인도마·실리콘도마·TPU도마). 리필이 winnable 전역 1위만 집으므로 한 카테고리가
+    상위를 점유하면 씨앗 소진까지 같은 주제만 나간다. GSC 실측으로 그 6편은 상위 노출 0편.
+    """
+
+    @staticmethod
+    def _cat(keyword: str) -> str | None:
+        from collector import keyword_relevance
+
+        return keyword_relevance.resolve_category(keyword)
+
+    @staticmethod
+    def _fetch_of(rows: dict[str, list[dict[str, Any]]]) -> Any:
+        return lambda s, dry_run=False: [dict(r) for r in rows.get(s, [])]
+
+    # 카테고리 무관 씨앗 1개(추천 후보로 여러 카테고리를 섞기 위함)
+    SEED_MIX: ClassVar[list[dict[str, Any]]] = [
+        {
+            "seed": "살림",
+            "core": None,
+            "exclude_terms": (),
+            "require_terms": (),
+            "category": None,
+            "cached_secondary": [],
+        }
+    ]
+
+    def _drain(self, conn: sqlite3.Connection, picked: dict[str, Any]) -> None:
+        """리필 후 글 생성돼 pending을 벗어난 상태 모사 — 다음 호출이 다시 리필을 타게 한다."""
+        conn.execute(
+            "UPDATE keyword_queue SET status = 'drafted' WHERE id = ?", (picked["keyword_id"],)
+        )
+        conn.commit()
+
+    def test_no_consecutive_same_category(self) -> None:
+        """★도마 6연속 재현 방지 — 한 카테고리가 점수 상위를 독식해도 연속으로 뽑지 않는다."""
+        conn = _db()
+        rows = {
+            "살림": [
+                # cutting-board가 winnable 1~3위 독식(07-20~27 실제 상황 재현)
+                {"keyword": "나무도마", "volume": 30000, "competition": "낮음"},
+                {"keyword": "스텐도마", "volume": 29000, "competition": "낮음"},
+                {"keyword": "원목도마", "volume": 28000, "competition": "낮음"},
+                # 다른 카테고리는 점수가 한참 낮다
+                {"keyword": "컴퓨터의자", "volume": 5000, "competition": "중간"},
+                {"keyword": "서재책상", "volume": 4000, "competition": "중간"},
+            ]
+        }
+        cats: list[str | None] = []
+        for _ in range(3):
+            picked = kr.auto_pick_keyword(conn, seeds=self.SEED_MIX, fetch=self._fetch_of(rows))
+            assert picked is not None
+            cats.append(self._cat(picked["keyword"]))
+            self._drain(conn, picked)
+
+        # 수정 전이었다면 ['cutting-board'] * 3 (점수 1·2·3위가 전부 도마)
+        assert cats != ["cutting-board", "cutting-board", "cutting-board"]
+        assert cats[0] != cats[1] and cats[1] != cats[2]  # 직전 연속 회피
+        assert len(set(cats)) >= 2
+
+    def test_least_used_category_first(self) -> None:
+        """사용 횟수가 적은 카테고리를 우선 — 점수 1위라도 이미 많이 쓴 카테고리는 후순위."""
+        conn = _db()
+        for kw in ("컴퓨터의자", "메쉬의자", "책상의자"):  # office-chair 3회 소비 이력
+            kid = kq.add_keyword(conn, kw, channel="ali", score=1.0)
+            conn.execute("UPDATE keyword_queue SET status = 'drafted' WHERE id = ?", (kid,))
+        conn.commit()
+
+        rows = {
+            "살림": [
+                {"keyword": "중역의자", "volume": 30000, "competition": "낮음"},  # 많이 쓴 카테고리
+                {"keyword": "나무도마", "volume": 5000, "competition": "중간"},  # 안 쓴 카테고리
+            ]
+        }
+        picked = kr.auto_pick_keyword(conn, seeds=self.SEED_MIX, fetch=self._fetch_of(rows))
+        assert picked is not None
+        assert picked["keyword"] == "나무도마"  # 점수 6배 차이를 균형이 이긴다
+
+    def test_single_eligible_category_still_picks(self) -> None:
+        """★멈추지 않음(§0) — 적격이 한 카테고리뿐이면 균형과 무관하게 그것을 고른다."""
+        conn = _db()
+        kid = kq.add_keyword(conn, "나무도마", channel="ali", score=1.0)  # 같은 카테고리 이력
+        conn.execute("UPDATE keyword_queue SET status = 'drafted' WHERE id = ?", (kid,))
+        conn.commit()
+        rows = {
+            "살림": [
+                {"keyword": "여름이불", "volume": 50000, "competition": "낮음"},  # 미매핑
+                {"keyword": "스텐도마", "volume": 3000, "competition": "중간"},  # 유일 적격
+            ]
+        }
+        picked = kr.auto_pick_keyword(conn, seeds=self.SEED_MIX, fetch=self._fetch_of(rows))
+        assert picked is not None
+        assert picked["keyword"] == "스텐도마"  # 직전과 같은 카테고리여도 선택(멈추면 발행 0)
+
+    def test_empty_history_keeps_score_order(self) -> None:
+        """이력이 없으면 기존 winnable 순서 그대로 — 신규 DB·구 스키마 동작 보존."""
+        conn = _db()
+        picked = kr.auto_pick_keyword(conn, seeds=SEED, fetch=_fetch)
+        assert picked is not None
+        assert picked["keyword"] == "책상의자"  # 기존 winnable 1위
+
+    def test_balance_sorted_preserves_candidate_set(self) -> None:
+        """재배열일 뿐 후보 집합은 불변 — 균형이 후보를 '버리지' 않는다."""
+        recs: list[dict[str, Any]] = [
+            {"keyword": "나무도마", "volume": 100, "competition": "낮음"},
+            {"keyword": "컴퓨터의자", "volume": 200, "competition": "낮음"},
+            {"keyword": "여름이불", "volume": 300, "competition": "낮음"},  # 미매핑
+        ]
+        out = kr.balance_sorted(recs, {"cutting-board": 5}, "cutting-board")
+        assert len(out) == len(recs)
+        assert sorted(r["keyword"] for r in out) == sorted(r["keyword"] for r in recs)
+        assert out[-1]["keyword"] == "여름이불"  # 미매핑은 맨 뒤
+
+    def test_category_usage_ignores_unmapped(self) -> None:
+        """미매핑 키워드는 어느 카테고리도 소비하지 않는다 — 횟수·'직전' 판정 모두 제외."""
+        conn = _db()
+        kq.add_keyword(conn, "나무도마", channel="ali")
+        kq.add_keyword(conn, "여름이불", channel="ali")  # 가장 최근이지만 미매핑
+        counts, last = kr.category_usage(conn)
+        assert counts == {"cutting-board": 1}
+        assert last == "cutting-board"
+
+    def test_category_usage_missing_table_is_safe(self) -> None:
+        """구 스키마(큐 테이블 없음)에서도 죽지 않고 균형 판정만 생략 — 점수순 폴백."""
+        conn = sqlite3.connect(":memory:")
+        counts, last = kr.category_usage(conn)
+        assert counts == {}
+        assert last is None
+
+    def test_balance_works_when_cache_degraded(self) -> None:
+        """★실운영 조건 — 캐시 강등(volume=None)으로 점수가 전부 동률일 때도 균형이 작동한다.
+
+        07-20~27 도마 6연속이 정확히 이 상태였다: 리필이 네이버 자격증명 없이 돌아 캐시로
+        강등 → winnable 점수가 전부 -1.0 동률 → **yml secondary에 적힌 순서 그대로** 한
+        카테고리를 통째로 소진(나무도마→스텐도마→도마추천→엔드그레인도마→실리콘도마→TPU도마).
+        점수가 무력한 조건이므로 균형 키(사용 횟수·직전 회피)만으로 순환해야 한다.
+        """
+        conn = _db()
+        seeds: list[dict[str, Any]] = [
+            {
+                "seed": "도마",
+                "core": None,
+                "exclude_terms": (),
+                "require_terms": (),
+                "category": "cutting-board",
+                "cached_secondary": ["나무도마", "스텐도마", "원목도마"],
+            },
+            {
+                "seed": "컴퓨터 책상",
+                "core": None,
+                "exclude_terms": (),
+                "require_terms": (),
+                "category": "desk",
+                "cached_secondary": ["서재책상", "미니책상"],
+            },
+        ]
+        cats: list[str | None] = []
+        for _ in range(3):
+            picked = kr.auto_pick_keyword(conn, seeds=seeds, live=False)  # 캐시만 = 강등 재현
+            assert picked is not None
+            cats.append(self._cat(picked["keyword"]))
+            self._drain(conn, picked)
+
+        # 수정 전이었다면 yml 순서 그대로 ['cutting-board'] * 3
+        assert cats != ["cutting-board", "cutting-board", "cutting-board"]
+        assert cats[0] != cats[1] and cats[1] != cats[2]
+
+
+class TestRefillDegradedSignal:
+    """★세션 #50 fail-loud — '검색량 없이 캐시로 골랐다'가 호출부로 새어나가야 한다.
+
+    recommend는 네이버 실패를 예외로 올리지 않고 캐시로 자가강등한다(§0 멈추지 않음). 그
+    자체는 옳지만 **사실이 보고되지 않으면** 선정 품질이 무너진 채로 조용히 계속 돈다 —
+    실제로 07-01~27 리필 10건이 전부 캐시였는데 글은 매일 나가 한 달간 아무도 몰랐다.
+    """
+
+    def test_degraded_true_on_cache_fallback(self) -> None:
+        conn = _db()
+        picked = kr.auto_pick_keyword(conn, seeds=SEED, live=False)  # 캐시만 = 강등
+        assert picked is not None
+        assert picked["source"] == "recommend"
+        assert picked["degraded"] is True
+
+    def test_degraded_false_on_live_success(self) -> None:
+        conn = _db()
+        picked = kr.auto_pick_keyword(conn, seeds=SEED, fetch=_fetch)  # 네이버 성공
+        assert picked is not None
+        assert picked["degraded"] is False
+
+    def test_queue_reuse_is_not_degraded(self) -> None:
+        # 큐 재사용은 검색량 조회와 무관 — 오경보 금지
+        conn = _db()
+        kq.add_keyword(conn, "컴퓨터의자", channel="ali", score=10.0)
+        picked = kr.auto_pick_keyword(conn, seeds=SEED, fetch=_fetch)
+        assert picked is not None
+        assert picked["source"] == "queue"
+        assert picked["degraded"] is False
 
 
 if __name__ == "__main__":
