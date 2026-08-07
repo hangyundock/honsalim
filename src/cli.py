@@ -279,6 +279,9 @@ def _check_phase2_modules() -> bool:
         ("collector.naver_searchad", "fetch_related_keywords"),
         ("tracker.gsc", "summary"),
         ("tracker.gsc", "query"),
+        ("tracker.gsc", "index_coverage"),
+        ("tracker.gsc_store", "save_rows"),
+        ("tracker.gsc_store", "dictionary"),
         ("collector.product_filter", "is_relevant"),
         ("collector.keyword_relevance", "filter_products"),
         ("collector.category_collect", "collect_category"),
@@ -2650,6 +2653,85 @@ def cmd_gsc_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _gsc_collect(days: int = 28) -> tuple[int, str]:
+    """GSC 검색어 1회 적립 — (저장 행수, 요약 문구). 실패는 예외로 올린다(호출부가 처리).
+
+    쿼리 단독 집계만 적립한다(page 차원은 창마다 조합이 폭증하고, 사전 용도엔 불필요).
+    """
+    from tracker import gsc, gsc_store
+
+    start, end = gsc.window(days)
+    rows = gsc.query(start, end, dimensions=("query",))
+    conn = db.connect(db.DB_PATH)
+    try:
+        n = gsc_store.save_rows(
+            conn, rows, period_start=start.isoformat(), period_end=end.isoformat()
+        )
+        st = gsc_store.stats(conn)
+    finally:
+        conn.close()
+    return n, (
+        f"{start}~{end} 검색어 {n}건 적립 · 누적 고유 쿼리 {st['unique_queries']}개"
+        f"({st['windows']}개 창)"
+    )
+
+
+def cmd_gsc_collect(args: argparse.Namespace) -> int:
+    """구글 검색어 적립 — '구글 실수요 사전'을 시간에 걸쳐 축적 (세션 #52).
+
+    GSC는 최근 16개월만 보관하고 조회 창이 계속 밀린다. 주 1회 쌓아두지 않으면 몇 달 뒤에도
+    '네이버 신호 vs 구글 실수요'를 비교할 표본이 없다. 멱등(같은 창 재적립=갱신).
+    """
+    from tracker import gsc
+
+    config.load_secrets()
+    try:
+        _, summary = _gsc_collect(args.days)
+    except gsc.GscError as e:
+        print(f"{FAIL} GSC 적립 실패: {e}")
+        return 1
+    print(f"{OK} {summary}")
+    return 0
+
+
+def cmd_gsc_queries(args: argparse.Namespace) -> int:
+    """적립된 구글 실수요 사전 조회 — 씨앗 보강 후보(씨앗에 없는 쿼리) 표시."""
+    from collector import seo_keywords
+    from tracker import gsc_store
+
+    conn = db.connect(db.DB_PATH)
+    try:
+        st = gsc_store.stats(conn)
+        if not st["rows"]:
+            print(f"{WARN} 적립된 검색어 없음 — `gsc-collect`를 먼저 실행하세요")
+            return 0
+        print(
+            f"{OK} 적립 현황: 고유 쿼리 {st['unique_queries']}개 · 창 {st['windows']}개"
+            f" ({st['first_period']}~{st['last_period']})"
+        )
+        # 재평가 기준(#52 확정) 도달 여부를 매번 보여 준다 — 감으로 다시 꺼내지 않기 위해.
+        need = 30 - st["unique_queries"]
+        print(
+            "     키워드 신호 재판단 기준(비익명 쿼리 30+): "
+            + ("★도달 — 재판단 가능" if need <= 0 else f"{need}개 부족")
+        )
+        rows = gsc_store.dictionary(conn, limit=args.limit)
+        seeds: set[str] = set()
+        for entry in seo_keywords.load_all().values():
+            seeds.add(str(entry.get("primary") or ""))
+            seeds.update(str(s) for s in (entry.get("secondary") or []))
+        seed_ns = {"".join(s.split()) for s in seeds if s}
+        for r in rows:
+            mark = "" if "".join(r["query"].split()) in seed_ns else "  ← 씨앗에 없음"
+            print(
+                f"     {r['query']} — 최대노출 {r['peak_impressions']}"
+                f" · 최고 {r['best_position']:.1f}위 · 관측 {r['windows']}창{mark}"
+            )
+    finally:
+        conn.close()
+    return 0
+
+
 def cmd_keyword_recommend(args: argparse.Namespace) -> int:
     """추천 키워드 생성(검색량순) — 정의된 선정 방식(keyword_research)을 SEO 씨앗에 적용.
 
@@ -3619,6 +3701,7 @@ def _weekly_summary_lines() -> list[str]:
         ]
         if n_fail:
             out.append(f"  {site_audit.summarize(findings, limit=3)}")
+        out.extend(_weekly_gsc_lines())
         return out
     except Exception as e:
         # 요약 실패가 사이클 알림을 막지는 않되(§0), **조용히 사라지지도 않게** 한다.
@@ -3626,6 +3709,42 @@ def _weekly_summary_lines() -> list[str]:
         # (실측에서 워크트리 DB 부재로 0줄 반환하는 걸 발견). fail-loud가 이 프로젝트 원칙이다.
         logging.getLogger(__name__).warning("주간 요약 생성 실패: %s: %s", type(e).__name__, e)
         return ["", f"⚠️ 주간 요약 생성 실패({type(e).__name__}) — 로그 확인 필요"]
+
+
+def _weekly_gsc_lines() -> list[str]:
+    """주간 GSC 성과 + 검색어 적립 (세션 #52) — 월요일 요약에 얹는다.
+
+    ★적립을 여기 두는 이유: GSC는 최근 16개월만 보관하고 창이 계속 밀린다. 별도 예약 작업을
+    만들면 조용히 죽는 지점이 늘어나므로(#51 II10), **이미 매일 도는 경로의 월요일 분기**에 얹는다.
+    실패는 요약 한 줄로 드러내되 사이클·알림은 막지 않는다(§0).
+    """
+    try:
+        from tracker import gsc
+
+        rep = gsc.summary(days=28)
+        t = rep["totals"]
+        lines = [
+            "",
+            "🔎 구글 검색 성과 (28일)",
+            f"  노출 {t['impressions']:.0f} · 클릭 {t['clicks']:.0f} · 평균 {t['position']:.1f}위",
+        ]
+        if rep.get("trend"):
+            a, b = rep["trend"]["last7"], rep["trend"]["prev7"]
+            lines.append(
+                f"  최근7 vs 이전7: 노출 {b['impressions']:.0f}→{a['impressions']:.0f}"
+                f" · 순위 {b['position']:.1f}→{a['position']:.1f}"
+            )
+        try:
+            _, summary = _gsc_collect(28)
+            lines.append(f"  {summary}")
+        except Exception as e:  # 적립 실패가 성과 보고를 죽이지 않게 격리(§0)
+            logging.getLogger(__name__).warning("GSC 검색어 적립 실패: %s: %s", type(e).__name__, e)
+            lines.append(f"  ⚠️ 검색어 적립 실패({type(e).__name__})")
+        return lines
+    except Exception as e:
+        # 연동 전이거나 권한 문제 — 조용히 사라지지 않게 한 줄로 알린다(#51 II9 교훈).
+        logging.getLogger(__name__).warning("주간 GSC 요약 실패: %s: %s", type(e).__name__, e)
+        return ["", f"⚠️ 구글 검색 성과 조회 실패({type(e).__name__}) — GSC 연동 확인 필요"]
 
 
 def cmd_notify_alert(args: argparse.Namespace) -> int:
@@ -4379,6 +4498,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_gsc.add_argument("--json", action="store_true", help="JSON 원본 출력(무인 세션 소비용)")
     p_gsc.set_defaults(func=cmd_gsc_report)
+
+    p_gsc_col = sub.add_parser(
+        "gsc-collect",
+        help="구글 검색어 적립 (실수요 사전 축적·멱등) — 주간 훅이 자동 실행",
+    )
+    p_gsc_col.add_argument("--days", type=int, default=28, help="적립할 조회 창(일·기본 28)")
+    p_gsc_col.set_defaults(func=cmd_gsc_collect)
+
+    p_gsc_q = sub.add_parser(
+        "gsc-queries", help="적립된 구글 실수요 사전 조회 (씨앗에 없는 후보 표시)"
+    )
+    p_gsc_q.add_argument("--limit", type=int, default=40, help="표시 개수")
+    p_gsc_q.set_defaults(func=cmd_gsc_queries)
 
     p_reject = sub.add_parser("reject", help="draft → rejected (반려)")
     p_reject.add_argument("--draft", type=int, required=True, help="draft id")
