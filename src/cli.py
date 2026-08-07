@@ -2591,6 +2591,26 @@ def cmd_gsc_report(args: argparse.Namespace) -> int:
             for s in sites:
                 print(f"     {s.get('siteUrl')} ({s.get('permissionLevel')})")
             return 0
+        if args.index_coverage:
+            # ★색인 커버리지 = 성장 병목 #1(DECISIONS JJ4)의 유일한 정확 측정.
+            # sitemap API의 indexed 필드는 구글이 폐기해 항상 0 → URL 검사 API로 URL마다 판정.
+            urls = gsc.sitemap_urls(PROJECT_ROOT / "build" / "site" / "sitemap.xml")
+            if not urls:
+                print(f"{FAIL} 로컬 sitemap.xml에서 URL을 못 읽음 — 빌드 산출물 확인")
+                return 1
+            cov = gsc.index_coverage(urls, site=args.site, limit=args.limit_urls)
+            pct = (cov["indexed"] / cov["checked"] * 100) if cov["checked"] else 0.0
+            print(
+                f"{OK} 색인 커버리지 {cov['indexed']}/{cov['checked']} ({pct:.0f}%)"
+                f" · 미색인 {cov['not_indexed']}"
+            )
+            for state, n in cov["by_state"].items():
+                print(f"     {state}: {n}건")
+            for u in cov["not_indexed_urls"]:
+                print(f"       미색인 {u}")
+            for err in cov["errors"]:
+                print(f"{WARN} {err}")
+            return 0
         rep = gsc.summary(days=args.days, site=args.site)
     except gsc.GscError as e:
         print(f"{FAIL} GSC 조회 실패: {e}")
@@ -2612,7 +2632,10 @@ def cmd_gsc_report(args: argparse.Namespace) -> int:
             f" · 순위 {b['position']:.1f}→{a['position']:.1f}"
         )
     for sm in rep.get("sitemaps") or []:
-        print(f"     sitemap {sm['path']}: 제출 {sm['submitted']} · 색인 {sm['indexed']}")
+        # 색인 수는 여기서 안 낸다 — sitemap API의 indexed는 폐기 필드(항상 0). --index-coverage 사용.
+        print(
+            f"     sitemap {sm['path']}: 제출 {sm['submitted']} · 마지막 읽음 {sm['last_read'][:10]}"
+        )
     n = max(0, int(args.limit))
     for title, key in (("상위 쿼리", "top_queries"), ("상위 페이지", "top_pages")):
         rows = (rep.get(key) or [])[:n]
@@ -4345,6 +4368,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_gsc.add_argument("--limit", type=int, default=10, help="상위 쿼리/페이지 표시 개수")
     p_gsc.add_argument(
         "--list-sites", action="store_true", help="서비스 계정 접근 가능 속성 나열(연동 검증)"
+    )
+    p_gsc.add_argument(
+        "--index-coverage",
+        action="store_true",
+        help="sitemap URL별 실제 색인 여부(URL 검사 API) — 성장 병목 #1 측정",
+    )
+    p_gsc.add_argument(
+        "--limit-urls", type=int, default=200, help="--index-coverage 검사 URL 상한(쿼터 보호)"
     )
     p_gsc.add_argument("--json", action="store_true", help="JSON 원본 출력(무인 세션 소비용)")
     p_gsc.set_defaults(func=cmd_gsc_report)

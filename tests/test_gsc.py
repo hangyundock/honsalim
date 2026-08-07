@@ -100,6 +100,94 @@ def test_site_url_env_override(monkeypatch):
     assert gsc.site_url() == gsc.DEFAULT_SITE_URL
 
 
+def test_inspect_url_normalizes_verdict():
+    s = FakeSession(
+        [
+            FakeResp(
+                {
+                    "inspectionResult": {
+                        "indexStatusResult": {
+                            "verdict": "PASS",
+                            "coverageState": "Submitted and indexed",
+                            "robotsTxtState": "ALLOWED",
+                            "lastCrawlTime": "2026-08-05T00:00:00Z",
+                        }
+                    }
+                }
+            )
+        ]
+    )
+    r = gsc.inspect_url("https://honsallim.com/", site="sc-domain:x", session=s)
+    assert r["verdict"] == "PASS" and r["coverage"] == "Submitted and indexed"
+    assert s.calls[0]["json"] == {
+        "inspectionUrl": "https://honsallim.com/",
+        "siteUrl": "sc-domain:x",
+    }
+    assert "/v1/urlInspection/index:inspect" in s.calls[0]["url"]
+
+
+def test_index_coverage_counts_and_isolates_errors():
+    def ok(v: str, cov: str) -> FakeResp:
+        return FakeResp(
+            {"inspectionResult": {"indexStatusResult": {"verdict": v, "coverageState": cov}}}
+        )
+
+    s = FakeSession(
+        [
+            ok("PASS", "Submitted and indexed"),
+            ok("NEUTRAL", "Crawled - currently not indexed"),
+            ok("NEUTRAL", "Discovered - currently not indexed"),
+            FakeResp({}, status_code=403),  # 한 건 실패해도 나머지는 집계된다
+        ]
+    )
+    cov = gsc.index_coverage(["u1", "u2", "u3", "u4"], site="sc-domain:x", session=s)
+    assert cov["checked"] == 3 and cov["indexed"] == 1 and cov["not_indexed"] == 2
+    assert cov["by_state"] == {
+        "Crawled - currently not indexed": 1,
+        "Discovered - currently not indexed": 1,
+    }
+    assert cov["not_indexed_urls"] == ["u2", "u3"]
+    assert len(cov["errors"]) == 1
+
+
+def test_sitemap_urls_parses_loc(tmp_path):
+    p = tmp_path / "sitemap.xml"
+    p.write_text(
+        "<urlset><url><loc>https://a/</loc></url>\n<url><loc>\n https://b/ \n</loc></url></urlset>",
+        encoding="utf-8",
+    )
+    assert gsc.sitemap_urls(p) == ["https://a/", "https://b/"]
+    assert gsc.sitemap_urls(tmp_path / "absent.xml") == []
+
+
+def test_summary_omits_deprecated_indexed_field(monkeypatch):
+    """★sitemap API의 indexed는 구글 폐기 필드(항상 0) — 요약에 담으면 거짓 '색인 0' 경보."""
+    days = [dt.date(2026, 8, 1) + dt.timedelta(days=i) for i in range(3)]
+    s = FakeSession(
+        [
+            FakeResp({"rows": [_row(d.isoformat(), 0, 1, 1.0) for d in days]}),
+            FakeResp({"rows": []}),
+            FakeResp({"rows": []}),
+            FakeResp(
+                {
+                    "sitemap": [
+                        {
+                            "path": "https://honsallim.com/sitemap.xml",
+                            "lastDownloaded": "2026-08-06T01:02:03Z",
+                            "contents": [{"submitted": "42", "indexed": "0"}],
+                        }
+                    ]
+                }
+            ),
+        ]
+    )
+    monkeypatch.setattr(gsc, "window", lambda d, today=None: (days[0], days[-1]))
+    rep = gsc.summary(days=3, site="sc-domain:x", session=s)
+    sm = rep["sitemaps"][0]
+    assert "indexed" not in sm
+    assert sm["submitted"] == 42 and sm["last_read"].startswith("2026-08-06")
+
+
 def test_summary_totals_trend_and_sitemaps(monkeypatch):
     # 14일 창: by_date 14행(전반 7일 노출 10·후반 7일 노출 20) → 추이 검증.
     days = [dt.date(2026, 7, 23) + dt.timedelta(days=i) for i in range(14)]
@@ -133,7 +221,7 @@ def test_summary_totals_trend_and_sitemaps(monkeypatch):
     assert rep["trend"]["last7"]["impressions"] == 140
     assert rep["trend"]["last7"]["position"] == 10.0
     assert rep["sitemaps"] == [
-        {"path": "https://honsallim.com/sitemap.xml", "submitted": 42, "indexed": 18}
+        {"path": "https://honsallim.com/sitemap.xml", "submitted": 42, "last_read": ""}
     ]
 
 

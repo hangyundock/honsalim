@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+import re
 import urllib.parse
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,7 @@ from common import config
 
 SCOPES = ["https://www.googleapis.com/auth/webmasters.readonly"]
 API_BASE = "https://searchconsole.googleapis.com/webmasters/v3"
+INSPECT_BASE = "https://searchconsole.googleapis.com/v1"  # URL 검사 API는 v1 (성과 API와 별개)
 
 ENV_KEY_PATH = "GSC_SERVICE_ACCOUNT_JSON"
 ENV_SITE_URL = "GSC_SITE_URL"
@@ -104,11 +106,81 @@ def list_sites(session: Any = None) -> list[dict[str, Any]]:
 
 
 def list_sitemaps(site: str | None = None, session: Any = None) -> list[dict[str, Any]]:
-    """제출된 sitemap 목록(제출/색인 수 포함) — 색인 커버리지 근사치."""
+    """제출된 sitemap 목록 — 제출 URL 수·마지막 읽은 시각.
+
+    ★``contents[].indexed``는 **쓰지 않는다**: 구글이 이 필드를 폐기해 항상 0을 반환한다
+    (라이브 실측 2026-08-07 — 실제 색인은 18인데 0으로 옴). 그대로 표시하면 무인 주간
+    보고가 매주 '색인 0'이라고 거짓 경보를 낸다. 실제 색인 수는 ``index_coverage()``
+    (URL 검사 API)로 URL마다 직접 판정한다.
+    """
     s = session or build_session()
     target = site or site_url()
     data = _check(s.get(f"{_site_path(target)}/sitemaps"), context="sitemaps.list")
     return [e for e in (data.get("sitemap") or []) if isinstance(e, dict)]
+
+
+def inspect_url(url: str, *, site: str | None = None, session: Any = None) -> dict[str, Any]:
+    """URL 검사 API — 이 URL이 실제로 색인됐는지 구글에 직접 묻는다.
+
+    반환: {url, verdict, coverage, robots, last_crawl, canonical}. verdict='PASS'가 색인됨.
+    쿼터: 속성당 하루 2,000회·분당 600회 — 우리 규모(수십 URL·주 1회)엔 여유.
+    """
+    s = session or build_session()
+    target = site or site_url()
+    payload = {"inspectionUrl": url, "siteUrl": target}
+    data = _check(
+        s.post(f"{INSPECT_BASE}/urlInspection/index:inspect", json=payload),
+        context=f"urlInspection({url})",
+    )
+    idx = (data.get("inspectionResult") or {}).get("indexStatusResult") or {}
+    return {
+        "url": url,
+        "verdict": idx.get("verdict") or "UNKNOWN",
+        "coverage": idx.get("coverageState") or "",
+        "robots": idx.get("robotsTxtState") or "",
+        "last_crawl": idx.get("lastCrawlTime") or "",
+        "canonical": idx.get("googleCanonical") or "",
+    }
+
+
+def index_coverage(
+    urls: list[str], *, site: str | None = None, session: Any = None, limit: int = 200
+) -> dict[str, Any]:
+    """URL 목록의 실제 색인 상태 집계 — 성장 병목 #1(색인 커버리지)의 자동 측정.
+
+    실패한 URL은 건너뛰고 계속한다(§0 실패 격리) — 한 건 오류로 전체 리포트를 잃지 않는다.
+    """
+    s = session or build_session()
+    target = site or site_url()
+    rows: list[dict[str, Any]] = []
+    errors: list[str] = []
+    for u in urls[: max(0, limit)]:
+        try:
+            rows.append(inspect_url(u, site=target, session=s))
+        except GscError as e:
+            # URL 한 건 실패로 전체 리포트를 잃지 않는다 — 루프 안 try가 격리의 목적.
+            errors.append(f"{u}: {e}")
+    indexed = [r for r in rows if r["verdict"] == "PASS"]
+    by_state: dict[str, int] = {}
+    for r in rows:
+        if r["verdict"] != "PASS":
+            by_state[r["coverage"] or "?"] = by_state.get(r["coverage"] or "?", 0) + 1
+    return {
+        "checked": len(rows),
+        "indexed": len(indexed),
+        "not_indexed": len(rows) - len(indexed),
+        "by_state": dict(sorted(by_state.items(), key=lambda kv: -kv[1])),
+        "not_indexed_urls": [r["url"] for r in rows if r["verdict"] != "PASS"],
+        "errors": errors,
+    }
+
+
+def sitemap_urls(path: Path) -> list[str]:
+    """로컬 빌드 sitemap.xml에서 URL 추출 — 검사 대상 목록(라이브 재조회 불요)."""
+    if not path.exists():
+        return []
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", text)
 
 
 def query(
@@ -206,7 +278,8 @@ def summary(
             {
                 "path": sm.get("path"),
                 "submitted": sum(int(c.get("submitted") or 0) for c in (sm.get("contents") or [])),
-                "indexed": sum(int(c.get("indexed") or 0) for c in (sm.get("contents") or [])),
+                "last_read": sm.get("lastDownloaded") or "",
+                # ★'indexed'는 담지 않는다 — 구글 폐기 필드(항상 0)라 거짓 경보원. index_coverage() 사용.
             }
             for sm in list_sitemaps(site=target, session=s)
         ]
