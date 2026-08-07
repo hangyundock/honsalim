@@ -2720,13 +2720,18 @@ def cmd_gsc_queries(args: argparse.Namespace) -> int:
         for entry in seo_keywords.load_all().values():
             seeds.add(str(entry.get("primary") or ""))
             seeds.update(str(s) for s in (entry.get("secondary") or []))
-        seed_ns = {"".join(s.split()) for s in seeds if s}
+        # 커버 판정은 gsc_store 단일 소스 — 표시와 후보 추출이 어긋나지 않게 한다.
+        seed_ns = {gsc_store.normalize(s) for s in seeds if s}
+        n_new = 0
         for r in rows:
-            mark = "" if "".join(r["query"].split()) in seed_ns else "  ← 씨앗에 없음"
+            covered = gsc_store.is_covered_by_seeds(r["query"], seed_ns)
+            n_new += 0 if covered else 1
             print(
                 f"     {r['query']} — 최대노출 {r['peak_impressions']}"
-                f" · 최고 {r['best_position']:.1f}위 · 관측 {r['windows']}창{mark}"
+                f" · 최고 {r['best_position']:.1f}위 · 관측 {r['windows']}창"
+                + ("" if covered else "  ← ★씨앗 미커버(보강 후보)")
             )
+        print(f"     — 표시 {len(rows)}개 중 씨앗 미커버 {n_new}개")
     finally:
         conn.close()
     return 0

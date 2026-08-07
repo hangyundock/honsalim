@@ -123,20 +123,36 @@ def stats(conn: sqlite3.Connection) -> dict[str, Any]:
     }
 
 
+def normalize(text: str) -> str:
+    """비교용 정규화 — 공백 제거 + 소문자. 구글은 'tpu 도마 추천'처럼 띄어 검색한다."""
+    return "".join(str(text or "").split()).lower()
+
+
+def is_covered_by_seeds(query: str, seeds_ns: set[str]) -> bool:
+    """이 쿼리를 기존 씨앗이 이미 커버하는가.
+
+    ★정확 일치로 보면 안 된다: 한국어 검색은 '~추천'을 붙이는 일이 흔해서, 씨앗 '서재책상'이
+    있는데도 '서재 책상 추천'이 매번 '새 후보'로 잡힌다(라이브 실측 — 9개 쿼리 전부 오검출).
+    그런 근친 변형은 등재 금지 대상이므로(DECISIONS JJ3) 후보에서 빼는 게 맞다.
+    → **포함 관계**로 판정한다: 씨앗이 쿼리에 들어 있거나(서재책상 ⊂ 서재책상추천) 그 반대면 커버됨.
+    """
+    q = normalize(query)
+    if not q:
+        return True  # 빈 쿼리는 후보가 아니다
+    return any(s and (s in q or q in s) for s in seeds_ns)
+
+
 def unmapped_candidates(
     conn: sqlite3.Connection, seed_terms: set[str], *, limit: int = 30
 ) -> list[dict[str, Any]]:
-    """씨앗에 없는 실수요 쿼리 — 씨앗 보강 후보(구글 실측 기반).
+    """어떤 씨앗도 커버하지 않는 실수요 쿼리 — 씨앗 보강 후보(구글 실측 기반).
 
-    비교는 공백 제거로만 한다(구글은 '나무 도마'/'나무도마'를 같은 의도로 다루지만 우리
-    ``resolve_category``는 정확 매칭이라, 공백 변형이 씨앗에 없으면 '새 후보'로 잡힌다).
-    ★자동 등재하지 않는다 — 후보 제시까지만(DECISIONS JJ3 근친 변형 금지 판단은 사람 몫).
+    ★자동 등재하지 않는다 — 후보 제시까지만(JJ3 근친 변형 금지·컨셉 정합 판단은 사람 몫).
     """
-    seeds = {"".join(s.split()) for s in seed_terms}
+    seeds_ns = {normalize(s) for s in seed_terms if s}
     out = []
     for row in dictionary(conn, limit=limit * 4):
-        norm = "".join(row["query"].split())
-        if norm in seeds:
+        if is_covered_by_seeds(row["query"], seeds_ns):
             continue
         out.append(row)
         if len(out) >= limit:

@@ -145,3 +145,28 @@ def test_unmapped_candidates_ignores_spacing(conn):
     gsc_store.save_rows(conn, [_row("나무 도마", 9), _row("접이식 도마", 4)], **w)
     got = gsc_store.unmapped_candidates(conn, {"나무도마", "스텐도마"})
     assert [x["query"] for x in got] == ["접이식 도마"]
+
+
+def test_unmapped_candidates_excludes_recommend_suffix(conn):
+    """★라이브 적발: 씨앗 '서재책상'이 있는데 '서재 책상 추천'이 새 후보로 잡히던 오검출.
+
+    한국어 검색은 '~추천'을 붙이는 일이 흔하고, 그런 근친 변형은 등재 금지(JJ3)라 후보가 아니다.
+    """
+    w = {"period_start": "s", "period_end": "e"}
+    gsc_store.save_rows(
+        conn,
+        [_row("서재 책상 추천", 7), _row("고등학생 자취", 5), _row("인체 공학 의자", 3)],
+        **w,
+    )
+    got = [x["query"] for x in gsc_store.unmapped_candidates(conn, {"서재책상", "사무용 의자"})]
+    assert "서재 책상 추천" not in got  # 씨앗이 부분문자열로 커버
+    assert got == ["고등학생 자취", "인체 공학 의자"]
+
+
+def test_is_covered_by_seeds_both_directions():
+    seeds = {gsc_store.normalize(s) for s in ("서재책상", "TPU도마")}
+    assert gsc_store.is_covered_by_seeds("서재 책상 추천", seeds)  # 씨앗 ⊂ 쿼리
+    assert gsc_store.is_covered_by_seeds("tpu도마", seeds)  # 대소문자 무시
+    assert gsc_store.is_covered_by_seeds("도마", {gsc_store.normalize("TPU도마")})  # 쿼리 ⊂ 씨앗
+    assert not gsc_store.is_covered_by_seeds("고등학생 자취", seeds)
+    assert gsc_store.is_covered_by_seeds("   ", seeds)  # 빈 쿼리는 후보 아님
