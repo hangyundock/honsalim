@@ -277,6 +277,8 @@ def _check_phase2_modules() -> bool:
         ("collector.aliexpress", "query_products"),
         ("collector.aliexpress", "map_product"),
         ("collector.naver_searchad", "fetch_related_keywords"),
+        ("tracker.gsc", "summary"),
+        ("tracker.gsc", "query"),
         ("collector.product_filter", "is_relevant"),
         ("collector.keyword_relevance", "filter_products"),
         ("collector.category_collect", "collect_category"),
@@ -2566,6 +2568,65 @@ def cmd_keyword_add(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_gsc_report(args: argparse.Namespace) -> int:
+    """구글 서치콘솔 검색 성과 리포트 (read-only·무료) — 세션 #52 신설.
+
+    순위·노출·클릭을 스크린샷 없이 코드로 읽는다(주간 무인 운영 세션의 데이터 소스).
+    --list-sites = 연동 검증(서비스 계정이 보는 속성 나열). --json = 무인 소비용 원본.
+    """
+    import json as _json
+
+    from tracker import gsc
+
+    config.load_secrets()  # ★서비스 계정 경로/속성 오버라이드(gsc.env) — load_secrets 선행 규칙
+    try:
+        if args.list_sites:
+            sites = gsc.list_sites()
+            if not sites:
+                print(
+                    f"{WARN} 접근 가능한 속성 0개 — 서치콘솔 '사용자 및 권한'에 서비스 계정 추가 필요"
+                )
+                return 1
+            print(f"{OK} 서비스 계정 접근 속성 {len(sites)}개:")
+            for s in sites:
+                print(f"     {s.get('siteUrl')} ({s.get('permissionLevel')})")
+            return 0
+        rep = gsc.summary(days=args.days, site=args.site)
+    except gsc.GscError as e:
+        print(f"{FAIL} GSC 조회 실패: {e}")
+        return 1
+    if args.json:
+        print(_json.dumps(rep, ensure_ascii=False, indent=2))
+        return 0
+    t = rep["totals"]
+    print(f"{OK} GSC {rep['start']}~{rep['end']} ({rep['days']}일·{rep['site']})")
+    print(
+        f"     노출 {t['impressions']:.0f} · 클릭 {t['clicks']:.0f}"
+        f" · CTR {t['ctr'] * 100:.1f}% · 평균 {t['position']:.1f}위"
+    )
+    if rep.get("trend"):
+        a, b = rep["trend"]["last7"], rep["trend"]["prev7"]
+        print(
+            f"     추이(최근7 vs 이전7): 노출 {b['impressions']:.0f}→{a['impressions']:.0f}"
+            f" · 클릭 {b['clicks']:.0f}→{a['clicks']:.0f}"
+            f" · 순위 {b['position']:.1f}→{a['position']:.1f}"
+        )
+    for sm in rep.get("sitemaps") or []:
+        print(f"     sitemap {sm['path']}: 제출 {sm['submitted']} · 색인 {sm['indexed']}")
+    n = max(0, int(args.limit))
+    for title, key in (("상위 쿼리", "top_queries"), ("상위 페이지", "top_pages")):
+        rows = (rep.get(key) or [])[:n]
+        if rows:
+            print(f"     {title}:")
+            for r in rows:
+                label = r["keys"][0] if r["keys"] else "?"
+                print(
+                    f"       {label} — 노출 {r['impressions']} · 클릭 {r['clicks']}"
+                    f" · {r['position']:.1f}위"
+                )
+    return 0
+
+
 def cmd_keyword_recommend(args: argparse.Namespace) -> int:
     """추천 키워드 생성(검색량순) — 정의된 선정 방식(keyword_research)을 SEO 씨앗에 적용.
 
@@ -4274,6 +4335,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--add-top", action="store_true", help="1순위를 큐에 추가 (status=pending)"
     )
     p_kw_rec.set_defaults(func=cmd_keyword_recommend)
+
+    p_gsc = sub.add_parser(
+        "gsc-report",
+        help="구글 서치콘솔 검색 성과 (노출·클릭·순위·색인 추이) — read-only·무료",
+    )
+    p_gsc.add_argument("--days", type=int, default=28, help="조회 기간(일·기본 28)")
+    p_gsc.add_argument("--site", type=str, default=None, help="속성 URL 오버라이드")
+    p_gsc.add_argument("--limit", type=int, default=10, help="상위 쿼리/페이지 표시 개수")
+    p_gsc.add_argument(
+        "--list-sites", action="store_true", help="서비스 계정 접근 가능 속성 나열(연동 검증)"
+    )
+    p_gsc.add_argument("--json", action="store_true", help="JSON 원본 출력(무인 세션 소비용)")
+    p_gsc.set_defaults(func=cmd_gsc_report)
 
     p_reject = sub.add_parser("reject", help="draft → rejected (반려)")
     p_reject.add_argument("--draft", type=int, required=True, help="draft id")
