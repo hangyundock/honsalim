@@ -276,29 +276,88 @@ class RecommendDialog(QDialog):
     추천 생성(네이버 조회)은 부모의 백그라운드 작업에서 끝낸 뒤 결과만 넘겨받는다(UI 비프리징).
     """
 
-    def __init__(self, recs: list[dict[str, Any]], parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        recs: list[dict[str, Any]],
+        parent: QWidget | None = None,
+        cluster_counts: dict[str, int] | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("추천 키워드 — 선택")
-        self.resize(640, 480)
-        self.recs = recs
+        self.resize(720, 520)
+        self.all_recs = recs
+        self.cluster_counts = cluster_counts or {}
+        self.recs: list[dict[str, Any]] = []
         self._choices: list[dict[str, Any]] = []
         lay = QVBoxLayout(self)
         info = QLabel(
-            "검색량순 추천입니다. 맨 앞 체크박스로 여러 개를 한꺼번에 고른 뒤 "
-            "'체크한 키워드 추가'를 누르세요(행을 클릭해도 체크됩니다).\n"
-            "(월검색량=네이버 실데이터 · '캐시'=검색량 미상 보조키워드)\n"
-            "★'발행' 칸이 ✅가 아니면 글을 만들어도 자동 승인이 보류돼 그날 발행이 0편이 됩니다 "
-            "— 검색량이 높아도 먼저 seo_keywords.yml에 매핑하세요."
+            "★위에서부터 고르면 됩니다 — 지금 넣기 좋은 순서로 정렬돼 있습니다"
+            "(발행 가능 → 글이 적은 묶음 → 점수순).\n"
+            "맨 앞 체크박스로 여러 개를 한꺼번에 고른 뒤 '체크한 키워드 추가'를 누르세요"
+            "(행을 클릭해도 체크됩니다).\n"
+            "발행 불가(씨앗 미매핑)와 이미 글이 많은 묶음은 기본으로 숨겨집니다 "
+            "— 아래 체크박스로 펼칠 수 있습니다."
         )
         info.setStyleSheet("color:#555;")
         info.setWordWrap(True)
         lay.addWidget(info)
+        # 기본 숨김 토글 — 숨김은 '차단'이 아니라 기본값일 뿐(주인 결정권 유지).
+        opt = QHBoxLayout()
+        self.cb_unpub = QCheckBox("발행 불가도 보기")
+        self.cb_sat = QCheckBox("글 많은 묶음도 보기")
+        self.cb_unpub.stateChanged.connect(self._refill)
+        self.cb_sat.stateChanged.connect(self._refill)
+        opt.addWidget(self.cb_unpub)
+        opt.addWidget(self.cb_sat)
+        opt.addStretch(1)
+        lay.addLayout(opt)
+        self.lbl_summary = QLabel("")
+        self.lbl_summary.setStyleSheet("color:#333;")
+        lay.addWidget(self.lbl_summary)
         # 맨 앞 체크박스 컬럼 — 여러 키워드를 한 번에 골라 일괄 등록(#38 주인 요청).
         # '발행' 칸(#49) — 미매핑·비공개 카테고리를 **고르기 전에** 보여준다.
-        self.table = _read_only_table(["✓", "키워드", "월검색량", "경쟁도", "발행", "씨앗", "출처"])
+        # '묶음' 칸(#52) — 그 주제에 글이 몇 편인지·포화인지를 운영자가 판단하지 않아도 보이게.
+        self.table = _read_only_table(
+            ["✓", "키워드", "월검색량", "경쟁도", "발행", "묶음", "씨앗", "출처"]
+        )
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.table.setRowCount(len(recs))
-        for i, r in enumerate(recs):
+        # 키워드 등 다른 칸을 클릭해도 그 행 체크가 토글되게(체크박스 칸을 정확히 안 눌러도 편하게).
+        self.table.cellClicked.connect(self._toggle_row)
+        lay.addWidget(self.table, 1)
+        self._refill()
+        bar = QHBoxLayout()
+        b_all = QPushButton("전체 선택")
+        b_all.clicked.connect(lambda: self._set_all(Qt.Checked))
+        b_none = QPushButton("전체 해제")
+        b_none.clicked.connect(lambda: self._set_all(Qt.Unchecked))
+        b_sel = QPushButton("✅ 체크한 키워드 추가")
+        b_sel.clicked.connect(self._choose_selected)
+        b_top = QPushButton("⭐ 1순위만 추가")
+        b_top.clicked.connect(self._choose_top)
+        b_cancel = QPushButton("취소")
+        b_cancel.clicked.connect(self.reject)
+        bar.addWidget(b_all)
+        bar.addWidget(b_none)
+        bar.addStretch(1)
+        bar.addWidget(b_sel)
+        bar.addWidget(b_top)
+        bar.addWidget(b_cancel)
+        lay.addLayout(bar)
+
+    def _refill(self) -> None:
+        """토글 상태에 맞춰 표를 다시 채운다 — 정렬·숨김 판정은 writer.cluster_balance가 한다."""
+        from writer import cluster_balance as cb
+
+        prepared = cb.prepare(
+            self.all_recs,
+            self.cluster_counts,
+            show_unpublishable=self.cb_unpub.isChecked(),
+            show_saturated=self.cb_sat.isChecked(),
+        )
+        self.recs = prepared["rows"]
+        self.lbl_summary.setText(cb.summary_line(prepared))
+        self.table.setRowCount(len(self.recs))
+        for i, r in enumerate(self.recs):
             vol = f"{r['volume']:,}" if r.get("volume") is not None else "—"
             src = "네이버" if r.get("source") == "naver" else "캐시"
             chk = QTableWidgetItem()
@@ -318,29 +377,15 @@ class RecommendDialog(QDialog):
             else:
                 pub = "—"
             self.table.setItem(i, 4, _cell(pub))
-            self.table.setItem(i, 5, _cell(str(r.get("seed") or "")))
-            self.table.setItem(i, 6, _cell(src))
-        # 키워드 등 다른 칸을 클릭해도 그 행 체크가 토글되게(체크박스 칸을 정확히 안 눌러도 편하게).
-        self.table.cellClicked.connect(self._toggle_row)
-        lay.addWidget(self.table, 1)
-        bar = QHBoxLayout()
-        b_all = QPushButton("전체 선택")
-        b_all.clicked.connect(lambda: self._set_all(Qt.Checked))
-        b_none = QPushButton("전체 해제")
-        b_none.clicked.connect(lambda: self._set_all(Qt.Unchecked))
-        b_sel = QPushButton("✅ 체크한 키워드 추가")
-        b_sel.clicked.connect(self._choose_selected)
-        b_top = QPushButton("⭐ 1순위만 추가")
-        b_top.clicked.connect(self._choose_top)
-        b_cancel = QPushButton("취소")
-        b_cancel.clicked.connect(self.reject)
-        bar.addWidget(b_all)
-        bar.addWidget(b_none)
-        bar.addStretch(1)
-        bar.addWidget(b_sel)
-        bar.addWidget(b_top)
-        bar.addWidget(b_cancel)
-        lay.addLayout(bar)
+            cluster = r.get("cluster")
+            if cluster:
+                mark = " ⚠많음" if r.get("saturated") else ""
+                cell = f"{cluster} {r.get('cluster_count', 0)}편{mark}"
+            else:
+                cell = "—"
+            self.table.setItem(i, 5, _cell(cell))
+            self.table.setItem(i, 6, _cell(str(r.get("seed") or "")))
+            self.table.setItem(i, 7, _cell(src))
 
     def _toggle_row(self, row: int, col: int) -> None:
         if col == 0:
@@ -374,7 +419,29 @@ class RecommendDialog(QDialog):
         self.accept()
 
     def _choose_top(self) -> None:
-        self._choices = [self.recs[0]] if self.recs else []
+        """★#52: 정렬이 '발행 가능 → 글 적은 묶음 → 점수'라 self.recs[0]이 곧 최선의 후보다.
+
+        옛 정렬(검색량순)에선 맨 위가 미매핑인 경우가 많아 이 버튼이 발행 불가 키워드를 큐에
+        넣는 함정이었다(#49 '32인치모니터암' 사고와 같은 경로). 그래도 사람이 토글로 발행 불가를
+        펼쳐 둔 상태일 수 있으니, 맨 위가 발행 불가면 **막지 않고 확인만** 받는다(§2-마).
+        """
+        if not self.recs:
+            self._choices = []
+            self.accept()
+            return
+        top = self.recs[0]
+        if top.get("publishable") is False:
+            ans = QMessageBox.question(
+                self,
+                "발행 불가 키워드",
+                f"'{top.get('keyword')}'는 씨앗에 매핑되지 않아 글을 만들어도 "
+                "자동 승인이 보류됩니다(그날 발행 0편).\n그래도 추가할까요?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if ans != QMessageBox.Yes:
+                return
+        self._choices = [top]
         self.accept()
 
     def chosen_list(self) -> list[dict[str, Any]]:
@@ -1281,13 +1348,17 @@ class DashboardWindow(QMainWindow):
         def task() -> list[dict[str, Any]]:
             from collector import keyword_relevance
             from common import config
+            from writer import cluster_balance
             from writer import keyword_recommender as kr
 
             config.load_secrets()  # 네이버 검색광고 키
             print("[추천] 네이버 연관검색어 조회 중…")
             conn = db.connect(db.DB_PATH)
             try:
-                recs = kr.recommend(conn, custom_seed=custom, limit=30, live=True)
+                # ★#52: 30 → 80. 발행 불가·포화를 숨기면 30건 중 1건만 남는 일이 생긴다
+                # (라이브 실측: 30건 중 29건 숨김 → 화면 1줄). 네이버 호출은 씨앗 단위라
+                # limit을 키워도 호출 수·소요 시간이 같다(실측 2.4초 → 2.0초).
+                recs = kr.recommend(conn, custom_seed=custom, limit=80, live=True)
                 # ★세션 #49: 고르기 전에 '자동발행 가능'을 함께 보여준다(선택 창 '발행' 칸).
                 # 검색량만 보고 고르면 미매핑 키워드가 큐에 들어가 며칠 뒤 LLM 비용을 쓴 뒤
                 # 'unmapped 보류'로 그날 발행 0편이 된다(#49 '32인치모니터암' 실제 사례).
@@ -1296,25 +1367,34 @@ class DashboardWindow(QMainWindow):
                     _ok, code = keyword_relevance.publishability(str(r.get("keyword") or ""), conn)
                     r["publishable"] = _ok
                     r["publishable_code"] = code
+                # ★세션 #52: 클러스터 편수도 여기서 세어 넘긴다 — 운영자가 "이 주제가 이미
+                # 포화인가"를 머리로 판단하지 않게(주인 지적). DB 접근은 백그라운드에서 끝낸다.
+                counts = cluster_balance.published_counts(conn)
             finally:
                 conn.close()
             n_block = sum(1 for r in recs if not r.get("publishable"))
             print(f"[추천] 후보 {len(recs)}건 (자동발행 불가 {n_block}건 — 선택 창 '발행' 칸 확인)")
-            return recs
+            return {"recs": recs, "counts": counts}
 
         self.run_task(task, on_done=self._after_recommend, label="추천 키워드 조회")
 
     def _after_recommend(self, ok: bool, result: Any) -> None:
         if not ok:
             return  # 오류는 run_task가 이미 로그/경고
-        if not isinstance(result, list) or not result:
+        # #52부터 {recs, counts} — 옛 형식(list)도 받아 준다(하위 호환).
+        if isinstance(result, dict):
+            recs = result.get("recs") or []
+            counts = result.get("counts") or {}
+        else:
+            recs, counts = (result or []), {}
+        if not isinstance(recs, list) or not recs:
             QMessageBox.information(
                 self,
                 "추천 없음",
                 "추천 키워드가 없습니다. 주제어를 바꾸거나 네이버 키를 확인하세요.",
             )
             return
-        dlg = RecommendDialog(result, self)
+        dlg = RecommendDialog(recs, self, cluster_counts=counts)
         if dlg.exec_() != QDialog.Accepted:
             return
         chosen = dlg.chosen_list()
